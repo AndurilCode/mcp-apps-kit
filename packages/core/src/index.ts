@@ -46,7 +46,7 @@ export type {
 export type { CSPConfig, UIDef, UIDefs } from "./types/ui";
 
 // Config types
-export type { AuthConfig, CORSConfig, GlobalConfig, AppConfig } from "./types/config";
+export type { Protocol, AuthConfig, CORSConfig, GlobalConfig, AppConfig } from "./types/config";
 
 // =============================================================================
 // UTILITY EXPORTS

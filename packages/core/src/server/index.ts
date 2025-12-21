@@ -14,12 +14,12 @@ import type { Server } from "http";
 import type { z } from "zod";
 
 import type { ToolDefs, StartOptions, ExpressMiddleware } from "../types/tools";
-import type { AppConfig, CORSConfig } from "../types/config";
+import type { AppConfig, CORSConfig, Protocol } from "../types/config";
 import type { UIDefs, UIDef } from "../types/ui";
 import { zodToJsonSchema } from "../utils/schema";
 import { wrapError } from "../utils/errors";
-import { mapVisibilityToMcp } from "../utils/metadata";
-import { generateMcpCSPMetadata } from "../utils/csp";
+import { mapVisibilityToMcp, mapVisibilityToOpenAI } from "../utils/metadata";
+import { generateMcpCSPMetadata, generateOpenAICSPMetadata } from "../utils/csp";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -50,6 +50,9 @@ export interface ServerInstance {
 export function createServerInstance<T extends ToolDefs>(
   config: AppConfig<T>
 ): ServerInstance {
+  // Get protocol from config (default to MCP)
+  const protocol: Protocol = config.config?.protocol ?? "mcp";
+
   // Create MCP server
   const mcpServer = new McpServer({
     name: config.name,
@@ -57,11 +60,11 @@ export function createServerInstance<T extends ToolDefs>(
   });
 
   // Register tools with MCP server
-  registerTools(mcpServer, config.tools);
+  registerTools(mcpServer, config.tools, protocol);
 
   // Register UI resources with MCP server
   if (config.ui) {
-    registerUIResources(mcpServer, config.name, config.ui);
+    registerUIResources(mcpServer, config.name, config.ui, protocol);
   }
 
   // Create Express app
@@ -306,21 +309,42 @@ export function createServerInstance<T extends ToolDefs>(
  */
 function registerTools(
   mcpServer: McpServer,
-  tools: ToolDefs
+  tools: ToolDefs,
+  protocol: Protocol
 ): void {
   for (const [name, toolDef] of Object.entries(tools)) {
     // Convert Zod schema to JSON Schema for MCP
     const inputSchema = zodToJsonSchema(toolDef.input);
 
-    // Build annotations with visibility and UI binding
-    const visibilityAnnotations = mapVisibilityToMcp(toolDef.visibility);
-    const annotations: Record<string, unknown> = {
-      ...visibilityAnnotations,
-    };
+    // Build annotations based on protocol
+    const annotations: Record<string, unknown> = {};
 
-    // Add UI binding if specified
-    if (toolDef.ui) {
-      annotations.ui = toolDef.ui;
+    if (protocol === "openai") {
+      // OpenAI protocol: use invokableByAI/invokableByApp format
+      const visibilitySettings = mapVisibilityToOpenAI(toolDef.visibility);
+      Object.assign(annotations, visibilitySettings);
+
+      // Add UI binding with OpenAI prefix if specified
+      if (toolDef.ui) {
+        annotations["openai/outputTemplate"] = toolDef.ui;
+      }
+
+      // Add invoking/invoked messages (ChatGPT-specific)
+      if (toolDef.invokingMessage) {
+        annotations.invokingMessage = toolDef.invokingMessage;
+      }
+      if (toolDef.invokedMessage) {
+        annotations.invokedMessage = toolDef.invokedMessage;
+      }
+    } else {
+      // MCP protocol: use readOnlyHint/appOnly format
+      const visibilityAnnotations = mapVisibilityToMcp(toolDef.visibility);
+      Object.assign(annotations, visibilityAnnotations);
+
+      // Add UI binding if specified
+      if (toolDef.ui) {
+        annotations.ui = toolDef.ui;
+      }
     }
 
     // Register tool with MCP server using new registerTool API
@@ -396,44 +420,79 @@ function applyCors(app: Express, config: CORSConfig): void {
 /**
  * Register UI resources with the MCP server
  *
- * Registers each UI resource as an MCP resource with:
+ * Registers each UI resource as an MCP resource with protocol-specific metadata:
+ *
+ * MCP protocol:
  * - URI format: ui://{serverName}/{resourceKey}
  * - MIME type: text/html;profile=mcp-app
- * - CSP metadata in _meta.ui.csp
+ * - CSP metadata in _meta.ui.csp (camelCase)
+ *
+ * OpenAI protocol:
+ * - URI format: ui://{serverName}/{resourceKey}
+ * - MIME type: text/html;profile=chatgpt-widget
+ * - CSP metadata in _meta["openai/widgetCSP"] (snake_case)
  */
 function registerUIResources(
   mcpServer: McpServer,
   serverName: string,
-  ui: UIDefs
+  ui: UIDefs,
+  protocol: Protocol
 ): void {
   for (const [key, uiDef] of Object.entries(ui)) {
     const uri = `ui://${serverName}/${key}`;
 
-    // Build resource metadata
+    // Build resource metadata based on protocol
     const metadata: Record<string, unknown> = {
-      mimeType: "text/html;profile=mcp-app",
+      mimeType: protocol === "openai"
+        ? "text/html;profile=chatgpt-widget"
+        : "text/html;profile=mcp-app",
     };
 
     if (uiDef.description) {
       metadata.description = uiDef.description;
     }
 
-    // Build _meta with UI-specific properties
-    const uiMeta: Record<string, unknown> = {};
+    // Build _meta with protocol-specific structure
+    if (protocol === "openai") {
+      // OpenAI protocol: use snake_case and openai/ prefixes
+      const metaObj: Record<string, unknown> = {};
 
-    if (uiDef.csp) {
-      const cspMetadata = generateMcpCSPMetadata(uiDef.csp);
-      if (Object.keys(cspMetadata).length > 0) {
-        uiMeta.csp = cspMetadata;
+      if (uiDef.csp) {
+        const cspMetadata = generateOpenAICSPMetadata(uiDef.csp);
+        if (Object.keys(cspMetadata).length > 0) {
+          metaObj["openai/widgetCSP"] = cspMetadata;
+        }
       }
-    }
 
-    if (uiDef.prefersBorder !== undefined) {
-      uiMeta.prefersBorder = uiDef.prefersBorder;
-    }
+      if (uiDef.prefersBorder !== undefined) {
+        metaObj.prefersBorder = uiDef.prefersBorder;
+      }
 
-    if (Object.keys(uiMeta).length > 0) {
-      metadata._meta = { ui: uiMeta };
+      if (uiDef.domain) {
+        metaObj.domain = uiDef.domain;
+      }
+
+      if (Object.keys(metaObj).length > 0) {
+        metadata._meta = metaObj;
+      }
+    } else {
+      // MCP protocol: use camelCase in _meta.ui namespace
+      const uiMeta: Record<string, unknown> = {};
+
+      if (uiDef.csp) {
+        const cspMetadata = generateMcpCSPMetadata(uiDef.csp);
+        if (Object.keys(cspMetadata).length > 0) {
+          uiMeta.csp = cspMetadata;
+        }
+      }
+
+      if (uiDef.prefersBorder !== undefined) {
+        uiMeta.prefersBorder = uiDef.prefersBorder;
+      }
+
+      if (Object.keys(uiMeta).length > 0) {
+        metadata._meta = { ui: uiMeta };
+      }
     }
 
     // Register the resource

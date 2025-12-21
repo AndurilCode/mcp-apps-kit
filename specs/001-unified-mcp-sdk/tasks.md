@@ -217,17 +217,17 @@ Based on plan.md structure:
 
 ### Tests for User Story 6
 
-- [ ] T084 [P] [US6] Unit test for CSP metadata generation in `packages/core/tests/unit/csp.test.ts`
-- [ ] T085 [P] [US6] Unit test for HTML resource loading in `packages/core/tests/unit/resources.test.ts`
+- [X] T084 [P] [US6] Unit test for CSP metadata generation in `packages/core/tests/unit/csp.test.ts`
+- [X] T085 [P] [US6] Unit test for HTML resource loading in `packages/core/tests/unit/ui-resources.test.ts`
 
 ### Implementation for User Story 6
 
-- [ ] T086 [US6] Implement CSP mapping for MCP Apps in `packages/core/src/adapters/mcp.ts`
-- [ ] T087 [US6] Implement CSP mapping for ChatGPT Apps in `packages/core/src/adapters/openai.ts`
-- [ ] T088 [US6] Implement UI resource registration with file path resolution in `packages/core/src/createApp.ts`
-- [ ] T089 [US6] Implement inline HTML string support for UI resources in `packages/core/src/createApp.ts`
-- [ ] T090 [US6] Implement prefersBorder and domain metadata in `packages/core/src/adapters/mcp.ts`
-- [ ] T091 [US6] Implement prefersBorder and domain metadata in `packages/core/src/adapters/openai.ts`
+- [X] T086 [US6] Implement CSP mapping for MCP Apps in `packages/core/src/utils/csp.ts`
+- [X] T087 [US6] Implement CSP mapping for ChatGPT Apps in `packages/core/src/utils/csp.ts`
+- [X] T088 [US6] Implement UI resource registration with file path resolution in `packages/core/src/server/index.ts`
+- [X] T089 [US6] Implement inline HTML string support for UI resources in `packages/core/src/server/index.ts`
+- [X] T090 [US6] Implement prefersBorder and domain metadata in `packages/core/src/utils/csp.ts`
+- [X] T091 [US6] Implement prefersBorder and domain metadata in `packages/core/src/utils/csp.ts`
 
 **Checkpoint**: CSP and UI resources working - widgets can safely connect to external APIs
 
@@ -241,15 +241,15 @@ Based on plan.md structure:
 
 ### Tests for User Story 7
 
-- [ ] T092 [P] [US7] Integration test for app.handler() in `packages/core/tests/integration/middleware.test.ts`
-- [ ] T093 [P] [US7] Integration test for app.handleRequest() in `packages/core/tests/integration/serverless.test.ts`
+- [X] T092 [P] [US7] Integration test for app.handler() in `packages/core/tests/unit/express.test.ts`
+- [X] T093 [P] [US7] Integration test for app.handleRequest() in `packages/core/tests/unit/express.test.ts`
 
 ### Implementation for User Story 7
 
-- [ ] T094 [US7] Implement app.handler() Express middleware in `packages/core/src/server/express.ts`
-- [ ] T095 [US7] Implement app.handleRequest() serverless handler in `packages/core/src/server/serverless.ts`
-- [ ] T096 [US7] Ensure stateless request handling for serverless in `packages/core/src/server/serverless.ts`
-- [ ] T097 [US7] Add deployment documentation examples in `docs/DEPLOYMENT.md`
+- [X] T094 [US7] Implement app.handler() Express middleware in `packages/core/src/server/index.ts`
+- [X] T095 [US7] Implement app.handleRequest() serverless handler in `packages/core/src/server/index.ts`
+- [X] T096 [US7] Ensure stateless request handling for serverless in `packages/core/src/server/index.ts`
+- [X] T097 [US7] Add deployment documentation examples in `docs/DEPLOYMENT.md`
 
 **Checkpoint**: All deployment options working - Express, middleware, serverless
 

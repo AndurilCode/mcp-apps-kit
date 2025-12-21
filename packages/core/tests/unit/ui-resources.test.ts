@@ -222,4 +222,115 @@ describe("UI Resource Registration", () => {
       expect(app.ui!.widget.domain).toBe("widget.example.com");
     });
   });
+
+  describe("protocol configuration", () => {
+    it("should default to MCP protocol when not specified", () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {
+          test: {
+            description: "Test tool",
+            input: z.object({}),
+            output: z.object({}),
+            handler: async () => ({}),
+          },
+        },
+      });
+
+      // App should be created successfully with default MCP protocol
+      expect(app).toBeDefined();
+      expect(app.tools.test).toBeDefined();
+    });
+
+    it("should accept MCP protocol configuration", () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {
+          test: {
+            description: "Test tool",
+            input: z.object({}),
+            output: z.object({}),
+            handler: async () => ({}),
+            ui: "widget",
+          },
+        },
+        ui: {
+          widget: {
+            html: "<div>Widget</div>",
+            csp: {
+              connectDomains: ["https://api.example.com"],
+            },
+          },
+        },
+        config: {
+          protocol: "mcp",
+        },
+      });
+
+      expect(app).toBeDefined();
+      expect(app.tools.test.ui).toBe("widget");
+    });
+
+    it("should accept OpenAI protocol configuration", () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {
+          test: {
+            description: "Test tool",
+            input: z.object({}),
+            output: z.object({}),
+            handler: async () => ({}),
+            ui: "widget",
+            invokingMessage: "Loading...",
+            invokedMessage: "Done!",
+          },
+        },
+        ui: {
+          widget: {
+            html: "<div>Widget</div>",
+            csp: {
+              connectDomains: ["https://api.example.com"],
+              redirectDomains: ["https://docs.example.com"],
+            },
+            domain: "widget.example.com",
+          },
+        },
+        config: {
+          protocol: "openai",
+        },
+      });
+
+      expect(app).toBeDefined();
+      expect(app.tools.test.ui).toBe("widget");
+      expect(app.tools.test.invokingMessage).toBe("Loading...");
+      expect(app.tools.test.invokedMessage).toBe("Done!");
+    });
+
+    it("should support ChatGPT-specific tool properties with OpenAI protocol", () => {
+      const app = createApp({
+        name: "chatgpt-app",
+        version: "1.0.0",
+        tools: {
+          search: {
+            description: "Search the web",
+            input: z.object({ query: z.string() }),
+            output: z.object({ results: z.array(z.string()) }),
+            handler: async ({ query }) => ({ results: [`Result for: ${query}`] }),
+            visibility: "model", // Should map to invokableByAI: true, invokableByApp: false
+            invokingMessage: "Searching...",
+            invokedMessage: "Search complete!",
+          },
+        },
+        config: {
+          protocol: "openai",
+        },
+      });
+
+      expect(app.tools.search.visibility).toBe("model");
+      expect(app.tools.search.invokingMessage).toBe("Searching...");
+    });
+  });
 });

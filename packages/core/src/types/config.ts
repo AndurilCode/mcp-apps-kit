@@ -6,6 +6,18 @@ import type { ToolDefs } from "./tools";
 import type { UIDefs } from "./ui";
 
 // =============================================================================
+// PROTOCOL CONFIGURATION
+// =============================================================================
+
+/**
+ * Target protocol for metadata generation
+ *
+ * - `"mcp"`: MCP Apps protocol (Claude Desktop, etc.) - uses camelCase metadata
+ * - `"openai"`: OpenAI/ChatGPT Apps protocol - uses snake_case metadata with openai/ prefixes
+ */
+export type Protocol = "mcp" | "openai";
+
+// =============================================================================
 // AUTHENTICATION
 // =============================================================================
 
@@ -66,6 +78,19 @@ export interface GlobalConfig {
 
   /** CORS configuration for HTTP server */
   cors?: CORSConfig;
+
+  /**
+   * Target protocol for metadata generation.
+   *
+   * - `"mcp"` (default): MCP Apps protocol for Claude Desktop, etc.
+   *   Uses camelCase metadata format (e.g., `_meta.ui.csp.connectDomains`)
+   *
+   * - `"openai"`: OpenAI/ChatGPT Apps protocol.
+   *   Uses snake_case metadata with openai/ prefixes (e.g., `_meta["openai/widgetCSP"].connect_domains`)
+   *
+   * @default "mcp"
+   */
+  protocol?: Protocol;
 }
 
 /**
