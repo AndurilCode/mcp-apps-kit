@@ -191,19 +191,19 @@ Based on plan.md structure:
 
 ### Tests for User Story 5
 
-- [ ] T074 [P] [US5] Unit test for MCP metadata generation in `packages/core/tests/unit/mcp-adapter.test.ts`
-- [ ] T075 [P] [US5] Unit test for OpenAI metadata generation in `packages/core/tests/unit/openai-adapter.test.ts`
-- [ ] T076 [P] [US5] Unit test for visibility mapping in `packages/core/tests/unit/metadata.test.ts`
+- [X] T074 [P] [US5] Unit test for MCP metadata generation in `packages/core/tests/unit/metadata.test.ts`
+- [X] T075 [P] [US5] Unit test for OpenAI metadata generation in `packages/core/tests/unit/metadata.test.ts`
+- [X] T076 [P] [US5] Unit test for visibility mapping in `packages/core/tests/unit/metadata.test.ts`
 
 ### Implementation for User Story 5
 
-- [ ] T077 [P] [US5] Implement metadata mapping utilities in `packages/core/src/utils/metadata.ts`
-- [ ] T078 [US5] Implement MCP Apps protocol adapter in `packages/core/src/adapters/mcp.ts`
-- [ ] T079 [US5] Implement ChatGPT Apps protocol adapter in `packages/core/src/adapters/openai.ts`
-- [ ] T080 [US5] Implement visibility mapping (model/app/both → protocol-specific) in `packages/core/src/utils/metadata.ts`
-- [ ] T081 [US5] Implement tool metadata generation with UI bindings in `packages/core/src/adapters/mcp.ts`
-- [ ] T082 [US5] Implement tool metadata generation with UI bindings in `packages/core/src/adapters/openai.ts`
-- [ ] T083 [US5] Wire protocol adapters to createApp() in `packages/core/src/createApp.ts`
+- [X] T077 [P] [US5] Implement metadata mapping utilities in `packages/core/src/utils/metadata.ts`
+- [X] T078 [US5] Implement MCP Apps protocol adapter in `packages/core/src/server/index.ts` (integrated into registerTools)
+- [X] T079 [US5] Implement ChatGPT Apps protocol adapter in `packages/core/src/utils/metadata.ts` (generateOpenAIMetadata)
+- [X] T080 [US5] Implement visibility mapping (model/app/both → protocol-specific) in `packages/core/src/utils/metadata.ts`
+- [X] T081 [US5] Implement tool metadata generation with UI bindings in `packages/core/src/server/index.ts`
+- [X] T082 [US5] Implement tool metadata generation with UI bindings in `packages/core/src/utils/metadata.ts`
+- [X] T083 [US5] Wire protocol adapters to createApp() in `packages/core/src/server/index.ts`
 
 **Checkpoint**: Protocol abstraction complete - metadata auto-generated for both platforms
 

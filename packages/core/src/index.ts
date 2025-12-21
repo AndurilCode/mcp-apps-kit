@@ -60,6 +60,20 @@ export type { JSONSchema, ZodToJsonSchemaOptions } from "./utils/schema";
 export { AppError, ErrorCode, formatZodError, wrapError } from "./utils/errors";
 export type { ErrorCodeType } from "./utils/errors";
 
+// Metadata utilities
+export {
+  mapVisibilityToMcp,
+  mapVisibilityToOpenAI,
+  generateToolMetadata,
+  generateAllToolsMetadata,
+} from "./utils/metadata";
+export type {
+  McpVisibilityAnnotations,
+  OpenAIVisibilitySettings,
+  McpToolMetadata,
+  OpenAIToolMetadata,
+} from "./utils/metadata";
+
 // =============================================================================
 // MAIN ENTRY POINTS
 // =============================================================================

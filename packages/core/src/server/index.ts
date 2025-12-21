@@ -17,6 +17,7 @@ import type { ToolDefs, StartOptions, ExpressMiddleware } from "../types/tools";
 import type { AppConfig, CORSConfig } from "../types/config";
 import { zodToJsonSchema } from "../utils/schema";
 import { wrapError } from "../utils/errors";
+import { mapVisibilityToMcp } from "../utils/metadata";
 
 // =============================================================================
 // SERVER WRAPPER
@@ -302,6 +303,17 @@ function registerTools(
     // Convert Zod schema to JSON Schema for MCP
     const inputSchema = zodToJsonSchema(toolDef.input);
 
+    // Build annotations with visibility and UI binding
+    const visibilityAnnotations = mapVisibilityToMcp(toolDef.visibility);
+    const annotations: Record<string, unknown> = {
+      ...visibilityAnnotations,
+    };
+
+    // Add UI binding if specified
+    if (toolDef.ui) {
+      annotations.ui = toolDef.ui;
+    }
+
     // Register tool with MCP server using new registerTool API
     mcpServer.registerTool(
       name,
@@ -309,6 +321,7 @@ function registerTools(
         title: toolDef.title ?? name,
         description: toolDef.description,
         inputSchema: inputSchema as Record<string, unknown>,
+        annotations: Object.keys(annotations).length > 0 ? annotations : undefined,
       },
       async (args: Record<string, unknown>) => {
         try {
