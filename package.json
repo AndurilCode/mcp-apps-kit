@@ -1,0 +1,42 @@
+{
+  "name": "@apps-builder/monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Unified MCP Apps Builder SDK - Build MCP apps for Claude Desktop and ChatGPT from a single codebase",
+  "scripts": {
+    "build": "nx run-many --target=build",
+    "test": "nx run-many --target=test",
+    "lint": "nx run-many --target=lint",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "typecheck": "nx run-many --target=typecheck"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "chatgpt",
+    "claude",
+    "sdk"
+  ],
+  "author": "",
+  "license": "MIT",
+  "packageManager": "pnpm@10.19.0",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@nx/js": "^22.3.3",
+    "@nx/workspace": "^22.3.3",
+    "@types/node": "^25.0.3",
+    "@typescript-eslint/eslint-plugin": "^8.50.0",
+    "@typescript-eslint/parser": "^8.50.0",
+    "@vitest/coverage-v8": "^4.0.16",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "nx": "^22.3.3",
+    "prettier": "^3.7.4",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.16"
+  }
+}

@@ -28,18 +28,18 @@ Based on plan.md structure:
 
 **Purpose**: NX monorepo initialization and basic structure
 
-- [ ] T001 Initialize NX monorepo with pnpm workspace at repository root
-- [ ] T002 Create base TypeScript configuration in `tsconfig.base.json` (strict mode)
-- [ ] T003 [P] Configure NX workspace in `nx.json` with build/test/lint caching
-- [ ] T004 [P] Configure pnpm workspace in `pnpm-workspace.yaml`
-- [ ] T005 [P] Configure ESLint in `eslint.config.js` (flat config, zero warnings policy)
-- [ ] T006 [P] Configure Prettier in `prettier.config.js`
-- [ ] T007 [P] Configure Vitest in `vitest.config.ts` (80% coverage threshold)
-- [ ] T008 Create `@apps-builder/core` package scaffold in `packages/core/`
-- [ ] T009 [P] Create `@apps-builder/ui` package scaffold in `packages/ui/`
-- [ ] T010 [P] Create `@apps-builder/ui-react` package scaffold in `packages/ui-react/`
-- [ ] T011 [P] Create `@apps-builder/create-app` package scaffold in `packages/create-app/`
-- [ ] T012 Install shared dependencies: zod, @modelcontextprotocol/sdk, zod-to-json-schema
+- [X] T001 Initialize NX monorepo with pnpm workspace at repository root
+- [X] T002 Create base TypeScript configuration in `tsconfig.base.json` (strict mode)
+- [X] T003 [P] Configure NX workspace in `nx.json` with build/test/lint caching
+- [X] T004 [P] Configure pnpm workspace in `pnpm-workspace.yaml`
+- [X] T005 [P] Configure ESLint in `eslint.config.js` (flat config, zero warnings policy)
+- [X] T006 [P] Configure Prettier in `prettier.config.js`
+- [X] T007 [P] Configure Vitest in `vitest.config.ts` (80% coverage threshold)
+- [X] T008 Create `@apps-builder/core` package scaffold in `packages/core/`
+- [X] T009 [P] Create `@apps-builder/ui` package scaffold in `packages/ui/`
+- [X] T010 [P] Create `@apps-builder/ui-react` package scaffold in `packages/ui-react/`
+- [X] T011 [P] Create `@apps-builder/create-app` package scaffold in `packages/create-app/`
+- [X] T012 Install shared dependencies: zod, @modelcontextprotocol/sdk, zod-to-json-schema
 
 **Checkpoint**: NX monorepo structure ready, all packages scaffolded with tsconfig
 

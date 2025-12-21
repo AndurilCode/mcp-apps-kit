@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# NX
+.nx/
+.nx-cache/
+
+# Coverage
+coverage/
+
+# Specs and docs (not code)
+specs/
+docs/
