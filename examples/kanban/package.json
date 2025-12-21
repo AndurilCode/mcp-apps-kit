@@ -1,0 +1,22 @@
+{
+  "name": "@apps-builder/example-kanban",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kanban board example app built with @apps-builder/core",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@apps-builder/core": "workspace:*",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -11,12 +11,11 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import express, { type Express, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import type { Server } from "http";
-import type { z } from "zod";
+import { z } from "zod";
 
 import type { ToolDefs, StartOptions, ExpressMiddleware } from "../types/tools";
 import type { AppConfig, CORSConfig, Protocol } from "../types/config";
 import type { UIDefs, UIDef } from "../types/ui";
-import { zodToJsonSchema } from "../utils/schema";
 import { wrapError } from "../utils/errors";
 import { mapVisibilityToMcp, mapVisibilityToOpenAI } from "../utils/metadata";
 import { generateMcpCSPMetadata, generateOpenAICSPMetadata } from "../utils/csp";
@@ -60,7 +59,7 @@ export function createServerInstance<T extends ToolDefs>(
   });
 
   // Register tools with MCP server
-  registerTools(mcpServer, config.tools, protocol);
+  registerTools(mcpServer, config.tools, protocol, config.name);
 
   // Register UI resources with MCP server
   if (config.ui) {
@@ -310,34 +309,37 @@ export function createServerInstance<T extends ToolDefs>(
 function registerTools(
   mcpServer: McpServer,
   tools: ToolDefs,
-  protocol: Protocol
+  protocol: Protocol,
+  serverName: string
 ): void {
   for (const [name, toolDef] of Object.entries(tools)) {
-    // Convert Zod schema to JSON Schema for MCP
-    const inputSchema = zodToJsonSchema(toolDef.input);
+    // Extract the Zod shape from z.object() for MCP SDK
+    // MCP SDK expects inputSchema as { key: zodSchema, ... } not JSON Schema
+    const zodShape = extractZodShape(toolDef.input);
 
-    // Build annotations based on protocol
+    // Build annotations and _meta based on protocol
     const annotations: Record<string, unknown> = {};
+    const meta: Record<string, unknown> = {};
 
     if (protocol === "openai") {
-      // OpenAI protocol: use invokableByAI/invokableByApp format
+      // OpenAI protocol: put openai-specific fields under _meta
       const visibilitySettings = mapVisibilityToOpenAI(toolDef.visibility);
-      Object.assign(annotations, visibilitySettings);
+      Object.assign(meta, visibilitySettings);
 
-      // Add UI binding with OpenAI prefix if specified
+      // Add UI binding with OpenAI prefix - use full resource URI
       if (toolDef.ui) {
-        annotations["openai/outputTemplate"] = toolDef.ui;
+        meta["openai/outputTemplate"] = `ui://${serverName}/${toolDef.ui}`;
       }
 
       // Add invoking/invoked messages (ChatGPT-specific)
       if (toolDef.invokingMessage) {
-        annotations.invokingMessage = toolDef.invokingMessage;
+        meta.invokingMessage = toolDef.invokingMessage;
       }
       if (toolDef.invokedMessage) {
-        annotations.invokedMessage = toolDef.invokedMessage;
+        meta.invokedMessage = toolDef.invokedMessage;
       }
     } else {
-      // MCP protocol: use readOnlyHint/appOnly format
+      // MCP protocol: use readOnlyHint/appOnly format in annotations
       const visibilityAnnotations = mapVisibilityToMcp(toolDef.visibility);
       Object.assign(annotations, visibilityAnnotations);
 
@@ -347,14 +349,19 @@ function registerTools(
       }
     }
 
+    // Build output schema if defined
+    const outputSchema = toolDef.output ? extractZodShape(toolDef.output) : undefined;
+
     // Register tool with MCP server using new registerTool API
     mcpServer.registerTool(
       name,
       {
         title: toolDef.title ?? name,
         description: toolDef.description,
-        inputSchema: inputSchema as Record<string, unknown>,
+        inputSchema: zodShape,
+        outputSchema,
         annotations: Object.keys(annotations).length > 0 ? annotations : undefined,
+        _meta: Object.keys(meta).length > 0 ? meta : undefined,
       },
       async (args: Record<string, unknown>) => {
         try {
@@ -385,6 +392,22 @@ function registerTools(
 }
 
 /**
+ * Extract the shape from a Zod schema
+ *
+ * MCP SDK expects inputSchema as { key: zodSchema, ... } format
+ * This extracts the shape from z.object({ ... })
+ */
+function extractZodShape(schema: z.ZodType): Record<string, z.ZodType> {
+  // Check if it's a ZodObject and extract its shape
+  if (schema instanceof z.ZodObject) {
+    return schema.shape as Record<string, z.ZodType>;
+  }
+
+  // For other schema types, wrap in a single 'value' key
+  return { value: schema };
+}
+
+/**
  * Apply CORS configuration to Express app
  */
 function applyCors(app: Express, config: CORSConfig): void {
@@ -395,7 +418,7 @@ function applyCors(app: Express, config: CORSConfig): void {
       res.setHeader("Access-Control-Allow-Origin", "*");
     } else if (typeof origin === "string") {
       res.setHeader("Access-Control-Allow-Origin", origin);
-    } else if (Array.isArray(origin)) {
+    } else if (Array.isArray(origin) && origin.length > 0) {
       // For simplicity, use first origin or implement proper matching
       res.setHeader("Access-Control-Allow-Origin", origin[0]);
     }
@@ -444,7 +467,7 @@ function registerUIResources(
     // Build resource metadata based on protocol
     const metadata: Record<string, unknown> = {
       mimeType: protocol === "openai"
-        ? "text/html;profile=chatgpt-widget"
+        ? "text/html+skybridge"
         : "text/html;profile=mcp-app",
     };
 
@@ -495,12 +518,16 @@ function registerUIResources(
       }
     }
 
+    // Get the MIME type and _meta for use in the callback
+    const mimeType = metadata.mimeType as string;
+    const resourceMeta = metadata._meta as Record<string, unknown> | undefined;
+
     // Register the resource
     mcpServer.registerResource(
       uiDef.name ?? key,
       uri,
       metadata,
-      () => readUIResource(key, uiDef, uri)
+      () => readUIResource(key, uiDef, uri, mimeType, resourceMeta)
     );
   }
 }
@@ -513,8 +540,10 @@ function registerUIResources(
 function readUIResource(
   key: string,
   uiDef: UIDef,
-  uri: string
-): { contents: Array<{ uri: string; mimeType: string; text: string }> } {
+  uri: string,
+  mimeType: string,
+  meta?: Record<string, unknown>
+): { contents: Array<{ uri: string; mimeType: string; text: string; _meta?: Record<string, unknown> }> } {
   let html: string;
 
   if (uiDef.html.startsWith("<")) {
@@ -530,13 +559,17 @@ function readUIResource(
     }
   }
 
+  const content: { uri: string; mimeType: string; text: string; _meta?: Record<string, unknown> } = {
+    uri,
+    mimeType,
+    text: html,
+  };
+
+  if (meta) {
+    content._meta = meta;
+  }
+
   return {
-    contents: [
-      {
-        uri,
-        mimeType: "text/html;profile=mcp-app",
-        text: html,
-      },
-    ],
+    contents: [content],
   };
 }

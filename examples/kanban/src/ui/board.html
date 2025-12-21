@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kanban Board</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-color: #f5f7fa;
+      --card-bg: #ffffff;
+      --text-primary: #1a1a2e;
+      --text-secondary: #6b7280;
+      --border-color: #e5e7eb;
+      --todo-color: #f59e0b;
+      --progress-color: #3b82f6;
+      --done-color: #10b981;
+      --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-color: #1a1a2e;
+        --card-bg: #252540;
+        --text-primary: #f5f7fa;
+        --text-secondary: #9ca3af;
+        --border-color: #374151;
+      }
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-primary);
+      padding: 16px;
+      min-height: 100vh;
+    }
+
+    .board-container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .board-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .board-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .board-stats {
+      display: flex;
+      gap: 16px;
+    }
+
+    .stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+
+    .stat-count {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .board {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .column {
+      background-color: var(--card-bg);
+      border-radius: 12px;
+      padding: 16px;
+      min-height: 400px;
+      border: 1px solid var(--border-color);
+    }
+
+    .column-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid var(--border-color);
+    }
+
+    .column-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .column-indicator {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .column--todo .column-indicator { background-color: var(--todo-color); }
+    .column--in_progress .column-indicator { background-color: var(--progress-color); }
+    .column--done .column-indicator { background-color: var(--done-color); }
+
+    .column-count {
+      background-color: var(--bg-color);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .task-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .task-card {
+      background-color: var(--bg-color);
+      border-radius: 8px;
+      padding: 12px;
+      border-left: 3px solid transparent;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .task-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow);
+    }
+
+    .column--todo .task-card { border-left-color: var(--todo-color); }
+    .column--in_progress .task-card { border-left-color: var(--progress-color); }
+    .column--done .task-card { border-left-color: var(--done-color); }
+
+    .task-title {
+      font-weight: 500;
+      font-size: 0.9rem;
+      margin-bottom: 4px;
+    }
+
+    .column--done .task-title {
+      text-decoration: line-through;
+      opacity: 0.7;
+    }
+
+    .task-description {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    .task-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+    }
+
+    .task-id {
+      font-family: monospace;
+      background-color: var(--card-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .empty-column {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100px;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      font-style: italic;
+    }
+
+    .message {
+      background-color: var(--card-bg);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      border-left: 4px solid var(--progress-color);
+    }
+
+    .message-text {
+      font-size: 0.9rem;
+    }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 200px;
+      color: var(--text-secondary);
+    }
+
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid var(--border-color);
+      border-top-color: var(--progress-color);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 12px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="board-container" id="app">
+    <div class="loading">
+      <div class="spinner"></div>
+      <span>Loading board...</span>
+    </div>
+  </div>
+
+  <script>
+    // Widget data comes from the tool result
+    const data = window.__TOOL_RESULT__ || {};
+
+    function formatDate(dateString) {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    function renderBoard() {
+      const container = document.getElementById('app');
+
+      // Handle different response shapes
+      const tasks = data.tasks || [];
+      const counts = data.counts || {};
+      const columns = data.columns || null;
+      const message = data.message || null;
+
+      // If we have columns data (from getBoardSummary), use that
+      if (columns) {
+        container.innerHTML = `
+          <div class="board-header">
+            <h1 class="board-title">Kanban Board</h1>
+            <div class="board-stats">
+              <div class="stat">
+                <span class="stat-count">${data.totalTasks || 0}</span>
+                <span>total tasks</span>
+              </div>
+            </div>
+          </div>
+          <div class="board">
+            ${columns.map(col => `
+              <div class="column column--${col.status}">
+                <div class="column-header">
+                  <div class="column-title">
+                    <div class="column-indicator"></div>
+                    ${col.name}
+                  </div>
+                  <div class="column-count">${col.count}</div>
+                </div>
+                <div class="task-list">
+                  ${col.tasks.length === 0
+                    ? '<div class="empty-column">No tasks</div>'
+                    : col.tasks.map(task => `
+                        <div class="task-card">
+                          <div class="task-title">${escapeHtml(task.title)}</div>
+                          <div class="task-meta">
+                            <span class="task-id">${task.id}</span>
+                          </div>
+                        </div>
+                      `).join('')
+                  }
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+        return;
+      }
+
+      // Otherwise, build columns from tasks array
+      const todoTasks = tasks.filter(t => t.status === 'todo');
+      const inProgressTasks = tasks.filter(t => t.status === 'in_progress');
+      const doneTasks = tasks.filter(t => t.status === 'done');
+
+      container.innerHTML = `
+        ${message ? `
+          <div class="message">
+            <div class="message-text">${escapeHtml(message)}</div>
+          </div>
+        ` : ''}
+        <div class="board-header">
+          <h1 class="board-title">Kanban Board</h1>
+          <div class="board-stats">
+            <div class="stat">
+              <span class="stat-count">${counts.total || tasks.length}</span>
+              <span>total tasks</span>
+            </div>
+          </div>
+        </div>
+        <div class="board">
+          ${renderColumn('To Do', 'todo', todoTasks)}
+          ${renderColumn('In Progress', 'in_progress', inProgressTasks)}
+          ${renderColumn('Done', 'done', doneTasks)}
+        </div>
+      `;
+    }
+
+    function renderColumn(name, status, tasks) {
+      return `
+        <div class="column column--${status}">
+          <div class="column-header">
+            <div class="column-title">
+              <div class="column-indicator"></div>
+              ${name}
+            </div>
+            <div class="column-count">${tasks.length}</div>
+          </div>
+          <div class="task-list">
+            ${tasks.length === 0
+              ? '<div class="empty-column">No tasks</div>'
+              : tasks.map(renderTask).join('')
+            }
+          </div>
+        </div>
+      `;
+    }
+
+    function renderTask(task) {
+      return `
+        <div class="task-card">
+          <div class="task-title">${escapeHtml(task.title)}</div>
+          ${task.description
+            ? `<div class="task-description">${escapeHtml(task.description)}</div>`
+            : ''
+          }
+          <div class="task-meta">
+            <span class="task-id">${task.id}</span>
+            <span>${formatDate(task.updatedAt)}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Handle single task responses (create, update, move, delete)
+    if (data.task && !data.tasks) {
+      // Wrap single task in array for consistent rendering
+      data.tasks = [data.task];
+      data.counts = {
+        todo: data.task.status === 'todo' ? 1 : 0,
+        in_progress: data.task.status === 'in_progress' ? 1 : 0,
+        done: data.task.status === 'done' ? 1 : 0,
+        total: 1
+      };
+    }
+
+    // Handle delete response
+    if (data.success !== undefined) {
+      const container = document.getElementById('app');
+      container.innerHTML = `
+        <div class="message">
+          <div class="message-text">${escapeHtml(data.message || 'Operation completed')}</div>
+        </div>
+      `;
+    } else {
+      renderBoard();
+    }
+  </script>
+</body>
+</html>
