@@ -2,6 +2,7 @@
   "name": "@apps-builder/monorepo",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "description": "Unified MCP Apps Builder SDK - Build MCP apps for Claude Desktop and ChatGPT from a single codebase",
   "scripts": {
     "build": "nx run-many --target=build",
@@ -33,6 +34,7 @@
     "@vitest/coverage-v8": "^4.0.16",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.5.0",
     "nx": "^22.3.3",
     "prettier": "^3.7.4",
     "tsup": "^8.5.1",

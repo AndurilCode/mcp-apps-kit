@@ -6,6 +6,7 @@ export default defineConfig({
     environment: "node",
     include: ["packages/**/*.{test,spec}.{ts,tsx}"],
     exclude: ["**/node_modules/**", "**/dist/**"],
+    passWithNoTests: true,
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],

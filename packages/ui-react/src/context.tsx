@@ -2,7 +2,7 @@
  * React context and provider for @apps-builder/ui-react
  */
 
-import { createContext, useContext, useState, useEffect, type ReactNode, type ComponentType } from "react";
+import React, { createContext, useContext, useState, useEffect, type ReactNode, type ComponentType } from "react";
 import type { AppsClient, ToolDefs } from "@apps-builder/ui";
 
 // =============================================================================
@@ -76,7 +76,7 @@ export function AppsProvider<T extends ToolDefs = ToolDefs>({
   forceAdapter: _forceAdapter,
   fallback,
   errorFallback: ErrorFallback,
-}: AppsProviderProps<T>): JSX.Element {
+}: AppsProviderProps<T>): React.JSX.Element {
   const [client, setClient] = useState<AppsClient<T> | null>(providedClient ?? null);
   const [isConnecting, setIsConnecting] = useState(!providedClient);
   const [error, setError] = useState<Error | null>(null);

@@ -51,15 +51,15 @@ Based on plan.md structure:
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T013 Define base type exports in `packages/core/src/types/tools.ts` (ToolDef, ToolDefs, Visibility)
-- [ ] T014 [P] Define UI types in `packages/core/src/types/ui.ts` (UIDef, UIDefs, CSPConfig)
-- [ ] T015 [P] Define config types in `packages/core/src/types/config.ts` (AppConfig, AuthConfig, CORSConfig)
-- [ ] T016 [P] Define client types in `packages/ui/src/types.ts` (HostContext, AppsClient, ToolResult)
-- [ ] T017 Implement zodToJsonSchema utility in `packages/core/src/utils/schema.ts`
-- [ ] T018 [P] Implement AppError class in `packages/core/src/utils/errors.ts`
-- [ ] T019 Define ProtocolAdapter interface in `packages/ui/src/adapters/types.ts`
-- [ ] T020 Create package index exports in `packages/core/src/index.ts`
-- [ ] T021 [P] Create package index exports in `packages/ui/src/index.ts`
+- [X] T013 Define base type exports in `packages/core/src/types/tools.ts` (ToolDef, ToolDefs, Visibility)
+- [X] T014 [P] Define UI types in `packages/core/src/types/ui.ts` (UIDef, UIDefs, CSPConfig)
+- [X] T015 [P] Define config types in `packages/core/src/types/config.ts` (AppConfig, AuthConfig, CORSConfig)
+- [X] T016 [P] Define client types in `packages/ui/src/types.ts` (HostContext, AppsClient, ToolResult)
+- [X] T017 Implement zodToJsonSchema utility in `packages/core/src/utils/schema.ts`
+- [X] T018 [P] Implement AppError class in `packages/core/src/utils/errors.ts`
+- [X] T019 Define ProtocolAdapter interface in `packages/ui/src/adapters/types.ts`
+- [X] T020 Create package index exports in `packages/core/src/index.ts`
+- [X] T021 [P] Create package index exports in `packages/ui/src/index.ts`
 
 **Checkpoint**: Foundation ready - all base types defined, user story implementation can now begin
 

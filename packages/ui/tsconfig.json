@@ -3,12 +3,13 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
-    "composite": true,
+    "composite": false,
+    "incremental": false,
     "declaration": true,
     "declarationMap": true,
+    "tsBuildInfoFile": null,
     "lib": ["ES2020", "DOM", "DOM.Iterable"]
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "tests", "**/*.test.ts", "**/*.spec.ts"],
-  "references": []
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "tests", "**/*.test.ts", "**/*.spec.ts"]
 }
