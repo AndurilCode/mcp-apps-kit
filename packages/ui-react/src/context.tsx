@@ -4,6 +4,7 @@
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, type ComponentType } from "react";
 import type { AppsClient, ToolDefs } from "@apps-builder/ui";
+import { createClient } from "@apps-builder/ui";
 
 // =============================================================================
 // CONTEXT
@@ -88,12 +89,14 @@ export function AppsProvider<T extends ToolDefs = ToolDefs>({
       return;
     }
 
-    // Will be implemented in Phase 5
+    // Initialize client with auto-detection or forced adapter
     const initClient = async () => {
       try {
-        // Placeholder - createClient will be called here
+        const newClient = await createClient<T>({
+          forceAdapter: _forceAdapter,
+        });
+        setClient(newClient);
         setIsConnecting(false);
-        setError(new Error("Client initialization not implemented yet - Phase 5"));
       } catch (err) {
         setError(err instanceof Error ? err : new Error(String(err)));
         setIsConnecting(false);
@@ -101,7 +104,7 @@ export function AppsProvider<T extends ToolDefs = ToolDefs>({
     };
 
     void initClient();
-  }, [providedClient]);
+  }, [providedClient, _forceAdapter]);
 
   if (error && ErrorFallback) {
     return <ErrorFallback error={error} reset={() => setError(null)} />;

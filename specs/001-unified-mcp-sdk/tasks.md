@@ -161,23 +161,23 @@ Based on plan.md structure:
 
 ### Tests for User Story 4
 
-- [ ] T060 [P] [US4] Unit test for AppsProvider in `packages/ui-react/tests/unit/context.test.tsx`
-- [ ] T061 [P] [US4] Unit test for useAppsClient hook in `packages/ui-react/tests/unit/hooks.test.tsx`
-- [ ] T062 [P] [US4] Unit test for useToolResult hook in `packages/ui-react/tests/unit/hooks.test.tsx`
-- [ ] T063 [P] [US4] Unit test for useHostContext hook in `packages/ui-react/tests/unit/hooks.test.tsx`
-- [ ] T064 [P] [US4] Unit test for useWidgetState hook in `packages/ui-react/tests/unit/hooks.test.tsx`
+- [X] T060 [P] [US4] Unit test for AppsProvider in `packages/ui-react/tests/unit/context.test.tsx`
+- [X] T061 [P] [US4] Unit test for useAppsClient hook in `packages/ui-react/tests/unit/hooks.test.tsx`
+- [X] T062 [P] [US4] Unit test for useToolResult hook in `packages/ui-react/tests/unit/hooks.test.tsx`
+- [X] T063 [P] [US4] Unit test for useHostContext hook in `packages/ui-react/tests/unit/hooks.test.tsx`
+- [X] T064 [P] [US4] Unit test for useWidgetState hook in `packages/ui-react/tests/unit/hooks.test.tsx`
 
 ### Implementation for User Story 4
 
-- [ ] T065 [US4] Implement AppsContext and AppsProvider in `packages/ui-react/src/context.tsx`
-- [ ] T066 [US4] Implement useAppsClient<T>() hook in `packages/ui-react/src/hooks.ts`
-- [ ] T067 [US4] Implement useToolResult<T>() hook in `packages/ui-react/src/hooks.ts`
-- [ ] T068 [US4] Implement useToolInput() hook in `packages/ui-react/src/hooks.ts`
-- [ ] T069 [US4] Implement useHostContext() hook in `packages/ui-react/src/hooks.ts`
-- [ ] T070 [US4] Implement useWidgetState<S>() hook (session-scoped ChatGPT, no-op MCP) in `packages/ui-react/src/hooks.ts`
-- [ ] T071 [US4] Implement useHostStyleVariables() hook in `packages/ui-react/src/hooks.ts`
-- [ ] T072 [US4] Implement useDocumentTheme() hook in `packages/ui-react/src/hooks.ts`
-- [ ] T073 [US4] Create package index exports in `packages/ui-react/src/index.ts`
+- [X] T065 [US4] Implement AppsContext and AppsProvider in `packages/ui-react/src/context.tsx`
+- [X] T066 [US4] Implement useAppsClient<T>() hook in `packages/ui-react/src/hooks.ts`
+- [X] T067 [US4] Implement useToolResult<T>() hook in `packages/ui-react/src/hooks.ts`
+- [X] T068 [US4] Implement useToolInput() hook in `packages/ui-react/src/hooks.ts`
+- [X] T069 [US4] Implement useHostContext() hook in `packages/ui-react/src/hooks.ts`
+- [X] T070 [US4] Implement useWidgetState<S>() hook (session-scoped ChatGPT, no-op MCP) in `packages/ui-react/src/hooks.ts`
+- [X] T071 [US4] Implement useHostStyleVariables() hook in `packages/ui-react/src/hooks.ts`
+- [X] T072 [US4] Implement useDocumentTheme() hook in `packages/ui-react/src/hooks.ts`
+- [X] T073 [US4] Create package index exports in `packages/ui-react/src/index.ts`
 
 **Checkpoint**: React bindings working - hooks provide reactive access to client, results, and context
 

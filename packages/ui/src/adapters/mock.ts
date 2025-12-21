@@ -209,11 +209,44 @@ export class MockAdapter implements ProtocolAdapter {
   }
 
   /**
-   * Emit host context change (for testing)
+   * Set host context (for testing)
    */
   setHostContext(context: Partial<HostContext>): void {
     this.context = { ...this.context, ...context };
     this.notifyHostContextChange();
+  }
+
+  /**
+   * Emit host context change (for testing)
+   */
+  emitContextChange(context: HostContext): void {
+    this.context = context;
+    this.notifyHostContextChange();
+  }
+
+  /**
+   * Set tool input directly (for testing)
+   */
+  setToolInput(input: Record<string, unknown>): void {
+    this.currentToolInput = input;
+  }
+
+  /**
+   * Emit tool cancelled event (for testing)
+   */
+  emitToolCancelled(reason?: string): void {
+    for (const handler of this.toolCancelledHandlers) {
+      handler(reason);
+    }
+  }
+
+  /**
+   * Emit teardown event (for testing)
+   */
+  emitTeardown(reason?: string): void {
+    for (const handler of this.teardownHandlers) {
+      handler(reason);
+    }
   }
 
   private notifyHostContextChange(): void {
