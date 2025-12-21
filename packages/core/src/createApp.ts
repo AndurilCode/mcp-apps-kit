@@ -13,6 +13,7 @@ import type {
 } from "./types/tools";
 import type { AppConfig } from "./types/config";
 import { AppError, ErrorCode } from "./utils/errors";
+import { createServerInstance, type ServerInstance } from "./server/index";
 
 /**
  * Validate app configuration
@@ -65,8 +66,13 @@ export function createApp<T extends ToolDefs>(config: AppConfig<T>): App<T> {
   // Validate config at runtime
   validateConfig<T>(config);
 
-  // Store the MCP server instance (created lazily)
-  let mcpServer: McpServer | null = null;
+  // Create server instance (lazy initialization)
+  let serverInstance: ServerInstance | null = null;
+
+  function getServerInstance(): ServerInstance {
+    serverInstance ??= createServerInstance(config);
+    return serverInstance;
+  }
 
   // Create the app instance
   const app: App<T> = {
@@ -75,52 +81,34 @@ export function createApp<T extends ToolDefs>(config: AppConfig<T>): App<T> {
 
     /**
      * Start the built-in Express server
-     * Full implementation in Phase 4 (User Story 2)
      */
-    start: async (_options?: StartOptions): Promise<void> => {
-      // Placeholder - will be implemented in Phase 4
-      throw new AppError(
-        ErrorCode.INTERNAL_ERROR,
-        "app.start() not implemented yet - Phase 4"
-      );
+    start: async (options?: StartOptions): Promise<void> => {
+      const server = getServerInstance();
+      await server.start(options);
     },
 
     /**
      * Get the underlying MCP server instance
-     * Full implementation in Phase 4 (User Story 2)
      */
     getServer: (): McpServer => {
-      // Create MCP server on first access
-      // Placeholder - will be implemented in Phase 4
-      mcpServer ??= {
-        _placeholder: true,
-        name: config.name,
-        version: config.version,
-      };
-      return mcpServer;
+      const server = getServerInstance();
+      return server.mcpServer as unknown as McpServer;
     },
 
     /**
      * Get Express middleware for custom server setup
-     * Full implementation in Phase 4 (User Story 2)
      */
     handler: (): ExpressMiddleware => {
-      // Placeholder - will be implemented in Phase 4
-      return (_req: unknown, _res: unknown, next: () => void): void => {
-        next();
-      };
+      const server = getServerInstance();
+      return server.handler();
     },
 
     /**
      * Handle a single request (for serverless)
-     * Full implementation in Phase 4 (User Story 2)
      */
-    handleRequest: async (_req: Request, _env?: unknown): Promise<Response> => {
-      // Placeholder - will be implemented in Phase 4
-      return new Response(
-        JSON.stringify({ error: "handleRequest() not implemented yet - Phase 4" }),
-        { status: 501, headers: { "Content-Type": "application/json" } }
-      );
+    handleRequest: async (req: Request, env?: unknown): Promise<Response> => {
+      const server = getServerInstance();
+      return server.handleRequest(req, env);
     },
   };
 
