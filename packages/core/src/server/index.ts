@@ -15,9 +15,13 @@ import type { z } from "zod";
 
 import type { ToolDefs, StartOptions, ExpressMiddleware } from "../types/tools";
 import type { AppConfig, CORSConfig } from "../types/config";
+import type { UIDefs, UIDef } from "../types/ui";
 import { zodToJsonSchema } from "../utils/schema";
 import { wrapError } from "../utils/errors";
 import { mapVisibilityToMcp } from "../utils/metadata";
+import { generateMcpCSPMetadata } from "../utils/csp";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 // =============================================================================
 // SERVER WRAPPER
@@ -54,6 +58,11 @@ export function createServerInstance<T extends ToolDefs>(
 
   // Register tools with MCP server
   registerTools(mcpServer, config.tools);
+
+  // Register UI resources with MCP server
+  if (config.ui) {
+    registerUIResources(mcpServer, config.name, config.ui);
+  }
 
   // Create Express app
   const expressApp = express();
@@ -382,4 +391,93 @@ function applyCors(app: Express, config: CORSConfig): void {
   app.options(/.*/, (_req: Request, res: Response) => {
     res.sendStatus(200);
   });
+}
+
+/**
+ * Register UI resources with the MCP server
+ *
+ * Registers each UI resource as an MCP resource with:
+ * - URI format: ui://{serverName}/{resourceKey}
+ * - MIME type: text/html;profile=mcp-app
+ * - CSP metadata in _meta.ui.csp
+ */
+function registerUIResources(
+  mcpServer: McpServer,
+  serverName: string,
+  ui: UIDefs
+): void {
+  for (const [key, uiDef] of Object.entries(ui)) {
+    const uri = `ui://${serverName}/${key}`;
+
+    // Build resource metadata
+    const metadata: Record<string, unknown> = {
+      mimeType: "text/html;profile=mcp-app",
+    };
+
+    if (uiDef.description) {
+      metadata.description = uiDef.description;
+    }
+
+    // Build _meta with UI-specific properties
+    const uiMeta: Record<string, unknown> = {};
+
+    if (uiDef.csp) {
+      const cspMetadata = generateMcpCSPMetadata(uiDef.csp);
+      if (Object.keys(cspMetadata).length > 0) {
+        uiMeta.csp = cspMetadata;
+      }
+    }
+
+    if (uiDef.prefersBorder !== undefined) {
+      uiMeta.prefersBorder = uiDef.prefersBorder;
+    }
+
+    if (Object.keys(uiMeta).length > 0) {
+      metadata._meta = { ui: uiMeta };
+    }
+
+    // Register the resource
+    mcpServer.registerResource(
+      uiDef.name ?? key,
+      uri,
+      metadata,
+      () => readUIResource(key, uiDef, uri)
+    );
+  }
+}
+
+/**
+ * Read UI resource content
+ *
+ * Handles both inline HTML (starts with "<") and file paths.
+ */
+function readUIResource(
+  key: string,
+  uiDef: UIDef,
+  uri: string
+): { contents: Array<{ uri: string; mimeType: string; text: string }> } {
+  let html: string;
+
+  if (uiDef.html.startsWith("<")) {
+    // Inline HTML
+    html = uiDef.html;
+  } else {
+    // File path - resolve relative to current working directory
+    const filePath = path.resolve(process.cwd(), uiDef.html);
+    try {
+      html = fs.readFileSync(filePath, "utf-8");
+    } catch (error) {
+      throw new Error(`Failed to read UI resource "${key}" from ${filePath}: ${(error as Error).message}`);
+    }
+  }
+
+  return {
+    contents: [
+      {
+        uri,
+        mimeType: "text/html;profile=mcp-app",
+        text: html,
+      },
+    ],
+  };
 }

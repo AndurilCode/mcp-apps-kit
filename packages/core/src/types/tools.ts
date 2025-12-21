@@ -95,10 +95,12 @@ export type ExpressMiddleware = (
   next: () => void
 ) => void | Promise<void>;
 
+import type { UIDefs } from "./ui";
+
 /**
  * App instance returned by createApp()
  */
-export interface App<T extends ToolDefs = ToolDefs> {
+export interface App<T extends ToolDefs = ToolDefs, U extends UIDefs | undefined = UIDefs | undefined> {
   /** Start the built-in Express server */
   start(options?: StartOptions): Promise<void>;
 
@@ -113,6 +115,9 @@ export interface App<T extends ToolDefs = ToolDefs> {
 
   /** Typed tool definitions (for type inference) */
   readonly tools: T;
+
+  /** UI resource definitions (for type inference) */
+  readonly ui: U;
 }
 
 // =============================================================================

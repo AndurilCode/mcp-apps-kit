@@ -203,8 +203,8 @@ function generateOpenAIMetadata(name: string, toolDef: ToolDef): OpenAIToolMetad
  * @param protocol - Target protocol
  * @returns Array of protocol-specific metadata objects
  */
-export function generateAllToolsMetadata<T extends Record<string, ToolDef>>(
-  tools: T,
+export function generateAllToolsMetadata(
+  tools: Record<string, ToolDef>,
   protocol: "mcp" | "openai"
 ): (McpToolMetadata | OpenAIToolMetadata)[] {
   return Object.entries(tools).map(([name, toolDef]) =>

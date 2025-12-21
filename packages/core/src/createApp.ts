@@ -12,6 +12,7 @@ import type {
   ExpressMiddleware,
 } from "./types/tools";
 import type { AppConfig } from "./types/config";
+import type { UIDefs } from "./types/ui";
 import { AppError, ErrorCode } from "./utils/errors";
 import { createServerInstance, type ServerInstance } from "./server/index";
 
@@ -62,7 +63,9 @@ function validateConfig<T extends ToolDefs>(config: unknown): asserts config is 
  * await app.start({ port: 3000 });
  * ```
  */
-export function createApp<T extends ToolDefs>(config: AppConfig<T>): App<T> {
+export function createApp<T extends ToolDefs, U extends UIDefs | undefined = undefined>(
+  config: AppConfig<T> & { ui?: U }
+): App<T, U> {
   // Validate config at runtime
   validateConfig<T>(config);
 
@@ -75,9 +78,12 @@ export function createApp<T extends ToolDefs>(config: AppConfig<T>): App<T> {
   }
 
   // Create the app instance
-  const app: App<T> = {
+  const app: App<T, U> = {
     // Typed tool definitions
     tools: config.tools,
+
+    // UI resource definitions
+    ui: config.ui as U,
 
     /**
      * Start the built-in Express server

@@ -74,6 +74,20 @@ export type {
   OpenAIToolMetadata,
 } from "./utils/metadata";
 
+// CSP utilities
+export {
+  generateMcpCSPMetadata,
+  generateOpenAICSPMetadata,
+  generateMcpUIMetadata,
+  generateOpenAIUIMetadata,
+} from "./utils/csp";
+export type {
+  McpCSPMetadata,
+  OpenAICSPMetadata,
+  McpUIResourceMetadata,
+  OpenAIUIResourceMetadata,
+} from "./utils/csp";
+
 // =============================================================================
 // MAIN ENTRY POINTS
 // =============================================================================
