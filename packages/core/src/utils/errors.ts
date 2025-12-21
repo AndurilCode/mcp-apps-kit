@@ -27,6 +27,7 @@ export const ErrorCode = {
 
   // Configuration errors
   CONFIG_ERROR: "CONFIG_ERROR",
+  INVALID_CONFIG: "INVALID_CONFIG",
   MISSING_CONFIG: "MISSING_CONFIG",
 
   // Transport errors

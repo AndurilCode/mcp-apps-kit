@@ -63,102 +63,10 @@ export interface ToolDef<
 export type ToolDefs = Record<string, ToolDef>;
 
 // =============================================================================
-// UI DEFINITIONS
-// =============================================================================
-
-/**
- * Content Security Policy configuration
- */
-export interface CSPConfig {
-  /** Domains allowed for fetch/XHR/WebSocket */
-  connectDomains?: string[];
-
-  /** Domains allowed for images, scripts, stylesheets, fonts */
-  resourceDomains?: string[];
-
-  /** Domains for openExternal without modal (ChatGPT only) */
-  redirectDomains?: string[];
-
-  /** Allowed iframe origins (ChatGPT only, discouraged) */
-  frameDomains?: string[];
-}
-
-/**
- * Single UI resource definition
- */
-export interface UIDef {
-  /** HTML content: path to file or inline HTML string */
-  html: string;
-
-  /** Optional display name */
-  name?: string;
-
-  /** Optional description */
-  description?: string;
-
-  /** Content Security Policy */
-  csp?: CSPConfig;
-
-  /** Request a visible border around the widget */
-  prefersBorder?: boolean;
-
-  /** Dedicated domain for isolation (advanced) */
-  domain?: string;
-}
-
-/**
- * Collection of UI resource definitions
- */
-export type UIDefs = Record<string, UIDef>;
-
-// =============================================================================
-// APP CONFIGURATION
-// =============================================================================
-
-/**
- * OAuth 2.1 authentication configuration
- */
-export interface AuthConfig {
-  type: "oauth2";
-  scopes: string[];
-  protectedResource: string;
-  authorizationServer: string;
-}
-
-/**
- * CORS configuration
- */
-export interface CORSConfig {
-  origin: string | string[] | boolean;
-  credentials?: boolean;
-}
-
-/**
- * Main application configuration
- */
-export interface AppConfig<T extends ToolDefs = ToolDefs> {
-  /** App name (used in MCP server registration) */
-  name: string;
-
-  /** Semantic version */
-  version: string;
-
-  /** Tool definitions */
-  tools: T;
-
-  /** UI resource definitions */
-  ui?: UIDefs;
-
-  /** Global configuration */
-  config?: {
-    auth?: AuthConfig;
-    cors?: CORSConfig;
-  };
-}
-
-// =============================================================================
 // APP INSTANCE
 // =============================================================================
+
+import type { CORSConfig } from "./config";
 
 /**
  * Server start options

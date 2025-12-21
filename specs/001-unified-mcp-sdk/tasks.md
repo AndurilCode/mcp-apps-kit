@@ -75,20 +75,20 @@ Based on plan.md structure:
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T022 [P] [US1] Contract test for createApp basic structure in `packages/core/tests/contract/createApp.test.ts`
-- [ ] T023 [P] [US1] Unit test for type inference utilities in `packages/core/tests/unit/types.test.ts`
-- [ ] T024 [P] [US1] Unit test for zodToJsonSchema in `packages/core/tests/unit/schema.test.ts`
+- [X] T022 [P] [US1] Contract test for createApp basic structure in `packages/core/tests/contract/createApp.test.ts`
+- [X] T023 [P] [US1] Unit test for type inference utilities in `packages/core/tests/unit/types.test.ts`
+- [X] T024 [P] [US1] Unit test for zodToJsonSchema in `packages/core/tests/unit/schema.test.ts`
 
 ### Implementation for User Story 1
 
-- [ ] T025 [P] [US1] Implement InferToolInputs<T> type utility in `packages/core/src/types/tools.ts`
-- [ ] T026 [P] [US1] Implement InferToolOutputs<T> type utility in `packages/core/src/types/tools.ts`
-- [ ] T027 [US1] Implement createApp() function signature in `packages/core/src/createApp.ts`
-- [ ] T028 [US1] Implement tool registration with Zod schema validation in `packages/core/src/createApp.ts`
-- [ ] T029 [US1] Implement defineTool() helper function in `packages/core/src/createApp.ts`
-- [ ] T030 [US1] Implement defineUI() helper function in `packages/core/src/createApp.ts`
-- [ ] T031 [US1] Add runtime Zod validation for tool inputs in `packages/core/src/createApp.ts`
-- [ ] T032 [US1] Add user-friendly Zod validation error formatting in `packages/core/src/utils/errors.ts`
+- [X] T025 [P] [US1] Implement InferToolInputs<T> type utility in `packages/core/src/types/tools.ts`
+- [X] T026 [P] [US1] Implement InferToolOutputs<T> type utility in `packages/core/src/types/tools.ts`
+- [X] T027 [US1] Implement createApp() function signature in `packages/core/src/createApp.ts`
+- [X] T028 [US1] Implement tool registration with Zod schema validation in `packages/core/src/createApp.ts`
+- [X] T029 [US1] Implement defineTool() helper function in `packages/core/src/createApp.ts`
+- [X] T030 [US1] Implement defineUI() helper function in `packages/core/src/createApp.ts`
+- [X] T031 [US1] Add runtime Zod validation for tool inputs in `packages/core/src/createApp.ts`
+- [X] T032 [US1] Add user-friendly Zod validation error formatting in `packages/core/src/utils/errors.ts`
 
 **Checkpoint**: Tool definitions with full type inference working - verify with TypeScript compiler
 
