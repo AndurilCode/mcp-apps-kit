@@ -44,10 +44,46 @@ export type {
 export type { ProtocolAdapter, AdapterFactory, AdapterType } from "./adapters/types";
 
 // =============================================================================
-// MAIN ENTRY POINTS (Placeholders - Implemented in Phase 5)
+// ADAPTER EXPORTS
 // =============================================================================
 
-import type { AppsClient, CreateClientOptions, DetectedProtocol, ToolDefs } from "./types";
+export { MockAdapter } from "./adapters/mock";
+export { McpAdapter } from "./adapters/mcp";
+export { OpenAIAdapter } from "./adapters/openai";
+
+// =============================================================================
+// DETECTION
+// =============================================================================
+
+export { detectProtocol } from "./detection";
+
+// =============================================================================
+// CLIENT FACTORY
+// =============================================================================
+
+import type { AppsClient, CreateClientOptions, ToolDefs } from "./types";
+import type { ProtocolAdapter } from "./adapters/types";
+import { detectProtocol } from "./detection";
+import { MockAdapter } from "./adapters/mock";
+import { McpAdapter } from "./adapters/mcp";
+import { OpenAIAdapter } from "./adapters/openai";
+import { createAppsClient } from "./client";
+
+/**
+ * Create an adapter based on detected or forced protocol
+ */
+function createAdapter(protocol: "mcp" | "openai" | "mock"): ProtocolAdapter {
+  switch (protocol) {
+    case "mcp":
+      return new McpAdapter();
+    case "openai":
+      return new OpenAIAdapter();
+    case "mock":
+      return new MockAdapter();
+    default:
+      throw new Error(`Unknown adapter type: ${protocol as string}`);
+  }
+}
 
 /**
  * Create a unified client for UI code
@@ -72,44 +108,20 @@ import type { AppsClient, CreateClientOptions, DetectedProtocol, ToolDefs } from
  * ```
  */
 export async function createClient<T extends ToolDefs = ToolDefs>(
-  _options?: CreateClientOptions
+  options?: CreateClientOptions
 ): Promise<AppsClient<T>> {
-  // Placeholder - will be implemented in Phase 5
-  throw new Error("createClient() not implemented yet - Phase 5");
-}
+  // Determine which adapter to use
+  const protocol = options?.forceAdapter ?? detectProtocol();
 
-/**
- * Detect the current host protocol
- *
- * Detection order:
- * 1. `window.openai` exists → ChatGPT Apps
- * 2. `window.parent !== window` (iframe) → MCP Apps
- * 3. Neither → Mock (development mode)
- *
- * @returns Detected protocol type
- *
- * @example
- * ```typescript
- * const protocol = detectProtocol();
- * console.log(`Running on: ${protocol}`); // "mcp", "openai", or "mock"
- * ```
- */
-export function detectProtocol(): DetectedProtocol {
-  // Placeholder - will be implemented in Phase 5
-  if (typeof window === "undefined") {
-    return "mock";
+  // Validate the adapter type
+  if (!["mcp", "openai", "mock"].includes(protocol)) {
+    throw new Error(`Unknown adapter type: ${protocol}`);
   }
 
-  // Check for OpenAI/ChatGPT
-  if ("openai" in window) {
-    return "openai";
-  }
+  // Create and connect the adapter
+  const adapter = createAdapter(protocol);
+  await adapter.connect();
 
-  // Check for iframe (MCP Apps)
-  if (window.parent !== window) {
-    return "mcp";
-  }
-
-  // Default to mock for development
-  return "mock";
+  // Create and return the client
+  return createAppsClient<T>(adapter);
 }

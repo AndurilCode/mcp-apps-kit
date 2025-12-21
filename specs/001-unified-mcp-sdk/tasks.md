@@ -102,19 +102,19 @@ Based on plan.md structure:
 
 ### Tests for User Story 2
 
-- [ ] T033 [P] [US2] Integration test for app.start() HTTP in `packages/core/tests/integration/server.test.ts`
-- [ ] T034 [P] [US2] Unit test for Express handler in `packages/core/tests/unit/express.test.ts`
-- [ ] T035 [P] [US2] Unit test for stdio transport in `packages/core/tests/unit/stdio.test.ts`
+- [X] T033 [P] [US2] Integration test for app.start() HTTP in `packages/core/tests/integration/server.test.ts`
+- [X] T034 [P] [US2] Unit test for Express handler in `packages/core/tests/unit/express.test.ts`
+- [X] T035 [P] [US2] Unit test for stdio transport in `packages/core/tests/unit/stdio.test.ts`
 
 ### Implementation for User Story 2
 
-- [ ] T036 [P] [US2] Implement MCP server wrapper in `packages/core/src/server.ts`
-- [ ] T037 [US2] Implement app.start() with HTTP transport in `packages/core/src/server/express.ts`
-- [ ] T038 [US2] Implement app.start() with stdio transport in `packages/core/src/server/stdio.ts`
-- [ ] T039 [US2] Implement app.getServer() method in `packages/core/src/createApp.ts`
-- [ ] T040 [US2] Wire createApp() to return full App instance in `packages/core/src/createApp.ts`
-- [ ] T041 [US2] Add CORS configuration support in `packages/core/src/server/express.ts`
-- [ ] T042 [US2] Add error handler middleware for tool errors in `packages/core/src/server/express.ts`
+- [X] T036 [P] [US2] Implement MCP server wrapper in `packages/core/src/server/index.ts`
+- [X] T037 [US2] Implement app.start() with HTTP transport in `packages/core/src/server/index.ts`
+- [X] T038 [US2] Implement app.start() with stdio transport in `packages/core/src/server/index.ts`
+- [X] T039 [US2] Implement app.getServer() method in `packages/core/src/createApp.ts`
+- [X] T040 [US2] Wire createApp() to return full App instance in `packages/core/src/createApp.ts`
+- [X] T041 [US2] Add CORS configuration support in `packages/core/src/server/index.ts`
+- [X] T042 [US2] Add error handler middleware for tool errors in `packages/core/src/server/index.ts`
 
 **Checkpoint**: `createApp().start()` works - minimal MCP server running on HTTP and stdio
 
@@ -128,26 +128,26 @@ Based on plan.md structure:
 
 ### Tests for User Story 3
 
-- [ ] T043 [P] [US3] Unit test for protocol detection in `packages/ui/tests/unit/detection.test.ts`
-- [ ] T044 [P] [US3] Unit test for MCP adapter in `packages/ui/tests/unit/mcp-adapter.test.ts`
-- [ ] T045 [P] [US3] Unit test for OpenAI adapter in `packages/ui/tests/unit/openai-adapter.test.ts`
-- [ ] T046 [P] [US3] Unit test for Mock adapter in `packages/ui/tests/unit/mock-adapter.test.ts`
-- [ ] T047 [P] [US3] Contract test for createClient in `packages/ui/tests/contract/client.test.ts`
+- [X] T043 [P] [US3] Unit test for protocol detection in `packages/ui/tests/unit/detection.test.ts`
+- [X] T044 [P] [US3] Unit test for MCP adapter in `packages/ui/tests/unit/mcp-adapter.test.ts`
+- [X] T045 [P] [US3] Unit test for OpenAI adapter in `packages/ui/tests/unit/openai-adapter.test.ts`
+- [X] T046 [P] [US3] Unit test for Mock adapter in `packages/ui/tests/unit/mock-adapter.test.ts`
+- [X] T047 [P] [US3] Contract test for createClient in `packages/ui/tests/contract/client.test.ts`
 
 ### Implementation for User Story 3
 
-- [ ] T048 [P] [US3] Implement protocol detection in `packages/ui/src/detection.ts`
-- [ ] T049 [US3] Implement MCP Apps adapter in `packages/ui/src/adapters/mcp.ts`
-- [ ] T050 [US3] Implement ChatGPT Apps adapter in `packages/ui/src/adapters/openai.ts`
-- [ ] T051 [US3] Implement Mock adapter for development in `packages/ui/src/adapters/mock.ts`
-- [ ] T052 [US3] Implement unified AppsClient class in `packages/ui/src/client.ts`
-- [ ] T053 [US3] Implement createClient() factory function in `packages/ui/src/client.ts`
-- [ ] T054 [US3] Implement callTool() with type-safe generics in `packages/ui/src/client.ts`
-- [ ] T055 [US3] Implement sendMessage() and sendFollowUpMessage() in `packages/ui/src/client.ts`
-- [ ] T056 [US3] Implement openLink() and requestDisplayMode() in `packages/ui/src/client.ts`
-- [ ] T057 [US3] Implement getState()/setState() with silent no-op on MCP Apps in `packages/ui/src/client.ts`
-- [ ] T058 [US3] Implement event subscriptions (onToolResult, onHostContextChange, etc.) in `packages/ui/src/client.ts`
-- [ ] T059 [US3] Implement hostContext property accessor in `packages/ui/src/client.ts`
+- [X] T048 [P] [US3] Implement protocol detection in `packages/ui/src/detection.ts`
+- [X] T049 [US3] Implement MCP Apps adapter in `packages/ui/src/adapters/mcp.ts`
+- [X] T050 [US3] Implement ChatGPT Apps adapter in `packages/ui/src/adapters/openai.ts`
+- [X] T051 [US3] Implement Mock adapter for development in `packages/ui/src/adapters/mock.ts`
+- [X] T052 [US3] Implement unified AppsClient class in `packages/ui/src/client.ts`
+- [X] T053 [US3] Implement createClient() factory function in `packages/ui/src/index.ts`
+- [X] T054 [US3] Implement callTool() with type-safe generics in `packages/ui/src/client.ts`
+- [X] T055 [US3] Implement sendMessage() and sendFollowUpMessage() in `packages/ui/src/client.ts`
+- [X] T056 [US3] Implement openLink() and requestDisplayMode() in `packages/ui/src/client.ts`
+- [X] T057 [US3] Implement getState()/setState() with silent no-op on MCP Apps in `packages/ui/src/client.ts`
+- [X] T058 [US3] Implement event subscriptions (onToolResult, onHostContextChange, etc.) in `packages/ui/src/client.ts`
+- [X] T059 [US3] Implement hostContext property accessor in `packages/ui/src/client.ts`
 
 **Checkpoint**: UI client SDK working - createClient() auto-detects platform and provides unified API
 
