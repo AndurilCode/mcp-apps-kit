@@ -51,9 +51,10 @@ export interface ProtocolAdapter {
    *
    * @param toolDef - The tool definition
    * @param serverName - The server/app name for resource URI generation
+   * @param uiUri - Optional pre-computed UI resource URI with cache-busting hash
    * @returns Protocol-specific annotations and _meta
    */
-  buildToolMeta(toolDef: ToolDef, serverName: string): ToolMetaResult;
+  buildToolMeta(toolDef: ToolDef, serverName: string, uiUri?: string): ToolMetaResult;
 
   /**
    * Build UI resource metadata

@@ -85,9 +85,10 @@ describe("McpAdapter", () => {
 
     it("should include resourceUri when ui is specified", () => {
       const toolDef = { ...sampleToolDef, ui: "greeting-widget" };
-      const result = adapter.buildToolMeta(toolDef, "test-server");
+      const uiUri = "ui://test-server/greeting-widget?v=abc12345";
+      const result = adapter.buildToolMeta(toolDef, "test-server", uiUri);
       expect(result._meta?.ui).toMatchObject({
-        resourceUri: "ui://test-server/greeting-widget",
+        resourceUri: uiUri,
       });
     });
 
@@ -274,9 +275,10 @@ describe("OpenAIAdapter", () => {
 
     it("should include outputTemplate when ui is specified", () => {
       const toolDef = { ...sampleToolDef, ui: "greeting-widget" };
-      const result = adapter.buildToolMeta(toolDef, "test-server");
+      const uiUri = "ui://test-server/greeting-widget?v=abc12345";
+      const result = adapter.buildToolMeta(toolDef, "test-server", uiUri);
       expect(result._meta).toMatchObject({
-        "openai/outputTemplate": "ui://test-server/greeting-widget",
+        "openai/outputTemplate": uiUri,
       });
     });
 

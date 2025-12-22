@@ -29,7 +29,7 @@ export class OpenAIAdapter implements ProtocolAdapter {
   /**
    * Build tool metadata for OpenAI protocol
    */
-  buildToolMeta(toolDef: ToolDef, serverName: string): ToolMetaResult {
+  buildToolMeta(toolDef: ToolDef, _serverName: string, uiUri?: string): ToolMetaResult {
     const meta: Record<string, unknown> = {};
 
     // Add visibility settings with openai/ prefixes
@@ -41,9 +41,9 @@ export class OpenAIAdapter implements ProtocolAdapter {
       meta["openai/widgetAccessible"] = toolDef.widgetAccessible;
     }
 
-    // Add UI binding with OpenAI prefix - use full resource URI
-    if (toolDef.ui) {
-      meta["openai/outputTemplate"] = `ui://${serverName}/${toolDef.ui}`;
+    // Add UI binding with OpenAI prefix (use pre-computed URI with cache-busting hash)
+    if (uiUri) {
+      meta["openai/outputTemplate"] = uiUri;
     }
 
     // Add invoking/invoked messages (ChatGPT-specific)

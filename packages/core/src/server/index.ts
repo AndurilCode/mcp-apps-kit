@@ -18,6 +18,7 @@ import { wrapError } from "../utils/errors";
 import { createAdapter, type ProtocolAdapter } from "../adapters";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import * as crypto from "node:crypto";
 
 // =============================================================================
 // SERVER WRAPPER
@@ -55,12 +56,15 @@ export function createServerInstance<T extends ToolDefs>(
     version: config.version,
   });
 
-  // Register tools with MCP server
-  registerTools(mcpServer, config.tools, adapter, config.name);
+  // Compute UI resource URIs with content hashes for cache busting
+  const uiUriMap = config.ui ? computeUIUris(config.name, config.ui) : {};
+
+  // Register tools with MCP server (pass UI URIs for correct binding)
+  registerTools(mcpServer, config.tools, adapter, config.name, uiUriMap);
 
   // Register UI resources with MCP server
   if (config.ui) {
-    registerUIResources(mcpServer, config.name, config.ui, adapter);
+    registerUIResources(mcpServer, config.ui, adapter, uiUriMap);
   }
 
   // Create Express app
@@ -269,15 +273,19 @@ function registerTools(
   mcpServer: McpServer,
   tools: ToolDefs,
   adapter: ProtocolAdapter,
-  serverName: string
+  serverName: string,
+  uiUriMap: Record<string, { uri: string; html: string }>
 ): void {
   for (const [name, toolDef] of Object.entries(tools)) {
     // Extract the Zod shape from z.object() for MCP SDK
     // MCP SDK expects inputSchema as { key: zodSchema, ... } not JSON Schema
     const zodShape = extractZodShape(toolDef.input);
 
+    // Look up the full UI URI with hash if tool has a UI binding
+    const uiUri = toolDef.ui ? uiUriMap[toolDef.ui]?.uri : undefined;
+
     // Build annotations and _meta using the protocol adapter
-    const { annotations, _meta } = adapter.buildToolMeta(toolDef, serverName);
+    const { annotations, _meta } = adapter.buildToolMeta(toolDef, serverName, uiUri);
 
     // Build output schema if defined
     const outputSchema = toolDef.output ? extractZodShape(toolDef.output) : undefined;
@@ -458,6 +466,24 @@ function applyCors(app: Express, config: CORSConfig): void {
 }
 
 /**
+ * Compute UI resource URIs with content hashes for cache busting
+ *
+ * Returns a map of UI key to full URI with hash.
+ */
+function computeUIUris(serverName: string, ui: UIDefs): Record<string, { uri: string; html: string }> {
+  const result: Record<string, { uri: string; html: string }> = {};
+
+  for (const [key, uiDef] of Object.entries(ui)) {
+    const html = readUIHtml(key, uiDef);
+    const contentHash = crypto.createHash("sha256").update(html).digest("hex").substring(0, 8);
+    const uri = `ui://${serverName}/${key}?v=${contentHash}`;
+    result[key] = { uri, html };
+  }
+
+  return result;
+}
+
+/**
  * Register UI resources with the MCP server
  *
  * Registers each UI resource as an MCP resource with protocol-specific metadata
@@ -465,12 +491,16 @@ function applyCors(app: Express, config: CORSConfig): void {
  */
 function registerUIResources(
   mcpServer: McpServer,
-  serverName: string,
   ui: UIDefs,
-  adapter: ProtocolAdapter
+  adapter: ProtocolAdapter,
+  uiUriMap: Record<string, { uri: string; html: string }>
 ): void {
   for (const [key, uiDef] of Object.entries(ui)) {
-    const uri = `ui://${serverName}/${key}`;
+    const uiEntry = uiUriMap[key];
+    if (!uiEntry) {
+      throw new Error(`UI resource "${key}" not found in URI map`);
+    }
+    const { uri, html } = uiEntry;
 
     // Build resource metadata using the protocol adapter
     const { mimeType, _meta } = adapter.buildUIResourceMeta(uiDef);
@@ -485,54 +515,39 @@ function registerUIResources(
       metadata._meta = _meta;
     }
 
-    // Register the resource
+    // Register the resource with pre-loaded HTML
     mcpServer.registerResource(
       uiDef.name ?? key,
       uri,
       metadata,
-      () => readUIResource(key, uiDef, uri, mimeType, _meta)
+      () => ({
+        contents: [{
+          uri,
+          mimeType,
+          text: html,
+          ...(_meta && { _meta }),
+        }],
+      })
     );
   }
 }
 
 /**
- * Read UI resource content
+ * Read UI HTML content
  *
  * Handles both inline HTML (starts with "<") and file paths.
  */
-function readUIResource(
-  key: string,
-  uiDef: UIDef,
-  uri: string,
-  mimeType: string,
-  meta?: Record<string, unknown>
-): { contents: Array<{ uri: string; mimeType: string; text: string; _meta?: Record<string, unknown> }> } {
-  let html: string;
-
+function readUIHtml(key: string, uiDef: UIDef): string {
   if (uiDef.html.startsWith("<")) {
     // Inline HTML
-    html = uiDef.html;
-  } else {
-    // File path - resolve relative to current working directory
-    const filePath = path.resolve(process.cwd(), uiDef.html);
-    try {
-      html = fs.readFileSync(filePath, "utf-8");
-    } catch (error) {
-      throw new Error(`Failed to read UI resource "${key}" from ${filePath}: ${(error as Error).message}`);
-    }
+    return uiDef.html;
   }
 
-  const content: { uri: string; mimeType: string; text: string; _meta?: Record<string, unknown> } = {
-    uri,
-    mimeType,
-    text: html,
-  };
-
-  if (meta) {
-    content._meta = meta;
+  // File path - resolve relative to current working directory
+  const filePath = path.resolve(process.cwd(), uiDef.html);
+  try {
+    return fs.readFileSync(filePath, "utf-8");
+  } catch (error) {
+    throw new Error(`Failed to read UI resource "${key}" from ${filePath}: ${(error as Error).message}`);
   }
-
-  return {
-    contents: [content],
-  };
 }

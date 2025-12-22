@@ -28,15 +28,15 @@ export class McpAdapter implements ProtocolAdapter {
   /**
    * Build tool metadata for MCP protocol
    */
-  buildToolMeta(toolDef: ToolDef, serverName: string): ToolMetaResult {
+  buildToolMeta(toolDef: ToolDef, _serverName: string, uiUri?: string): ToolMetaResult {
     const uiMeta: Record<string, unknown> = {};
 
     // Add visibility as array: ["model"], ["app"], or ["model", "app"]
     uiMeta.visibility = mapVisibilityToMcp(toolDef.visibility);
 
-    // Add UI resource link if specified
-    if (toolDef.ui) {
-      uiMeta.resourceUri = `ui://${serverName}/${toolDef.ui}`;
+    // Add UI resource link if specified (use pre-computed URI with cache-busting hash)
+    if (uiUri) {
+      uiMeta.resourceUri = uiUri;
     }
 
     // Build annotations if specified
