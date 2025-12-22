@@ -80,6 +80,12 @@ export interface HostContext {
 
   /** Host-provided styling */
   styles?: HostStyles;
+
+  /**
+   * View identifier for multi-view widgets (ChatGPT only).
+   * Allows widgets to have different views/screens.
+   */
+  view?: string;
 }
 
 // =============================================================================
@@ -221,6 +227,30 @@ export interface AppsClient<T extends ToolDefs = ToolDefs> {
    */
   getFileDownloadUrl?(fileId: string): Promise<{ downloadUrl: string }>;
 
+  // === Layout (Platform-Dependent) ===
+
+  /**
+   * Notify host of widget's intrinsic height (ChatGPT only)
+   *
+   * Call this when your widget's content height changes to prevent
+   * scroll clipping. The host will adjust the container accordingly.
+   *
+   * @param height - Widget height in pixels
+   */
+  notifyIntrinsicHeight?(height: number): void;
+
+  /**
+   * Request a host-owned modal dialog (ChatGPT only)
+   *
+   * Spawns a native ChatGPT modal for confirmations, inputs, etc.
+   * Returns the user's response when the modal is dismissed.
+   *
+   * @param options - Modal configuration
+   * @returns User's modal response
+   * @throws Error on unsupported platforms
+   */
+  requestModal?(options: ModalOptions): Promise<ModalResult>;
+
   // === Resources ===
 
   /**
@@ -296,6 +326,60 @@ export interface AppsClient<T extends ToolDefs = ToolDefs> {
 
   /** Current tool metadata (if any) */
   readonly toolMeta?: Record<string, unknown>;
+}
+
+// =============================================================================
+// MODAL TYPES
+// =============================================================================
+
+/**
+ * Modal button configuration
+ */
+export interface ModalButton {
+  /** Button label text */
+  label: string;
+  /** Button style variant */
+  variant?: "primary" | "secondary" | "destructive";
+  /** Value returned when this button is clicked */
+  value?: string;
+}
+
+/**
+ * Modal input field configuration
+ */
+export interface ModalInput {
+  /** Input field type */
+  type: "text" | "textarea";
+  /** Placeholder text */
+  placeholder?: string;
+  /** Default value */
+  defaultValue?: string;
+  /** Maximum length */
+  maxLength?: number;
+}
+
+/**
+ * Options for requestModal
+ */
+export interface ModalOptions {
+  /** Modal title */
+  title: string;
+  /** Modal body text or description */
+  body?: string;
+  /** Input field configuration (for input modals) */
+  input?: ModalInput;
+  /** Button configurations */
+  buttons?: ModalButton[];
+}
+
+/**
+ * Result from modal interaction
+ */
+export interface ModalResult {
+  /** Which button was clicked (by value or index) */
+  action: string;
+  /** Input value if modal had an input field */
+  inputValue?: string;
 }
 
 // =============================================================================

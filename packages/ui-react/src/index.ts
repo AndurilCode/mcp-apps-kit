@@ -27,7 +27,15 @@ export {
   // File operations (ChatGPT only)
   useFileUpload,
   useFileDownload,
+  // Layout (ChatGPT only)
+  useIntrinsicHeight,
+  useView,
+  // Modals (ChatGPT only)
+  useModal,
 } from "./hooks";
 
 // File operation types
 export type { FileUploadResult, UseFileUploadState } from "./hooks";
+
+// Re-export modal types from @apps-builder/ui
+export type { ModalButton, ModalInput, ModalOptions, ModalResult } from "@apps-builder/ui";

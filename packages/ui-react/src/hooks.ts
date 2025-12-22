@@ -2,8 +2,8 @@
  * React hooks for @apps-builder/ui-react
  */
 
-import { useState, useEffect, useCallback } from "react";
-import type { AppsClient, HostContext, ToolDefs, ToolResult } from "@apps-builder/ui";
+import { useState, useEffect, useCallback, useRef } from "react";
+import type { AppsClient, HostContext, ToolDefs, ToolResult, ModalOptions, ModalResult } from "@apps-builder/ui";
 import { useAppsContext } from "./context";
 
 // =============================================================================
@@ -620,4 +620,226 @@ export function useFileDownload(): {
   );
 
   return { ...state, getDownloadUrl };
+}
+
+// =============================================================================
+// LAYOUT HOOKS
+// =============================================================================
+
+/**
+ * Hook to notify host of widget's intrinsic height (ChatGPT only)
+ *
+ * Automatically reports height changes to prevent scroll clipping.
+ * Returns a ref to attach to your root element for automatic height tracking,
+ * or a manual notify function for custom height reporting.
+ *
+ * @returns Ref for auto-tracking and manual notify function
+ *
+ * @example
+ * ```tsx
+ * // Automatic height tracking
+ * function AutoHeightWidget() {
+ *   const { containerRef, isSupported } = useIntrinsicHeight();
+ *
+ *   return (
+ *     <div ref={containerRef}>
+ *       <p>Content that may change height...</p>
+ *     </div>
+ *   );
+ * }
+ *
+ * // Manual height notification
+ * function ManualHeightWidget() {
+ *   const { notify, isSupported } = useIntrinsicHeight();
+ *
+ *   useEffect(() => {
+ *     // Notify after content loads
+ *     notify(500);
+ *   }, [notify]);
+ *
+ *   return <div style={{ height: 500 }}>Fixed height content</div>;
+ * }
+ * ```
+ */
+export function useIntrinsicHeight(): {
+  /** Whether intrinsic height notification is supported */
+  isSupported: boolean;
+  /** Ref to attach to container for automatic height tracking */
+  containerRef: React.RefObject<HTMLElement | null>;
+  /** Manually notify host of height */
+  notify: (height: number) => void;
+} {
+  const { client } = useAppsContext();
+  const containerRef = useRef<HTMLElement | null>(null);
+  const [isSupported, setIsSupported] = useState(false);
+
+  // Check if supported
+  useEffect(() => {
+    setIsSupported(!!client?.notifyIntrinsicHeight);
+  }, [client]);
+
+  // Manual notify function
+  const notify = useCallback(
+    (height: number) => {
+      client?.notifyIntrinsicHeight?.(height);
+    },
+    [client]
+  );
+
+  // Auto-track height with ResizeObserver
+  useEffect(() => {
+    if (!client?.notifyIntrinsicHeight || !containerRef.current) return;
+
+    const element = containerRef.current;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const height = entry.contentRect.height;
+        client.notifyIntrinsicHeight?.(height);
+      }
+    });
+
+    observer.observe(element);
+
+    // Report initial height
+    client.notifyIntrinsicHeight(element.offsetHeight);
+
+    return () => observer.disconnect();
+  }, [client]);
+
+  return { isSupported, containerRef, notify };
+}
+
+/**
+ * Hook to access the current view identifier (ChatGPT only)
+ *
+ * Useful for multi-view widgets that need to know which view is active.
+ *
+ * @returns Current view identifier or undefined
+ *
+ * @example
+ * ```tsx
+ * function MultiViewWidget() {
+ *   const view = useView();
+ *
+ *   switch (view) {
+ *     case "settings":
+ *       return <SettingsView />;
+ *     case "details":
+ *       return <DetailsView />;
+ *     default:
+ *       return <MainView />;
+ *   }
+ * }
+ * ```
+ */
+export function useView(): string | undefined {
+  const context = useHostContext();
+  return context.view;
+}
+
+// =============================================================================
+// MODAL HOOKS
+// =============================================================================
+
+/**
+ * Hook for showing host-owned modal dialogs (ChatGPT only)
+ *
+ * Spawns native ChatGPT modals for confirmations, inputs, etc.
+ * On unsupported platforms, isSupported will be false.
+ *
+ * @returns Modal function and state
+ *
+ * @example
+ * ```tsx
+ * function DeleteButton() {
+ *   const { showModal, isSupported, isOpen } = useModal();
+ *
+ *   const handleDelete = async () => {
+ *     const result = await showModal({
+ *       title: "Confirm Delete",
+ *       body: "Are you sure you want to delete this item?",
+ *       buttons: [
+ *         { label: "Cancel", variant: "secondary", value: "cancel" },
+ *         { label: "Delete", variant: "destructive", value: "delete" },
+ *       ],
+ *     });
+ *
+ *     if (result?.action === "delete") {
+ *       // Perform delete
+ *     }
+ *   };
+ *
+ *   if (!isSupported) {
+ *     return <button onClick={() => window.confirm("Delete?")}>Delete</button>;
+ *   }
+ *
+ *   return (
+ *     <button onClick={handleDelete} disabled={isOpen}>
+ *       Delete
+ *     </button>
+ *   );
+ * }
+ *
+ * // Input modal example
+ * function RenameButton() {
+ *   const { showModal } = useModal();
+ *
+ *   const handleRename = async () => {
+ *     const result = await showModal({
+ *       title: "Rename Item",
+ *       input: {
+ *         type: "text",
+ *         placeholder: "Enter new name",
+ *         defaultValue: "Current Name",
+ *       },
+ *       buttons: [
+ *         { label: "Cancel", variant: "secondary", value: "cancel" },
+ *         { label: "Rename", variant: "primary", value: "rename" },
+ *       ],
+ *     });
+ *
+ *     if (result?.action === "rename" && result.inputValue) {
+ *       console.log("New name:", result.inputValue);
+ *     }
+ *   };
+ *
+ *   return <button onClick={handleRename}>Rename</button>;
+ * }
+ * ```
+ */
+export function useModal(): {
+  /** Whether modal API is supported */
+  isSupported: boolean;
+  /** Whether a modal is currently open */
+  isOpen: boolean;
+  /** Show a modal dialog */
+  showModal: (options: ModalOptions) => Promise<ModalResult | null>;
+} {
+  const { client } = useAppsContext();
+  const [isSupported, setIsSupported] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+
+  // Check if supported
+  useEffect(() => {
+    setIsSupported(!!client?.requestModal);
+  }, [client]);
+
+  const showModal = useCallback(
+    async (options: ModalOptions): Promise<ModalResult | null> => {
+      if (!client?.requestModal) {
+        return null;
+      }
+
+      setIsOpen(true);
+      try {
+        const result = await client.requestModal(options);
+        return result;
+      } finally {
+        setIsOpen(false);
+      }
+    },
+    [client]
+  );
+
+  return { isSupported, isOpen, showModal };
 }

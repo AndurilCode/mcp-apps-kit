@@ -308,15 +308,37 @@ function registerTools(
             context
           );
 
+          // Extract special fields from result
+          const resultObj = result as Record<string, unknown>;
+          const closeWidget = resultObj._closeWidget as boolean | undefined;
+
+          // Build response _meta, merging user _meta with closeWidget
+          let responseMeta: Record<string, unknown> | undefined;
+          if (closeWidget || resultObj._meta) {
+            responseMeta = { ...(resultObj._meta as Record<string, unknown> | undefined) };
+            if (closeWidget) {
+              responseMeta["openai/closeWidget"] = true;
+            }
+          }
+
+          // Clean result for structured content (remove underscore-prefixed fields)
+          const cleanResult: Record<string, unknown> = {};
+          for (const [key, value] of Object.entries(resultObj)) {
+            if (!key.startsWith("_")) {
+              cleanResult[key] = value;
+            }
+          }
+
           // Return result with both text content and structuredContent
           return {
             content: [
               {
                 type: "text" as const,
-                text: JSON.stringify(result),
+                text: JSON.stringify(cleanResult),
               },
             ],
-            structuredContent: result as Record<string, unknown>,
+            structuredContent: cleanResult,
+            _meta: responseMeta,
           };
         } catch (error) {
           const appError = wrapError(error);

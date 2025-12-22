@@ -177,6 +177,22 @@ export interface ToolDef<
       _meta?: Record<string, unknown>;
       /** Text narration for model (optional) */
       _text?: string;
+      /**
+       * Close the widget after this tool response (ChatGPT only).
+       *
+       * When true, the widget will be closed after the response is processed.
+       * Useful for completing flows like checkout or submission.
+       *
+       * @example
+       * ```typescript
+       * handler: async (input) => ({
+       *   success: true,
+       *   message: "Order placed!",
+       *   _closeWidget: true,
+       * })
+       * ```
+       */
+      _closeWidget?: boolean;
     }
   >;
 

@@ -38,6 +38,11 @@ export type {
   AppsClient,
   CreateClientOptions,
   DetectedProtocol,
+  // Modal types
+  ModalButton,
+  ModalInput,
+  ModalOptions,
+  ModalResult,
 } from "./types";
 
 // Adapter types
