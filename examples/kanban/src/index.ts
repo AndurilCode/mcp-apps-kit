@@ -116,7 +116,7 @@ const app = createApp({
 
   tools: {
     // =========================================================================
-    // LIST TASKS
+    // LIST TASKS (Widget-only tool)
     // =========================================================================
     listTasks: {
       description:
@@ -135,7 +135,8 @@ const app = createApp({
           total: z.number(),
         }),
       }),
-      ui: "kanban-board",
+      visibility: "app",
+      widgetAccessible: true,
       handler: async ({ status }) => {
         const filteredTasks = status ? getTasksByStatus(status) : getAllTasks();
 
@@ -152,7 +153,7 @@ const app = createApp({
     },
 
     // =========================================================================
-    // CREATE TASK
+    // CREATE TASK (Widget-only tool)
     // =========================================================================
     createTask: {
       description: "Create a new task on the Kanban board",
@@ -167,7 +168,8 @@ const app = createApp({
         task: TaskSchema,
         message: z.string(),
       }),
-      ui: "kanban-board",
+      visibility: "app",
+      widgetAccessible: true,
       invokingMessage: "Creating task...",
       invokedMessage: "Task created!",
       handler: async ({ title, description, status }) => {
@@ -191,7 +193,7 @@ const app = createApp({
     },
 
     // =========================================================================
-    // MOVE TASK
+    // MOVE TASK (Widget-only tool)
     // =========================================================================
     moveTask: {
       description: "Move a task to a different column on the Kanban board",
@@ -203,7 +205,8 @@ const app = createApp({
         task: TaskSchema,
         message: z.string(),
       }),
-      ui: "kanban-board",
+      visibility: "app",
+      widgetAccessible: true,
       invokingMessage: "Moving task...",
       invokedMessage: "Task moved!",
       handler: async ({ taskId, newStatus }) => {
@@ -224,7 +227,7 @@ const app = createApp({
     },
 
     // =========================================================================
-    // UPDATE TASK
+    // UPDATE TASK (Widget-only tool)
     // =========================================================================
     updateTask: {
       description: "Update a task's title or description",
@@ -237,7 +240,8 @@ const app = createApp({
         task: TaskSchema,
         message: z.string(),
       }),
-      ui: "kanban-board",
+      visibility: "app",
+      widgetAccessible: true,
       handler: async ({ taskId, title, description }) => {
         const task = tasks.get(taskId);
         if (!task) {
@@ -260,7 +264,7 @@ const app = createApp({
     },
 
     // =========================================================================
-    // DELETE TASK
+    // DELETE TASK (Widget-only tool)
     // =========================================================================
     deleteTask: {
       description: "Delete a task from the Kanban board",
@@ -271,7 +275,8 @@ const app = createApp({
         success: z.boolean(),
         message: z.string(),
       }),
-      ui: "kanban-board",
+      visibility: "app",
+      widgetAccessible: true,
       invokingMessage: "Deleting task...",
       invokedMessage: "Task deleted!",
       handler: async ({ taskId }) => {
@@ -314,6 +319,7 @@ const app = createApp({
       }),
       ui: "kanban-board",
       visibility: "both",
+      widgetAccessible: true,
       handler: async () => {
         const columns = [
           { name: "To Do", status: "todo" as TaskStatus },
@@ -343,8 +349,8 @@ const app = createApp({
   ui: {
     "kanban-board": {
       name: "Kanban Board Widget",
-      description: "Interactive Kanban board visualization",
-      html: "./src/ui/board.html",
+      description: "Interactive Kanban board React app",
+      html: "./src/ui/dist/index.html",
       prefersBorder: true,
       csp: {
         connectDomains: [],
