@@ -13,28 +13,40 @@ import { zodToJsonSchema } from "./schema";
 // =============================================================================
 
 /**
- * MCP visibility annotations
+ * MCP visibility value per PROTOCOL-COMPARISON.md
+ * Array of who can invoke: "model", "app", or both
  */
-export interface McpVisibilityAnnotations {
-  readOnlyHint: boolean;
-  appOnly?: boolean;
+export type McpVisibilityValue = ("model" | "app")[];
+
+/**
+ * MCP UI metadata structure per PROTOCOL-COMPARISON.md
+ * All MCP-specific metadata goes under _meta.ui.*
+ */
+export interface McpUIMeta {
+  resourceUri?: string;
+  visibility?: McpVisibilityValue;
 }
 
 /**
- * Map visibility to MCP protocol annotations
+ * Map visibility to MCP protocol format
+ *
+ * Per PROTOCOL-COMPARISON.md:
+ * - Model + UI: ["model", "app"]
+ * - Model Only: ["model"]
+ * - UI Only: ["app"]
  *
  * @param visibility - Tool visibility setting
- * @returns MCP-specific annotations
+ * @returns MCP visibility array
  */
-export function mapVisibilityToMcp(visibility?: Visibility): McpVisibilityAnnotations {
+export function mapVisibilityToMcp(visibility?: Visibility): McpVisibilityValue {
   switch (visibility) {
     case "model":
-      return { readOnlyHint: true };
+      return ["model"];
     case "app":
-      return { readOnlyHint: false, appOnly: true };
+      return ["app"];
     case "both":
     default:
-      return { readOnlyHint: false };
+      return ["model", "app"];
   }
 }
 
@@ -43,28 +55,36 @@ export function mapVisibilityToMcp(visibility?: Visibility): McpVisibilityAnnota
 // =============================================================================
 
 /**
- * OpenAI visibility settings
+ * OpenAI visibility settings with proper openai/ prefixed keys
+ * Per PROTOCOL-COMPARISON.md:
+ * - openai/visibility: "public" | "private"
+ * - openai/widgetAccessible: boolean
  */
 export interface OpenAIVisibilitySettings {
-  invokableByAI: boolean;
-  invokableByApp: boolean;
+  "openai/visibility": "public" | "private";
+  "openai/widgetAccessible": boolean;
 }
 
 /**
  * Map visibility to OpenAI/ChatGPT protocol settings
  *
+ * Per PROTOCOL-COMPARISON.md:
+ * - Model + UI: "public" + widgetAccessible: true
+ * - Model Only: "public" + widgetAccessible: false
+ * - UI Only: "private" + widgetAccessible: true
+ *
  * @param visibility - Tool visibility setting
- * @returns OpenAI-specific visibility settings
+ * @returns OpenAI-specific visibility settings with openai/ prefixes
  */
 export function mapVisibilityToOpenAI(visibility?: Visibility): OpenAIVisibilitySettings {
   switch (visibility) {
     case "model":
-      return { invokableByAI: true, invokableByApp: false };
+      return { "openai/visibility": "public", "openai/widgetAccessible": false };
     case "app":
-      return { invokableByAI: false, invokableByApp: true };
+      return { "openai/visibility": "private", "openai/widgetAccessible": true };
     case "both":
     default:
-      return { invokableByAI: true, invokableByApp: true };
+      return { "openai/visibility": "public", "openai/widgetAccessible": true };
   }
 }
 

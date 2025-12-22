@@ -68,7 +68,8 @@ export {
   generateAllToolsMetadata,
 } from "./utils/metadata";
 export type {
-  McpVisibilityAnnotations,
+  McpVisibilityValue,
+  McpUIMeta,
   OpenAIVisibilitySettings,
   McpToolMetadata,
   OpenAIToolMetadata,

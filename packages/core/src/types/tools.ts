@@ -50,6 +50,9 @@ export interface ToolDef<
   /** Who can call this tool */
   visibility?: Visibility;
 
+  /** Whether the widget/app can invoke this tool (ChatGPT only) */
+  widgetAccessible?: boolean;
+
   /** Message shown while tool is executing (ChatGPT only) */
   invokingMessage?: string;
 

@@ -326,27 +326,37 @@ function registerTools(
       const visibilitySettings = mapVisibilityToOpenAI(toolDef.visibility);
       Object.assign(meta, visibilitySettings);
 
+      // Allow explicit widgetAccessible to override visibility-derived value
+      if (toolDef.widgetAccessible !== undefined) {
+        meta["openai/widgetAccessible"] = toolDef.widgetAccessible;
+      }
+
       // Add UI binding with OpenAI prefix - use full resource URI
       if (toolDef.ui) {
         meta["openai/outputTemplate"] = `ui://${serverName}/${toolDef.ui}`;
       }
 
       // Add invoking/invoked messages (ChatGPT-specific)
+      // Per PROTOCOL-COMPARISON.md: use openai/toolInvocation/invoking and openai/toolInvocation/invoked
       if (toolDef.invokingMessage) {
-        meta.invokingMessage = toolDef.invokingMessage;
+        meta["openai/toolInvocation/invoking"] = toolDef.invokingMessage;
       }
       if (toolDef.invokedMessage) {
-        meta.invokedMessage = toolDef.invokedMessage;
+        meta["openai/toolInvocation/invoked"] = toolDef.invokedMessage;
       }
     } else {
-      // MCP protocol: use readOnlyHint/appOnly format in annotations
-      const visibilityAnnotations = mapVisibilityToMcp(toolDef.visibility);
-      Object.assign(annotations, visibilityAnnotations);
+      // MCP protocol: put metadata under _meta.ui.* per PROTOCOL-COMPARISON.md
+      const uiMeta: Record<string, unknown> = {};
 
-      // Add UI binding if specified
+      // Add visibility as array: ["model"], ["app"], or ["model", "app"]
+      uiMeta.visibility = mapVisibilityToMcp(toolDef.visibility);
+
+      // Add UI resource link if specified
       if (toolDef.ui) {
-        annotations.ui = toolDef.ui;
+        uiMeta.resourceUri = `ui://${serverName}/${toolDef.ui}`;
       }
+
+      meta.ui = uiMeta;
     }
 
     // Build output schema if defined
@@ -487,19 +497,20 @@ function registerUIResources(
         }
       }
 
+      // Per PROTOCOL-COMPARISON.md: use openai/widgetPrefersBorder and openai/widgetDomain
       if (uiDef.prefersBorder !== undefined) {
-        metaObj.prefersBorder = uiDef.prefersBorder;
+        metaObj["openai/widgetPrefersBorder"] = uiDef.prefersBorder;
       }
 
       if (uiDef.domain) {
-        metaObj.domain = uiDef.domain;
+        metaObj["openai/widgetDomain"] = uiDef.domain;
       }
 
       if (Object.keys(metaObj).length > 0) {
         metadata._meta = metaObj;
       }
     } else {
-      // MCP protocol: use camelCase in _meta.ui namespace
+      // MCP protocol: use camelCase in _meta.ui namespace per PROTOCOL-COMPARISON.md
       const uiMeta: Record<string, unknown> = {};
 
       if (uiDef.csp) {
@@ -511,6 +522,10 @@ function registerUIResources(
 
       if (uiDef.prefersBorder !== undefined) {
         uiMeta.prefersBorder = uiDef.prefersBorder;
+      }
+
+      if (uiDef.domain) {
+        uiMeta.domain = uiDef.domain;
       }
 
       if (Object.keys(uiMeta).length > 0) {
