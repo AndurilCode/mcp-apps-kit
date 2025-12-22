@@ -196,6 +196,16 @@ export interface ToolDef<
   invokedMessage?: string;
 
   /**
+   * Input parameters that accept file references (ChatGPT only).
+   *
+   * List parameter names that should accept uploaded file IDs.
+   * ChatGPT will allow users to attach files to these parameters.
+   *
+   * @example ["imageFile", "documentFile"]
+   */
+  fileParams?: string[];
+
+  /**
    * Behavioral hints for the AI model.
    * Help hosts optimize UX and models understand tool behavior.
    */

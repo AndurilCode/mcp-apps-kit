@@ -24,4 +24,10 @@ export {
   useSafeAreaInsets,
   useOnToolCancelled,
   useOnTeardown,
+  // File operations (ChatGPT only)
+  useFileUpload,
+  useFileDownload,
 } from "./hooks";
+
+// File operation types
+export type { FileUploadResult, UseFileUploadState } from "./hooks";

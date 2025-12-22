@@ -95,6 +95,16 @@ export interface UIDef {
   description?: string;
 
   /**
+   * Human-readable summary for the AI model (ChatGPT only).
+   *
+   * This description helps the model understand what the widget does
+   * and when to display it. Keep it concise and informative.
+   *
+   * @example "Interactive task board for managing project workflows"
+   */
+  widgetDescription?: string;
+
+  /**
    * Content Security Policy configuration.
    * Controls what external resources the UI can access.
    */

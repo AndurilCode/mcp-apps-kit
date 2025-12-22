@@ -54,6 +54,11 @@ export class OpenAIAdapter implements ProtocolAdapter {
       meta["openai/toolInvocation/invoked"] = toolDef.invokedMessage;
     }
 
+    // Add file parameters (ChatGPT-specific)
+    if (toolDef.fileParams && toolDef.fileParams.length > 0) {
+      meta["openai/fileParams"] = toolDef.fileParams;
+    }
+
     // Build annotations if specified
     const annotations = this.buildAnnotations(toolDef.annotations);
 
@@ -113,6 +118,11 @@ export class OpenAIAdapter implements ProtocolAdapter {
     // Add domain with openai/ prefix
     if (uiDef.domain) {
       meta["openai/widgetDomain"] = uiDef.domain;
+    }
+
+    // Add widget description for model understanding
+    if (uiDef.widgetDescription) {
+      meta["openai/widgetDescription"] = uiDef.widgetDescription;
     }
 
     const result: UIResourceMetaResult = {

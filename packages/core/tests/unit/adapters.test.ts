@@ -344,6 +344,25 @@ describe("OpenAIAdapter", () => {
         idempotentHint: false,
       });
     });
+
+    it("should include fileParams when specified", () => {
+      const toolDef = { ...sampleToolDef, fileParams: ["imageFile", "documentFile"] };
+      const result = adapter.buildToolMeta(toolDef, "test-server");
+      expect(result._meta).toMatchObject({
+        "openai/fileParams": ["imageFile", "documentFile"],
+      });
+    });
+
+    it("should not include fileParams when empty array", () => {
+      const toolDef = { ...sampleToolDef, fileParams: [] };
+      const result = adapter.buildToolMeta(toolDef, "test-server");
+      expect(result._meta).not.toHaveProperty("openai/fileParams");
+    });
+
+    it("should not include fileParams when not specified", () => {
+      const result = adapter.buildToolMeta(sampleToolDef, "test-server");
+      expect(result._meta).not.toHaveProperty("openai/fileParams");
+    });
   });
 
   describe("buildUIResourceMeta", () => {
@@ -410,6 +429,35 @@ describe("OpenAIAdapter", () => {
         },
         "openai/widgetPrefersBorder": false,
         "openai/widgetDomain": "https://example.com",
+      });
+    });
+
+    it("should include widgetDescription when specified", () => {
+      const uiDef: UIDef = {
+        ...sampleUIDef,
+        widgetDescription: "Interactive task board for managing project workflows",
+      };
+      const result = adapter.buildUIResourceMeta(uiDef);
+      expect(result._meta).toEqual({
+        "openai/widgetDescription": "Interactive task board for managing project workflows",
+      });
+    });
+
+    it("should not include widgetDescription when not specified", () => {
+      const result = adapter.buildUIResourceMeta(sampleUIDef);
+      expect(result._meta).toBeUndefined();
+    });
+
+    it("should combine widgetDescription with other options", () => {
+      const uiDef: UIDef = {
+        ...sampleUIDef,
+        widgetDescription: "A greeting widget",
+        prefersBorder: true,
+      };
+      const result = adapter.buildUIResourceMeta(uiDef);
+      expect(result._meta).toEqual({
+        "openai/widgetDescription": "A greeting widget",
+        "openai/widgetPrefersBorder": true,
       });
     });
   });

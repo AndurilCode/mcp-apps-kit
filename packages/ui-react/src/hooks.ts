@@ -410,3 +410,214 @@ export function useOnTeardown(handler: (reason?: string) => void): void {
     return unsubscribe;
   }, [client, handler]);
 }
+
+// =============================================================================
+// FILE OPERATION HOOKS
+// =============================================================================
+
+/**
+ * File upload result
+ */
+export interface FileUploadResult {
+  /** Uploaded file ID */
+  fileId: string;
+}
+
+/**
+ * File upload state
+ */
+export interface UseFileUploadState {
+  /** Whether file upload is supported on this platform */
+  isSupported: boolean;
+  /** Whether upload is in progress */
+  isUploading: boolean;
+  /** Upload error if any */
+  error: Error | null;
+  /** Last uploaded file ID */
+  fileId: string | null;
+}
+
+/**
+ * Hook for uploading files (ChatGPT only)
+ *
+ * Provides a function to upload files and tracks upload state.
+ * On unsupported platforms, isSupported will be false.
+ *
+ * Supported file types: PNG, JPEG, WebP images
+ *
+ * @returns Upload function and state
+ *
+ * @example
+ * ```tsx
+ * function ImageUploader() {
+ *   const { upload, isSupported, isUploading, error, fileId } = useFileUpload();
+ *
+ *   if (!isSupported) {
+ *     return <div>File upload not supported on this platform</div>;
+ *   }
+ *
+ *   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+ *     const file = e.target.files?.[0];
+ *     if (file) {
+ *       const result = await upload(file);
+ *       console.log("Uploaded:", result?.fileId);
+ *     }
+ *   };
+ *
+ *   return (
+ *     <div>
+ *       <input type="file" accept="image/*" onChange={handleFileChange} />
+ *       {isUploading && <span>Uploading...</span>}
+ *       {error && <span>Error: {error.message}</span>}
+ *       {fileId && <span>Uploaded: {fileId}</span>}
+ *     </div>
+ *   );
+ * }
+ * ```
+ */
+export function useFileUpload(): UseFileUploadState & {
+  upload: (file: File) => Promise<FileUploadResult | null>;
+} {
+  const { client } = useAppsContext();
+  const [state, setState] = useState<UseFileUploadState>({
+    isSupported: false,
+    isUploading: false,
+    error: null,
+    fileId: null,
+  });
+
+  // Check if upload is supported
+  useEffect(() => {
+    setState((prev) => ({
+      ...prev,
+      isSupported: !!client?.uploadFile,
+    }));
+  }, [client]);
+
+  const upload = useCallback(
+    async (file: File): Promise<FileUploadResult | null> => {
+      if (!client?.uploadFile) {
+        setState((prev) => ({
+          ...prev,
+          error: new Error("File upload not supported on this platform"),
+        }));
+        return null;
+      }
+
+      setState((prev) => ({ ...prev, isUploading: true, error: null }));
+
+      try {
+        const result = await client.uploadFile(file);
+        setState((prev) => ({
+          ...prev,
+          isUploading: false,
+          fileId: result.fileId,
+        }));
+        return result;
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        setState((prev) => ({
+          ...prev,
+          isUploading: false,
+          error,
+        }));
+        return null;
+      }
+    },
+    [client]
+  );
+
+  return { ...state, upload };
+}
+
+/**
+ * Hook for getting file download URLs (ChatGPT only)
+ *
+ * Provides a function to get temporary download URLs for uploaded files.
+ * On unsupported platforms, isSupported will be false.
+ *
+ * @returns Download URL function and state
+ *
+ * @example
+ * ```tsx
+ * function FileDownloader({ fileId }: { fileId: string }) {
+ *   const { getDownloadUrl, isSupported, isLoading, error, downloadUrl } = useFileDownload();
+ *
+ *   useEffect(() => {
+ *     if (fileId && isSupported) {
+ *       getDownloadUrl(fileId);
+ *     }
+ *   }, [fileId, isSupported, getDownloadUrl]);
+ *
+ *   if (!isSupported) return <div>Not supported</div>;
+ *   if (isLoading) return <div>Loading...</div>;
+ *   if (error) return <div>Error: {error.message}</div>;
+ *   if (downloadUrl) return <img src={downloadUrl} alt="Uploaded file" />;
+ *
+ *   return null;
+ * }
+ * ```
+ */
+export function useFileDownload(): {
+  isSupported: boolean;
+  isLoading: boolean;
+  error: Error | null;
+  downloadUrl: string | null;
+  getDownloadUrl: (fileId: string) => Promise<string | null>;
+} {
+  const { client } = useAppsContext();
+  const [state, setState] = useState<{
+    isSupported: boolean;
+    isLoading: boolean;
+    error: Error | null;
+    downloadUrl: string | null;
+  }>({
+    isSupported: false,
+    isLoading: false,
+    error: null,
+    downloadUrl: null,
+  });
+
+  // Check if download URL is supported
+  useEffect(() => {
+    setState((prev) => ({
+      ...prev,
+      isSupported: !!client?.getFileDownloadUrl,
+    }));
+  }, [client]);
+
+  const getDownloadUrl = useCallback(
+    async (fileId: string): Promise<string | null> => {
+      if (!client?.getFileDownloadUrl) {
+        setState((prev) => ({
+          ...prev,
+          error: new Error("File download not supported on this platform"),
+        }));
+        return null;
+      }
+
+      setState((prev) => ({ ...prev, isLoading: true, error: null }));
+
+      try {
+        const result = await client.getFileDownloadUrl(fileId);
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          downloadUrl: result.downloadUrl,
+        }));
+        return result.downloadUrl;
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error,
+        }));
+        return null;
+      }
+    },
+    [client]
+  );
+
+  return { ...state, getDownloadUrl };
+}
