@@ -26,6 +26,7 @@ export class OpenAIAdapter implements ProtocolAdapter {
   private currentToolInput?: Record<string, unknown>;
   private currentToolOutput?: Record<string, unknown>;
   private currentToolMeta?: Record<string, unknown>;
+  private globalsHandler?: (event: MessageEvent) => void;
 
   constructor() {
     this.context = this.createDefaultContext();
@@ -52,6 +53,77 @@ export class OpenAIAdapter implements ProtocolAdapter {
     };
   }
 
+  /**
+   * Read current context from the OpenAI SDK globals
+   * Properties available: theme, displayMode, maxHeight, safeArea, view, userAgent, locale
+   */
+  private readContextFromSDK(): void {
+    const openai = this.getOpenAI();
+    if (!openai) return;
+
+    const isBrowser = typeof window !== "undefined";
+
+    // Read theme
+    if (typeof openai.theme === "string") {
+      this.context.theme = openai.theme as "light" | "dark";
+    }
+
+    // Read display mode
+    if (typeof openai.displayMode === "string") {
+      this.context.displayMode = openai.displayMode as HostContext["displayMode"];
+    }
+
+    // Read locale
+    if (typeof openai.locale === "string") {
+      this.context.locale = openai.locale;
+    }
+
+    // Read user agent - store in a type-safe way
+    if (typeof openai.userAgent === "string") {
+      // Note: userAgent is not part of HostContext type, but we store it for access
+      // Apps can access it via (context as any).userAgent if needed
+      Object.assign(this.context, { userAgent: openai.userAgent });
+    }
+
+    // Read view identifier
+    if (typeof openai.view === "string") {
+      this.context.view = openai.view;
+    }
+
+    // Read safe area insets
+    if (openai.safeArea && typeof openai.safeArea === "object") {
+      const safeArea = openai.safeArea as Record<string, unknown>;
+      this.context.safeAreaInsets = {
+        top: typeof safeArea.top === "number" ? safeArea.top : 0,
+        right: typeof safeArea.right === "number" ? safeArea.right : 0,
+        bottom: typeof safeArea.bottom === "number" ? safeArea.bottom : 0,
+        left: typeof safeArea.left === "number" ? safeArea.left : 0,
+      };
+    }
+
+    // Read max height for viewport
+    if (typeof openai.maxHeight === "number") {
+      this.context.viewport = {
+        width: isBrowser ? window.innerWidth : 800,
+        height: openai.maxHeight,
+      };
+    }
+
+    console.log("[OpenAI Adapter] Read context from SDK:", this.context);
+  }
+
+  /**
+   * Notify all registered handlers of context changes
+   */
+  private notifyContextChange(): void {
+    console.log(`[OpenAI Adapter] Notifying ${this.hostContextHandlers.size} context change handlers`);
+    // Create a new object reference to trigger React state updates
+    const contextSnapshot = { ...this.context };
+    for (const handler of this.hostContextHandlers) {
+      handler(contextSnapshot);
+    }
+  }
+
   private getOpenAI(): { [key: string]: unknown } | null {
     if (typeof window !== "undefined" && "openai" in window) {
       return (window as { openai: { [key: string]: unknown } }).openai;
@@ -70,6 +142,9 @@ export class OpenAIAdapter implements ProtocolAdapter {
     // Log available SDK methods for debugging
     if (openai) {
       console.log("[OpenAI Adapter] Available SDK methods:", Object.keys(openai));
+
+      // Read initial host context from SDK properties
+      this.readContextFromSDK();
 
       // Try to get initial tool context
       if (typeof openai.getToolOutput === "function") {
@@ -96,7 +171,53 @@ export class OpenAIAdapter implements ProtocolAdapter {
       }
     }
 
+    // Subscribe to context changes via postMessage
+    this.setupGlobalsListener();
+
     this.connected = true;
+  }
+
+  /**
+   * Set up listener for openai:set_globals messages
+   * The host fires these events when context values change (theme, locale, etc.)
+   */
+  private setupGlobalsListener(): void {
+    if (typeof window === "undefined") return;
+
+    this.globalsHandler = (event: MessageEvent) => {
+      const data = event.data;
+
+      // Handle various message formats for set_globals
+      const isSetGlobals =
+        data === "openai:set_globals" ||
+        data?.type === "openai:set_globals" ||
+        (typeof data === "object" && data?.message === "openai:set_globals");
+
+      if (isSetGlobals) {
+        console.log("[OpenAI Adapter] Received set_globals event, refreshing context");
+
+        // Give a small delay for the globals to be applied
+        setTimeout(() => {
+          const previousTheme = this.context.theme;
+          const previousLocale = this.context.locale;
+          const previousDisplayMode = this.context.displayMode;
+
+          this.readContextFromSDK();
+
+          // Check if anything actually changed
+          if (
+            this.context.theme !== previousTheme ||
+            this.context.locale !== previousLocale ||
+            this.context.displayMode !== previousDisplayMode
+          ) {
+            console.log("[OpenAI Adapter] Context changed, notifying handlers");
+            this.notifyContextChange();
+          }
+        }, 10);
+      }
+    };
+
+    window.addEventListener("message", this.globalsHandler);
   }
 
   private async waitForOpenAI(timeout = 5000): Promise<void> {
@@ -295,7 +416,11 @@ export class OpenAIAdapter implements ProtocolAdapter {
 
   onHostContextChange(handler: (context: HostContext) => void): () => void {
     this.hostContextHandlers.add(handler);
-    return () => this.hostContextHandlers.delete(handler);
+    console.log(`[OpenAI Adapter] Host context handler added, total: ${this.hostContextHandlers.size}`);
+    return () => {
+      this.hostContextHandlers.delete(handler);
+      console.log(`[OpenAI Adapter] Host context handler removed, total: ${this.hostContextHandlers.size}`);
+    };
   }
 
   onTeardown(handler: (reason?: string) => void): () => void {
