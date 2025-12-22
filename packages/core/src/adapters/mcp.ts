@@ -5,7 +5,7 @@
  * Uses camelCase naming and _meta.ui.* namespace.
  */
 
-import type { ToolDef } from "../types/tools";
+import type { ToolDef, ToolAnnotations } from "../types/tools";
 import type { UIDef } from "../types/ui";
 import type { ProtocolAdapter, ToolMetaResult, UIResourceMetaResult } from "./types";
 import { mapVisibilityToMcp } from "../utils/metadata";
@@ -39,9 +39,39 @@ export class McpAdapter implements ProtocolAdapter {
       uiMeta.resourceUri = `ui://${serverName}/${toolDef.ui}`;
     }
 
+    // Build annotations if specified
+    const annotations = this.buildAnnotations(toolDef.annotations);
+
     return {
+      annotations,
       _meta: { ui: uiMeta },
     };
+  }
+
+  /**
+   * Build MCP annotations from tool annotations
+   */
+  private buildAnnotations(annotations?: ToolAnnotations): Record<string, unknown> | undefined {
+    if (!annotations) {
+      return undefined;
+    }
+
+    const result: Record<string, unknown> = {};
+
+    if (annotations.readOnlyHint !== undefined) {
+      result.readOnlyHint = annotations.readOnlyHint;
+    }
+    if (annotations.destructiveHint !== undefined) {
+      result.destructiveHint = annotations.destructiveHint;
+    }
+    if (annotations.openWorldHint !== undefined) {
+      result.openWorldHint = annotations.openWorldHint;
+    }
+    if (annotations.idempotentHint !== undefined) {
+      result.idempotentHint = annotations.idempotentHint;
+    }
+
+    return Object.keys(result).length > 0 ? result : undefined;
   }
 
   /**

@@ -32,6 +32,9 @@
 // Tool types
 export type {
   Visibility,
+  UserLocation,
+  ToolContext,
+  ToolAnnotations,
   ToolDef,
   ToolDefs,
   StartOptions,

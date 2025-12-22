@@ -14,6 +14,127 @@ import type { z } from "zod";
 export type Visibility = "model" | "app" | "both";
 
 /**
+ * User location provided by the client
+ *
+ * Coarse location hint for analytics, formatting, or localization.
+ * Only available when the client provides this information.
+ */
+export interface UserLocation {
+  /** City name */
+  city?: string;
+  /** Region/state/province */
+  region?: string;
+  /** Country name or code */
+  country?: string;
+  /** IANA timezone (e.g., "America/New_York") */
+  timezone?: string;
+  /** Latitude coordinate */
+  latitude?: number;
+  /** Longitude coordinate */
+  longitude?: number;
+}
+
+/**
+ * Context provided by the client during tool invocation
+ *
+ * Contains metadata hints from the host platform (ChatGPT, Claude Desktop, etc.).
+ * All fields are optional as availability depends on the client.
+ *
+ * @example
+ * ```typescript
+ * handler: async (input, context) => {
+ *   if (context.locale) {
+ *     // Format response in user's preferred language
+ *   }
+ *   if (context.userLocation?.timezone) {
+ *     // Adjust times to user's timezone
+ *   }
+ * }
+ * ```
+ */
+export interface ToolContext {
+  /**
+   * User's preferred locale (BCP 47 format).
+   * Use for localization and formatting.
+   *
+   * @example "en-US", "fr-FR", "ja-JP"
+   */
+  locale?: string;
+
+  /**
+   * Client user agent string.
+   * Use for analytics or client-specific formatting.
+   * Never rely on this for authentication.
+   */
+  userAgent?: string;
+
+  /**
+   * Coarse user location.
+   * Use for localization, timezone adjustments, or regional content.
+   */
+  userLocation?: UserLocation;
+
+  /**
+   * Anonymized user identifier.
+   * Use for rate limiting or session correlation.
+   * Never use for authentication or PII.
+   */
+  subject?: string;
+
+  /**
+   * Widget session ID for component correlation.
+   * Stable across tool calls within the same widget instance.
+   */
+  widgetSessionId?: string;
+
+  /**
+   * Raw _meta object from the client.
+   * Access protocol-specific fields not mapped to typed properties.
+   */
+  raw?: Record<string, unknown>;
+}
+
+/**
+ * Tool annotations provide behavioral hints to the AI model
+ *
+ * These help the model understand the nature of the tool and
+ * allow hosts to optimize UX (e.g., skip confirmations for read-only tools).
+ */
+export interface ToolAnnotations {
+  /**
+   * Tool only reads data without side effects.
+   * Hosts may skip confirmation prompts for read-only tools.
+   *
+   * @example true for "getWeather", "searchProducts"
+   */
+  readOnlyHint?: boolean;
+
+  /**
+   * Tool performs destructive or irreversible operations.
+   * Hosts may show additional confirmation for destructive tools.
+   *
+   * @example true for "deleteAccount", "formatDisk"
+   */
+  destructiveHint?: boolean;
+
+  /**
+   * Tool interacts with external systems or the public internet.
+   * Helps models understand the scope of the operation.
+   *
+   * @example true for "sendEmail", "postToTwitter"
+   */
+  openWorldHint?: boolean;
+
+  /**
+   * Tool is safe to call multiple times with the same input.
+   * Repeated calls produce the same result without cumulative effects.
+   *
+   * @example true for "getUser", false for "incrementCounter"
+   */
+  idempotentHint?: boolean;
+}
+
+/**
  * Single tool definition with Zod schemas
  */
 export interface ToolDef<
@@ -32,9 +153,24 @@ export interface ToolDef<
   /** Zod schema for output validation (optional for type inference) */
   output?: TOutput;
 
-  /** Async handler function with typed input */
+  /**
+   * Async handler function with typed input and context
+   *
+   * @param input - Validated input matching the Zod schema
+   * @param context - Client-provided metadata (locale, location, etc.)
+   * @returns Promise resolving to the output matching the output schema
+   *
+   * @example
+   * ```typescript
+   * handler: async (input, context) => {
+   *   console.log(`Locale: ${context.locale}`);
+   *   return { message: `Hello, ${input.name}!` };
+   * }
+   * ```
+   */
   handler: (
-    input: z.infer<TInput>
+    input: z.infer<TInput>,
+    context: ToolContext
   ) => Promise<
     z.infer<TOutput> & {
       /** Additional metadata for UI (not sent to model) */
@@ -58,6 +194,12 @@ export interface ToolDef<
 
   /** Message shown after tool completes (ChatGPT only) */
   invokedMessage?: string;
+
+  /**
+   * Behavioral hints for the AI model.
+   * Help hosts optimize UX and models understand tool behavior.
+   */
+  annotations?: ToolAnnotations;
 }
 
 /**

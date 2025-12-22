@@ -5,7 +5,7 @@
  * Uses snake_case naming and openai/* prefixed keys.
  */
 
-import type { ToolDef } from "../types/tools";
+import type { ToolDef, ToolAnnotations } from "../types/tools";
 import type { UIDef } from "../types/ui";
 import type { ProtocolAdapter, ToolMetaResult, UIResourceMetaResult } from "./types";
 import { mapVisibilityToOpenAI } from "../utils/metadata";
@@ -54,9 +54,41 @@ export class OpenAIAdapter implements ProtocolAdapter {
       meta["openai/toolInvocation/invoked"] = toolDef.invokedMessage;
     }
 
+    // Build annotations if specified
+    const annotations = this.buildAnnotations(toolDef.annotations);
+
     return {
+      annotations,
       _meta: Object.keys(meta).length > 0 ? meta : undefined,
     };
+  }
+
+  /**
+   * Build OpenAI annotations from tool annotations
+   *
+   * OpenAI uses the same annotation names as MCP spec
+   */
+  private buildAnnotations(annotations?: ToolAnnotations): Record<string, unknown> | undefined {
+    if (!annotations) {
+      return undefined;
+    }
+
+    const result: Record<string, unknown> = {};
+
+    if (annotations.readOnlyHint !== undefined) {
+      result.readOnlyHint = annotations.readOnlyHint;
+    }
+    if (annotations.destructiveHint !== undefined) {
+      result.destructiveHint = annotations.destructiveHint;
+    }
+    if (annotations.openWorldHint !== undefined) {
+      result.openWorldHint = annotations.openWorldHint;
+    }
+    if (annotations.idempotentHint !== undefined) {
+      result.idempotentHint = annotations.idempotentHint;
+    }
+
+    return Object.keys(result).length > 0 ? result : undefined;
   }
 
   /**

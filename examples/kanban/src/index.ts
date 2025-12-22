@@ -137,8 +137,15 @@ const app = createApp({
       }),
       visibility: "app",
       widgetAccessible: true,
-      handler: async ({ status }) => {
+      annotations: {
+        readOnlyHint: true,
+        idempotentHint: true,
+      },
+      handler: async ({ status }, context) => {
         const filteredTasks = status ? getTasksByStatus(status) : getAllTasks();
+
+        // Use context.locale for potential localization (example)
+        const locale = context.locale ?? "en-US";
 
         return {
           tasks: filteredTasks,
@@ -148,6 +155,7 @@ const app = createApp({
             done: getTasksByStatus("done").length,
             total: tasks.size,
           },
+          _meta: { locale },
         };
       },
     },
@@ -172,7 +180,12 @@ const app = createApp({
       widgetAccessible: true,
       invokingMessage: "Creating task...",
       invokedMessage: "Task created!",
-      handler: async ({ title, description, status }) => {
+      annotations: {
+        readOnlyHint: false,
+      },
+      handler: async ({ title, description, status }, context) => {
+        // Format timestamp using user's timezone if available
+        const timezone = context.userLocation?.timezone ?? "UTC";
         const now = new Date().toISOString();
         const task: Task = {
           id: generateId(),
@@ -188,6 +201,7 @@ const app = createApp({
         return {
           task,
           message: `Created task "${title}" in ${status ?? "todo"} column`,
+          _meta: { timezone },
         };
       },
     },
@@ -209,7 +223,11 @@ const app = createApp({
       widgetAccessible: true,
       invokingMessage: "Moving task...",
       invokedMessage: "Task moved!",
-      handler: async ({ taskId, newStatus }) => {
+      annotations: {
+        readOnlyHint: false,
+        idempotentHint: true,
+      },
+      handler: async ({ taskId, newStatus }, context) => {
         const task = tasks.get(taskId);
         if (!task) {
           throw new Error(`Task with ID "${taskId}" not found`);
@@ -219,9 +237,13 @@ const app = createApp({
         task.status = newStatus;
         task.updatedAt = new Date().toISOString();
 
+        // Track who performed the action (anonymized)
+        const performer = context.subject ?? "anonymous";
+
         return {
           task,
           message: `Moved "${task.title}" from ${oldStatus} to ${newStatus}`,
+          _meta: { performer },
         };
       },
     },
@@ -242,7 +264,11 @@ const app = createApp({
       }),
       visibility: "app",
       widgetAccessible: true,
-      handler: async ({ taskId, title, description }) => {
+      annotations: {
+        readOnlyHint: false,
+        idempotentHint: true,
+      },
+      handler: async ({ taskId, title, description }, _context) => {
         const task = tasks.get(taskId);
         if (!task) {
           throw new Error(`Task with ID "${taskId}" not found`);
@@ -279,7 +305,11 @@ const app = createApp({
       widgetAccessible: true,
       invokingMessage: "Deleting task...",
       invokedMessage: "Task deleted!",
-      handler: async ({ taskId }) => {
+      annotations: {
+        destructiveHint: true,
+        idempotentHint: true,
+      },
+      handler: async ({ taskId }, _context) => {
         const task = tasks.get(taskId);
         if (!task) {
           throw new Error(`Task with ID "${taskId}" not found`);
@@ -320,7 +350,11 @@ const app = createApp({
       ui: "kanban-board",
       visibility: "both",
       widgetAccessible: true,
-      handler: async () => {
+      annotations: {
+        readOnlyHint: true,
+        idempotentHint: true,
+      },
+      handler: async (_input, context) => {
         const columns = [
           { name: "To Do", status: "todo" as TaskStatus },
           { name: "In Progress", status: "in_progress" as TaskStatus },
@@ -335,9 +369,13 @@ const app = createApp({
           };
         });
 
+        // Include widget session for state correlation
+        const widgetSession = context.widgetSessionId;
+
         return {
           columns,
           totalTasks: tasks.size,
+          _meta: widgetSession ? { widgetSession } : undefined,
         };
       },
     },
@@ -366,8 +404,8 @@ const app = createApp({
       origin: true,
       credentials: true,
     },
-    // Use OpenAI protocol for ChatGPT compatibility
-    protocol: "openai",
+    // Use MCP protocol for Claude Desktop / MCP Apps
+    protocol: "mcp",
   },
 });
 

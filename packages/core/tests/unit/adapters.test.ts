@@ -96,9 +96,50 @@ describe("McpAdapter", () => {
       expect(result._meta?.ui).not.toHaveProperty("resourceUri");
     });
 
-    it("should not return annotations", () => {
+    it("should not return annotations when not specified", () => {
       const result = adapter.buildToolMeta(sampleToolDef, "test-server");
       expect(result.annotations).toBeUndefined();
+    });
+
+    it("should include readOnlyHint annotation", () => {
+      const toolDef = { ...sampleToolDef, annotations: { readOnlyHint: true } };
+      const result = adapter.buildToolMeta(toolDef, "test-server");
+      expect(result.annotations).toEqual({ readOnlyHint: true });
+    });
+
+    it("should include destructiveHint annotation", () => {
+      const toolDef = { ...sampleToolDef, annotations: { destructiveHint: true } };
+      const result = adapter.buildToolMeta(toolDef, "test-server");
+      expect(result.annotations).toEqual({ destructiveHint: true });
+    });
+
+    it("should include openWorldHint annotation", () => {
+      const toolDef = { ...sampleToolDef, annotations: { openWorldHint: true } };
+      const result = adapter.buildToolMeta(toolDef, "test-server");
+      expect(result.annotations).toEqual({ openWorldHint: true });
+    });
+
+    it("should include idempotentHint annotation", () => {
+      const toolDef = { ...sampleToolDef, annotations: { idempotentHint: true } };
+      const result = adapter.buildToolMeta(toolDef, "test-server");
+      expect(result.annotations).toEqual({ idempotentHint: true });
+    });
+
+    it("should include multiple annotations", () => {
+      const toolDef = {
+        ...sampleToolDef,
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
+      };
+      const result = adapter.buildToolMeta(toolDef, "test-server");
+      expect(result.annotations).toEqual({
+        readOnlyHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      });
     });
   });
 
@@ -268,9 +309,40 @@ describe("OpenAIAdapter", () => {
       });
     });
 
-    it("should not return annotations", () => {
+    it("should not return annotations when not specified", () => {
       const result = adapter.buildToolMeta(sampleToolDef, "test-server");
       expect(result.annotations).toBeUndefined();
+    });
+
+    it("should include readOnlyHint annotation", () => {
+      const toolDef = { ...sampleToolDef, annotations: { readOnlyHint: true } };
+      const result = adapter.buildToolMeta(toolDef, "test-server");
+      expect(result.annotations).toEqual({ readOnlyHint: true });
+    });
+
+    it("should include destructiveHint annotation", () => {
+      const toolDef = { ...sampleToolDef, annotations: { destructiveHint: true } };
+      const result = adapter.buildToolMeta(toolDef, "test-server");
+      expect(result.annotations).toEqual({ destructiveHint: true });
+    });
+
+    it("should include all annotation types together", () => {
+      const toolDef = {
+        ...sampleToolDef,
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+          openWorldHint: true,
+          idempotentHint: false,
+        },
+      };
+      const result = adapter.buildToolMeta(toolDef, "test-server");
+      expect(result.annotations).toEqual({
+        readOnlyHint: false,
+        destructiveHint: true,
+        openWorldHint: true,
+        idempotentHint: false,
+      });
     });
   });
 

@@ -11,7 +11,7 @@ import express, { type Express, type Request, type Response } from "express";
 import type { Server } from "http";
 import { z } from "zod";
 
-import type { ToolDefs, StartOptions, ExpressMiddleware } from "../types/tools";
+import type { ToolDefs, StartOptions, ExpressMiddleware, ToolContext, UserLocation } from "../types/tools";
 import type { AppConfig, CORSConfig } from "../types/config";
 import type { UIDefs, UIDef } from "../types/ui";
 import { wrapError } from "../utils/errors";
@@ -293,14 +293,20 @@ function registerTools(
         annotations,
         _meta,
       },
-      async (args: Record<string, unknown>) => {
+      async (args: Record<string, unknown>, extra?: { _meta?: Record<string, unknown> }) => {
         try {
           // Validate input with Zod
           const parsed: unknown = toolDef.input.parse(args);
 
-          // Execute handler (result type is safe from the handler signature)
+          // Parse client-supplied _meta into typed context
+          const context = parseToolContext(extra?._meta);
+
+          // Execute handler with input and context
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          const result = await toolDef.handler(parsed as z.infer<typeof toolDef.input>);
+          const result = await toolDef.handler(
+            parsed as z.infer<typeof toolDef.input>,
+            context
+          );
 
           // Return result with both text content and structuredContent
           return {
@@ -335,6 +341,65 @@ function extractZodShape(schema: z.ZodType): Record<string, z.ZodType> {
 
   // For other schema types, wrap in a single 'value' key
   return { value: schema };
+}
+
+/**
+ * Parse client-supplied _meta into a typed ToolContext
+ *
+ * Handles both OpenAI (openai/* prefixed) and MCP formats.
+ */
+function parseToolContext(meta?: Record<string, unknown>): ToolContext {
+  if (!meta) {
+    return { raw: undefined };
+  }
+
+  const context: ToolContext = {
+    raw: meta,
+  };
+
+  // Parse locale (OpenAI format or legacy webplus format)
+  const locale = meta["openai/locale"] ?? meta["webplus/i18n"];
+  if (typeof locale === "string") {
+    context.locale = locale;
+  }
+
+  // Parse user agent
+  const userAgent = meta["openai/userAgent"];
+  if (typeof userAgent === "string") {
+    context.userAgent = userAgent;
+  }
+
+  // Parse subject (anonymized user ID)
+  const subject = meta["openai/subject"];
+  if (typeof subject === "string") {
+    context.subject = subject;
+  }
+
+  // Parse widget session ID
+  const widgetSessionId = meta["openai/widgetSessionId"];
+  if (typeof widgetSessionId === "string") {
+    context.widgetSessionId = widgetSessionId;
+  }
+
+  // Parse user location
+  const locationData = meta["openai/userLocation"];
+  if (locationData && typeof locationData === "object") {
+    const loc = locationData as Record<string, unknown>;
+    const userLocation: UserLocation = {};
+
+    if (typeof loc.city === "string") userLocation.city = loc.city;
+    if (typeof loc.region === "string") userLocation.region = loc.region;
+    if (typeof loc.country === "string") userLocation.country = loc.country;
+    if (typeof loc.timezone === "string") userLocation.timezone = loc.timezone;
+    if (typeof loc.latitude === "number") userLocation.latitude = loc.latitude;
+    if (typeof loc.longitude === "number") userLocation.longitude = loc.longitude;
+
+    if (Object.keys(userLocation).length > 0) {
+      context.userLocation = userLocation;
+    }
+  }
+
+  return context;
 }
 
 /**
