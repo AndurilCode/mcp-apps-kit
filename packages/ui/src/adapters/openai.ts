@@ -62,12 +62,111 @@ export class OpenAIAdapter implements ProtocolAdapter {
   // === Lifecycle ===
 
   async connect(): Promise<void> {
-    // In a real implementation, we would initialize the OpenAI Apps SDK here
+    // Wait for the OpenAI SDK to be available (injected by ChatGPT sandbox)
+    await this.waitForOpenAI();
+
     const openai = this.getOpenAI();
-    if (openai && typeof openai.init === "function") {
-      await (openai.init as () => Promise<void>)();
+
+    // Log available SDK methods for debugging
+    if (openai) {
+      console.log("[OpenAI Adapter] Available SDK methods:", Object.keys(openai));
+
+      // Try to get initial tool context
+      if (typeof openai.getToolOutput === "function") {
+        this.currentToolOutput = (openai.getToolOutput as () => Record<string, unknown>)();
+        console.log("[OpenAI Adapter] Got tool output from SDK");
+      } else if (openai.toolOutput) {
+        this.currentToolOutput = openai.toolOutput as Record<string, unknown>;
+        console.log("[OpenAI Adapter] Got tool output from SDK property");
+      } else if (openai.result) {
+        this.currentToolOutput = openai.result as Record<string, unknown>;
+        console.log("[OpenAI Adapter] Got result from SDK");
+      }
+
+      if (typeof openai.getToolInput === "function") {
+        this.currentToolInput = (openai.getToolInput as () => Record<string, unknown>)();
+      } else if (openai.toolInput) {
+        this.currentToolInput = openai.toolInput as Record<string, unknown>;
+      } else if (openai.input) {
+        this.currentToolInput = openai.input as Record<string, unknown>;
+      }
+
+      if (typeof openai.init === "function") {
+        await (openai.init as () => Promise<void>)();
+      }
     }
+
     this.connected = true;
+  }
+
+  private async waitForOpenAI(timeout = 5000): Promise<void> {
+    // If already available, return immediately
+    if (this.getOpenAI()) {
+      console.log("[OpenAI Adapter] window.openai already available");
+      return;
+    }
+
+    console.log("[OpenAI Adapter] Waiting for window.openai...");
+
+    // Wait for the openai global to be injected
+    return new Promise((resolve) => {
+      const startTime = Date.now();
+      let resolved = false;
+
+      const doResolve = () => {
+        if (!resolved) {
+          resolved = true;
+          window.removeEventListener("message", messageHandler);
+          resolve();
+        }
+      };
+
+      const check = () => {
+        if (resolved) return;
+
+        if (this.getOpenAI()) {
+          console.log("[OpenAI Adapter] window.openai found via polling");
+          doResolve();
+          return;
+        }
+
+        if (Date.now() - startTime > timeout) {
+          // Timeout - resolve anyway as we might be in a dev/testing environment
+          console.warn("[OpenAI Adapter] window.openai not found after timeout, proceeding anyway");
+          doResolve();
+          return;
+        }
+
+        // Check again in 50ms
+        setTimeout(check, 50);
+      };
+
+      // Also listen for the set_globals message (various formats)
+      const messageHandler = (event: MessageEvent) => {
+        const data = event.data;
+        // Handle both string and object formats
+        const isSetGlobals =
+          data === "openai:set_globals" ||
+          data?.type === "openai:set_globals" ||
+          (typeof data === "object" && data?.message === "openai:set_globals");
+
+        if (isSetGlobals) {
+          console.log("[OpenAI Adapter] Received set_globals message");
+          // Give a small delay for the globals to be applied, then check
+          setTimeout(() => {
+            if (this.getOpenAI()) {
+              console.log("[OpenAI Adapter] window.openai available after set_globals");
+              doResolve();
+            } else {
+              console.log("[OpenAI Adapter] window.openai still not available after set_globals, continuing poll");
+            }
+          }, 50);
+        }
+      };
+      window.addEventListener("message", messageHandler);
+
+      check();
+    });
   }
 
   isConnected(): boolean {

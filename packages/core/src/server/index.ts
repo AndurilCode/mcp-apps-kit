@@ -7,9 +7,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import express, { type Express, type Request, type Response } from "express";
-import { randomUUID } from "node:crypto";
 import type { Server } from "http";
 import { z } from "zod";
 
@@ -78,68 +76,35 @@ export function createServerInstance<T extends ToolDefs>(
   // Track HTTP server
   let httpServer: Server | undefined;
 
-  // Session management for Streamable HTTP transport
-  const transports: Record<string, StreamableHTTPServerTransport> = {};
-
-  // Setup Streamable HTTP endpoint for MCP
+  // Setup stateless Streamable HTTP endpoint for MCP
+  // Each request creates a fresh transport (no session management)
   expressApp.post("/mcp", async (req: Request, res: Response) => {
-    const sessionId = req.headers["mcp-session-id"] as string | undefined;
-    let transport: StreamableHTTPServerTransport;
+    // Create stateless transport (sessionIdGenerator: undefined)
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+      enableJsonResponse: true,
+    });
 
-    if (sessionId && transports[sessionId]) {
-      // Reuse existing session
-      transport = transports[sessionId];
-    } else if (!sessionId && isInitializeRequest(req.body)) {
-      // New session initialization
-      transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-        onsessioninitialized: (id) => {
-          transports[id] = transport;
-        },
-      });
+    // Close transport when response closes
+    res.on("close", () => {
+      void transport.close();
+    });
 
-      transport.onclose = () => {
-        const sid = transport.sessionId;
-        if (sid) {
-          // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-          delete transports[sid];
-        }
-      };
+    // Connect transport to MCP server for this request
+    await mcpServer.connect(transport);
 
-      // Connect the new transport to the MCP server
-      await mcpServer.connect(transport);
-    } else {
-      res.status(400).json({
-        jsonrpc: "2.0",
-        error: { code: -32000, message: "Invalid session" },
-        id: null,
-      });
-      return;
-    }
-
+    // Handle the request
     await transport.handleRequest(req, res, req.body);
   });
 
-  // GET endpoint for SSE streaming (Streamable HTTP)
-  expressApp.get("/mcp", async (req: Request, res: Response) => {
-    const sessionId = req.headers["mcp-session-id"] as string;
-    const transport = transports[sessionId];
-    if (transport) {
-      await transport.handleRequest(req, res);
-    } else {
-      res.status(400).json({ error: "Invalid session" });
-    }
+  // GET endpoint - not needed for stateless mode
+  expressApp.get("/mcp", (_req: Request, res: Response) => {
+    res.status(405).json({ error: "GET not supported in stateless mode" });
   });
 
-  // DELETE endpoint for session cleanup
-  expressApp.delete("/mcp", async (req: Request, res: Response) => {
-    const sessionId = req.headers["mcp-session-id"] as string;
-    const transport = transports[sessionId];
-    if (transport) {
-      await transport.handleRequest(req, res);
-    } else {
-      res.status(400).json({ error: "Invalid session" });
-    }
+  // DELETE endpoint - not needed for stateless mode
+  expressApp.delete("/mcp", (_req: Request, res: Response) => {
+    res.status(405).json({ error: "DELETE not supported in stateless mode" });
   });
 
   // Health check endpoint
@@ -188,11 +153,6 @@ export function createServerInstance<T extends ToolDefs>(
     },
 
     stop: async () => {
-      // Close all active transports
-      for (const transport of Object.values(transports)) {
-        await transport.close();
-      }
-
       return new Promise<void>((resolve) => {
         if (httpServer) {
           httpServer.close(() => {
@@ -428,7 +388,7 @@ function applyCors(app: Express, config: CORSConfig): void {
       res.setHeader("Access-Control-Allow-Origin", "*");
     } else if (typeof origin === "string") {
       res.setHeader("Access-Control-Allow-Origin", origin);
-    } else if (Array.isArray(origin) && origin.length > 0) {
+    } else if (Array.isArray(origin) && origin.length > 0 && origin[0]) {
       // For simplicity, use first origin or implement proper matching
       res.setHeader("Access-Control-Allow-Origin", origin[0]);
     }
