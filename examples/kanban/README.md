@@ -1,11 +1,42 @@
 # Kanban Board Example
 
-A simple Kanban board application built with `@apps-builder/core`, demonstrating:
+A comprehensive Kanban board application demonstrating all features of the `@apps-builder` SDK.
 
-- Type-safe tool definitions with Zod schemas
-- UI resource binding for rich visualizations
-- Protocol-agnostic design (works with MCP and OpenAI)
-- In-memory data store with CRUD operations
+## SDK Features Demonstrated
+
+### Server-Side Features (`@apps-builder/core`)
+
+| Feature | Description | Example in Code |
+|---------|-------------|-----------------|
+| **Tool Definitions** | Type-safe tool definitions with Zod schemas | All tools use `z.object()` for input/output |
+| **Tool Annotations** | Behavioral hints for AI models | `readOnlyHint`, `destructiveHint`, `openWorldHint`, `idempotentHint` |
+| **ToolContext** | Client-provided metadata in handlers | `context.locale`, `context.userLocation`, `context.subject`, `context.widgetSessionId` |
+| **fileParams** | Enable file upload parameters | `createTask` tool with `fileParams: ["attachmentId"]` |
+| **widgetDescription** | Human-readable summary for AI | UI resource with `widgetDescription` |
+| **_closeWidget** | Dismiss widget after action | `clearCompleted` tool returns `_closeWidget: true` |
+| **visibility** | Control who can invoke tools | `"model"`, `"app"`, `"both"` |
+| **widgetAccessible** | Allow widget to call tool | All widget-only tools |
+| **invokingMessage/invokedMessage** | Loading state messages | `createTask`, `deleteTask`, etc. |
+| **title** | Human-readable tool title | All tools have `title` property |
+
+### Client-Side Features (`@apps-builder/ui-react`)
+
+| Hook | Description | Usage in App |
+|------|-------------|--------------|
+| **useAppsClient** | Access typed client for tool calls | Main tool call interface |
+| **useToolInput** | Access initial tool input | Debug panel display |
+| **useHostContext** | Access theme, viewport, locale | Theme and context display |
+| **useWidgetState** | Persist state across reloads | Collapsed columns, debug panel |
+| **useHostStyleVariables** | Apply host CSS variables | Applied in App component |
+| **useDocumentTheme** | Apply theme class to document | Light/dark mode |
+| **useDisplayMode** | Access/change display mode | Debug panel display |
+| **useSafeAreaInsets** | Mobile safe area padding | Container padding |
+| **useOnToolCancelled** | Handle tool cancellation | Cancellation message |
+| **useOnTeardown** | Cleanup on widget teardown | Console logging |
+| **useFileUpload** | Upload files (ChatGPT) | Task attachment |
+| **useIntrinsicHeight** | Report widget height | Auto-height container |
+| **useView** | Access view identifier | Debug panel display |
+| **useModal** | Host-owned modal dialogs | Delete confirmation |
 
 ## Quick Start
 
@@ -13,65 +44,117 @@ A simple Kanban board application built with `@apps-builder/core`, demonstrating
 # Install dependencies
 pnpm install
 
-# Start the server
-pnpm start
-
-# Or with hot-reload during development
+# Start both server and UI dev mode
 pnpm dev
+
+# Or start individually
+pnpm dev:server  # Server only
+pnpm dev:ui      # UI dev server only
+
+# Build for production
+pnpm build
 ```
 
-The server will start at `http://localhost:3000`.
+The server starts at `http://localhost:3001`.
 
 ## Available Tools
 
-| Tool | Description |
-|------|-------------|
-| `listTasks` | List all tasks, optionally filtered by status |
-| `createTask` | Create a new task |
-| `moveTask` | Move a task to a different column |
-| `updateTask` | Update a task's title or description |
-| `deleteTask` | Delete a task from the board |
-| `getBoardSummary` | Get an overview of the board |
+| Tool | Description | Features Used |
+|------|-------------|---------------|
+| `listTasks` | List all tasks (optional filter) | `readOnlyHint`, `idempotentHint`, `visibility: "app"` |
+| `createTask` | Create task with attachment | `fileParams`, `invokingMessage` |
+| `moveTask` | Move task between columns | `idempotentHint` |
+| `updateTask` | Update task details | Widget-accessible |
+| `deleteTask` | Delete a task | `destructiveHint` |
+| `clearCompleted` | Clear done tasks | `_closeWidget` |
+| `exportBoard` | Export board data | `openWorldHint` |
+| `getBoardSummary` | Get board overview | `ui: "kanban-board"` |
 
 ## Example Usage
 
-### List All Tasks
-
-```json
-{
-  "tool": "listTasks",
-  "arguments": {}
-}
-```
-
-### Create a Task
+### Create a Task with Attachment
 
 ```json
 {
   "tool": "createTask",
   "arguments": {
-    "title": "Implement feature X",
-    "description": "Add the new feature to the dashboard",
-    "status": "todo"
+    "title": "Review document",
+    "description": "Review the attached document",
+    "attachmentId": "file-abc123"
   }
 }
 ```
 
-### Move a Task
+### Clear Completed Tasks and Close Widget
 
 ```json
 {
-  "tool": "moveTask",
+  "tool": "clearCompleted",
   "arguments": {
-    "taskId": "task-123",
-    "newStatus": "in_progress"
+    "closeWidget": true
   }
 }
 ```
 
-## Claude Desktop Configuration
+### Export Board as CSV
 
-Add to your `claude_desktop_config.json`:
+```json
+{
+  "tool": "exportBoard",
+  "arguments": {
+    "format": "csv",
+    "includeMetadata": false
+  }
+}
+```
+
+## UI Features
+
+### Debug Panel
+
+Click the 🔧 button to open the SDK Feature Status panel, showing:
+
+- Host context (theme, platform, locale, viewport)
+- Display mode and available modes
+- Safe area insets
+- Platform feature support (file upload, modal, intrinsic height)
+- Current view identifier
+- Tool input
+
+### Persisted Preferences
+
+The following preferences are persisted using `useWidgetState`:
+
+- Collapsed columns (click column header to toggle)
+- Debug panel visibility
+
+### Modal Dialogs
+
+On supported platforms (ChatGPT), delete confirmation uses native host modals via `useModal`. Falls back to `confirm()` on other platforms.
+
+### File Attachments
+
+On supported platforms (ChatGPT), the Add Task modal includes a file upload option using `useFileUpload`.
+
+## Project Structure
+
+```
+kanban/
+├── src/
+│   ├── index.ts           # Server with all SDK features
+│   └── ui/
+│       ├── App.tsx        # React app with all hooks
+│       ├── main.tsx       # Entry point with AppsProvider
+│       ├── index.html     # HTML template
+│       ├── styles.css     # Comprehensive styling
+│       └── dist/          # Built UI output
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+└── README.md
+```
+
+## Claude Desktop Configuration
 
 ```json
 {
@@ -84,22 +167,7 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-## Project Structure
-
-```
-kanban/
-├── src/
-│   ├── index.ts        # Main app with tool definitions
-│   └── ui/
-│       └── board.html  # Kanban board widget
-├── package.json
-├── tsconfig.json
-└── README.md
-```
-
 ## Switching Protocols
-
-The example uses MCP protocol by default. To switch to OpenAI protocol for ChatGPT compatibility:
 
 ```typescript
 // In src/index.ts
@@ -108,15 +176,15 @@ config: {
 }
 ```
 
-This will change:
-- Metadata format from camelCase to snake_case
-- MIME type from `text/html;profile=mcp-app` to `text/html;profile=chatgpt-widget`
-- Visibility annotations from `readOnlyHint` to `invokableByAI`
+## Development
 
-## Features Demonstrated
+```bash
+# Type checking
+pnpm typecheck
 
-1. **Type-Safe Schemas**: All inputs and outputs are validated with Zod
-2. **UI Binding**: Tools reference the `kanban-board` UI resource for visualization
-3. **ChatGPT Messages**: `invokingMessage` and `invokedMessage` for loading states
-4. **CORS Configuration**: Enabled for browser-based clients
-5. **Health Check**: Available at `/health` endpoint
+# Build UI
+pnpm build:ui
+
+# Build server
+pnpm build
+```

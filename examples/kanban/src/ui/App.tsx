@@ -1,8 +1,54 @@
-import React, { useState, useCallback, useEffect } from "react";
+/**
+ * Kanban Board App - Comprehensive SDK Feature Demonstration
+ *
+ * This component demonstrates all available hooks from @apps-builder/ui-react:
+ *
+ * Core Hooks:
+ * - useAppsClient: Access the typed client instance for tool calls
+ * - useToolResult: Subscribe to tool results
+ * - useToolInput: Access initial tool input
+ * - useHostContext: Access host context (theme, viewport, etc.)
+ * - useWidgetState: Persist state across widget reloads
+ *
+ * Utility Hooks:
+ * - useHostStyleVariables: Apply host CSS variables
+ * - useDocumentTheme: Apply theme class to document
+ * - useDisplayMode: Access and request display mode changes
+ * - useSafeAreaInsets: Get safe area padding for mobile
+ *
+ * Event Hooks:
+ * - useOnToolCancelled: Handle tool cancellation
+ * - useOnTeardown: Cleanup on widget teardown
+ *
+ * File Hooks (ChatGPT only):
+ * - useFileUpload: Upload files
+ * - useFileDownload: Get file download URLs
+ *
+ * Layout Hooks (ChatGPT only):
+ * - useIntrinsicHeight: Report widget height to host
+ * - useView: Access current view identifier
+ *
+ * Modal Hooks (ChatGPT only):
+ * - useModal: Show host-owned modal dialogs
+ */
+
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   useAppsClient,
   useHostContext,
   useDocumentTheme,
+  useWidgetState,
+  useHostStyleVariables,
+  useDisplayMode,
+  useSafeAreaInsets,
+  useOnToolCancelled,
+  useOnTeardown,
+  useFileUpload,
+  useIntrinsicHeight,
+  useView,
+  useModal,
+  useToolInput,
+  type ModalOptions,
 } from "@apps-builder/ui-react";
 
 // =============================================================================
@@ -16,6 +62,7 @@ interface Task {
   status: "todo" | "in_progress" | "done";
   createdAt?: string;
   updatedAt?: string;
+  attachmentId?: string;
 }
 
 interface Column {
@@ -30,31 +77,134 @@ interface BoardData {
   totalTasks: number;
 }
 
+// Persisted preferences using useWidgetState
+interface WidgetPreferences {
+  collapsedColumns: string[];
+  showDebugPanel: boolean;
+}
+
 // =============================================================================
-// Components
+// Debug Panel Component
 // =============================================================================
 
-function Message({ text, isError, onDismiss }: { text: string; isError?: boolean; onDismiss: () => void }) {
+function DebugPanel({
+  context,
+  displayMode,
+  safeAreaInsets,
+  view,
+  toolInput,
+  isFileUploadSupported,
+  isModalSupported,
+  isHeightSupported,
+  onClose,
+}: {
+  context: ReturnType<typeof useHostContext>;
+  displayMode: ReturnType<typeof useDisplayMode>;
+  safeAreaInsets: ReturnType<typeof useSafeAreaInsets>;
+  view: string | undefined;
+  toolInput: Record<string, unknown> | undefined;
+  isFileUploadSupported: boolean;
+  isModalSupported: boolean;
+  isHeightSupported: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <div className="debug-panel">
+      <div className="debug-header">
+        <h3>SDK Feature Status</h3>
+        <button className="debug-close" onClick={onClose}>×</button>
+      </div>
+      <div className="debug-content">
+        <div className="debug-section">
+          <h4>Host Context</h4>
+          <ul>
+            <li>Theme: <code>{context.theme}</code></li>
+            <li>Platform: <code>{context.platform}</code></li>
+            <li>Locale: <code>{context.locale}</code></li>
+            <li>Viewport: <code>{context.viewport.width}x{context.viewport.height}</code></li>
+          </ul>
+        </div>
+        <div className="debug-section">
+          <h4>Display Mode</h4>
+          <ul>
+            <li>Current: <code>{displayMode.mode}</code></li>
+            <li>Available: <code>{displayMode.availableModes.join(", ")}</code></li>
+          </ul>
+        </div>
+        <div className="debug-section">
+          <h4>Safe Area Insets</h4>
+          <ul>
+            <li>Top: <code>{safeAreaInsets.top}px</code></li>
+            <li>Right: <code>{safeAreaInsets.right}px</code></li>
+            <li>Bottom: <code>{safeAreaInsets.bottom}px</code></li>
+            <li>Left: <code>{safeAreaInsets.left}px</code></li>
+          </ul>
+        </div>
+        <div className="debug-section">
+          <h4>Platform Features</h4>
+          <ul>
+            <li>File Upload: <span className={isFileUploadSupported ? "supported" : "unsupported"}>
+              {isFileUploadSupported ? "✓ Supported" : "✗ Not available"}
+            </span></li>
+            <li>Modal: <span className={isModalSupported ? "supported" : "unsupported"}>
+              {isModalSupported ? "✓ Supported" : "✗ Not available"}
+            </span></li>
+            <li>Intrinsic Height: <span className={isHeightSupported ? "supported" : "unsupported"}>
+              {isHeightSupported ? "✓ Supported" : "✗ Not available"}
+            </span></li>
+            <li>View: <code>{view ?? "undefined"}</code></li>
+          </ul>
+        </div>
+        {toolInput && (
+          <div className="debug-section">
+            <h4>Tool Input</h4>
+            <pre>{JSON.stringify(toolInput, null, 2)}</pre>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// Message Component
+// =============================================================================
+
+function Message({
+  text,
+  isError,
+  isWarning,
+  onDismiss,
+}: {
+  text: string;
+  isError?: boolean;
+  isWarning?: boolean;
+  onDismiss: () => void;
+}) {
   useEffect(() => {
     const timer = setTimeout(onDismiss, 3000);
     return () => clearTimeout(timer);
   }, [onDismiss]);
 
+  const className = isError ? "message error" : isWarning ? "message warning" : "message";
+
   return (
-    <div className={`message ${isError ? "error" : ""}`}>
+    <div className={className}>
       <div className="message-text">{text}</div>
     </div>
   );
 }
 
+// =============================================================================
+// Task Card Component
+// =============================================================================
+
 function TaskCard({
   task,
-  status,
   onDelete,
   onDragStart,
 }: {
   task: Task;
-  status: string;
   onDelete: (id: string) => void;
   onDragStart: (e: React.DragEvent, task: Task) => void;
 }) {
@@ -68,6 +218,12 @@ function TaskCard({
       <div className="task-title">{task.title}</div>
       {task.description && (
         <div className="task-description">{task.description}</div>
+      )}
+      {task.attachmentId && (
+        <div className="task-attachment">
+          <span className="attachment-icon">📎</span>
+          <span className="attachment-label">Attachment</span>
+        </div>
       )}
       <div className="task-meta">
         <span className="task-id">{task.id}</span>
@@ -85,8 +241,14 @@ function TaskCard({
   );
 }
 
-function Column({
+// =============================================================================
+// Column Component
+// =============================================================================
+
+function ColumnComponent({
   column,
+  isCollapsed,
+  onToggleCollapse,
   onDelete,
   onDragStart,
   onDragOver,
@@ -95,6 +257,8 @@ function Column({
   isDragOver,
 }: {
   column: Column;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
   onDelete: (id: string) => void;
   onDragStart: (e: React.DragEvent, task: Task) => void;
   onDragOver: (e: React.DragEvent) => void;
@@ -104,52 +268,62 @@ function Column({
 }) {
   return (
     <div
-      className={`column column--${column.status} ${isDragOver ? "drag-over" : ""}`}
+      className={`column column--${column.status} ${isDragOver ? "drag-over" : ""} ${isCollapsed ? "collapsed" : ""}`}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={(e) => onDrop(e, column.status)}
     >
-      <div className="column-header">
+      <div className="column-header" onClick={onToggleCollapse}>
         <div className="column-title">
           <div className="column-indicator" />
           {column.name}
+          <span className="collapse-icon">{isCollapsed ? "▶" : "▼"}</span>
         </div>
         <div className="column-count">{column.count}</div>
       </div>
-      <div className="task-list">
-        {column.tasks.length === 0 ? (
-          <div className="empty-column">No tasks</div>
-        ) : (
-          column.tasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              status={column.status}
-              onDelete={onDelete}
-              onDragStart={onDragStart}
-            />
-          ))
-        )}
-      </div>
+      {!isCollapsed && (
+        <div className="task-list">
+          {column.tasks.length === 0 ? (
+            <div className="empty-column">No tasks</div>
+          ) : (
+            column.tasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                onDelete={onDelete}
+                onDragStart={onDragStart}
+              />
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }
+
+// =============================================================================
+// Add Task Modal Component
+// =============================================================================
 
 function AddTaskModal({
   isOpen,
   onClose,
   onSubmit,
+  isFileUploadSupported,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (title: string, description?: string) => void;
+  onSubmit: (title: string, description?: string, attachmentId?: string) => void;
+  isFileUploadSupported: boolean;
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const { upload, isUploading, fileId, error: uploadError } = useFileUpload();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = () => {
     if (!title.trim()) return;
-    onSubmit(title.trim(), description.trim() || undefined);
+    onSubmit(title.trim(), description.trim() || undefined, fileId || undefined);
     setTitle("");
     setDescription("");
     onClose();
@@ -160,6 +334,13 @@ function AddTaskModal({
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      await upload(file);
     }
   };
 
@@ -196,11 +377,30 @@ function AddTaskModal({
             onChange={(e) => setDescription(e.target.value)}
           />
         </div>
+        {isFileUploadSupported && (
+          <div className="form-group">
+            <label className="form-label" htmlFor="taskAttachment">
+              Attachment (optional)
+            </label>
+            <input
+              type="file"
+              id="taskAttachment"
+              className="form-input file-input"
+              accept="image/*"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              disabled={isUploading}
+            />
+            {isUploading && <span className="upload-status">Uploading...</span>}
+            {fileId && <span className="upload-status success">✓ File attached</span>}
+            {uploadError && <span className="upload-status error">Error: {uploadError.message}</span>}
+          </div>
+        )}
         <div className="modal-actions">
           <button className="btn btn-secondary" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn btn-primary" onClick={handleSubmit}>
+          <button className="btn btn-primary" onClick={handleSubmit} disabled={isUploading}>
             Add Task
           </button>
         </div>
@@ -210,27 +410,64 @@ function AddTaskModal({
 }
 
 // =============================================================================
-// Main App
+// Main App Component
 // =============================================================================
 
 export function App() {
   const client = useAppsClient();
   const context = useHostContext();
+  const toolInput = useToolInput();
+  const view = useView();
 
-  // Apply theme to document
+  // Apply theme and host styles
   useDocumentTheme("light", "dark");
+  useHostStyleVariables();
 
-  // State
+  // Get display mode controls
+  const displayMode = useDisplayMode();
+
+  // Get safe area insets for mobile
+  const safeAreaInsets = useSafeAreaInsets();
+
+  // Get intrinsic height controls
+  const { containerRef, isSupported: isHeightSupported } = useIntrinsicHeight();
+
+  // Get modal controls
+  const { showModal, isSupported: isModalSupported } = useModal();
+
+  // Get file upload state
+  const { isSupported: isFileUploadSupported } = useFileUpload();
+
+  // Persisted preferences using useWidgetState
+  const [preferences, setPreferences] = useWidgetState<WidgetPreferences>({
+    collapsedColumns: [],
+    showDebugPanel: false,
+  });
+
+  // Local state
   const [boardData, setBoardData] = useState<BoardData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null);
+  const [message, setMessage] = useState<{ text: string; isError?: boolean; isWarning?: boolean } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
+  const [isCancelled, setIsCancelled] = useState(false);
+
+  // Subscribe to tool cancellation
+  useOnToolCancelled((reason) => {
+    setIsCancelled(true);
+    setMessage({ text: `Operation cancelled: ${reason ?? "User requested"}`, isWarning: true });
+  });
+
+  // Subscribe to teardown events
+  useOnTeardown((reason) => {
+    console.log("[Kanban App] Teardown:", reason);
+    // Cleanup resources if needed
+  });
 
   // Show message helper
-  const showMessage = useCallback((text: string, isError = false) => {
-    setMessage({ text, isError });
+  const showMessage = useCallback((text: string, isError = false, isWarning = false) => {
+    setMessage({ text, isError, isWarning });
   }, []);
 
   // Convert tasks array to board data
@@ -254,27 +491,21 @@ export function App() {
 
   // Refresh board by calling listTasks
   const refreshBoard = useCallback(async () => {
+    if (isCancelled) return;
     console.log("[Kanban App] refreshBoard called");
     setIsLoading(true);
     try {
       const result = await client.callTool("listTasks", {}) as Record<string, unknown>;
       console.log("[Kanban App] refreshBoard result:", result);
 
-      // Handle different response formats:
-      // 1. Direct: { tasks: [...] }
-      // 2. SDK wrapped: { structuredContent: { tasks: [...] } }
-      // 3. String result: { result: '{"tasks":[...]}' }
       let data: Record<string, unknown> | null = null;
 
       if (result && typeof result === "object") {
         if ("tasks" in result) {
-          // Direct format
           data = result;
         } else if ("structuredContent" in result && typeof result.structuredContent === "object") {
-          // SDK wrapped format
           data = result.structuredContent as Record<string, unknown>;
         } else if ("result" in result && typeof result.result === "string") {
-          // String result format - parse it
           try {
             data = JSON.parse(result.result) as Record<string, unknown>;
           } catch {
@@ -287,8 +518,6 @@ export function App() {
         const newBoardData = tasksToBoard(data.tasks as Task[]);
         console.log("[Kanban App] Setting board data:", newBoardData);
         setBoardData(newBoardData);
-      } else {
-        console.log("[Kanban App] Could not extract tasks from result");
       }
     } catch (err) {
       console.error("[Kanban App] refreshBoard error:", err);
@@ -296,37 +525,32 @@ export function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [client, tasksToBoard, showMessage]);
+  }, [client, tasksToBoard, showMessage, isCancelled]);
 
-  // Load initial data from tool output or fetch it
+  // Load initial data
   useEffect(() => {
     const output = client.toolOutput as Record<string, unknown> | undefined;
     console.log("[Kanban App] Tool output:", output);
 
     if (output) {
       if ("columns" in output && Array.isArray(output.columns)) {
-        console.log("[Kanban App] Using columns from tool output");
         setBoardData(output as unknown as BoardData);
       } else if ("tasks" in output && Array.isArray(output.tasks)) {
-        console.log("[Kanban App] Using tasks from tool output");
         setBoardData(tasksToBoard(output.tasks as Task[]));
       } else {
-        console.log("[Kanban App] Tool output has unknown format, fetching data");
         void refreshBoard();
       }
     } else {
-      console.log("[Kanban App] No tool output, fetching data");
       void refreshBoard();
     }
   }, [client.toolOutput, tasksToBoard, refreshBoard]);
 
   // Create task
   const handleCreateTask = useCallback(
-    async (title: string, description?: string) => {
+    async (title: string, description?: string, attachmentId?: string) => {
       setIsLoading(true);
       try {
-        const args: Record<string, string> = { title };
-        if (description) args.description = description;
+        const args: Record<string, string | undefined> = { title, description, attachmentId };
 
         const result = await client.callTool("createTask", args) as Record<string, unknown>;
         if (result && typeof result === "object" && "message" in result) {
@@ -342,10 +566,25 @@ export function App() {
     [client, refreshBoard, showMessage]
   );
 
-  // Delete task
+  // Delete task with modal confirmation (uses useModal)
   const handleDeleteTask = useCallback(
     async (taskId: string) => {
-      if (!confirm("Delete this task?")) return;
+      // Try to use native modal if supported, fall back to confirm()
+      if (isModalSupported) {
+        const modalOptions: ModalOptions = {
+          title: "Delete Task",
+          body: "Are you sure you want to delete this task? This action cannot be undone.",
+          buttons: [
+            { label: "Cancel", variant: "secondary", value: "cancel" },
+            { label: "Delete", variant: "destructive", value: "delete" },
+          ],
+        };
+
+        const result = await showModal(modalOptions);
+        if (result?.action !== "delete") return;
+      } else {
+        if (!confirm("Delete this task?")) return;
+      }
 
       setIsLoading(true);
       try {
@@ -360,7 +599,7 @@ export function App() {
         setIsLoading(false);
       }
     },
-    [client, refreshBoard, showMessage]
+    [client, refreshBoard, showMessage, isModalSupported, showModal]
   );
 
   // Move task
@@ -382,6 +621,80 @@ export function App() {
     },
     [client, refreshBoard, showMessage]
   );
+
+  // Clear completed tasks
+  const handleClearCompleted = useCallback(async () => {
+    if (isModalSupported) {
+      const result = await showModal({
+        title: "Clear Completed Tasks",
+        body: "Remove all tasks from the Done column?",
+        buttons: [
+          { label: "Cancel", variant: "secondary", value: "cancel" },
+          { label: "Clear", variant: "primary", value: "clear" },
+        ],
+      });
+      if (result?.action !== "clear") return;
+    } else {
+      if (!confirm("Clear all completed tasks?")) return;
+    }
+
+    setIsLoading(true);
+    try {
+      const result = await client.callTool("clearCompleted", { closeWidget: false }) as Record<string, unknown>;
+      if (result && typeof result === "object" && "message" in result) {
+        showMessage(result.message as string);
+      }
+      await refreshBoard();
+    } catch (err) {
+      showMessage(`Failed to clear: ${(err as Error).message}`, true);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [client, refreshBoard, showMessage, isModalSupported, showModal]);
+
+  // Export board
+  const handleExport = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const result = await client.callTool("exportBoard", { format: "json", includeMetadata: true }) as Record<string, unknown>;
+      if (result && typeof result === "object" && "data" in result) {
+        // Create download
+        const blob = new Blob([result.data as string], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "kanban-export.json";
+        a.click();
+        URL.revokeObjectURL(url);
+        showMessage("Board exported successfully!");
+      }
+    } catch (err) {
+      showMessage(`Failed to export: ${(err as Error).message}`, true);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [client, showMessage]);
+
+  // Toggle column collapse (persisted with useWidgetState)
+  const toggleColumnCollapse = useCallback((status: string) => {
+    setPreferences((prev) => {
+      const isCollapsed = prev.collapsedColumns.includes(status);
+      return {
+        ...prev,
+        collapsedColumns: isCollapsed
+          ? prev.collapsedColumns.filter((s) => s !== status)
+          : [...prev.collapsedColumns, status],
+      };
+    });
+  }, [setPreferences]);
+
+  // Toggle debug panel (persisted with useWidgetState)
+  const toggleDebugPanel = useCallback(() => {
+    setPreferences((prev) => ({
+      ...prev,
+      showDebugPanel: !prev.showDebugPanel,
+    }));
+  }, [setPreferences]);
 
   // Drag and drop handlers
   const handleDragStart = useCallback((e: React.DragEvent, task: Task) => {
@@ -422,10 +735,18 @@ export function App() {
     [draggedTask, handleMoveTask]
   );
 
+  // Apply safe area insets to container
+  const containerStyle: React.CSSProperties = {
+    paddingTop: safeAreaInsets.top,
+    paddingRight: safeAreaInsets.right,
+    paddingBottom: safeAreaInsets.bottom,
+    paddingLeft: safeAreaInsets.left,
+  };
+
   // Loading state
   if (!boardData) {
     return (
-      <div className="board-container">
+      <div className="board-container" style={containerStyle}>
         <div className="loading">
           <div className="spinner" />
           <span>Loading board...</span>
@@ -434,13 +755,35 @@ export function App() {
     );
   }
 
+  const doneColumn = boardData.columns.find((c) => c.status === "done");
+  const hasDoneTasks = doneColumn && doneColumn.count > 0;
+
   return (
-    <div className="board-container">
+    <div
+      className="board-container"
+      style={containerStyle}
+      ref={containerRef as React.RefObject<HTMLDivElement>}
+    >
       {message && (
         <Message
           text={message.text}
           isError={message.isError}
+          isWarning={message.isWarning}
           onDismiss={() => setMessage(null)}
+        />
+      )}
+
+      {preferences.showDebugPanel && (
+        <DebugPanel
+          context={context}
+          displayMode={displayMode}
+          safeAreaInsets={safeAreaInsets}
+          view={view}
+          toolInput={toolInput}
+          isFileUploadSupported={isFileUploadSupported}
+          isModalSupported={isModalSupported}
+          isHeightSupported={isHeightSupported}
+          onClose={() => toggleDebugPanel()}
         />
       )}
 
@@ -453,21 +796,49 @@ export function App() {
               <span>total tasks</span>
             </div>
           </div>
-          <button
-            className="add-btn"
-            onClick={() => setIsModalOpen(true)}
-            disabled={isLoading}
-          >
-            <span>+</span> Add Task
-          </button>
+          <div className="header-buttons">
+            <button
+              className="btn btn-icon"
+              onClick={toggleDebugPanel}
+              title="Toggle Debug Panel"
+            >
+              🔧
+            </button>
+            <button
+              className="btn btn-icon"
+              onClick={handleExport}
+              disabled={isLoading}
+              title="Export Board"
+            >
+              📥
+            </button>
+            {hasDoneTasks && (
+              <button
+                className="btn btn-secondary"
+                onClick={handleClearCompleted}
+                disabled={isLoading}
+              >
+                Clear Done
+              </button>
+            )}
+            <button
+              className="add-btn"
+              onClick={() => setIsModalOpen(true)}
+              disabled={isLoading}
+            >
+              <span>+</span> Add Task
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="board">
         {boardData.columns.map((column) => (
-          <Column
+          <ColumnComponent
             key={column.status}
             column={column}
+            isCollapsed={preferences.collapsedColumns.includes(column.status)}
+            onToggleCollapse={() => toggleColumnCollapse(column.status)}
             onDelete={handleDeleteTask}
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
@@ -482,6 +853,7 @@ export function App() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreateTask}
+        isFileUploadSupported={isFileUploadSupported}
       />
     </div>
   );

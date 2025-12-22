@@ -14,8 +14,7 @@ import { z } from "zod";
 // DATA TYPES
 // =============================================================================
 
-type TaskStatus = "todo" | "in_progress" |
- "done";
+type TaskStatus = "todo" | "in_progress" | "done";
 
 interface Task {
   id: string;
@@ -24,6 +23,7 @@ interface Task {
   status: TaskStatus;
   createdAt: string;
   updatedAt: string;
+  attachmentId?: string; // File attachment reference (for file upload demo)
 }
 
 // =============================================================================
@@ -104,6 +104,7 @@ const TaskSchema = z.object({
   status: TaskStatusSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
+  attachmentId: z.string().optional(),
 });
 
 // =============================================================================
@@ -119,6 +120,7 @@ const app = createApp({
     // LIST TASKS (Widget-only tool)
     // =========================================================================
     listTasks: {
+      title: "List Tasks",
       description:
         "List all tasks on the Kanban board, optionally filtered by status",
       input: z.object({
@@ -161,16 +163,18 @@ const app = createApp({
     },
 
     // =========================================================================
-    // CREATE TASK (Widget-only tool)
+    // CREATE TASK (Widget-only tool with file attachment support)
     // =========================================================================
     createTask: {
-      description: "Create a new task on the Kanban board",
+      title: "Create Task",
+      description: "Create a new task on the Kanban board with optional file attachment",
       input: z.object({
         title: z.string().min(1).describe("Task title (required)"),
         description: z.string().optional().describe("Task description"),
         status: TaskStatusSchema.default("todo").describe(
           "Initial status (defaults to 'todo')"
         ),
+        attachmentId: z.string().optional().describe("Optional file attachment ID"),
       }),
       output: z.object({
         task: TaskSchema,
@@ -180,10 +184,12 @@ const app = createApp({
       widgetAccessible: true,
       invokingMessage: "Creating task...",
       invokedMessage: "Task created!",
+      // Enable file upload for the attachmentId parameter (ChatGPT only)
+      fileParams: ["attachmentId"],
       annotations: {
         readOnlyHint: false,
       },
-      handler: async ({ title, description, status }, context) => {
+      handler: async ({ title, description, status, attachmentId }, context) => {
         // Format timestamp using user's timezone if available
         const timezone = context.userLocation?.timezone ?? "UTC";
         const now = new Date().toISOString();
@@ -194,13 +200,14 @@ const app = createApp({
           status: status ?? "todo",
           createdAt: now,
           updatedAt: now,
+          attachmentId,
         };
 
         tasks.set(task.id, task);
 
         return {
           task,
-          message: `Created task "${title}" in ${status ?? "todo"} column`,
+          message: `Created task "${title}" in ${status ?? "todo"} column${attachmentId ? " with attachment" : ""}`,
           _meta: { timezone },
         };
       },
@@ -210,6 +217,7 @@ const app = createApp({
     // MOVE TASK (Widget-only tool)
     // =========================================================================
     moveTask: {
+      title: "Move Task",
       description: "Move a task to a different column on the Kanban board",
       input: z.object({
         taskId: z.string().describe("ID of the task to move"),
@@ -252,6 +260,7 @@ const app = createApp({
     // UPDATE TASK (Widget-only tool)
     // =========================================================================
     updateTask: {
+      title: "Update Task",
       description: "Update a task's title or description",
       input: z.object({
         taskId: z.string().describe("ID of the task to update"),
@@ -293,6 +302,7 @@ const app = createApp({
     // DELETE TASK (Widget-only tool)
     // =========================================================================
     deleteTask: {
+      title: "Delete Task",
       description: "Delete a task from the Kanban board",
       input: z.object({
         taskId: z.string().describe("ID of the task to delete"),
@@ -325,9 +335,106 @@ const app = createApp({
     },
 
     // =========================================================================
+    // CLEAR COMPLETED (Demonstrates _closeWidget for widget dismissal)
+    // =========================================================================
+    clearCompleted: {
+      title: "Clear Completed Tasks",
+      description: "Remove all completed tasks from the board and close the widget",
+      input: z.object({
+        closeWidget: z.boolean().default(false).describe(
+          "Whether to close the widget after clearing (ChatGPT only)"
+        ),
+      }),
+      output: z.object({
+        success: z.boolean(),
+        message: z.string(),
+        deletedCount: z.number(),
+      }),
+      visibility: "both",
+      widgetAccessible: true,
+      invokingMessage: "Clearing completed tasks...",
+      invokedMessage: "Completed tasks cleared!",
+      annotations: {
+        destructiveHint: true,
+      },
+      handler: async ({ closeWidget }, _context) => {
+        const completedTasks = getTasksByStatus("done");
+        const deletedCount = completedTasks.length;
+
+        completedTasks.forEach((task) => tasks.delete(task.id));
+
+        return {
+          success: true,
+          message: deletedCount > 0
+            ? `Cleared ${deletedCount} completed task${deletedCount > 1 ? "s" : ""}`
+            : "No completed tasks to clear",
+          deletedCount,
+          // Signal to close the widget after this action (ChatGPT only)
+          _closeWidget: closeWidget,
+        };
+      },
+    },
+
+    // =========================================================================
+    // EXPORT BOARD (Demonstrates openWorldHint for external operations)
+    // =========================================================================
+    exportBoard: {
+      title: "Export Board",
+      description: "Export the Kanban board data as JSON (simulates external API call)",
+      input: z.object({
+        format: z.enum(["json", "csv"]).default("json").describe("Export format"),
+        includeMetadata: z.boolean().default(true).describe("Include task metadata"),
+      }),
+      output: z.object({
+        success: z.boolean(),
+        message: z.string(),
+        data: z.string(),
+        taskCount: z.number(),
+      }),
+      visibility: "both",
+      annotations: {
+        readOnlyHint: true,
+        // This tool would interact with external systems in a real app
+        openWorldHint: true,
+      },
+      handler: async ({ format, includeMetadata }, context) => {
+        const allTasks = getAllTasks();
+
+        let data: string;
+        if (format === "csv") {
+          const header = "id,title,description,status,createdAt,updatedAt";
+          const rows = allTasks.map((t) =>
+            `${t.id},"${t.title}","${t.description ?? ""}",${t.status},${t.createdAt},${t.updatedAt}`
+          );
+          data = [header, ...rows].join("\n");
+        } else {
+          data = JSON.stringify(
+            includeMetadata
+              ? allTasks
+              : allTasks.map((t) => ({ id: t.id, title: t.title, status: t.status })),
+            null,
+            2
+          );
+        }
+
+        // Log export action with user info if available
+        const userInfo = context.userAgent ?? "Unknown client";
+
+        return {
+          success: true,
+          message: `Exported ${allTasks.length} tasks as ${format.toUpperCase()}`,
+          data,
+          taskCount: allTasks.length,
+          _meta: { exportedBy: userInfo },
+        };
+      },
+    },
+
+    // =========================================================================
     // GET BOARD SUMMARY
     // =========================================================================
     getBoardSummary: {
+      title: "Get Board Summary",
       description:
         "Get a summary of the Kanban board with task counts per column",
       input: z.object({}),
@@ -388,6 +495,9 @@ const app = createApp({
     "kanban-board": {
       name: "Kanban Board Widget",
       description: "Interactive Kanban board React app",
+      // Widget description helps the model understand what the widget does
+      widgetDescription:
+        "A drag-and-drop Kanban board for task management. Users can create, move, update, and delete tasks across three columns: To Do, In Progress, and Done. Supports file attachments on tasks and provides real-time updates. The board displays task counts per column and allows exporting data.",
       html: "./src/ui/dist/index.html",
       prefersBorder: true,
       csp: {
@@ -405,7 +515,7 @@ const app = createApp({
       credentials: true,
     },
     // Use MCP protocol for Claude Desktop / MCP Apps
-    protocol: "mcp",
+    protocol: "openai",
   },
 });
 
@@ -417,20 +527,30 @@ const port = parseInt(process.env.PORT || "3001");
 
 app.start({ port }).then(() => {
   console.log(`
-╔═══════════════════════════════════════════════════════════════╗
-║                     KANBAN BOARD SERVER                       ║
-╠═══════════════════════════════════════════════════════════════╣
-║  Server running on http://localhost:${port}                      ║
-║  MCP endpoint: http://localhost:${port}/mcp                      ║
-║  Health check: http://localhost:${port}/health                   ║
-╠═══════════════════════════════════════════════════════════════╣
-║  Available Tools:                                             ║
-║  • listTasks     - List all tasks (optional status filter)    ║
-║  • createTask    - Create a new task                          ║
-║  • moveTask      - Move task to different column              ║
-║  • updateTask    - Update task title/description              ║
-║  • deleteTask    - Delete a task                              ║
-║  • getBoardSummary - Get board overview                       ║
-╚═══════════════════════════════════════════════════════════════╝
+╔═══════════════════════════════════════════════════════════════════════╗
+║                         KANBAN BOARD SERVER                           ║
+║            Comprehensive SDK Feature Demonstration                    ║
+╠═══════════════════════════════════════════════════════════════════════╣
+║  Server running on http://localhost:${port}                              ║
+║  MCP endpoint: http://localhost:${port}/mcp                              ║
+║  Health check: http://localhost:${port}/health                           ║
+╠═══════════════════════════════════════════════════════════════════════╣
+║  Available Tools:                                                     ║
+║  • listTasks       - List all tasks (optional status filter)          ║
+║  • createTask      - Create a new task (supports fileParams)          ║
+║  • moveTask        - Move task to different column                    ║
+║  • updateTask      - Update task title/description                    ║
+║  • deleteTask      - Delete a task (destructiveHint)                  ║
+║  • clearCompleted  - Clear done tasks (_closeWidget demo)             ║
+║  • exportBoard     - Export board data (openWorldHint demo)           ║
+║  • getBoardSummary - Get board overview (launches widget)             ║
+╠═══════════════════════════════════════════════════════════════════════╣
+║  SDK Features Demonstrated:                                           ║
+║  • Tool annotations: readOnlyHint, destructiveHint, openWorldHint     ║
+║  • ToolContext: locale, timezone, subject, widgetSessionId            ║
+║  • fileParams: File upload support (ChatGPT only)                     ║
+║  • _closeWidget: Widget dismissal after action                        ║
+║  • widgetDescription: Model-readable widget summary                   ║
+╚═══════════════════════════════════════════════════════════════════════╝
   `);
 });
