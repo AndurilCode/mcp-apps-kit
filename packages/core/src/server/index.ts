@@ -12,11 +12,10 @@ import type { Server } from "http";
 import { z } from "zod";
 
 import type { ToolDefs, StartOptions, ExpressMiddleware } from "../types/tools";
-import type { AppConfig, CORSConfig, Protocol } from "../types/config";
+import type { AppConfig, CORSConfig } from "../types/config";
 import type { UIDefs, UIDef } from "../types/ui";
 import { wrapError } from "../utils/errors";
-import { mapVisibilityToMcp, mapVisibilityToOpenAI } from "../utils/metadata";
-import { generateMcpCSPMetadata, generateOpenAICSPMetadata } from "../utils/csp";
+import { createAdapter, type ProtocolAdapter } from "../adapters";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -47,8 +46,8 @@ export interface ServerInstance {
 export function createServerInstance<T extends ToolDefs>(
   config: AppConfig<T>
 ): ServerInstance {
-  // Get protocol from config (default to MCP)
-  const protocol: Protocol = config.config?.protocol ?? "mcp";
+  // Create protocol adapter
+  const adapter = createAdapter(config.config?.protocol ?? "mcp");
 
   // Create MCP server
   const mcpServer = new McpServer({
@@ -57,11 +56,11 @@ export function createServerInstance<T extends ToolDefs>(
   });
 
   // Register tools with MCP server
-  registerTools(mcpServer, config.tools, protocol, config.name);
+  registerTools(mcpServer, config.tools, adapter, config.name);
 
   // Register UI resources with MCP server
   if (config.ui) {
-    registerUIResources(mcpServer, config.name, config.ui, protocol);
+    registerUIResources(mcpServer, config.name, config.ui, adapter);
   }
 
   // Create Express app
@@ -269,7 +268,7 @@ export function createServerInstance<T extends ToolDefs>(
 function registerTools(
   mcpServer: McpServer,
   tools: ToolDefs,
-  protocol: Protocol,
+  adapter: ProtocolAdapter,
   serverName: string
 ): void {
   for (const [name, toolDef] of Object.entries(tools)) {
@@ -277,47 +276,8 @@ function registerTools(
     // MCP SDK expects inputSchema as { key: zodSchema, ... } not JSON Schema
     const zodShape = extractZodShape(toolDef.input);
 
-    // Build annotations and _meta based on protocol
-    const annotations: Record<string, unknown> = {};
-    const meta: Record<string, unknown> = {};
-
-    if (protocol === "openai") {
-      // OpenAI protocol: put openai-specific fields under _meta
-      const visibilitySettings = mapVisibilityToOpenAI(toolDef.visibility);
-      Object.assign(meta, visibilitySettings);
-
-      // Allow explicit widgetAccessible to override visibility-derived value
-      if (toolDef.widgetAccessible !== undefined) {
-        meta["openai/widgetAccessible"] = toolDef.widgetAccessible;
-      }
-
-      // Add UI binding with OpenAI prefix - use full resource URI
-      if (toolDef.ui) {
-        meta["openai/outputTemplate"] = `ui://${serverName}/${toolDef.ui}`;
-      }
-
-      // Add invoking/invoked messages (ChatGPT-specific)
-      // Per PROTOCOL-COMPARISON.md: use openai/toolInvocation/invoking and openai/toolInvocation/invoked
-      if (toolDef.invokingMessage) {
-        meta["openai/toolInvocation/invoking"] = toolDef.invokingMessage;
-      }
-      if (toolDef.invokedMessage) {
-        meta["openai/toolInvocation/invoked"] = toolDef.invokedMessage;
-      }
-    } else {
-      // MCP protocol: put metadata under _meta.ui.* per PROTOCOL-COMPARISON.md
-      const uiMeta: Record<string, unknown> = {};
-
-      // Add visibility as array: ["model"], ["app"], or ["model", "app"]
-      uiMeta.visibility = mapVisibilityToMcp(toolDef.visibility);
-
-      // Add UI resource link if specified
-      if (toolDef.ui) {
-        uiMeta.resourceUri = `ui://${serverName}/${toolDef.ui}`;
-      }
-
-      meta.ui = uiMeta;
-    }
+    // Build annotations and _meta using the protocol adapter
+    const { annotations, _meta } = adapter.buildToolMeta(toolDef, serverName);
 
     // Build output schema if defined
     const outputSchema = toolDef.output ? extractZodShape(toolDef.output) : undefined;
@@ -330,8 +290,8 @@ function registerTools(
         description: toolDef.description,
         inputSchema: zodShape,
         outputSchema,
-        annotations: Object.keys(annotations).length > 0 ? annotations : undefined,
-        _meta: Object.keys(meta).length > 0 ? meta : undefined,
+        annotations,
+        _meta,
       },
       async (args: Record<string, unknown>) => {
         try {
@@ -413,96 +373,37 @@ function applyCors(app: Express, config: CORSConfig): void {
 /**
  * Register UI resources with the MCP server
  *
- * Registers each UI resource as an MCP resource with protocol-specific metadata:
- *
- * MCP protocol:
- * - URI format: ui://{serverName}/{resourceKey}
- * - MIME type: text/html;profile=mcp-app
- * - CSP metadata in _meta.ui.csp (camelCase)
- *
- * OpenAI protocol:
- * - URI format: ui://{serverName}/{resourceKey}
- * - MIME type: text/html;profile=chatgpt-widget
- * - CSP metadata in _meta["openai/widgetCSP"] (snake_case)
+ * Registers each UI resource as an MCP resource with protocol-specific metadata
+ * generated by the adapter.
  */
 function registerUIResources(
   mcpServer: McpServer,
   serverName: string,
   ui: UIDefs,
-  protocol: Protocol
+  adapter: ProtocolAdapter
 ): void {
   for (const [key, uiDef] of Object.entries(ui)) {
     const uri = `ui://${serverName}/${key}`;
 
-    // Build resource metadata based on protocol
-    const metadata: Record<string, unknown> = {
-      mimeType: protocol === "openai"
-        ? "text/html+skybridge"
-        : "text/html;profile=mcp-app",
-    };
+    // Build resource metadata using the protocol adapter
+    const { mimeType, _meta } = adapter.buildUIResourceMeta(uiDef);
+
+    const metadata: Record<string, unknown> = { mimeType };
 
     if (uiDef.description) {
       metadata.description = uiDef.description;
     }
 
-    // Build _meta with protocol-specific structure
-    if (protocol === "openai") {
-      // OpenAI protocol: use snake_case and openai/ prefixes
-      const metaObj: Record<string, unknown> = {};
-
-      if (uiDef.csp) {
-        const cspMetadata = generateOpenAICSPMetadata(uiDef.csp);
-        if (Object.keys(cspMetadata).length > 0) {
-          metaObj["openai/widgetCSP"] = cspMetadata;
-        }
-      }
-
-      // Per PROTOCOL-COMPARISON.md: use openai/widgetPrefersBorder and openai/widgetDomain
-      if (uiDef.prefersBorder !== undefined) {
-        metaObj["openai/widgetPrefersBorder"] = uiDef.prefersBorder;
-      }
-
-      if (uiDef.domain) {
-        metaObj["openai/widgetDomain"] = uiDef.domain;
-      }
-
-      if (Object.keys(metaObj).length > 0) {
-        metadata._meta = metaObj;
-      }
-    } else {
-      // MCP protocol: use camelCase in _meta.ui namespace per PROTOCOL-COMPARISON.md
-      const uiMeta: Record<string, unknown> = {};
-
-      if (uiDef.csp) {
-        const cspMetadata = generateMcpCSPMetadata(uiDef.csp);
-        if (Object.keys(cspMetadata).length > 0) {
-          uiMeta.csp = cspMetadata;
-        }
-      }
-
-      if (uiDef.prefersBorder !== undefined) {
-        uiMeta.prefersBorder = uiDef.prefersBorder;
-      }
-
-      if (uiDef.domain) {
-        uiMeta.domain = uiDef.domain;
-      }
-
-      if (Object.keys(uiMeta).length > 0) {
-        metadata._meta = { ui: uiMeta };
-      }
+    if (_meta) {
+      metadata._meta = _meta;
     }
-
-    // Get the MIME type and _meta for use in the callback
-    const mimeType = metadata.mimeType as string;
-    const resourceMeta = metadata._meta as Record<string, unknown> | undefined;
 
     // Register the resource
     mcpServer.registerResource(
       uiDef.name ?? key,
       uri,
       metadata,
-      () => readUIResource(key, uiDef, uri, mimeType, resourceMeta)
+      () => readUIResource(key, uiDef, uri, mimeType, _meta)
     );
   }
 }

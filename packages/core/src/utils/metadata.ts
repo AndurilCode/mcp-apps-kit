@@ -141,10 +141,8 @@ export function generateToolMetadata(
  * Generate MCP-specific tool metadata
  */
 function generateMcpMetadata(name: string, toolDef: ToolDef): McpToolMetadata {
-  const visibilityAnnotations = mapVisibilityToMcp(toolDef.visibility);
-
   const annotations: Record<string, unknown> = {
-    ...visibilityAnnotations,
+    visibility: mapVisibilityToMcp(toolDef.visibility),
   };
 
   // Add UI binding if specified

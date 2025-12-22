@@ -14,46 +14,46 @@ import { z } from "zod";
 
 describe("Visibility Mapping", () => {
   describe("mapVisibilityToMcp", () => {
-    it("should map 'model' to readOnlyHint: true", () => {
+    it("should map 'model' to ['model'] array", () => {
       const result = mapVisibilityToMcp("model");
-      expect(result).toEqual({ readOnlyHint: true });
+      expect(result).toEqual(["model"]);
     });
 
-    it("should map 'app' to annotation for app-only tools", () => {
+    it("should map 'app' to ['app'] array", () => {
       const result = mapVisibilityToMcp("app");
-      expect(result).toEqual({ readOnlyHint: false, appOnly: true });
+      expect(result).toEqual(["app"]);
     });
 
-    it("should map 'both' to default (no restrictions)", () => {
+    it("should map 'both' to ['model', 'app'] array", () => {
       const result = mapVisibilityToMcp("both");
-      expect(result).toEqual({ readOnlyHint: false });
+      expect(result).toEqual(["model", "app"]);
     });
 
-    it("should default to 'both' when visibility is undefined", () => {
+    it("should default to ['model', 'app'] when visibility is undefined", () => {
       const result = mapVisibilityToMcp(undefined);
-      expect(result).toEqual({ readOnlyHint: false });
+      expect(result).toEqual(["model", "app"]);
     });
   });
 
   describe("mapVisibilityToOpenAI", () => {
-    it("should map 'model' to invokable by AI only", () => {
+    it("should map 'model' to public visibility without widget access", () => {
       const result = mapVisibilityToOpenAI("model");
-      expect(result).toEqual({ invokableByAI: true, invokableByApp: false });
+      expect(result).toEqual({ "openai/visibility": "public", "openai/widgetAccessible": false });
     });
 
-    it("should map 'app' to invokable by app only", () => {
+    it("should map 'app' to private visibility with widget access", () => {
       const result = mapVisibilityToOpenAI("app");
-      expect(result).toEqual({ invokableByAI: false, invokableByApp: true });
+      expect(result).toEqual({ "openai/visibility": "private", "openai/widgetAccessible": true });
     });
 
-    it("should map 'both' to invokable by both", () => {
+    it("should map 'both' to public visibility with widget access", () => {
       const result = mapVisibilityToOpenAI("both");
-      expect(result).toEqual({ invokableByAI: true, invokableByApp: true });
+      expect(result).toEqual({ "openai/visibility": "public", "openai/widgetAccessible": true });
     });
 
     it("should default to 'both' when visibility is undefined", () => {
       const result = mapVisibilityToOpenAI(undefined);
-      expect(result).toEqual({ invokableByAI: true, invokableByApp: true });
+      expect(result).toEqual({ "openai/visibility": "public", "openai/widgetAccessible": true });
     });
   });
 });
@@ -90,7 +90,7 @@ describe("generateToolMetadata", () => {
       const toolWithVisibility = { ...sampleToolDef, visibility: "model" as const };
       const metadata = generateToolMetadata("greet", toolWithVisibility, "mcp");
       expect(metadata.annotations).toMatchObject({
-        readOnlyHint: true,
+        visibility: ["model"],
       });
     });
   });
