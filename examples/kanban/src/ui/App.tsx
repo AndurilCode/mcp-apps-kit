@@ -430,7 +430,26 @@ export function App() {
   const safeAreaInsets = useSafeAreaInsets();
 
   // Get intrinsic height controls
-  const { containerRef, isSupported: isHeightSupported } = useIntrinsicHeight();
+  const { containerRef, isSupported: isHeightSupported, notify: notifyHeight } = useIntrinsicHeight();
+
+  // Notify host of preferred height when in inline mode (dynamic based on content)
+  useEffect(() => {
+    if (!isHeightSupported || displayMode.mode !== "inline") {
+      return;
+    }
+
+    // Small delay to ensure DOM is rendered
+    const timer = setTimeout(() => {
+      const container = containerRef.current;
+      if (container) {
+        const contentHeight = container.scrollHeight;
+        const preferredHeight = Math.min(Math.max(contentHeight, 300), 600);
+        notifyHeight(preferredHeight);
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [isHeightSupported, displayMode.mode, notifyHeight, containerRef]);
 
   // Get modal controls
   const { showModal, isSupported: isModalSupported } = useModal();
@@ -452,6 +471,25 @@ export function App() {
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [isCancelled, setIsCancelled] = useState(false);
+
+  // Recalculate height when board data changes
+  useEffect(() => {
+    if (!isHeightSupported || displayMode.mode !== "inline" || !boardData) {
+      return;
+    }
+
+    // Small delay to ensure DOM has updated
+    const timer = setTimeout(() => {
+      const container = containerRef.current;
+      if (container) {
+        const contentHeight = container.scrollHeight;
+        const preferredHeight = Math.min(Math.max(contentHeight, 300), 600);
+        notifyHeight(preferredHeight);
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [isHeightSupported, displayMode.mode, notifyHeight, containerRef, boardData]);
 
   // Subscribe to tool cancellation
   useOnToolCancelled((reason) => {
@@ -797,6 +835,24 @@ export function App() {
             </div>
           </div>
           <div className="header-buttons">
+            {displayMode.mode === "inline" && displayMode.availableModes.includes("fullscreen") && (
+              <button
+                className="btn btn-icon"
+                onClick={() => displayMode.requestMode("fullscreen")}
+                title="Fullscreen"
+              >
+                ⛶
+              </button>
+            )}
+            {displayMode.mode === "fullscreen" && (
+              <button
+                className="btn btn-icon"
+                onClick={() => displayMode.requestMode("inline")}
+                title="Exit Fullscreen"
+              >
+                ⛶
+              </button>
+            )}
             <button
               className="btn btn-icon"
               onClick={toggleDebugPanel}
@@ -823,7 +879,28 @@ export function App() {
             )}
             <button
               className="add-btn"
-              onClick={() => setIsModalOpen(true)}
+              onClick={async () => {
+                // Use native modal if supported, otherwise custom modal
+                if (isModalSupported) {
+                  const result = await showModal({
+                    title: "Add New Task",
+                    body: "Enter a title for your new task",
+                    input: {
+                      type: "text",
+                      placeholder: "Task title",
+                    },
+                    buttons: [
+                      { label: "Cancel", variant: "secondary", value: "cancel" },
+                      { label: "Add", variant: "primary", value: "add" },
+                    ],
+                  });
+                  if (result?.action === "add" && result.inputValue?.trim()) {
+                    await handleCreateTask(result.inputValue.trim());
+                  }
+                } else {
+                  setIsModalOpen(true);
+                }
+              }}
               disabled={isLoading}
             >
               <span>+</span> Add Task

@@ -109,7 +109,17 @@ body {
 
 @media (max-width: 768px) {
   .board {
-    grid-template-columns: 1fr;
+    /* Horizontal scroll layout for narrow viewports (inline mode) */
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 12px;
+    padding-bottom: 8px;
+  }
+
+  .board .column {
+    flex: 0 0 280px;
+    min-height: 200px;
   }
 }
 
@@ -117,7 +127,7 @@ body {
   background-color: var(--card-bg);
   border-radius: 12px;
   padding: 16px;
-  min-height: 400px;
+  min-height: 200px;
   border: 1px solid var(--border-color);
   transition: border-color 0.2s;
 }
