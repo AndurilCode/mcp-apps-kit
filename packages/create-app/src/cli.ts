@@ -8,7 +8,8 @@
 import { Command, InvalidArgumentError } from "commander";
 import prompts from "prompts";
 import chalk from "chalk";
-import { scaffoldProject, CreateAppOptions } from "./index.js";
+import { scaffoldProject } from "./index.js";
+import type { CreateAppOptions } from "./index.js";
 
 // =============================================================================
 // Types
