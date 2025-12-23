@@ -1,0 +1,35 @@
+{
+  "name": "@apps-builder/example-restaurant-finder",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Restaurant finder example with location-based search",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"pnpm dev:server\" \"pnpm dev:ui\"",
+    "dev:server": "tsx watch src/index.ts",
+    "dev:ui": "vite build --watch",
+    "start": "tsx src/index.ts",
+    "build": "pnpm build:ui && tsc",
+    "build:ui": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@apps-builder/core": "workspace:*",
+    "@apps-builder/ui": "workspace:*",
+    "@apps-builder/ui-react": "workspace:*",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "concurrently": "^8.2.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0",
+    "vite-plugin-singlefile": "^2.3.0"
+  }
+}

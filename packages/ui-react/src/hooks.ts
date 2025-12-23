@@ -2,7 +2,7 @@
  * React hooks for @apps-builder/ui-react
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import type { AppsClient, HostContext, ToolDefs, ToolResult, ModalOptions, ModalResult } from "@apps-builder/ui";
 import { useAppsContext } from "./context";
 

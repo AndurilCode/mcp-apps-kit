@@ -3,6 +3,8 @@
  *
  * Tests the detectProtocol() function that auto-detects
  * whether the UI is running in Claude Desktop, ChatGPT, or development mode.
+ *
+ * @vitest-environment jsdom
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -61,8 +63,10 @@ describe("detectProtocol", () => {
       const parentWindow = {};
       const mockWindow = {
         parent: parentWindow,
+        location: { href: "http://localhost:3000" },
       };
       vi.stubGlobal("window", mockWindow);
+      vi.stubGlobal("document", { referrer: "" });
 
       expect(detectProtocol()).toBe("mcp");
     });
@@ -70,9 +74,12 @@ describe("detectProtocol", () => {
 
   describe("development/mock mode", () => {
     it("should return 'mock' when not in iframe and no openai object", () => {
-      const mockWindow = {};
+      const mockWindow = {
+        location: { href: "http://localhost:3000" },
+      };
       Object.defineProperty(mockWindow, "parent", { value: mockWindow });
       vi.stubGlobal("window", mockWindow);
+      vi.stubGlobal("document", { referrer: "" });
 
       expect(detectProtocol()).toBe("mock");
     });

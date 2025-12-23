@@ -2,6 +2,8 @@
  * Unit tests for OpenAI/ChatGPT adapter
  *
  * Tests the OpenAIAdapter implementation for ChatGPT Apps.
+ *
+ * @vitest-environment jsdom
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";

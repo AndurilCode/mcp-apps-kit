@@ -116,7 +116,7 @@ export class OpenAIAdapter implements ProtocolAdapter {
    * Notify all registered handlers of context changes
    */
   private notifyContextChange(): void {
-    console.log(`[OpenAI Adapter] Notifying ${this.hostContextHandlers.size} context change handlers`);
+    console.log(`[OpenAI Adapter] Notifying ${String(this.hostContextHandlers.size)} context change handlers`);
     // Create a new object reference to trigger React state updates
     const contextSnapshot = { ...this.context };
     for (const handler of this.hostContextHandlers) {
@@ -185,13 +185,13 @@ export class OpenAIAdapter implements ProtocolAdapter {
     if (typeof window === "undefined") return;
 
     this.globalsHandler = (event: MessageEvent) => {
-      const data = event.data;
+      const data = event.data as unknown;
 
       // Handle various message formats for set_globals
       const isSetGlobals =
         data === "openai:set_globals" ||
-        data?.type === "openai:set_globals" ||
-        (typeof data === "object" && data?.message === "openai:set_globals");
+        (typeof data === "object" && data !== null && "type" in data && (data as { type: unknown }).type === "openai:set_globals") ||
+        (typeof data === "object" && data !== null && "message" in data && (data as { message: unknown }).message === "openai:set_globals");
 
       if (isSetGlobals) {
         console.log("[OpenAI Adapter] Received set_globals event, refreshing context");
@@ -264,12 +264,12 @@ export class OpenAIAdapter implements ProtocolAdapter {
 
       // Also listen for the set_globals message (various formats)
       const messageHandler = (event: MessageEvent) => {
-        const data = event.data;
+        const data = event.data as unknown;
         // Handle both string and object formats
         const isSetGlobals =
           data === "openai:set_globals" ||
-          data?.type === "openai:set_globals" ||
-          (typeof data === "object" && data?.message === "openai:set_globals");
+          (typeof data === "object" && data !== null && "type" in data && (data as { type: unknown }).type === "openai:set_globals") ||
+          (typeof data === "object" && data !== null && "message" in data && (data as { message: unknown }).message === "openai:set_globals");
 
         if (isSetGlobals) {
           console.log("[OpenAI Adapter] Received set_globals message");
@@ -422,10 +422,10 @@ export class OpenAIAdapter implements ProtocolAdapter {
 
   onHostContextChange(handler: (context: HostContext) => void): () => void {
     this.hostContextHandlers.add(handler);
-    console.log(`[OpenAI Adapter] Host context handler added, total: ${this.hostContextHandlers.size}`);
+    console.log(`[OpenAI Adapter] Host context handler added, total: ${String(this.hostContextHandlers.size)}`);
     return () => {
       this.hostContextHandlers.delete(handler);
-      console.log(`[OpenAI Adapter] Host context handler removed, total: ${this.hostContextHandlers.size}`);
+      console.log(`[OpenAI Adapter] Host context handler removed, total: ${String(this.hostContextHandlers.size)}`);
     };
   }
 

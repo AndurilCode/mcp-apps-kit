@@ -1,0 +1,29 @@
+{
+  "name": "@apps-builder/example-minimal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minimal example demonstrating basic @apps-builder/core usage",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"pnpm dev:server\" \"pnpm dev:ui\"",
+    "dev:server": "tsx watch src/index.ts",
+    "dev:ui": "vite build --watch",
+    "start": "tsx src/index.ts",
+    "build": "pnpm build:ui && tsc",
+    "build:ui": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@apps-builder/core": "workspace:*",
+    "@apps-builder/ui": "workspace:*",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "concurrently": "^8.2.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0",
+    "vite-plugin-singlefile": "^2.3.0"
+  }
+}
