@@ -328,10 +328,16 @@ export class OpenAIAdapter implements ProtocolAdapter {
   async requestDisplayMode(mode: string): Promise<{ mode: string }> {
     const openai = this.getOpenAI();
     if (openai && typeof openai.requestDisplayMode === "function") {
-      return (openai.requestDisplayMode as (mode: string) => Promise<{ mode: string }>)(mode);
+      // API expects { mode: "fullscreen" | "inline" | "pip" }
+      const result = await (openai.requestDisplayMode as (opts: { mode: string }) => Promise<{ mode: string }>)({ mode });
+      // Update local context with the actual mode returned
+      this.context = { ...this.context, displayMode: result.mode as HostContext["displayMode"] };
+      this.notifyContextChange();
+      return result;
     }
     // Fallback: just return the requested mode
     this.context = { ...this.context, displayMode: mode as HostContext["displayMode"] };
+    this.notifyContextChange();
     return { mode };
   }
 
