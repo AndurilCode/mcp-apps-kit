@@ -11,7 +11,13 @@ import express, { type Express, type Request, type Response } from "express";
 import type { Server } from "http";
 import { z } from "zod";
 
-import type { ToolDefs, StartOptions, ExpressMiddleware, ToolContext, UserLocation } from "../types/tools";
+import type {
+  ToolDefs,
+  StartOptions,
+  ExpressMiddleware,
+  ToolContext,
+  UserLocation,
+} from "../types/tools";
 import type { AppConfig, CORSConfig } from "../types/config";
 import type { UIDefs, UIDef } from "../types/ui";
 import { formatZodError, wrapError } from "../utils/errors";
@@ -44,9 +50,7 @@ export interface ServerInstance {
 /**
  * Create an MCP server instance with tools registered
  */
-export function createServerInstance<T extends ToolDefs>(
-  config: AppConfig<T>
-): ServerInstance {
+export function createServerInstance<T extends ToolDefs>(config: AppConfig<T>): ServerInstance {
   // Create protocol adapter
   const adapter = createAdapter(config.config?.protocol ?? "mcp");
 
@@ -248,13 +252,10 @@ export function createServerInstance<T extends ToolDefs>(
         });
       } catch (error) {
         const appError = wrapError(error);
-        return new Response(
-          JSON.stringify({ error: appError.message }),
-          {
-            status: 500,
-            headers: { "Content-Type": "application/json" },
-          }
-        );
+        return new Response(JSON.stringify({ error: appError.message }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
       }
     },
   };
@@ -311,10 +312,7 @@ function registerTools(
 
           // Execute handler with input and context
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          const result = await toolDef.handler(
-            parsed as z.infer<typeof toolDef.input>,
-            context
-          );
+          const result = await toolDef.handler(parsed as z.infer<typeof toolDef.input>, context);
 
           // Extract special fields from result
           const resultObj = result as Record<string, unknown>;
@@ -353,9 +351,10 @@ function registerTools(
           }
 
           // Model-facing text: prefer explicit narration when provided
-          const contentText = typeof textNarration === "string" && textNarration.length > 0
-            ? textNarration
-            : JSON.stringify(structured);
+          const contentText =
+            typeof textNarration === "string" && textNarration.length > 0
+              ? textNarration
+              : JSON.stringify(structured);
 
           // Return result with both text content and structuredContent
           return {
@@ -490,7 +489,10 @@ function applyCors(app: Express, config: CORSConfig): void {
  *
  * Returns a map of UI key to full URI with hash.
  */
-function computeUIUris(serverName: string, ui: UIDefs): Record<string, { uri: string; html: string }> {
+function computeUIUris(
+  serverName: string,
+  ui: UIDefs
+): Record<string, { uri: string; html: string }> {
   const result: Record<string, { uri: string; html: string }> = {};
 
   for (const [key, uiDef] of Object.entries(ui)) {
@@ -536,19 +538,16 @@ function registerUIResources(
     }
 
     // Register the resource with pre-loaded HTML
-    mcpServer.registerResource(
-      uiDef.name ?? key,
-      uri,
-      metadata,
-      () => ({
-        contents: [{
+    mcpServer.registerResource(uiDef.name ?? key, uri, metadata, () => ({
+      contents: [
+        {
           uri,
           mimeType,
           text: html,
           ...(_meta && { _meta }),
-        }],
-      })
-    );
+        },
+      ],
+    }));
   }
 }
 
@@ -568,6 +567,8 @@ function readUIHtml(key: string, uiDef: UIDef): string {
   try {
     return fs.readFileSync(filePath, "utf-8");
   } catch (error) {
-    throw new Error(`Failed to read UI resource "${key}" from ${filePath}: ${(error as Error).message}`);
+    throw new Error(
+      `Failed to read UI resource "${key}" from ${filePath}: ${(error as Error).message}`
+    );
   }
 }

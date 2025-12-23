@@ -3,7 +3,14 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import type { AppsClient, HostContext, ToolDefs, ToolResult, ModalOptions, ModalResult } from "@mcp-apps-kit/ui";
+import type {
+  AppsClient,
+  HostContext,
+  ToolDefs,
+  ToolResult,
+  ModalOptions,
+  ModalResult,
+} from "@mcp-apps-kit/ui";
 import { useAppsContext } from "./context";
 
 // =============================================================================

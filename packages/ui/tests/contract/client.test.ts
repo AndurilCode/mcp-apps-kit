@@ -139,9 +139,7 @@ describe("createClient contract", () => {
 
   describe("error handling", () => {
     it("should throw for unknown forced adapter", async () => {
-      await expect(
-        createClient({ forceAdapter: "invalid" as "mock" })
-      ).rejects.toThrow();
+      await expect(createClient({ forceAdapter: "invalid" as "mock" })).rejects.toThrow();
     });
   });
 });

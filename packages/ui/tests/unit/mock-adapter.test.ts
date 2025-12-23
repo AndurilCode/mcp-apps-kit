@@ -97,18 +97,14 @@ describe("MockAdapter", () => {
   describe("messaging", () => {
     it("should handle sendMessage without error", async () => {
       await adapter.connect();
-      await expect(
-        adapter.sendMessage({ type: "text", text: "Hello" })
-      ).resolves.toBeUndefined();
+      await expect(adapter.sendMessage({ type: "text", text: "Hello" })).resolves.toBeUndefined();
     });
   });
 
   describe("navigation", () => {
     it("should handle openLink without error", async () => {
       await adapter.connect();
-      await expect(
-        adapter.openLink("https://example.com")
-      ).resolves.toBeUndefined();
+      await expect(adapter.openLink("https://example.com")).resolves.toBeUndefined();
     });
 
     it("should return the requested display mode", async () => {

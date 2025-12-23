@@ -95,8 +95,7 @@ export class McpAdapter implements ProtocolAdapter {
 
     this.app.onhostcontextchanged = (params) => {
       // ext-apps sends { hostContext }, but keep this tolerant.
-      const hostContext =
-        (params as { hostContext?: unknown }).hostContext ?? (params as unknown);
+      const hostContext = (params as { hostContext?: unknown }).hostContext ?? (params as unknown);
       this.context = this.mapHostContext(hostContext);
       this.currentToolMeta = this.extractToolMeta(hostContext);
       for (const handler of this.hostContextHandlers) {
@@ -180,7 +179,7 @@ export class McpAdapter implements ProtocolAdapter {
         : base.displayMode;
 
     const availableDisplayModes = Array.isArray(ctx.availableDisplayModes)
-      ? (ctx.availableDisplayModes.filter((m): m is string => typeof m === "string"))
+      ? ctx.availableDisplayModes.filter((m): m is string => typeof m === "string")
       : base.availableDisplayModes;
 
     const isViewportObject = (v: unknown): v is Record<string, unknown> =>
@@ -333,7 +332,7 @@ export class McpAdapter implements ProtocolAdapter {
 
     const result = (await request(
       { method: "resources/read", params: { uri } },
-      AnySchema,
+      AnySchema
     )) as ResourceReadResult;
 
     // Normalize to our ResourceContent shape.
@@ -361,16 +360,7 @@ export class McpAdapter implements ProtocolAdapter {
   log(level: string, data: unknown): void {
     if (this.app) {
       const normalizedLevel: ExtAppsLogLevel = (
-        [
-          "debug",
-          "info",
-          "notice",
-          "warning",
-          "error",
-          "critical",
-          "alert",
-          "emergency",
-        ] as const
+        ["debug", "info", "notice", "warning", "error", "critical", "alert", "emergency"] as const
       ).includes(level as ExtAppsLogLevel)
         ? (level as ExtAppsLogLevel)
         : "info";
@@ -389,7 +379,10 @@ export class McpAdapter implements ProtocolAdapter {
     }
 
     // eslint-disable-next-line no-console -- Fallback logging when MCP logging unavailable
-    const logFn = { debug: console.debug, info: console.info, warning: console.warn, error: console.error }[level] ?? console.log;
+    const logFn =
+      { debug: console.debug, info: console.info, warning: console.warn, error: console.error }[
+        level
+      ] ?? console.log;
     logFn("[MCP Apps]", data);
   }
 

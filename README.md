@@ -14,6 +14,7 @@ A TypeScript framework for building interactive MCP applications that work seaml
 ## Why?
 
 Building interactive MCP apps today requires:
+
 - Different codebases for MCP Apps vs ChatGPT Apps
 - Different APIs (`@modelcontextprotocol/ext-apps` vs `window.openai`)
 - Different metadata schemas (`_meta.ui` vs `_meta["openai/..."]`)
@@ -33,11 +34,13 @@ Building interactive MCP apps today requires:
 ## Who Is This For?
 
 This project is most useful if you:
+
 - Want one codebase that can serve **MCP Apps** and **ChatGPT Apps**
 - Prefer defining tools with runtime validation (Zod) and strong TypeScript inference
 - Want a first-class pattern for **tool output → widget/UI rendering**
 
 This project may be a poor fit if you:
+
 - Only target a single host/protocol and want direct, low-level control
 - Need custom transport/session behavior that doesn’t fit the built-in server (you can still use `app.handler()` / `app.getServer()`, but you’ll be closer to the metal)
 
@@ -59,6 +62,7 @@ pnpm -C examples/kanban dev
 ```
 
 Then open:
+
 - http://localhost:3001/health
 - http://localhost:3001/mcp
 
@@ -88,11 +92,13 @@ const app = createApp({
       }),
       output: z.object({
         count: z.number(),
-        restaurants: z.array(z.object({
-          id: z.string(),
-          name: z.string(),
-          rating: z.number(),
-        })),
+        restaurants: z.array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            rating: z.number(),
+          })
+        ),
       }),
       handler: async ({ location, cuisine }) => {
         const results = await fetchRestaurants(location, cuisine);
@@ -164,21 +170,21 @@ function RestaurantList() {
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [Design Document](./docs/DESIGN.md) | Architecture overview and core concepts |
+| Document                                             | Description                               |
+| ---------------------------------------------------- | ----------------------------------------- |
+| [Design Document](./docs/DESIGN.md)                  | Architecture overview and core concepts   |
 | [Protocol Comparison](./docs/PROTOCOL-COMPARISON.md) | Detailed MCP Apps vs ChatGPT Apps mapping |
-| [API Reference](./docs/API-REFERENCE.md) | Complete API documentation |
-| [Implementation TODO](./docs/TODO.md) | Development roadmap and priorities |
+| [API Reference](./docs/API-REFERENCE.md)             | Complete API documentation                |
+| [Implementation TODO](./docs/TODO.md)                | Development roadmap and priorities        |
 
 ## Packages
 
-| Package | Description |
-|---------|-------------|
-| `@mcp-apps-kit/core` | Server-side framework |
-| `@mcp-apps-kit/ui` | Client-side SDK (vanilla JS) |
-| `@mcp-apps-kit/ui-react` | React bindings |
-| `@mcp-apps-kit/create-app` | CLI scaffolding tool |
+| Package                    | Description                  |
+| -------------------------- | ---------------------------- |
+| `@mcp-apps-kit/core`       | Server-side framework        |
+| `@mcp-apps-kit/ui`         | Client-side SDK (vanilla JS) |
+| `@mcp-apps-kit/ui-react`   | React bindings               |
+| `@mcp-apps-kit/create-app` | CLI scaffolding tool         |
 
 ## How It Works
 
@@ -255,21 +261,21 @@ await server.connect(new StdioTransport());
 export default {
   async fetch(request) {
     return app.handleRequest(request);
-  }
+  },
 };
 ```
 
 ## Platform Support
 
-| Feature | MCP Apps | ChatGPT Apps |
-|---------|---------------|---------|
-| Tool Calling | ✅ | ✅ |
-| Structured Data | ✅ | ✅ |
-| Theme Support | ✅ | ✅ |
-| Display Modes | ✅ | ✅ |
-| Persisted State | ✅ (polyfill) | ✅ |
-| File Upload | ❌ | ✅ |
-| Tool Cancellation | ✅ | ❌ |
+| Feature           | MCP Apps      | ChatGPT Apps |
+| ----------------- | ------------- | ------------ |
+| Tool Calling      | ✅            | ✅           |
+| Structured Data   | ✅            | ✅           |
+| Theme Support     | ✅            | ✅           |
+| Display Modes     | ✅            | ✅           |
+| Persisted State   | ✅ (polyfill) | ✅           |
+| File Upload       | ❌            | ✅           |
+| Tool Cancellation | ✅            | ❌           |
 
 ## Contributing
 

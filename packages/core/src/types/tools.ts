@@ -271,7 +271,10 @@ import type { UIDefs } from "./ui";
 /**
  * App instance returned by createApp()
  */
-export interface App<T extends ToolDefs = ToolDefs, U extends UIDefs | undefined = UIDefs | undefined> {
+export interface App<
+  T extends ToolDefs = ToolDefs,
+  U extends UIDefs | undefined = UIDefs | undefined,
+> {
   /** Start the built-in Express server */
   start(options?: StartOptions): Promise<void>;
 

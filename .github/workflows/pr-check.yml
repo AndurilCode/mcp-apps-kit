@@ -31,7 +31,13 @@ jobs:
         run: pnpm install
 
       - name: Build packages
-        run: pnpm build
+        run: pnpm 
+        
+      - name: Check formatting
+        run: pnpm format
+
+      - name: Run type checking
+        run: pnpm typecheck
 
       - name: Run linting
         run: pnpm lint

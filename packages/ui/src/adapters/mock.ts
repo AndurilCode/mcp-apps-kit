@@ -132,7 +132,10 @@ export class MockAdapter implements ProtocolAdapter {
 
   log(level: string, data: unknown): void {
     // eslint-disable-next-line no-console -- Mock adapter uses console for logging
-    const logFn = { debug: console.debug, info: console.info, warning: console.warn, error: console.error }[level] ?? console.log;
+    const logFn =
+      { debug: console.debug, info: console.info, warning: console.warn, error: console.error }[
+        level
+      ] ?? console.log;
     logFn("[MockAdapter]", data);
   }
 

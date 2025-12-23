@@ -126,10 +126,7 @@ export interface OpenAIUIResourceMetadata {
  * @param uiDef - UI resource definition
  * @returns MCP-specific UI resource metadata
  */
-export function generateMcpUIMetadata(
-  key: string,
-  uiDef: UIDef
-): McpUIResourceMetadata {
+export function generateMcpUIMetadata(key: string, uiDef: UIDef): McpUIResourceMetadata {
   const result: McpUIResourceMetadata = {
     name: uiDef.name ?? key,
     html: uiDef.html,
@@ -160,10 +157,7 @@ export function generateMcpUIMetadata(
  * @param uiDef - UI resource definition
  * @returns OpenAI-specific UI resource metadata
  */
-export function generateOpenAIUIMetadata(
-  key: string,
-  uiDef: UIDef
-): OpenAIUIResourceMetadata {
+export function generateOpenAIUIMetadata(key: string, uiDef: UIDef): OpenAIUIResourceMetadata {
   const result: OpenAIUIResourceMetadata = {
     name: uiDef.name ?? key,
     html: uiDef.html,

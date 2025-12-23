@@ -80,12 +80,19 @@ export function parseArgs(args: string[]): CLIOptions {
     .description("Scaffold a new MCP application")
     .version("0.1.0")
     .argument("[name]", "Project name")
-    .option("-t, --template <template>", "Template to use (react, vanilla)", (value) => {
-      if (!VALID_TEMPLATES.includes(value as Template)) {
-        throw new InvalidArgumentError(`Invalid template: ${value}. Must be one of: ${VALID_TEMPLATES.join(", ")}`);
-      }
-      return value as Template;
-    }, "react")
+    .option(
+      "-t, --template <template>",
+      "Template to use (react, vanilla)",
+      (value) => {
+        if (!VALID_TEMPLATES.includes(value as Template)) {
+          throw new InvalidArgumentError(
+            `Invalid template: ${value}. Must be one of: ${VALID_TEMPLATES.join(", ")}`
+          );
+        }
+        return value as Template;
+      },
+      "react"
+    )
     .option("-d, --directory <path>", "Directory to create project in")
     .option("--skip-install", "Skip installing dependencies", false)
     .option("--skip-git", "Skip initializing git repository", false)

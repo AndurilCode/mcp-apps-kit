@@ -159,8 +159,7 @@ function generateMcpMetadata(name: string, toolDef: ToolDef): McpToolMetadata {
     name,
     description: toolDef.description,
     inputSchema: zodToJsonSchema(toolDef.input),
-    annotations:
-      Object.keys(annotations).length > 0 ? annotations : undefined,
+    annotations: Object.keys(annotations).length > 0 ? annotations : undefined,
   };
 }
 

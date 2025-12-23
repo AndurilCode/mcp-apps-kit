@@ -6,39 +6,39 @@ A comprehensive Kanban board application demonstrating all features of the `@mcp
 
 ### Server-Side Features (`@mcp-apps-kit/core`)
 
-| Feature | Description | Example in Code |
-|---------|-------------|-----------------|
-| **Tool Definitions** | Type-safe tool definitions with Zod schemas | All tools use `z.object()` for input/output |
-| **Tool Annotations** | Behavioral hints for AI models | `readOnlyHint`, `destructiveHint`, `openWorldHint`, `idempotentHint` |
-| **ToolContext** | Client-provided metadata in handlers | `context.locale`, `context.userLocation`, `context.subject`, `context.widgetSessionId` |
-| **fileParams** | Enable file upload parameters | `createTask` tool with `fileParams: ["attachmentId"]` |
-| **widgetDescription** | Human-readable summary for AI | UI resource with `widgetDescription` |
-| **ClientToolsFromCore** | End-to-end typed UI client | UI imports `KanbanClientTools` (from `ClientToolsFromCore<typeof app.tools>`) |
-| **_text** | Human-friendly model-facing output | Tools that return `message` also set `_text: message` |
-| **_closeWidget** | Dismiss widget after action | `clearCompleted` tool returns `_closeWidget: true` |
-| **visibility** | Control who can invoke tools | `"model"`, `"app"`, `"both"` |
-| **widgetAccessible** | Allow widget to call tool | All widget-only tools |
-| **invokingMessage/invokedMessage** | Loading state messages | `createTask`, `deleteTask`, etc. |
-| **title** | Human-readable tool title | All tools have `title` property |
+| Feature                            | Description                                 | Example in Code                                                                        |
+| ---------------------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------- |
+| **Tool Definitions**               | Type-safe tool definitions with Zod schemas | All tools use `z.object()` for input/output                                            |
+| **Tool Annotations**               | Behavioral hints for AI models              | `readOnlyHint`, `destructiveHint`, `openWorldHint`, `idempotentHint`                   |
+| **ToolContext**                    | Client-provided metadata in handlers        | `context.locale`, `context.userLocation`, `context.subject`, `context.widgetSessionId` |
+| **fileParams**                     | Enable file upload parameters               | `createTask` tool with `fileParams: ["attachmentId"]`                                  |
+| **widgetDescription**              | Human-readable summary for AI               | UI resource with `widgetDescription`                                                   |
+| **ClientToolsFromCore**            | End-to-end typed UI client                  | UI imports `KanbanClientTools` (from `ClientToolsFromCore<typeof app.tools>`)          |
+| **\_text**                         | Human-friendly model-facing output          | Tools that return `message` also set `_text: message`                                  |
+| **\_closeWidget**                  | Dismiss widget after action                 | `clearCompleted` tool returns `_closeWidget: true`                                     |
+| **visibility**                     | Control who can invoke tools                | `"model"`, `"app"`, `"both"`                                                           |
+| **widgetAccessible**               | Allow widget to call tool                   | All widget-only tools                                                                  |
+| **invokingMessage/invokedMessage** | Loading state messages                      | `createTask`, `deleteTask`, etc.                                                       |
+| **title**                          | Human-readable tool title                   | All tools have `title` property                                                        |
 
 ### Client-Side Features (`@mcp-apps-kit/ui-react`)
 
-| Hook | Description | Usage in App |
-|------|-------------|--------------|
-| **useAppsClient** | Access typed client for tool calls | Main tool call interface |
-| **useToolInput** | Access initial tool input | Debug panel display |
-| **useHostContext** | Access theme, viewport, locale | Theme and context display |
-| **useWidgetState** | Persist state across reloads | Collapsed columns, debug panel |
-| **useHostStyleVariables** | Apply host CSS variables | Applied in App component |
-| **useDocumentTheme** | Apply theme class to document | Light/dark mode |
-| **useDisplayMode** | Access/change display mode | Debug panel display |
-| **useSafeAreaInsets** | Mobile safe area padding | Container padding |
-| **useOnToolCancelled** | Handle tool cancellation | Cancellation message |
-| **useOnTeardown** | Cleanup on widget teardown | Console logging |
-| **useFileUpload** | Upload files (ChatGPT) | Task attachment |
-| **useIntrinsicHeight** | Report widget height | Auto-height container |
-| **useView** | Access view identifier | Debug panel display |
-| **useModal** | Host-owned modal dialogs | Delete confirmation |
+| Hook                      | Description                        | Usage in App                   |
+| ------------------------- | ---------------------------------- | ------------------------------ |
+| **useAppsClient**         | Access typed client for tool calls | Main tool call interface       |
+| **useToolInput**          | Access initial tool input          | Debug panel display            |
+| **useHostContext**        | Access theme, viewport, locale     | Theme and context display      |
+| **useWidgetState**        | Persist state across reloads       | Collapsed columns, debug panel |
+| **useHostStyleVariables** | Apply host CSS variables           | Applied in App component       |
+| **useDocumentTheme**      | Apply theme class to document      | Light/dark mode                |
+| **useDisplayMode**        | Access/change display mode         | Debug panel display            |
+| **useSafeAreaInsets**     | Mobile safe area padding           | Container padding              |
+| **useOnToolCancelled**    | Handle tool cancellation           | Cancellation message           |
+| **useOnTeardown**         | Cleanup on widget teardown         | Console logging                |
+| **useFileUpload**         | Upload files (ChatGPT)             | Task attachment                |
+| **useIntrinsicHeight**    | Report widget height               | Auto-height container          |
+| **useView**               | Access view identifier             | Debug panel display            |
+| **useModal**              | Host-owned modal dialogs           | Delete confirmation            |
 
 ## Quick Start
 
@@ -61,16 +61,16 @@ The server starts at `http://localhost:3001`.
 
 ## Available Tools
 
-| Tool | Description | Features Used |
-|------|-------------|---------------|
-| `listTasks` | List all tasks (optional filter) | `readOnlyHint`, `idempotentHint`, `visibility: "app"` |
-| `createTask` | Create task with attachment | `fileParams`, `invokingMessage` |
-| `moveTask` | Move task between columns | `idempotentHint` |
-| `updateTask` | Update task details | Widget-accessible |
-| `deleteTask` | Delete a task | `destructiveHint` |
-| `clearCompleted` | Clear done tasks | `_closeWidget` |
-| `exportBoard` | Export board data | `openWorldHint` |
-| `getBoardSummary` | Get board overview | `ui: "kanban-board"` |
+| Tool              | Description                      | Features Used                                         |
+| ----------------- | -------------------------------- | ----------------------------------------------------- |
+| `listTasks`       | List all tasks (optional filter) | `readOnlyHint`, `idempotentHint`, `visibility: "app"` |
+| `createTask`      | Create task with attachment      | `fileParams`, `invokingMessage`                       |
+| `moveTask`        | Move task between columns        | `idempotentHint`                                      |
+| `updateTask`      | Update task details              | Widget-accessible                                     |
+| `deleteTask`      | Delete a task                    | `destructiveHint`                                     |
+| `clearCompleted`  | Clear done tasks                 | `_closeWidget`                                        |
+| `exportBoard`     | Export board data                | `openWorldHint`                                       |
+| `getBoardSummary` | Get board overview               | `ui: "kanban-board"`                                  |
 
 ## Example Usage
 

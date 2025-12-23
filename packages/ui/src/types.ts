@@ -147,7 +147,10 @@ export interface AppsClient<T extends ToolDefs = ToolDefs> {
    * @param args - Tool arguments (typed from input schema)
    * @returns Tool result (typed from output schema)
    */
-  callTool<K extends keyof T>(name: K, args: InferToolInputs<T>[K]): Promise<InferToolOutputs<T>[K]>;
+  callTool<K extends keyof T>(
+    name: K,
+    args: InferToolInputs<T>[K]
+  ): Promise<InferToolOutputs<T>[K]>;
 
   // === Messaging ===
 

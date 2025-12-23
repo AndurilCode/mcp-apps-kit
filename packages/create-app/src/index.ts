@@ -32,7 +32,7 @@ function getReactTemplate(name: string): Record<string, string> {
         version: "0.1.0",
         type: "module",
         scripts: {
-          dev: "concurrently \"pnpm dev:server\" \"pnpm dev:ui\"",
+          dev: 'concurrently "pnpm dev:server" "pnpm dev:ui"',
           "dev:server": "tsx watch server/index.ts",
           "dev:ui": "vite --config ui/vite.config.ts",
           build: "pnpm build:ui && tsc",
@@ -335,7 +335,7 @@ function getVanillaTemplate(name: string): Record<string, string> {
         version: "0.1.0",
         type: "module",
         scripts: {
-          dev: "concurrently \"pnpm dev:server\" \"pnpm dev:ui\"",
+          dev: 'concurrently "pnpm dev:server" "pnpm dev:ui"',
           "dev:server": "tsx watch server/index.ts",
           "dev:ui": "vite --config ui/vite.config.ts",
           build: "pnpm build:ui && tsc",

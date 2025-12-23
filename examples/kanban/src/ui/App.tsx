@@ -113,47 +113,83 @@ function DebugPanel({
     <div className="debug-panel">
       <div className="debug-header">
         <h3>SDK Feature Status</h3>
-        <button className="debug-close" onClick={onClose}>×</button>
+        <button className="debug-close" onClick={onClose}>
+          ×
+        </button>
       </div>
       <div className="debug-content">
         <div className="debug-section">
           <h4>Host Context</h4>
           <ul>
-            <li>Theme: <code>{context.theme}</code></li>
-            <li>Platform: <code>{context.platform}</code></li>
-            <li>Locale: <code>{context.locale}</code></li>
-            <li>Viewport: <code>{context.viewport.width}x{context.viewport.height}</code></li>
+            <li>
+              Theme: <code>{context.theme}</code>
+            </li>
+            <li>
+              Platform: <code>{context.platform}</code>
+            </li>
+            <li>
+              Locale: <code>{context.locale}</code>
+            </li>
+            <li>
+              Viewport:{" "}
+              <code>
+                {context.viewport.width}x{context.viewport.height}
+              </code>
+            </li>
           </ul>
         </div>
         <div className="debug-section">
           <h4>Display Mode</h4>
           <ul>
-            <li>Current: <code>{displayMode.mode}</code></li>
-            <li>Available: <code>{displayMode.availableModes.join(", ")}</code></li>
+            <li>
+              Current: <code>{displayMode.mode}</code>
+            </li>
+            <li>
+              Available: <code>{displayMode.availableModes.join(", ")}</code>
+            </li>
           </ul>
         </div>
         <div className="debug-section">
           <h4>Safe Area Insets</h4>
           <ul>
-            <li>Top: <code>{safeAreaInsets.top}px</code></li>
-            <li>Right: <code>{safeAreaInsets.right}px</code></li>
-            <li>Bottom: <code>{safeAreaInsets.bottom}px</code></li>
-            <li>Left: <code>{safeAreaInsets.left}px</code></li>
+            <li>
+              Top: <code>{safeAreaInsets.top}px</code>
+            </li>
+            <li>
+              Right: <code>{safeAreaInsets.right}px</code>
+            </li>
+            <li>
+              Bottom: <code>{safeAreaInsets.bottom}px</code>
+            </li>
+            <li>
+              Left: <code>{safeAreaInsets.left}px</code>
+            </li>
           </ul>
         </div>
         <div className="debug-section">
           <h4>Platform Features</h4>
           <ul>
-            <li>File Upload: <span className={isFileUploadSupported ? "supported" : "unsupported"}>
-              {isFileUploadSupported ? "✓ Supported" : "✗ Not available"}
-            </span></li>
-            <li>Modal: <span className={isModalSupported ? "supported" : "unsupported"}>
-              {isModalSupported ? "✓ Supported" : "✗ Not available"}
-            </span></li>
-            <li>Intrinsic Height: <span className={isHeightSupported ? "supported" : "unsupported"}>
-              {isHeightSupported ? "✓ Supported" : "✗ Not available"}
-            </span></li>
-            <li>View: <code>{view ?? "undefined"}</code></li>
+            <li>
+              File Upload:{" "}
+              <span className={isFileUploadSupported ? "supported" : "unsupported"}>
+                {isFileUploadSupported ? "✓ Supported" : "✗ Not available"}
+              </span>
+            </li>
+            <li>
+              Modal:{" "}
+              <span className={isModalSupported ? "supported" : "unsupported"}>
+                {isModalSupported ? "✓ Supported" : "✗ Not available"}
+              </span>
+            </li>
+            <li>
+              Intrinsic Height:{" "}
+              <span className={isHeightSupported ? "supported" : "unsupported"}>
+                {isHeightSupported ? "✓ Supported" : "✗ Not available"}
+              </span>
+            </li>
+            <li>
+              View: <code>{view ?? "undefined"}</code>
+            </li>
           </ul>
         </div>
         {toolInput && (
@@ -217,9 +253,7 @@ function TaskCard({
       data-task-id={task.id}
     >
       <div className="task-title">{task.title}</div>
-      {task.description && (
-        <div className="task-description">{task.description}</div>
-      )}
+      {task.description && <div className="task-description">{task.description}</div>}
       {task.attachmentId && (
         <div className="task-attachment">
           <span className="attachment-icon">📎</span>
@@ -288,12 +322,7 @@ function ColumnComponent({
             <div className="empty-column">No tasks</div>
           ) : (
             column.tasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                onDelete={onDelete}
-                onDragStart={onDragStart}
-              />
+              <TaskCard key={task.id} task={task} onDelete={onDelete} onDragStart={onDragStart} />
             ))
           )}
         </div>
@@ -394,7 +423,9 @@ function AddTaskModal({
             />
             {isUploading && <span className="upload-status">Uploading...</span>}
             {fileId && <span className="upload-status success">✓ File attached</span>}
-            {uploadError && <span className="upload-status error">Error: {uploadError.message}</span>}
+            {uploadError && (
+              <span className="upload-status error">Error: {uploadError.message}</span>
+            )}
           </div>
         )}
         <div className="modal-actions">
@@ -431,7 +462,11 @@ export function App() {
   const safeAreaInsets = useSafeAreaInsets();
 
   // Get intrinsic height controls
-  const { containerRef, isSupported: isHeightSupported, notify: notifyHeight } = useIntrinsicHeight();
+  const {
+    containerRef,
+    isSupported: isHeightSupported,
+    notify: notifyHeight,
+  } = useIntrinsicHeight();
 
   // Notify host of preferred height when in inline mode (dynamic based on content)
   useEffect(() => {
@@ -467,7 +502,11 @@ export function App() {
   // Local state
   const [boardData, setBoardData] = useState<BoardData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState<{ text: string; isError?: boolean; isWarning?: boolean } | null>(null);
+  const [message, setMessage] = useState<{
+    text: string;
+    isError?: boolean;
+    isWarning?: boolean;
+  } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
@@ -534,7 +573,7 @@ export function App() {
     console.log("[Kanban App] refreshBoard called");
     setIsLoading(true);
     try {
-      const result = await client.callTool("listTasks", {}) as Record<string, unknown>;
+      const result = (await client.callTool("listTasks", {})) as Record<string, unknown>;
       console.log("[Kanban App] refreshBoard result:", result);
 
       let data: Record<string, unknown> | null = null;
@@ -589,7 +628,11 @@ export function App() {
     async (title: string, description?: string, attachmentId?: string) => {
       setIsLoading(true);
       try {
-        const result = await client.callTool("createTask", { title, description, attachmentId }) as Record<string, unknown>;
+        const result = (await client.callTool("createTask", {
+          title,
+          description,
+          attachmentId,
+        })) as Record<string, unknown>;
         if (result && typeof result === "object" && "message" in result) {
           showMessage(result.message as string);
         }
@@ -625,7 +668,7 @@ export function App() {
 
       setIsLoading(true);
       try {
-        const result = await client.callTool("deleteTask", { taskId }) as Record<string, unknown>;
+        const result = (await client.callTool("deleteTask", { taskId })) as Record<string, unknown>;
         if (result && typeof result === "object" && "message" in result) {
           showMessage(result.message as string);
         }
@@ -644,7 +687,10 @@ export function App() {
     async (taskId: string, newStatus: Task["status"]) => {
       setIsLoading(true);
       try {
-        const result = await client.callTool("moveTask", { taskId, newStatus }) as Record<string, unknown>;
+        const result = (await client.callTool("moveTask", { taskId, newStatus })) as Record<
+          string,
+          unknown
+        >;
         if (result && typeof result === "object" && "message" in result) {
           showMessage(result.message as string);
         }
@@ -677,7 +723,10 @@ export function App() {
 
     setIsLoading(true);
     try {
-      const result = await client.callTool("clearCompleted", { closeWidget: false }) as Record<string, unknown>;
+      const result = (await client.callTool("clearCompleted", { closeWidget: false })) as Record<
+        string,
+        unknown
+      >;
       if (result && typeof result === "object" && "message" in result) {
         showMessage(result.message as string);
       }
@@ -693,7 +742,10 @@ export function App() {
   const handleExport = useCallback(async () => {
     setIsLoading(true);
     try {
-      const result = await client.callTool("exportBoard", { format: "json", includeMetadata: true }) as Record<string, unknown>;
+      const result = (await client.callTool("exportBoard", {
+        format: "json",
+        includeMetadata: true,
+      })) as Record<string, unknown>;
       if (result && typeof result === "object" && "data" in result) {
         // Create download
         const blob = new Blob([result.data as string], { type: "application/json" });
@@ -713,17 +765,20 @@ export function App() {
   }, [client, showMessage]);
 
   // Toggle column collapse (persisted with useWidgetState)
-  const toggleColumnCollapse = useCallback((status: string) => {
-    setPreferences((prev) => {
-      const isCollapsed = prev.collapsedColumns.includes(status);
-      return {
-        ...prev,
-        collapsedColumns: isCollapsed
-          ? prev.collapsedColumns.filter((s) => s !== status)
-          : [...prev.collapsedColumns, status],
-      };
-    });
-  }, [setPreferences]);
+  const toggleColumnCollapse = useCallback(
+    (status: string) => {
+      setPreferences((prev) => {
+        const isCollapsed = prev.collapsedColumns.includes(status);
+        return {
+          ...prev,
+          collapsedColumns: isCollapsed
+            ? prev.collapsedColumns.filter((s) => s !== status)
+            : [...prev.collapsedColumns, status],
+        };
+      });
+    },
+    [setPreferences]
+  );
 
   // Toggle debug panel (persisted with useWidgetState)
   const toggleDebugPanel = useCallback(() => {
@@ -852,11 +907,7 @@ export function App() {
                 ⛶
               </button>
             )}
-            <button
-              className="btn btn-icon"
-              onClick={toggleDebugPanel}
-              title="Toggle Debug Panel"
-            >
+            <button className="btn btn-icon" onClick={toggleDebugPanel} title="Toggle Debug Panel">
               🔧
             </button>
             <button

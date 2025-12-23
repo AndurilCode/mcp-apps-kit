@@ -69,9 +69,7 @@ describe("UI Resource Registration", () => {
       });
 
       expect(app.ui!["api-widget"].csp).toBeDefined();
-      expect(app.ui!["api-widget"].csp!.connectDomains).toEqual([
-        "https://api.example.com",
-      ]);
+      expect(app.ui!["api-widget"].csp!.connectDomains).toEqual(["https://api.example.com"]);
     });
 
     it("should support UI resources with prefersBorder", () => {
@@ -181,9 +179,7 @@ describe("UI Resource Registration", () => {
         },
       });
 
-      expect(app.ui!.widget.csp!.redirectDomains).toEqual([
-        "https://docs.example.com",
-      ]);
+      expect(app.ui!.widget.csp!.redirectDomains).toEqual(["https://docs.example.com"]);
     });
 
     it("should accept frameDomains for ChatGPT compatibility", () => {
@@ -201,9 +197,7 @@ describe("UI Resource Registration", () => {
         },
       });
 
-      expect(app.ui!.widget.csp!.frameDomains).toEqual([
-        "https://embed.example.com",
-      ]);
+      expect(app.ui!.widget.csp!.frameDomains).toEqual(["https://embed.example.com"]);
     });
 
     it("should accept domain for ChatGPT widget isolation", () => {

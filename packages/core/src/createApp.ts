@@ -4,13 +4,7 @@
  * Creates an MCP app with unified tool and UI definitions.
  */
 
-import type {
-  ToolDefs,
-  App,
-  StartOptions,
-  McpServer,
-  ExpressMiddleware,
-} from "./types/tools";
+import type { ToolDefs, App, StartOptions, McpServer, ExpressMiddleware } from "./types/tools";
 import type { AppConfig } from "./types/config";
 import type { UIDefs } from "./types/ui";
 import { AppError, ErrorCode } from "./utils/errors";
@@ -27,11 +21,17 @@ function validateConfig<T extends ToolDefs>(config: unknown): asserts config is 
   const cfg = config as Record<string, unknown>;
 
   if (typeof cfg.name !== "string" || cfg.name.length === 0) {
-    throw new AppError(ErrorCode.INVALID_CONFIG, "Config.name is required and must be a non-empty string");
+    throw new AppError(
+      ErrorCode.INVALID_CONFIG,
+      "Config.name is required and must be a non-empty string"
+    );
   }
 
   if (typeof cfg.version !== "string" || cfg.version.length === 0) {
-    throw new AppError(ErrorCode.INVALID_CONFIG, "Config.version is required and must be a non-empty string");
+    throw new AppError(
+      ErrorCode.INVALID_CONFIG,
+      "Config.version is required and must be a non-empty string"
+    );
   }
 
   if (typeof cfg.tools !== "object" || cfg.tools === null) {
