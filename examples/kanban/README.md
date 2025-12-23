@@ -13,6 +13,8 @@ A comprehensive Kanban board application demonstrating all features of the `@app
 | **ToolContext** | Client-provided metadata in handlers | `context.locale`, `context.userLocation`, `context.subject`, `context.widgetSessionId` |
 | **fileParams** | Enable file upload parameters | `createTask` tool with `fileParams: ["attachmentId"]` |
 | **widgetDescription** | Human-readable summary for AI | UI resource with `widgetDescription` |
+| **ClientToolsFromCore** | End-to-end typed UI client | UI imports `KanbanClientTools` (from `ClientToolsFromCore<typeof app.tools>`) |
+| **_text** | Human-friendly model-facing output | Tools that return `message` also set `_text: message` |
 | **_closeWidget** | Dismiss widget after action | `clearCompleted` tool returns `_closeWidget: true` |
 | **visibility** | Control who can invoke tools | `"model"`, `"app"`, `"both"` |
 | **widgetAccessible** | Allow widget to call tool | All widget-only tools |

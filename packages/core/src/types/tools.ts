@@ -320,3 +320,26 @@ export type InferToolInputs<T extends ToolDefs> = {
 export type InferToolOutputs<T extends ToolDefs> = {
   [K in keyof T]: T[K]["output"] extends z.ZodType ? z.infer<T[K]["output"]> : unknown;
 };
+
+/**
+ * Convert @apps-builder/core tool definitions (Zod-based) into the tool type
+ * shape expected by @apps-builder/ui.
+ *
+ * This is the recommended way to get end-to-end typing for UI clients without
+ * duplicating schemas.
+ *
+ * @example
+ * ```ts
+ * import type { ClientToolsFromCore } from "@apps-builder/core";
+ * import { createClient } from "@apps-builder/ui";
+ *
+ * type AppClientTools = ClientToolsFromCore<typeof app.tools>;
+ * const client = await createClient<AppClientTools>();
+ * ```
+ */
+export type ClientToolsFromCore<T extends ToolDefs> = {
+  [K in keyof T]: {
+    input: z.input<T[K]["input"]>;
+    output: T[K]["output"] extends z.ZodType ? z.infer<T[K]["output"]> : unknown;
+  };
+};

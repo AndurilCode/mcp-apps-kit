@@ -50,6 +50,7 @@ import {
   useToolInput,
   type ModalOptions,
 } from "@apps-builder/ui-react";
+import type { KanbanClientTools } from "../index";
 
 // =============================================================================
 // Types
@@ -263,7 +264,7 @@ function ColumnComponent({
   onDragStart: (e: React.DragEvent, task: Task) => void;
   onDragOver: (e: React.DragEvent) => void;
   onDragLeave: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent, status: string) => void;
+  onDrop: (e: React.DragEvent, status: Task["status"]) => void;
   isDragOver: boolean;
 }) {
   return (
@@ -414,7 +415,7 @@ function AddTaskModal({
 // =============================================================================
 
 export function App() {
-  const client = useAppsClient();
+  const client = useAppsClient<KanbanClientTools>();
   const context = useHostContext();
   const toolInput = useToolInput();
   const view = useView();
@@ -588,9 +589,7 @@ export function App() {
     async (title: string, description?: string, attachmentId?: string) => {
       setIsLoading(true);
       try {
-        const args: Record<string, string | undefined> = { title, description, attachmentId };
-
-        const result = await client.callTool("createTask", args) as Record<string, unknown>;
+        const result = await client.callTool("createTask", { title, description, attachmentId }) as Record<string, unknown>;
         if (result && typeof result === "object" && "message" in result) {
           showMessage(result.message as string);
         }
@@ -642,7 +641,7 @@ export function App() {
 
   // Move task
   const handleMoveTask = useCallback(
-    async (taskId: string, newStatus: string) => {
+    async (taskId: string, newStatus: Task["status"]) => {
       setIsLoading(true);
       try {
         const result = await client.callTool("moveTask", { taskId, newStatus }) as Record<string, unknown>;
@@ -761,7 +760,7 @@ export function App() {
   }, []);
 
   const handleDrop = useCallback(
-    async (e: React.DragEvent, newStatus: string) => {
+    async (e: React.DragEvent, newStatus: Task["status"]) => {
       e.preventDefault();
       setDragOverColumn(null);
 

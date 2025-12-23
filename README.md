@@ -33,7 +33,7 @@ npm install @apps-builder/core @apps-builder/ui-react zod
 
 ```typescript
 // server/index.ts
-import { createApp } from "@apps-builder/core";
+import { createApp, type ClientToolsFromCore } from "@apps-builder/core";
 import { z } from "zod";
 
 const app = createApp({
@@ -82,6 +82,7 @@ await app.start({ port: 3000 });
 
 // Export types for UI
 export type AppTools = typeof app.tools;
+export type AppClientTools = ClientToolsFromCore<AppTools>;
 ```
 
 ### UI Setup (React)
@@ -90,10 +91,11 @@ export type AppTools = typeof app.tools;
 // ui/src/App.tsx
 import { useAppsClient, useToolResult, useHostContext } from "@apps-builder/ui-react";
 import type { AppTools } from "../../server";
+import type { AppClientTools } from "../../server";
 
 function RestaurantList() {
-  const client = useAppsClient<AppTools>();
-  const result = useToolResult<AppTools>();
+  const client = useAppsClient<AppClientTools>();
+  const result = useToolResult<AppClientTools>();
   const context = useHostContext();
 
   // Fully typed access
@@ -175,7 +177,7 @@ _meta: {
 The UI SDK auto-detects the host and provides a unified API:
 
 ```typescript
-const client = await createClient<AppTools>();
+const client = await createClient<AppClientTools>();
 
 // Works on both platforms
 await client.callTool("my_tool", { arg: "value" });

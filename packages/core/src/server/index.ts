@@ -14,7 +14,7 @@ import { z } from "zod";
 import type { ToolDefs, StartOptions, ExpressMiddleware, ToolContext, UserLocation } from "../types/tools";
 import type { AppConfig, CORSConfig } from "../types/config";
 import type { UIDefs, UIDef } from "../types/ui";
-import { wrapError } from "../utils/errors";
+import { formatZodError, wrapError } from "../utils/errors";
 import { createAdapter, type ProtocolAdapter } from "../adapters";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -319,6 +319,7 @@ function registerTools(
           // Extract special fields from result
           const resultObj = result as Record<string, unknown>;
           const closeWidget = resultObj._closeWidget as boolean | undefined;
+          const textNarration = resultObj._text as string | undefined;
 
           // Build response _meta, merging user _meta with closeWidget
           let responseMeta: Record<string, unknown> | undefined;
@@ -337,15 +338,34 @@ function registerTools(
             }
           }
 
+          // Validate output if schema is provided
+          let structured: Record<string, unknown> = cleanResult;
+          if (toolDef.output) {
+            try {
+              // Parse/validate the cleaned output, ensuring runtime contract enforcement
+              structured = toolDef.output.parse(cleanResult) as unknown as Record<string, unknown>;
+            } catch (e) {
+              if (e instanceof z.ZodError) {
+                throw formatZodError(e);
+              }
+              throw e;
+            }
+          }
+
+          // Model-facing text: prefer explicit narration when provided
+          const contentText = typeof textNarration === "string" && textNarration.length > 0
+            ? textNarration
+            : JSON.stringify(structured);
+
           // Return result with both text content and structuredContent
           return {
             content: [
               {
                 type: "text" as const,
-                text: JSON.stringify(cleanResult),
+                text: contentText,
               },
             ],
-            structuredContent: cleanResult,
+            structuredContent: structured,
             _meta: responseMeta,
           };
         } catch (error) {

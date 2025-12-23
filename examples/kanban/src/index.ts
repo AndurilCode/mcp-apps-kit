@@ -7,7 +7,7 @@
  * - Protocol-agnostic design (works with MCP and OpenAI)
  */
 
-import { createApp } from "@apps-builder/core";
+import { createApp, type ClientToolsFromCore } from "@apps-builder/core";
 import { z } from "zod";
 
 // =============================================================================
@@ -205,9 +205,11 @@ const app = createApp({
 
         tasks.set(task.id, task);
 
+        const message = `Created task "${title}" in ${status ?? "todo"} column${attachmentId ? " with attachment" : ""}`;
         return {
           task,
-          message: `Created task "${title}" in ${status ?? "todo"} column${attachmentId ? " with attachment" : ""}`,
+          message,
+          _text: message,
           _meta: { timezone },
         };
       },
@@ -248,9 +250,11 @@ const app = createApp({
         // Track who performed the action (anonymized)
         const performer = context.subject ?? "anonymous";
 
+        const message = `Moved "${task.title}" from ${oldStatus} to ${newStatus}`;
         return {
           task,
-          message: `Moved "${task.title}" from ${oldStatus} to ${newStatus}`,
+          message,
+          _text: message,
           _meta: { performer },
         };
       },
@@ -291,9 +295,11 @@ const app = createApp({
         }
         task.updatedAt = new Date().toISOString();
 
+        const message = `Updated task "${task.title}"`;
         return {
           task,
-          message: `Updated task "${task.title}"`,
+          message,
+          _text: message,
         };
       },
     },
@@ -327,9 +333,11 @@ const app = createApp({
 
         tasks.delete(taskId);
 
+        const message = `Deleted task "${task.title}"`;
         return {
           success: true,
-          message: `Deleted task "${task.title}"`,
+          message,
+          _text: message,
         };
       },
     },
@@ -363,12 +371,16 @@ const app = createApp({
 
         completedTasks.forEach((task) => tasks.delete(task.id));
 
+        const message =
+          deletedCount > 0
+            ? `Cleared ${deletedCount} completed task${deletedCount > 1 ? "s" : ""}`
+            : "No completed tasks to clear";
+
         return {
           success: true,
-          message: deletedCount > 0
-            ? `Cleared ${deletedCount} completed task${deletedCount > 1 ? "s" : ""}`
-            : "No completed tasks to clear",
+          message,
           deletedCount,
+          _text: message,
           // Signal to close the widget after this action (ChatGPT only)
           _closeWidget: closeWidget,
         };
@@ -420,11 +432,13 @@ const app = createApp({
         // Log export action with user info if available
         const userInfo = context.userAgent ?? "Unknown client";
 
+        const message = `Exported ${allTasks.length} tasks as ${format.toUpperCase()}`;
         return {
           success: true,
-          message: `Exported ${allTasks.length} tasks as ${format.toUpperCase()}`,
+          message,
           data,
           taskCount: allTasks.length,
+          _text: message,
           _meta: { exportedBy: userInfo },
         };
       },
@@ -518,6 +532,8 @@ const app = createApp({
     protocol: "openai",
   },
 });
+
+export type KanbanClientTools = ClientToolsFromCore<typeof app.tools>;
 
 // =============================================================================
 // START SERVER

@@ -43,6 +43,7 @@ export type {
   ExpressMiddleware,
   InferToolInputs,
   InferToolOutputs,
+  ClientToolsFromCore,
 } from "./types/tools";
 
 // UI types

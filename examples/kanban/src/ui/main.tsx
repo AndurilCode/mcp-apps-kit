@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { AppsProvider } from "@apps-builder/ui-react";
 import { App } from "./App";
 import "./styles.css";
+import type { KanbanClientTools } from "../index";
 
 function Loading() {
   return (
@@ -19,7 +20,7 @@ const root = createRoot(document.getElementById("root")!);
 
 root.render(
   <React.StrictMode>
-    <AppsProvider fallback={<Loading />}>
+    <AppsProvider<KanbanClientTools> fallback={<Loading />}>
       <App />
     </AppsProvider>
   </React.StrictMode>
