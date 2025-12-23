@@ -30,6 +30,11 @@
   },
   "keywords": ["mcp", "model-context-protocol", "sdk", "react", "hooks"],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AndurilCode/mcp-apps-kit.git",
+    "directory": "packages/ui-react"
+  },
   "dependencies": {
     "@mcp-apps-kit/ui": "^0.1.1"
   },

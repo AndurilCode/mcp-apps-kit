@@ -30,6 +30,11 @@
   },
   "keywords": ["mcp", "model-context-protocol", "sdk", "client", "ui"],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AndurilCode/mcp-apps-kit.git",
+    "directory": "packages/ui"
+  },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^0.2.2"
   },

@@ -48,13 +48,13 @@ jobs:
 
       # Trusted Publisher (OIDC): configure each package on npm "Trusted Publishers" to point at this workflow.
       - name: Publish @mcp-apps-kit/core
-        run: pnpm --filter @mcp-apps-kit/core exec npm publish --access public --no-git-checks --provenance
+        run: pnpm --filter @mcp-apps-kit/core exec npm publish --access public --provenance
 
       - name: Publish @mcp-apps-kit/ui
-        run: pnpm --filter @mcp-apps-kit/ui exec npm publish --access public --no-git-checks --provenance
+        run: pnpm --filter @mcp-apps-kit/ui exec npm publish --access public --provenance
 
       - name: Publish @mcp-apps-kit/ui-react
-        run: pnpm --filter @mcp-apps-kit/ui-react exec npm publish --access public --no-git-checks --provenance
+        run: pnpm --filter @mcp-apps-kit/ui-react exec npm publish --access public --provenance
 
       - name: Publish @mcp-apps-kit/create-app
-        run: pnpm --filter @mcp-apps-kit/create-app exec npm publish --access public --no-git-checks --provenance
+        run: pnpm --filter @mcp-apps-kit/create-app exec npm publish --access public --provenance
