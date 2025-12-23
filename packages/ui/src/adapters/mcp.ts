@@ -2,8 +2,16 @@
  * MCP Apps adapter for Claude Desktop
  *
  * Implements the ProtocolAdapter interface for MCP Apps running in Claude Desktop.
- * Uses postMessage for iframe communication.
+ * Uses @modelcontextprotocol/ext-apps (JSON-RPC over postMessage + ui/initialize).
  */
+
+import { App } from "@modelcontextprotocol/ext-apps";
+import {
+  ReadResourceResultSchema,
+  type CallToolResult,
+  type LoggingMessageNotification,
+  type ReadResourceResult,
+} from "@modelcontextprotocol/sdk/types.js";
 
 import type { ProtocolAdapter } from "./types";
 import type { HostContext, ResourceContent } from "../types";
@@ -25,9 +33,7 @@ export class McpAdapter implements ProtocolAdapter {
   private currentToolInput?: Record<string, unknown>;
   private currentToolOutput?: Record<string, unknown>;
   private currentToolMeta?: Record<string, unknown>;
-  private messageHandler?: (event: MessageEvent) => void;
-  private pendingCalls: Map<string, { resolve: (value: unknown) => void; reject: (error: Error) => void }> = new Map();
-  private callId = 0;
+  private app?: App;
 
   constructor() {
     this.context = this.createDefaultContext();
@@ -53,14 +59,74 @@ export class McpAdapter implements ProtocolAdapter {
   // === Lifecycle ===
 
   async connect(): Promise<void> {
+    if (this.connected) return;
+
+    // SSR / tests (no window): behave as connected but inert.
     if (typeof window === "undefined") {
       this.connected = true;
       return;
     }
 
-    // Set up message handler
-    this.messageHandler = this.handleMessage.bind(this);
-    window.addEventListener("message", this.messageHandler);
+    // Instantiate App and register handlers BEFORE connecting.
+    this.app = new App({ name: "@mcp-apps-kit/ui", version: "0.0.0" }, {});
+
+    this.app.onerror = (err) => {
+      this.log("error", err);
+    };
+
+    this.app.onhostcontextchanged = (params) => {
+      // ext-apps sends { hostContext }, but keep this tolerant.
+      const hostContext =
+        (params as { hostContext?: unknown }).hostContext ?? (params as unknown);
+      this.context = this.mapHostContext(hostContext);
+      this.currentToolMeta = this.extractToolMeta(hostContext);
+      for (const handler of this.hostContextHandlers) {
+        handler(this.context);
+      }
+    };
+
+    this.app.ontoolinput = (params) => {
+      const args = (params as { arguments?: Record<string, unknown> }).arguments;
+      if (args) {
+        this.currentToolInput = args;
+        for (const handler of this.toolInputHandlers) {
+          handler(args);
+        }
+      }
+    };
+
+    // We currently ignore partial tool input streaming in this adapter.
+
+    this.app.ontoolresult = (result) => {
+      const output = this.extractToolOutput(result);
+      this.currentToolOutput = output;
+      for (const handler of this.toolResultHandlers) {
+        handler(output);
+      }
+    };
+
+    this.app.ontoolcancelled = (params) => {
+      const reason = (params as { reason?: string }).reason;
+      for (const handler of this.toolCancelledHandlers) {
+        handler(reason);
+      }
+    };
+
+    this.app.onteardown = async (params) => {
+      const reason = (params as { reason?: string }).reason;
+      for (const handler of this.teardownHandlers) {
+        handler(reason);
+      }
+      return {};
+    };
+
+    await this.app.connect();
+    // Seed initial context if available
+    const initialContext = this.app.getHostContext();
+    if (initialContext) {
+      this.context = this.mapHostContext(initialContext);
+      this.currentToolMeta = this.extractToolMeta(initialContext);
+    }
 
     this.connected = true;
   }
@@ -69,108 +135,160 @@ export class McpAdapter implements ProtocolAdapter {
     return this.connected;
   }
 
-  private handleMessage(event: MessageEvent): void {
-    // Verify origin if needed
-    const data = event.data as { type?: string; id?: string; result?: unknown; error?: string; context?: HostContext; input?: Record<string, unknown>; output?: Record<string, unknown>; reason?: string };
+  private mapHostContext(raw: unknown): HostContext {
+    const ctx = (raw ?? {}) as Partial<HostContext> & {
+      theme?: unknown;
+      displayMode?: unknown;
+      availableDisplayModes?: unknown;
+      viewport?: unknown;
+      locale?: unknown;
+      timeZone?: unknown;
+      platform?: unknown;
+      userAgent?: unknown;
+      deviceCapabilities?: unknown;
+      safeAreaInsets?: unknown;
+      styles?: unknown;
+      view?: unknown;
+    };
 
-    switch (data.type) {
-      case "mcp:response":
-        this.handleResponse(data);
-        break;
-      case "mcp:context":
-        if (data.context) {
-          this.context = data.context;
-          for (const handler of this.hostContextHandlers) {
-            handler(this.context);
+    // Keep defaults, overlay with host values when present.
+    const base = this.createDefaultContext();
+
+    const theme = ctx.theme === "dark" ? "dark" : ctx.theme === "light" ? "light" : base.theme;
+    const displayMode =
+      ctx.displayMode === "fullscreen" || ctx.displayMode === "pip" || ctx.displayMode === "inline"
+        ? (ctx.displayMode as HostContext["displayMode"])
+        : base.displayMode;
+
+    const availableDisplayModes = Array.isArray(ctx.availableDisplayModes)
+      ? (ctx.availableDisplayModes.filter((m): m is string => typeof m === "string"))
+      : base.availableDisplayModes;
+
+    const viewport =
+      typeof ctx.viewport === "object" && ctx.viewport !== null
+        ? {
+            ...base.viewport,
+            ...(ctx.viewport as unknown as Record<string, unknown>),
+          }
+        : base.viewport;
+
+    const locale = typeof ctx.locale === "string" ? ctx.locale : base.locale;
+    const timeZone = typeof ctx.timeZone === "string" ? ctx.timeZone : base.timeZone;
+
+    // Our HostContext platform is narrower than ext-apps; keep existing default.
+    const platform = base.platform;
+
+    return {
+      ...base,
+      theme,
+      displayMode,
+      availableDisplayModes,
+      viewport,
+      locale,
+      timeZone,
+      platform,
+      userAgent: typeof ctx.userAgent === "string" ? ctx.userAgent : base.userAgent,
+      deviceCapabilities: ctx.deviceCapabilities as HostContext["deviceCapabilities"],
+      safeAreaInsets: ctx.safeAreaInsets as HostContext["safeAreaInsets"],
+      styles: ctx.styles as HostContext["styles"],
+      view: typeof ctx.view === "string" ? ctx.view : base.view,
+    };
+  }
+
+  private extractToolMeta(rawHostContext: unknown): Record<string, unknown> | undefined {
+    const hc = rawHostContext as { toolInfo?: unknown };
+    if (!hc || typeof hc !== "object") return undefined;
+    if (!hc.toolInfo || typeof hc.toolInfo !== "object") return undefined;
+    return { toolInfo: hc.toolInfo as Record<string, unknown> };
+  }
+
+  private extractToolOutput(result: CallToolResult): Record<string, unknown> {
+    const structured = (result as { structuredContent?: unknown }).structuredContent;
+    const meta = (result as { _meta?: unknown })._meta;
+
+    const base: Record<string, unknown> =
+      structured && typeof structured === "object" && !Array.isArray(structured)
+        ? (structured as Record<string, unknown>)
+        : {};
+
+    if (meta && typeof meta === "object" && !Array.isArray(meta)) {
+      return { ...base, _meta: meta as Record<string, unknown> };
+    }
+
+    // Best-effort fallback: try to parse text content as JSON.
+    if (Object.keys(base).length === 0) {
+      const content = (result as { content?: unknown }).content;
+      if (Array.isArray(content) && content.length > 0) {
+        const first = content[0] as { type?: unknown; text?: unknown };
+        if (first?.type === "text" && typeof first.text === "string") {
+          try {
+            const parsed = JSON.parse(first.text);
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+              return parsed as Record<string, unknown>;
+            }
+          } catch {
+            // ignore
           }
         }
-        break;
-      case "mcp:toolResult":
-        this.currentToolOutput = data.output;
-        for (const handler of this.toolResultHandlers) {
-          handler(data.output);
-        }
-        break;
-      case "mcp:toolInput":
-        this.currentToolInput = data.input;
-        for (const handler of this.toolInputHandlers) {
-          handler(data.input);
-        }
-        break;
-      case "mcp:cancelled":
-        for (const handler of this.toolCancelledHandlers) {
-          handler(data.reason);
-        }
-        break;
-      case "mcp:teardown":
-        for (const handler of this.teardownHandlers) {
-          handler(data.reason);
-        }
-        break;
+      }
     }
-  }
 
-  private handleResponse(data: { id?: string; result?: unknown; error?: string }): void {
-    if (!data.id) return;
-    const pending = this.pendingCalls.get(data.id);
-    if (!pending) return;
-
-    this.pendingCalls.delete(data.id);
-    if (data.error) {
-      pending.reject(new Error(data.error));
-    } else {
-      pending.resolve(data.result);
-    }
-  }
-
-  private sendToHost(message: Record<string, unknown>): void {
-    if (typeof window !== "undefined" && window.parent !== window) {
-      window.parent.postMessage(message, "*");
-    }
-  }
-
-  private callHost(method: string, params: Record<string, unknown>): Promise<unknown> {
-    this.callId += 1;
-    const id = `mcp:${String(this.callId)}`;
-    return new Promise((resolve, reject) => {
-      this.pendingCalls.set(id, { resolve, reject });
-      this.sendToHost({ type: "mcp:request", id, method, params });
-
-      // Timeout after 30 seconds
-      setTimeout(() => {
-        if (this.pendingCalls.has(id)) {
-          this.pendingCalls.delete(id);
-          reject(new Error(`MCP call "${method}" timed out`));
-        }
-      }, 30000);
-    });
+    return base;
   }
 
   // === Tool Operations ===
 
   async callTool(name: string, args: Record<string, unknown>): Promise<unknown> {
-    return this.callHost("callTool", { name, args });
+    if (!this.app) {
+      throw new Error("MCP Apps adapter not connected");
+    }
+
+    const result = await this.app.callServerTool({
+      name,
+      arguments: args,
+    });
+
+    // AppsClient expects structured output shape.
+    return this.extractToolOutput(result);
   }
 
   // === Messaging ===
 
   async sendMessage(content: { type: string; text: string }): Promise<void> {
-    await this.callHost("sendMessage", { content });
+    if (!this.app) {
+      throw new Error("MCP Apps adapter not connected");
+    }
+    if (content.type !== "text") {
+      throw new Error(`Unsupported message content type: ${content.type}`);
+    }
+    await this.app.sendMessage({
+      role: "user",
+      content: [{ type: "text", text: content.text }],
+    });
   }
 
   // === Navigation ===
 
   async openLink(url: string): Promise<void> {
-    await this.callHost("openLink", { url });
+    if (!this.app) {
+      throw new Error("MCP Apps adapter not connected");
+    }
+    await this.app.openLink({ url });
   }
 
   async requestDisplayMode(mode: string): Promise<{ mode: string }> {
-    const result = await this.callHost("requestDisplayMode", { mode });
+    if (!this.app) {
+      throw new Error("MCP Apps adapter not connected");
+    }
+    const result = await this.app.requestDisplayMode({
+      mode: mode as "inline" | "fullscreen" | "pip",
+    });
     return result as { mode: string };
   }
 
   requestClose(): void {
-    this.sendToHost({ type: "mcp:close" });
+    // MCP Apps host does not define a standard "close" request from UI.
+    // Keep as graceful no-op.
   }
 
   // === State (Graceful No-Op for MCP Apps) ===
@@ -187,20 +305,67 @@ export class McpAdapter implements ProtocolAdapter {
   // === Resources ===
 
   async readResource(uri: string): Promise<{ contents: ResourceContent[] }> {
-    const result = await this.callHost("readResource", { uri });
-    return result as { contents: ResourceContent[] };
+    if (!this.app) {
+      throw new Error("MCP Apps adapter not connected");
+    }
+
+    // App.request() is strongly typed (schema-driven) and can trip TS into
+    // extremely deep instantiations. We only need a runtime-validated result.
+    const request = (this.app.request as unknown as (
+      req: unknown,
+      schema: unknown,
+      options?: unknown,
+    ) => Promise<unknown>);
+
+    const result = (await request(
+      { method: "resources/read", params: { uri } },
+      ReadResourceResultSchema,
+    )) as ReadResourceResult;
+
+    // Normalize to our ResourceContent shape.
+    return {
+      contents: result.contents.map((c) => {
+        const base = {
+          uri: c.uri,
+          mimeType: c.mimeType ?? "application/octet-stream",
+        };
+        if ("text" in c && typeof c.text === "string") {
+          return { ...base, text: c.text };
+        }
+        if ("blob" in c && typeof c.blob === "string") {
+          // sdk encodes blob as base64 string
+          const bytes = Uint8Array.from(atob(c.blob), (ch) => ch.charCodeAt(0));
+          return { ...base, blob: bytes };
+        }
+        return base;
+      }),
+    };
   }
 
   // === Logging ===
 
   log(level: string, data: unknown): void {
-    const logFn = {
-      debug: console.debug,
-      info: console.info,
-      warning: console.warn,
-      error: console.error,
-    }[level] ?? console.log;
+    if (this.app) {
+      const params = {
+        level: (level as LoggingMessageNotification["params"]["level"]) || "info",
+        data,
+        logger: "@mcp-apps-kit/ui",
+      } satisfies LoggingMessageNotification["params"];
+      try {
+        this.app.sendLog(params);
+        return;
+      } catch {
+        // fall back to console below
+      }
+    }
 
+    const logFn =
+      {
+        debug: console.debug,
+        info: console.info,
+        warning: console.warn,
+        error: console.error,
+      }[level] ?? console.log;
     logFn("[MCP Apps]", data);
   }
 

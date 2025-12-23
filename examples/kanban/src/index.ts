@@ -529,7 +529,7 @@ const app = createApp({
       credentials: true,
     },
     // Use MCP protocol for Claude Desktop / MCP Apps
-    protocol: "openai",
+    protocol: "mcp",
   },
 });
 

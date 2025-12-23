@@ -29,22 +29,29 @@ export class McpAdapter implements ProtocolAdapter {
    * Build tool metadata for MCP protocol
    */
   buildToolMeta(toolDef: ToolDef, _serverName: string, uiUri?: string): ToolMetaResult {
-    const uiMeta: Record<string, unknown> = {};
-
-    // Add visibility as array: ["model"], ["app"], or ["model", "app"]
-    uiMeta.visibility = mapVisibilityToMcp(toolDef.visibility);
-
-    // Add UI resource link if specified (use pre-computed URI with cache-busting hash)
-    if (uiUri) {
-      uiMeta.resourceUri = uiUri;
-    }
+    const visibility = mapVisibilityToMcp(toolDef.visibility);
+    const uiMeta: Record<string, unknown> = {
+      // Add visibility as array: ["model"], ["app"], or ["model", "app"]
+      visibility,
+      ...(uiUri ? { resourceUri: uiUri } : {}),
+    };
 
     // Build annotations if specified
     const annotations = this.buildAnnotations(toolDef.annotations);
 
+    // Compatibility notes:
+    // - ext-apps / MCP Apps reference shape commonly uses nested `_meta.ui.resourceUri`.
+    // - MCPJam Inspector currently detects MCP Apps via a flat `_meta["ui/resourceUri"]` key.
+    // Provide both shapes to maximize interoperability.
+    const meta: Record<string, unknown> = {
+      ui: uiMeta,
+      "ui/visibility": visibility,
+      ...(uiUri ? { "ui/resourceUri": uiUri } : {}),
+    };
+
     return {
       annotations,
-      _meta: { ui: uiMeta },
+      _meta: meta,
     };
   }
 
