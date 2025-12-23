@@ -60,7 +60,6 @@ const client = await createClient({ forceAdapter: "mock" });
 ## Documentation & examples
 
 - Project overview: ../../README.md
-- API reference: ../../docs/API-REFERENCE.md
 - Examples that include UI code:
   - ../../examples/kanban
   - ../../examples/minimal

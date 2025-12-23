@@ -90,8 +90,6 @@ const app = createApp({
 ## Documentation & examples
 
 - Project overview: ../../README.md
-- API reference: ../../docs/API-REFERENCE.md
-- Protocol mapping notes: ../../docs/PROTOCOL-COMPARISON.md
 - Examples:
   - ../../examples/kanban
   - ../../examples/minimal

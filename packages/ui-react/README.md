@@ -75,7 +75,6 @@ export function App() {
 ## Documentation & examples
 
 - Project overview: ../../README.md
-- API reference: ../../docs/API-REFERENCE.md
 - Example React widget: ../../examples/kanban
 
 ## License

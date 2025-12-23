@@ -21,8 +21,6 @@ examples/
 ├── minimal/        # Simple hello-world example
 ├── kanban/         # Full-featured kanban board
 └── restaurant-finder/
-
-docs/               # Design docs, API reference, protocol comparison
 ```
 
 Each package has its own `src/` and `tests/` directories.
@@ -48,10 +46,6 @@ pnpm -C examples/kanban dev
 ## Code Style
 
 TypeScript >= 5.0.0 (strict mode): Follow standard conventions
-
-## Recent Changes
-
-- 001-unified-mcp-sdk: Added TypeScript >= 5.0.0 (strict mode) + Zod (schema validation), @modelcontextprotocol/sdk (MCP server), Express (HTTP server)
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
