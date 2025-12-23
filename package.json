@@ -10,7 +10,13 @@
     "lint": "nx run-many --target=lint",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
-    "typecheck": "nx run-many --target=typecheck"
+    "typecheck": "nx run-many --target=typecheck",
+    "release:version:patch:dry": "nx release version patch -p @mcp-apps-kit/core,@mcp-apps-kit/ui,@mcp-apps-kit/ui-react,@mcp-apps-kit/create-app --dry-run",
+    "release:version:patch": "nx release version patch -p @mcp-apps-kit/core,@mcp-apps-kit/ui,@mcp-apps-kit/ui-react,@mcp-apps-kit/create-app",
+    "release:version:minor:dry": "nx release version minor -p @mcp-apps-kit/core,@mcp-apps-kit/ui,@mcp-apps-kit/ui-react,@mcp-apps-kit/create-app --dry-run",
+    "release:version:minor": "nx release version minor -p @mcp-apps-kit/core,@mcp-apps-kit/ui,@mcp-apps-kit/ui-react,@mcp-apps-kit/create-app",
+    "release:version:major:dry": "nx release version major -p @mcp-apps-kit/core,@mcp-apps-kit/ui,@mcp-apps-kit/ui-react,@mcp-apps-kit/create-app --dry-run",
+    "release:version:major": "nx release version major -p @mcp-apps-kit/core,@mcp-apps-kit/ui,@mcp-apps-kit/ui-react,@mcp-apps-kit/create-app"
   },
   "keywords": [
     "mcp",
