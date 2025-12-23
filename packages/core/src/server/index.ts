@@ -305,14 +305,13 @@ function registerTools(
       async (args: Record<string, unknown>, extra?: { _meta?: Record<string, unknown> }) => {
         try {
           // Validate input with Zod
-          const parsed: unknown = toolDef.input.parse(args);
+          const parsed = toolDef.input.parse(args);
 
           // Parse client-supplied _meta into typed context
           const context = parseToolContext(extra?._meta);
 
           // Execute handler with input and context
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          const result = await toolDef.handler(parsed as z.infer<typeof toolDef.input>, context);
+          const result = await toolDef.handler(parsed, context);
 
           // Extract special fields from result
           const resultObj = result as Record<string, unknown>;
@@ -341,7 +340,16 @@ function registerTools(
           if (toolDef.output) {
             try {
               // Parse/validate the cleaned output, ensuring runtime contract enforcement
-              structured = toolDef.output.parse(cleanResult) as unknown as Record<string, unknown>;
+              const validated = toolDef.output.parse(cleanResult);
+              if (
+                typeof validated === "object" &&
+                validated !== null &&
+                !Array.isArray(validated)
+              ) {
+                structured = validated;
+              } else {
+                structured = { value: validated };
+              }
             } catch (e) {
               if (e instanceof z.ZodError) {
                 throw formatZodError(e);

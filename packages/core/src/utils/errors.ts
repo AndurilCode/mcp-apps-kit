@@ -4,7 +4,9 @@
  * Provides custom error classes and error formatting utilities.
  */
 
-import type { ZodError, ZodIssue } from "zod";
+import type { ZodError, z } from "zod";
+
+type ZodIssue = z.core.$ZodIssue;
 
 // =============================================================================
 // ERROR CODES
@@ -163,10 +165,27 @@ function formatZodIssue(issue: ZodIssue): string {
   // Use small runtime checks for optional fields to keep this formatter stable across Zod versions.
   const issueAny = issue as unknown as Record<string, unknown>;
 
+  const formatValue = (value: unknown): string => {
+    if (value === null || value === undefined) return "<unknown>";
+    if (typeof value === "string") return value;
+    if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint")
+      return String(value);
+    if (typeof value === "symbol") return value.toString();
+    if (typeof value === "function") return "<function>";
+
+    try {
+      // Avoid default object stringification like "[object Object]".
+      const json = JSON.stringify(value);
+      return typeof json === "string" ? json : "<unknown>";
+    } catch {
+      return "<unknown>";
+    }
+  };
+
   switch (issue.code) {
     case "invalid_type":
-      return `${path}: expected ${String(issueAny.expected ?? "<unknown>")}, got ${String(
-        issueAny.received ?? issueAny.input ?? "<unknown>"
+      return `${path}: expected ${formatValue(issueAny.expected)}, got ${formatValue(
+        issueAny.received ?? issueAny.input
       )}`;
     case "unrecognized_keys":
       if (Array.isArray(issueAny.keys)) {
@@ -185,32 +204,32 @@ function formatZodIssue(issue: ZodIssue): string {
     }
     case "too_small":
       if (issueAny.origin === "string")
-        return `${path}: must be at least ${String(issueAny.minimum ?? "")} characters`;
+        return `${path}: must be at least ${formatValue(issueAny.minimum)} characters`;
       if (issueAny.origin === "number")
-        return `${path}: must be at least ${String(issueAny.minimum ?? "")}`;
+        return `${path}: must be at least ${formatValue(issueAny.minimum)}`;
       if (issueAny.origin === "array")
-        return `${path}: must have at least ${String(issueAny.minimum ?? "")} items`;
+        return `${path}: must have at least ${formatValue(issueAny.minimum)} items`;
       return `${path}: value too small`;
     case "too_big":
       if (issueAny.origin === "string")
-        return `${path}: must be at most ${String(issueAny.maximum ?? "")} characters`;
+        return `${path}: must be at most ${formatValue(issueAny.maximum)} characters`;
       if (issueAny.origin === "number")
-        return `${path}: must be at most ${String(issueAny.maximum ?? "")}`;
+        return `${path}: must be at most ${formatValue(issueAny.maximum)}`;
       if (issueAny.origin === "array")
-        return `${path}: must have at most ${String(issueAny.maximum ?? "")} items`;
+        return `${path}: must have at most ${formatValue(issueAny.maximum)} items`;
       return `${path}: value too large`;
     case "not_multiple_of":
-      return `${path}: must be a multiple of ${String(issueAny.multipleOf ?? issueAny.divisor ?? "")}`;
+      return `${path}: must be a multiple of ${formatValue(issueAny.multipleOf ?? issueAny.divisor)}`;
     case "invalid_key":
       return `${path}: invalid key`;
     case "invalid_element":
       return `${path}: invalid element`;
     case "invalid_value":
-      return `${path}: ${String(issueAny.message ?? issue.message)}`;
+      return `${path}: ${formatValue(issueAny.message ?? issue.message)}`;
     case "custom":
-      return `${path}: ${String(issueAny.message ?? issue.message)}`;
+      return `${path}: ${formatValue(issueAny.message ?? issue.message)}`;
     default:
-      return `${path}: ${String(issueAny.message ?? "")}`;
+      return `${path}: ${formatValue(issueAny.message)}`;
   }
 }
 

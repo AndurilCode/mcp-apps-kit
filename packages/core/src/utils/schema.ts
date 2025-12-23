@@ -23,7 +23,7 @@ export type JSONSchema = Record<string, unknown>;
  * Zod v4 provides a built-in `toJSONSchema()` method, which we prefer.
  * We keep a fallback path via `zod-to-json-schema` for older/foreign schema objects.
  */
-export type ZodSchema = z.ZodType<any, any, any>;
+export type ZodSchema = z.ZodType;
 
 /**
  * Options for zodToJsonSchema conversion

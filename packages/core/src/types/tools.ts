@@ -138,8 +138,8 @@ export interface ToolAnnotations {
  * Single tool definition with Zod schemas
  */
 export interface ToolDef<
-  TInput extends z.ZodType<any, any, any> = z.ZodType<any, any, any>,
-  TOutput extends z.ZodType<any, any, any> = z.ZodType<any, any, any>,
+  TInput extends z.ZodType = z.ZodType<Record<string, unknown>>,
+  TOutput extends z.ZodType = z.ZodType<Record<string, unknown>>,
 > {
   /** Human-readable description for the LLM */
   description: string;
