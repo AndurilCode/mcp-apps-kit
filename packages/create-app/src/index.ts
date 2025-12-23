@@ -1,5 +1,5 @@
 /**
- * @apps-builder/create-app
+ * @mcp-apps-kit/create-app
  *
  * Project scaffolding for MCP applications.
  */
@@ -40,9 +40,9 @@ function getReactTemplate(name: string): Record<string, string> {
           start: "node dist/server/index.js",
         },
         dependencies: {
-          "@apps-builder/core": "^0.1.0",
-          "@apps-builder/ui": "^0.1.0",
-          "@apps-builder/ui-react": "^0.1.0",
+          "@mcp-apps-kit/core": "^0.1.0",
+          "@mcp-apps-kit/ui": "^0.1.0",
+          "@mcp-apps-kit/ui-react": "^0.1.0",
           react: "^18.2.0",
           "react-dom": "^18.2.0",
           zod: "^3.22.0",
@@ -84,7 +84,7 @@ function getReactTemplate(name: string): Record<string, string> {
  * ${name} - MCP Server
  */
 
-import { createApp } from "@apps-builder/core";
+import { createApp } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 const app = createApp({
@@ -133,7 +133,7 @@ import {
   useHostContext,
   useDocumentTheme,
   useHostStyleVariables,
-} from "@apps-builder/ui-react";
+} from "@mcp-apps-kit/ui-react";
 
 export function App() {
   const client = useAppsClient();
@@ -177,7 +177,7 @@ export function App() {
 
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { AppsProvider } from "@apps-builder/ui-react";
+import { AppsProvider } from "@mcp-apps-kit/ui-react";
 import { App } from "./App";
 import "./styles.css";
 
@@ -294,7 +294,7 @@ dist/
 `,
     "README.md": `# ${name}
 
-An MCP application built with @apps-builder.
+An MCP application built with @mcp-apps-kit.
 
 ## Development
 
@@ -343,8 +343,8 @@ function getVanillaTemplate(name: string): Record<string, string> {
           start: "node dist/server/index.js",
         },
         dependencies: {
-          "@apps-builder/core": "^0.1.0",
-          "@apps-builder/ui": "^0.1.0",
+          "@mcp-apps-kit/core": "^0.1.0",
+          "@mcp-apps-kit/ui": "^0.1.0",
           zod: "^3.22.0",
         },
         devDependencies: {
@@ -380,7 +380,7 @@ function getVanillaTemplate(name: string): Record<string, string> {
  * ${name} - MCP Server
  */
 
-import { createApp } from "@apps-builder/core";
+import { createApp } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 const app = createApp({
@@ -424,7 +424,7 @@ console.log("MCP server running on http://localhost:3000");
  * ${name} - UI Entry Point
  */
 
-import { createClient } from "@apps-builder/ui";
+import { createClient } from "@mcp-apps-kit/ui";
 import "./styles.css";
 
 async function main() {
@@ -579,7 +579,7 @@ dist/
 `,
     "README.md": `# ${name}
 
-An MCP application built with @apps-builder.
+An MCP application built with @mcp-apps-kit.
 
 ## Development
 

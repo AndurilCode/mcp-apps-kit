@@ -1,5 +1,5 @@
 /**
- * Server module for @apps-builder/core
+ * Server module for @mcp-apps-kit/core
  *
  * Provides MCP server implementation with Streamable HTTP and stdio transports.
  */

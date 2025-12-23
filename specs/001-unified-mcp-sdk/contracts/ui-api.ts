@@ -1,5 +1,5 @@
 /**
- * @apps-builder/ui API Contract
+ * @mcp-apps-kit/ui API Contract
  *
  * This file defines the public API surface for the UI client package.
  * All exports listed here MUST be implemented and tested.

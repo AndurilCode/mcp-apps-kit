@@ -57,7 +57,7 @@ describe("Project scaffolding", () => {
       expect(packageJson.name).toBe("my-react-app");
     });
 
-    it("should include @apps-builder dependencies", async () => {
+    it("should include @mcp-apps-kit dependencies", async () => {
       const projectDir = path.join(tempDir, "my-react-app");
 
       await scaffoldProject({
@@ -71,8 +71,8 @@ describe("Project scaffolding", () => {
       const packageJson = JSON.parse(
         fs.readFileSync(path.join(projectDir, "package.json"), "utf-8")
       );
-      expect(packageJson.dependencies).toHaveProperty("@apps-builder/core");
-      expect(packageJson.dependencies).toHaveProperty("@apps-builder/ui-react");
+      expect(packageJson.dependencies).toHaveProperty("@mcp-apps-kit/core");
+      expect(packageJson.dependencies).toHaveProperty("@mcp-apps-kit/ui-react");
       expect(packageJson.dependencies).toHaveProperty("zod");
       expect(packageJson.dependencies).toHaveProperty("react");
       expect(packageJson.dependencies).toHaveProperty("react-dom");
@@ -137,7 +137,7 @@ describe("Project scaffolding", () => {
       expect(fs.existsSync(projectDir)).toBe(true);
     });
 
-    it("should include @apps-builder/ui but not ui-react", async () => {
+    it("should include @mcp-apps-kit/ui but not ui-react", async () => {
       const projectDir = path.join(tempDir, "my-vanilla-app");
 
       await scaffoldProject({
@@ -151,9 +151,9 @@ describe("Project scaffolding", () => {
       const packageJson = JSON.parse(
         fs.readFileSync(path.join(projectDir, "package.json"), "utf-8")
       );
-      expect(packageJson.dependencies).toHaveProperty("@apps-builder/core");
-      expect(packageJson.dependencies).toHaveProperty("@apps-builder/ui");
-      expect(packageJson.dependencies).not.toHaveProperty("@apps-builder/ui-react");
+      expect(packageJson.dependencies).toHaveProperty("@mcp-apps-kit/core");
+      expect(packageJson.dependencies).toHaveProperty("@mcp-apps-kit/ui");
+      expect(packageJson.dependencies).not.toHaveProperty("@mcp-apps-kit/ui-react");
     });
 
     it("should create ui directory with vanilla JS files", async () => {

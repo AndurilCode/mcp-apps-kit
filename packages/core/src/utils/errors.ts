@@ -1,5 +1,5 @@
 /**
- * Error handling utilities for @apps-builder/core
+ * Error handling utilities for @mcp-apps-kit/core
  *
  * Provides custom error classes and error formatting utilities.
  */

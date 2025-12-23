@@ -1,6 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { AppsProvider } from "@apps-builder/ui-react";
+import { AppsProvider } from "@mcp-apps-kit/ui-react";
 import { App } from "./App";
 import "./styles.css";
 import type { KanbanClientTools } from "../index";

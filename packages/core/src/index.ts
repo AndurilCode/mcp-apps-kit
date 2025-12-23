@@ -1,11 +1,11 @@
 /**
- * @apps-builder/core
+ * @mcp-apps-kit/core
  *
  * Server-side framework for building MCP applications.
  *
  * @example
  * ```typescript
- * import { createApp } from "@apps-builder/core";
+ * import { createApp } from "@mcp-apps-kit/core";
  * import { z } from "zod";
  *
  * const app = createApp({

@@ -58,7 +58,7 @@ specs/001-unified-mcp-sdk/
 
 ```text
 packages/
-├── core/                           # @apps-builder/core - Server-side framework
+├── core/                           # @mcp-apps-kit/core - Server-side framework
 │   ├── src/
 │   │   ├── index.ts                # Public exports
 │   │   ├── createApp.ts            # Main entry point
@@ -79,7 +79,7 @@ packages/
 │   ├── package.json
 │   └── tsconfig.json
 │
-├── ui/                             # @apps-builder/ui - Client-side SDK (vanilla JS)
+├── ui/                             # @mcp-apps-kit/ui - Client-side SDK (vanilla JS)
 │   ├── src/
 │   │   ├── index.ts                # Public exports
 │   │   ├── client.ts               # Unified AppsClient
@@ -92,7 +92,7 @@ packages/
 │   ├── package.json
 │   └── tsconfig.json
 │
-├── ui-react/                       # @apps-builder/ui-react - React bindings
+├── ui-react/                       # @mcp-apps-kit/ui-react - React bindings
 │   ├── src/
 │   │   ├── index.ts                # Public exports
 │   │   ├── context.tsx             # AppsContext, AppsProvider
@@ -101,7 +101,7 @@ packages/
 │   ├── package.json
 │   └── tsconfig.json
 │
-└── create-app/                     # @apps-builder/create-app - CLI scaffolding
+└── create-app/                     # @mcp-apps-kit/create-app - CLI scaffolding
     ├── src/
     │   ├── index.ts                # CLI entry point
     │   ├── cli.ts                  # Command parsing
@@ -124,7 +124,7 @@ eslint.config.js                    # ESLint flat config
 prettier.config.js                  # Prettier configuration
 ```
 
-**Structure Decision**: NX monorepo with 4 packages under `packages/`. This follows the Constitution's Monorepo Integrity principle and matches the existing docs/DESIGN.md structure. Each package is independently publishable under the `@apps-builder` npm scope.
+**Structure Decision**: NX monorepo with 4 packages under `packages/`. This follows the Constitution's Monorepo Integrity principle and matches the existing docs/DESIGN.md structure. Each package is independently publishable under the `@mcp-apps-kit` npm scope.
 
 ## Complexity Tracking
 

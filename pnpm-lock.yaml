@@ -62,13 +62,93 @@ importers:
 
   examples/kanban:
     dependencies:
-      '@apps-builder/core':
+      '@mcp-apps-kit/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@apps-builder/ui':
+      '@mcp-apps-kit/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      '@apps-builder/ui-react':
+      '@mcp-apps-kit/ui-react':
+        specifier: workspace:*
+        version: link:../../packages/ui-react
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.2.0
+        version: 18.3.1(react@18.3.1)
+      zod:
+        specifier: ^3.25.0
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.27
+      '@types/react':
+        specifier: ^18.2.0
+        version: 18.3.27
+      '@types/react-dom':
+        specifier: ^18.2.0
+        version: 18.3.7(@types/react@18.3.27)
+      '@vitejs/plugin-react':
+        specifier: ^4.2.0
+        version: 4.7.0(vite@5.4.21(@types/node@20.19.27))
+      concurrently:
+        specifier: ^8.2.0
+        version: 8.2.2
+      tsx:
+        specifier: ^4.0.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vite:
+        specifier: ^5.0.0
+        version: 5.4.21(@types/node@20.19.27)
+      vite-plugin-singlefile:
+        specifier: ^2.3.0
+        version: 2.3.0(rollup@4.54.0)(vite@5.4.21(@types/node@20.19.27))
+
+  examples/minimal:
+    dependencies:
+      '@mcp-apps-kit/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@mcp-apps-kit/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      zod:
+        specifier: ^3.25.0
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.27
+      concurrently:
+        specifier: ^8.2.0
+        version: 8.2.2
+      tsx:
+        specifier: ^4.0.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+      vite:
+        specifier: ^5.0.0
+        version: 5.4.21(@types/node@20.19.27)
+      vite-plugin-singlefile:
+        specifier: ^2.3.0
+        version: 2.3.0(rollup@4.54.0)(vite@5.4.21(@types/node@20.19.27))
+
+  examples/restaurant-finder:
+    dependencies:
+      '@mcp-apps-kit/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@mcp-apps-kit/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      '@mcp-apps-kit/ui-react':
         specifier: workspace:*
         version: link:../../packages/ui-react
       react:
@@ -152,7 +232,7 @@ importers:
 
   packages/ui-react:
     dependencies:
-      '@apps-builder/ui':
+      '@mcp-apps-kit/ui':
         specifier: workspace:*
         version: link:../ui
     devDependencies:

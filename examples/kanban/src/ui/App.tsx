@@ -1,7 +1,7 @@
 /**
  * Kanban Board App - Comprehensive SDK Feature Demonstration
  *
- * This component demonstrates all available hooks from @apps-builder/ui-react:
+ * This component demonstrates all available hooks from @mcp-apps-kit/ui-react:
  *
  * Core Hooks:
  * - useAppsClient: Access the typed client instance for tool calls
@@ -49,7 +49,7 @@ import {
   useModal,
   useToolInput,
   type ModalOptions,
-} from "@apps-builder/ui-react";
+} from "@mcp-apps-kit/ui-react";
 import type { KanbanClientTools } from "../index";
 
 // =============================================================================

@@ -12,7 +12,7 @@ export default defineConfig({
   clean: true,
   treeshake: true,
   minify: true,
-  external: ["react", "react-dom", "@apps-builder/ui"],
+  external: ["react", "react-dom", "@mcp-apps-kit/ui"],
   esbuildOptions(options) {
     options.jsx = "automatic";
   },

@@ -1,10 +1,10 @@
 # Kanban Board Example
 
-A comprehensive Kanban board application demonstrating all features of the `@apps-builder` SDK.
+A comprehensive Kanban board application demonstrating all features of the `@mcp-apps-kit` SDK.
 
 ## SDK Features Demonstrated
 
-### Server-Side Features (`@apps-builder/core`)
+### Server-Side Features (`@mcp-apps-kit/core`)
 
 | Feature | Description | Example in Code |
 |---------|-------------|-----------------|
@@ -21,7 +21,7 @@ A comprehensive Kanban board application demonstrating all features of the `@app
 | **invokingMessage/invokedMessage** | Loading state messages | `createTask`, `deleteTask`, etc. |
 | **title** | Human-readable tool title | All tools have `title` property |
 
-### Client-Side Features (`@apps-builder/ui-react`)
+### Client-Side Features (`@mcp-apps-kit/ui-react`)
 
 | Hook | Description | Usage in App |
 |------|-------------|--------------|

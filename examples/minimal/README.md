@@ -1,6 +1,6 @@
 # Minimal Example
 
-A simple "hello world" example demonstrating basic @apps-builder/core usage.
+A simple "hello world" example demonstrating basic @mcp-apps-kit/core usage.
 
 ## Features
 

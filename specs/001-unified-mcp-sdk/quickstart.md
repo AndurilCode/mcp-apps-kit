@@ -11,7 +11,7 @@ Get your first MCP app running in under 5 minutes.
 
 ```bash
 # Create a new project
-npx @apps-builder/create-app my-mcp-app
+npx @mcp-apps-kit/create-app my-mcp-app
 
 # Navigate to project
 cd my-mcp-app
@@ -33,10 +33,10 @@ mkdir my-mcp-app && cd my-mcp-app
 pnpm init
 
 # Install core package
-pnpm add @apps-builder/core zod
+pnpm add @mcp-apps-kit/core zod
 
 # Install UI packages (for widget development)
-pnpm add @apps-builder/ui @apps-builder/ui-react react react-dom
+pnpm add @mcp-apps-kit/ui @mcp-apps-kit/ui-react react react-dom
 ```
 
 ### Step 2: Create Server
@@ -44,7 +44,7 @@ pnpm add @apps-builder/ui @apps-builder/ui-react react react-dom
 Create `server/index.ts`:
 
 ```typescript
-import { createApp } from "@apps-builder/core";
+import { createApp } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 const app = createApp({
@@ -98,7 +98,7 @@ import {
   useAppsClient,
   useToolResult,
   useHostContext,
-} from "@apps-builder/ui-react";
+} from "@mcp-apps-kit/ui-react";
 
 // Import types from your server
 import type { app } from "../server";
@@ -203,7 +203,7 @@ Deploy your server to a public URL and register it as an MCP server in ChatGPT s
 A more complete example:
 
 ```typescript
-import { createApp } from "@apps-builder/core";
+import { createApp } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 const app = createApp({

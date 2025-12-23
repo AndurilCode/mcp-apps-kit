@@ -1,5 +1,5 @@
 /**
- * @apps-builder/create-app CLI
+ * @mcp-apps-kit/create-app CLI
  *
  * Command-line interface for scaffolding MCP applications.
  */
@@ -76,7 +76,7 @@ export function parseArgs(args: string[]): CLIOptions {
   };
 
   const program = new Command()
-    .name("create-apps-builder")
+    .name("create-mcp-apps-kit")
     .description("Scaffold a new MCP application")
     .version("0.1.0")
     .argument("[name]", "Project name")
@@ -90,7 +90,7 @@ export function parseArgs(args: string[]): CLIOptions {
     .option("--skip-install", "Skip installing dependencies", false)
     .option("--skip-git", "Skip initializing git repository", false)
     .allowUnknownOption(false)
-    .parse(["node", "create-apps-builder", ...args]);
+    .parse(["node", "create-mcp-apps-kit", ...args]);
 
   const options = program.opts<{
     template: Template;

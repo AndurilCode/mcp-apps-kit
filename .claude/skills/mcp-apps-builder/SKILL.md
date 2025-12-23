@@ -1,5 +1,5 @@
 ---
-name: mcp-apps-builder
+name: mcp-mcp-apps-kit
 description: Guide for implementing MCP Apps (SEP-1865) - interactive UI extensions for MCP servers. Use when building MCP servers that need to return rich, interactive HTML-based UIs alongside tool results for conversational AI hosts like Claude Desktop or ChatGPT.
 ---
 

@@ -1,12 +1,12 @@
 /**
  * Minimal UI Widget
  *
- * Demonstrates basic @apps-builder/ui client usage:
+ * Demonstrates basic @mcp-apps-kit/ui client usage:
  * - Receiving tool output
  * - Responding to theme changes
  */
 
-import { createClient } from "@apps-builder/ui";
+import { createClient } from "@mcp-apps-kit/ui";
 
 interface GreetingOutput {
   message: string;

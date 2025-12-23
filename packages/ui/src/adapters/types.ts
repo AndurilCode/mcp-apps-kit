@@ -1,5 +1,5 @@
 /**
- * Protocol adapter type definitions for @apps-builder/ui
+ * Protocol adapter type definitions for @mcp-apps-kit/ui
  *
  * Defines the internal interface for protocol adapters that map
  * the unified AppsClient API to platform-specific implementations.

@@ -1,13 +1,13 @@
 /**
  * Kanban Board Example App
  *
- * A simple Kanban board implementation demonstrating @apps-builder/core features:
+ * A simple Kanban board implementation demonstrating @mcp-apps-kit/core features:
  * - Type-safe tool definitions with Zod schemas
  * - UI resource binding for rich visualizations
  * - Protocol-agnostic design (works with MCP and OpenAI)
  */
 
-import { createApp, type ClientToolsFromCore } from "@apps-builder/core";
+import { createApp, type ClientToolsFromCore } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 // =============================================================================

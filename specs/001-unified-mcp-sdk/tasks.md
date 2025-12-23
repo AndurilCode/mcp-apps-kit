@@ -35,10 +35,10 @@ Based on plan.md structure:
 - [X] T005 [P] Configure ESLint in `eslint.config.js` (flat config, zero warnings policy)
 - [X] T006 [P] Configure Prettier in `prettier.config.js`
 - [X] T007 [P] Configure Vitest in `vitest.config.ts` (80% coverage threshold)
-- [X] T008 Create `@apps-builder/core` package scaffold in `packages/core/`
-- [X] T009 [P] Create `@apps-builder/ui` package scaffold in `packages/ui/`
-- [X] T010 [P] Create `@apps-builder/ui-react` package scaffold in `packages/ui-react/`
-- [X] T011 [P] Create `@apps-builder/create-app` package scaffold in `packages/create-app/`
+- [X] T008 Create `@mcp-apps-kit/core` package scaffold in `packages/core/`
+- [X] T009 [P] Create `@mcp-apps-kit/ui` package scaffold in `packages/ui/`
+- [X] T010 [P] Create `@mcp-apps-kit/ui-react` package scaffold in `packages/ui-react/`
+- [X] T011 [P] Create `@mcp-apps-kit/create-app` package scaffold in `packages/create-app/`
 - [X] T012 Install shared dependencies: zod, @modelcontextprotocol/sdk, zod-to-json-schema
 
 **Checkpoint**: NX monorepo structure ready, all packages scaffolded with tsconfig
@@ -259,7 +259,7 @@ Based on plan.md structure:
 
 **Goal**: Developers can run CLI command to scaffold new project with correct structure
 
-**Independent Test**: Run `npx @apps-builder/create-app my-app`, verify working project generated
+**Independent Test**: Run `npx @mcp-apps-kit/create-app my-app`, verify working project generated
 
 ### Tests for User Story 8
 
@@ -276,7 +276,7 @@ Based on plan.md structure:
 - [x] T105 [US8] Generate TypeScript configuration for scaffolded projects in `packages/create-app/src/index.ts` (in templates)
 - [x] T106 [US8] Add package.json bin entry for `create-app` command in `packages/create-app/package.json`
 
-**Checkpoint**: CLI working - `npx @apps-builder/create-app` scaffolds working projects
+**Checkpoint**: CLI working - `npx @mcp-apps-kit/create-app` scaffolds working projects
 
 ---
 

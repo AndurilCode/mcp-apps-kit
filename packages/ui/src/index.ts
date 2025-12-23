@@ -1,11 +1,11 @@
 /**
- * @apps-builder/ui
+ * @mcp-apps-kit/ui
  *
  * Client-side SDK for MCP applications (vanilla JavaScript).
  *
  * @example
  * ```typescript
- * import { createClient } from "@apps-builder/ui";
+ * import { createClient } from "@mcp-apps-kit/ui";
  *
  * // Auto-detects platform (Claude Desktop vs ChatGPT)
  * const client = await createClient();

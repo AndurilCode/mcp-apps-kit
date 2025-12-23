@@ -131,7 +131,7 @@ As a developer new to the SDK, I want to run a CLI command to scaffold a new pro
 
 **Why this priority**: Important for adoption but developers can manually create projects initially.
 
-**Independent Test**: Can be tested by running `npx @apps-builder/create-app my-app` and verifying a working project is generated.
+**Independent Test**: Can be tested by running `npx @mcp-apps-kit/create-app my-app` and verifying a working project is generated.
 
 **Acceptance Scenarios**:
 
@@ -153,7 +153,7 @@ As a developer new to the SDK, I want to run a CLI command to scaffold a new pro
 
 ### Functional Requirements
 
-**Core Server Package (`@apps-builder/core`)**
+**Core Server Package (`@mcp-apps-kit/core`)**
 - **FR-001**: System MUST provide a `createApp()` function that accepts tool definitions, UI resources, and configuration
 - **FR-002**: System MUST validate tool input/output schemas using Zod at runtime
 - **FR-003**: System MUST convert Zod schemas to JSON Schema for MCP protocol registration
@@ -165,7 +165,7 @@ As a developer new to the SDK, I want to run a CLI command to scaffold a new pro
 - **FR-009**: System MUST provide `app.handleRequest()` for serverless deployment
 - **FR-010**: System MUST read UI HTML from file paths or accept inline HTML strings
 
-**UI Client Package (`@apps-builder/ui`)**
+**UI Client Package (`@mcp-apps-kit/ui`)**
 - **FR-011**: System MUST provide a `createClient()` function that auto-detects the host platform
 - **FR-012**: System MUST implement MCP Apps adapter wrapping `@modelcontextprotocol/ext-apps`
 - **FR-013**: System MUST implement ChatGPT Apps adapter wrapping `window.openai`
@@ -176,7 +176,7 @@ As a developer new to the SDK, I want to run a CLI command to scaffold a new pro
 - **FR-018**: System MUST provide event subscription methods: `onToolResult`, `onHostContextChange`, `onToolCancelled`, `onTeardown`
 - **FR-019**: System MUST expose `hostContext` property with theme, displayMode, viewport, locale
 
-**React Bindings Package (`@apps-builder/ui-react`)**
+**React Bindings Package (`@mcp-apps-kit/ui-react`)**
 - **FR-020**: System MUST provide `AppsProvider` context provider component
 - **FR-021**: System MUST provide `useAppsClient<T>()` hook for accessing the typed client
 - **FR-022**: System MUST provide `useToolResult<T>()` hook for accessing typed tool results
@@ -186,7 +186,7 @@ As a developer new to the SDK, I want to run a CLI command to scaffold a new pro
 - **FR-026**: System MUST provide `useHostStyleVariables()` hook for applying CSS variables
 - **FR-027**: System MUST provide `useDocumentTheme()` hook for applying theme classes
 
-**CLI Package (`@apps-builder/create-app`)**
+**CLI Package (`@mcp-apps-kit/create-app`)**
 - **FR-028**: System MUST provide interactive project scaffolding with template selection
 - **FR-029**: System MUST generate working TypeScript configuration
 - **FR-030**: System MUST support React template with example components

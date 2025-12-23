@@ -54,7 +54,7 @@ This skill provides detailed, actionable guidance for building MCP (Model Contex
 
 ## Key Differences from MCP Apps (SEP-1865)
 
-This skill covers **OpenAI Apps SDK** for ChatGPT, which differs from the general MCP Apps (SEP-1865) covered in the `mcp-apps-builder` skill:
+This skill covers **OpenAI Apps SDK** for ChatGPT, which differs from the general MCP Apps (SEP-1865) covered in the `mcp-mcp-apps-kit` skill:
 
 | Feature | ChatGPT Apps SDK | MCP Apps (SEP-1865) |
 |---------|------------------|---------------------|
@@ -67,12 +67,12 @@ This skill covers **OpenAI Apps SDK** for ChatGPT, which differs from the genera
 | **Authentication** | OAuth 2.1 with DCR | OAuth 2.1 with DCR |
 | **State Management** | `window.openai.setWidgetState` | App-managed via PostMessage |
 
-**Use this skill (chatgpt-apps-builder) when:**
+**Use this skill (chatgpt-mcp-apps-kit) when:**
 - Targeting ChatGPT specifically
 - Building with OpenAI Apps SDK patterns
 - Following ChatGPT app submission guidelines
 
-**Use mcp-apps-builder when:**
+**Use mcp-mcp-apps-kit when:**
 - Targeting Claude Desktop or multi-host compatibility
 - Following SEP-1865 specification
 - Using `@modelcontextprotocol/ext-apps` package
@@ -119,7 +119,7 @@ This skill covers **OpenAI Apps SDK** for ChatGPT, which differs from the genera
 ## Related Skills
 
 - **mcp-builder** - General MCP server implementation
-- **mcp-apps-builder** - MCP Apps (SEP-1865) for Claude Desktop
+- **mcp-mcp-apps-kit** - MCP Apps (SEP-1865) for Claude Desktop
 
 ---
 

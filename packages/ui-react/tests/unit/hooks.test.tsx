@@ -20,8 +20,8 @@ import {
   useOnToolCancelled,
   useOnTeardown,
 } from "../../src";
-import type { AppsClient, ToolDefs } from "@apps-builder/ui";
-import { MockAdapter, createAppsClient } from "@apps-builder/ui";
+import type { AppsClient, ToolDefs } from "@mcp-apps-kit/ui";
+import { MockAdapter, createAppsClient } from "@mcp-apps-kit/ui";
 
 // Create a mock client for testing
 async function createMockClient(): Promise<{ client: AppsClient<ToolDefs>; adapter: MockAdapter }> {

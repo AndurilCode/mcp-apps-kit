@@ -6,9 +6,9 @@ This directory contains the public API contracts for the Unified MCP Apps Builde
 
 | Contract | Package | Description |
 |----------|---------|-------------|
-| [core-api.ts](./core-api.ts) | `@apps-builder/core` | Server-side API: `createApp()`, tool definitions, app instance |
-| [ui-api.ts](./ui-api.ts) | `@apps-builder/ui` | Client-side API: `createClient()`, `AppsClient` interface |
-| [ui-react-api.ts](./ui-react-api.ts) | `@apps-builder/ui-react` | React bindings: hooks and providers |
+| [core-api.ts](./core-api.ts) | `@mcp-apps-kit/core` | Server-side API: `createApp()`, tool definitions, app instance |
+| [ui-api.ts](./ui-api.ts) | `@mcp-apps-kit/ui` | Client-side API: `createClient()`, `AppsClient` interface |
+| [ui-react-api.ts](./ui-react-api.ts) | `@mcp-apps-kit/ui-react` | React bindings: hooks and providers |
 
 ## Contract Rules
 
@@ -35,13 +35,13 @@ Use these contracts as the reference for available APIs:
 
 ```typescript
 // Server
-import { createApp, type ToolDefs } from "@apps-builder/core";
+import { createApp, type ToolDefs } from "@mcp-apps-kit/core";
 
 // Client (vanilla)
-import { createClient, type AppsClient } from "@apps-builder/ui";
+import { createClient, type AppsClient } from "@mcp-apps-kit/ui";
 
 // Client (React)
-import { AppsProvider, useAppsClient, useToolResult } from "@apps-builder/ui-react";
+import { AppsProvider, useAppsClient, useToolResult } from "@mcp-apps-kit/ui-react";
 ```
 
 ### Contributors

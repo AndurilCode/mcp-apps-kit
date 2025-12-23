@@ -1,5 +1,5 @@
 /**
- * Type definitions for @apps-builder/ui
+ * Type definitions for @mcp-apps-kit/ui
  */
 
 // =============================================================================

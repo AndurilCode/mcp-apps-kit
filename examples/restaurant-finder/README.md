@@ -1,12 +1,12 @@
 # Restaurant Finder Example
 
-A restaurant search app demonstrating advanced @apps-builder/core features.
+A restaurant search app demonstrating advanced @mcp-apps-kit/core features.
 
 ## Features
 
 - Multiple tools with different purposes
 - ToolContext usage (location, timezone)
-- React-based UI widget with @apps-builder/ui-react
+- React-based UI widget with @mcp-apps-kit/ui-react
 - Different visibility settings (model vs app)
 - Mood-based recommendations
 

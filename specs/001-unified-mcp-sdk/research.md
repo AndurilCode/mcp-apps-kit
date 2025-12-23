@@ -134,7 +134,7 @@ Implement a localStorage-based polyfill for MCP Apps since it lacks native `widg
 ### Implementation Notes
 ```typescript
 class McpAppsAdapter {
-  private readonly stateKey = `@apps-builder:state:${appId}`;
+  private readonly stateKey = `@mcp-apps-kit:state:${appId}`;
 
   getState<S>(): S | null {
     const stored = localStorage.getItem(this.stateKey);
@@ -255,7 +255,7 @@ Implement React bindings as a separate package with React as a peer dependency.
 
 ### Rationale
 - Follows Constitution's package independence principle
-- Allows non-React users to use `@apps-builder/ui` without React overhead
+- Allows non-React users to use `@mcp-apps-kit/ui` without React overhead
 - React 18+ Suspense support for async operations
 
 ### Hook Design
@@ -313,7 +313,7 @@ Use tsup for library bundling with tree-shaking enabled.
 - tsup wraps esbuild for fast builds
 - Tree-shaking eliminates unused code
 - Separate ESM and CJS outputs for maximum compatibility
-- Target: < 50KB gzipped for `@apps-builder/ui`
+- Target: < 50KB gzipped for `@mcp-apps-kit/ui`
 
 ### Configuration Notes
 ```typescript

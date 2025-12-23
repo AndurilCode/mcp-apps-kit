@@ -1,5 +1,5 @@
 /**
- * Configuration type definitions for @apps-builder/core
+ * Configuration type definitions for @mcp-apps-kit/core
  */
 
 import type { ToolDefs } from "./tools";

@@ -1,5 +1,5 @@
 /**
- * UI resource type definitions for @apps-builder/core
+ * UI resource type definitions for @mcp-apps-kit/core
  */
 
 // =============================================================================

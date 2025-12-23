@@ -1,5 +1,5 @@
 /**
- * Schema utilities for @apps-builder/core
+ * Schema utilities for @mcp-apps-kit/core
  *
  * Provides Zod to JSON Schema conversion and related utilities.
  */
@@ -57,7 +57,7 @@ export interface ZodToJsonSchemaOptions {
  * @example
  * ```typescript
  * import { z } from "zod";
- * import { zodToJsonSchema } from "@apps-builder/core";
+ * import { zodToJsonSchema } from "@mcp-apps-kit/core";
  *
  * const inputSchema = z.object({
  *   name: z.string().describe("User's name"),

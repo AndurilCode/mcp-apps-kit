@@ -39,10 +39,10 @@
     "rootDir": ".",
     "baseUrl": ".",
     "paths": {
-      "@apps-builder/core": ["packages/core/src/index.ts"],
-      "@apps-builder/ui": ["packages/ui/src/index.ts"],
-      "@apps-builder/ui-react": ["packages/ui-react/src/index.ts"],
-      "@apps-builder/create-app": ["packages/create-app/src/index.ts"]
+      "@mcp-apps-kit/core": ["packages/core/src/index.ts"],
+      "@mcp-apps-kit/ui": ["packages/ui/src/index.ts"],
+      "@mcp-apps-kit/ui-react": ["packages/ui-react/src/index.ts"],
+      "@mcp-apps-kit/create-app": ["packages/create-app/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "dist", "coverage", "**/*.test.ts", "**/*.spec.ts"]

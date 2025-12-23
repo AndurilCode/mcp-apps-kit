@@ -1,14 +1,14 @@
 /**
  * Restaurant Finder Example App
  *
- * Demonstrates advanced @apps-builder/core features:
+ * Demonstrates advanced @mcp-apps-kit/core features:
  * - Multiple tools with relationships
  * - ToolContext usage (location, timezone)
  * - Different visibility settings
  * - Widget with complex data
  */
 
-import { createApp, type ClientToolsFromCore } from "@apps-builder/core";
+import { createApp, type ClientToolsFromCore } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 // =============================================================================

@@ -1,5 +1,5 @@
 {
-  "name": "@apps-builder/core",
+  "name": "@mcp-apps-kit/core",
   "version": "0.1.0",
   "description": "Server-side framework for building MCP applications",
   "type": "module",

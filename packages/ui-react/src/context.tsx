@@ -1,10 +1,10 @@
 /**
- * React context and provider for @apps-builder/ui-react
+ * React context and provider for @mcp-apps-kit/ui-react
  */
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, type ComponentType } from "react";
-import type { AppsClient, ToolDefs } from "@apps-builder/ui";
-import { createClient } from "@apps-builder/ui";
+import type { AppsClient, ToolDefs } from "@mcp-apps-kit/ui";
+import { createClient } from "@mcp-apps-kit/ui";
 
 // =============================================================================
 // CONTEXT
@@ -56,7 +56,7 @@ export interface AppsProviderProps<T extends ToolDefs = ToolDefs> {
 // =============================================================================
 
 /**
- * Context provider for apps-builder React integration
+ * Context provider for mcp-apps-kit React integration
  *
  * Wraps your app and provides the client instance to all hooks.
  *

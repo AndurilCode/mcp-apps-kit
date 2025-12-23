@@ -4,9 +4,9 @@ Complete API reference for the Unified MCP Apps Builder Framework.
 
 ## Table of Contents
 
-1. [Server API (`@apps-builder/core`)](#server-api)
-2. [Client API (`@apps-builder/ui`)](#client-api)
-3. [React Bindings (`@apps-builder/ui-react`)](#react-bindings)
+1. [Server API (`@mcp-apps-kit/core`)](#server-api)
+2. [Client API (`@mcp-apps-kit/ui`)](#client-api)
+3. [React Bindings (`@mcp-apps-kit/ui-react`)](#react-bindings)
 4. [Type Definitions](#type-definitions)
 
 ---
@@ -18,7 +18,7 @@ Complete API reference for the Unified MCP Apps Builder Framework.
 Creates a unified MCP app with tools, UI resources, and configuration.
 
 ```typescript
-import { createApp } from "@apps-builder/core";
+import { createApp } from "@mcp-apps-kit/core";
 
 const app = createApp(config: AppConfig): App;
 ```
@@ -344,7 +344,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 Creates a unified client for communicating with the host.
 
 ```typescript
-import { createClient } from "@apps-builder/ui";
+import { createClient } from "@mcp-apps-kit/ui";
 
 const client = await createClient<AppTools>(options?: ClientOptions): Promise<AppsClient<AppTools>>;
 
@@ -673,7 +673,7 @@ interface HostContext {
 Hook to access the apps client.
 
 ```typescript
-import { useAppsClient } from "@apps-builder/ui-react";
+import { useAppsClient } from "@mcp-apps-kit/ui-react";
 
 function MyComponent() {
   const client = useAppsClient<AppTools>();
@@ -691,7 +691,7 @@ function MyComponent() {
 Hook to access the current tool result.
 
 ```typescript
-import { useToolResult } from "@apps-builder/ui-react";
+import { useToolResult } from "@mcp-apps-kit/ui-react";
 
 function MyComponent() {
   const result = useToolResult<AppTools>();
@@ -708,7 +708,7 @@ function MyComponent() {
 Hook to access the current tool input.
 
 ```typescript
-import { useToolInput } from "@apps-builder/ui-react";
+import { useToolInput } from "@mcp-apps-kit/ui-react";
 
 function MyComponent() {
   const input = useToolInput();
@@ -722,7 +722,7 @@ function MyComponent() {
 Hook to access host context.
 
 ```typescript
-import { useHostContext } from "@apps-builder/ui-react";
+import { useHostContext } from "@mcp-apps-kit/ui-react";
 
 function MyComponent() {
   const context = useHostContext();
@@ -740,7 +740,7 @@ function MyComponent() {
 Hook for persisted widget state.
 
 ```typescript
-import { useWidgetState } from "@apps-builder/ui-react";
+import { useWidgetState } from "@mcp-apps-kit/ui-react";
 
 interface MyState {
   selectedTab: string;
@@ -774,7 +774,7 @@ function MyComponent() {
 Hook to apply host CSS variables.
 
 ```typescript
-import { useHostStyleVariables } from "@apps-builder/ui-react";
+import { useHostStyleVariables } from "@mcp-apps-kit/ui-react";
 
 function MyComponent() {
   // Automatically applies host CSS variables to document
@@ -789,7 +789,7 @@ function MyComponent() {
 Hook to apply theme class to document.
 
 ```typescript
-import { useDocumentTheme } from "@apps-builder/ui-react";
+import { useDocumentTheme } from "@mcp-apps-kit/ui-react";
 
 function MyComponent() {
   // Adds "light" or "dark" class to <html>
@@ -804,7 +804,7 @@ function MyComponent() {
 Hook for display mode management.
 
 ```typescript
-import { useDisplayMode } from "@apps-builder/ui-react";
+import { useDisplayMode } from "@mcp-apps-kit/ui-react";
 
 function MyComponent() {
   const { mode, requestMode, availableModes } = useDisplayMode();
@@ -827,7 +827,7 @@ function MyComponent() {
 Context provider for apps client.
 
 ```typescript
-import { AppsProvider } from "@apps-builder/ui-react";
+import { AppsProvider } from "@mcp-apps-kit/ui-react";
 
 function App() {
   return (
@@ -849,7 +849,7 @@ function App() {
 ### Extracting Types from App Definition
 
 ```typescript
-import { createApp, InferToolInputs, InferToolOutputs } from "@apps-builder/core";
+import { createApp, InferToolInputs, InferToolOutputs } from "@mcp-apps-kit/core";
 
 const app = createApp({ /* ... */ });
 

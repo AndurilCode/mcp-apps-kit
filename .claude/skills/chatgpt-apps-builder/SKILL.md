@@ -1,5 +1,5 @@
 ---
-name: chatgpt-apps-builder
+name: chatgpt-mcp-apps-kit
 description: Guide for implementing ChatGPT Apps using OpenAI Apps SDK. Use when building MCP servers with interactive UI components that integrate with ChatGPT, including widget runtime, authentication, state management, and deployment to the ChatGPT platform.
 ---
 
@@ -1014,4 +1014,4 @@ Scripted player with overlays
 ## Related Skills
 
 - **mcp-builder**: General MCP server implementation patterns
-- **mcp-apps-builder**: MCP Apps (SEP-1865) for Claude Desktop
+- **mcp-mcp-apps-kit**: MCP Apps (SEP-1865) for Claude Desktop

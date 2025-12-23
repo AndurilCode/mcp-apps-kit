@@ -11,7 +11,7 @@ This document outlines the implementation phases and priorities for the Unified 
 - [ ] Configure linting (ESLint) and formatting (Prettier)
 - [ ] Set up testing framework (Vitest)
 
-### 1.2 Type System (`@apps-builder/core`)
+### 1.2 Type System (`@mcp-apps-kit/core`)
 - [ ] Define `ToolDef` interface with Zod integration
 - [ ] Implement `InferToolInputs<T>` and `InferToolOutputs<T>` utilities
 - [ ] Define `UIDef` and `CSPConfig` interfaces
@@ -119,7 +119,7 @@ This document outlines the implementation phases and priorities for the Unified 
 
 ## Phase 5: Developer Experience
 
-### 5.1 CLI Tool (`@apps-builder/create-app`)
+### 5.1 CLI Tool (`@mcp-apps-kit/create-app`)
 - [ ] Project scaffolding
 - [ ] Template selection (React, Vue, vanilla)
 - [ ] Interactive prompts
@@ -272,9 +272,9 @@ This document outlines the implementation phases and priorities for the Unified 
 ## File Structure
 
 ```
-apps-builder/
+mcp-apps-kit/
 ├── packages/
-│   ├── core/                    # @apps-builder/core
+│   ├── core/                    # @mcp-apps-kit/core
 │   │   ├── src/
 │   │   │   ├── index.ts         # Public exports
 │   │   │   ├── createApp.ts     # Main entry point
@@ -294,7 +294,7 @@ apps-builder/
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │
-│   ├── ui/                      # @apps-builder/ui
+│   ├── ui/                      # @mcp-apps-kit/ui
 │   │   ├── src/
 │   │   │   ├── index.ts
 │   │   │   ├── client.ts
@@ -304,7 +304,7 @@ apps-builder/
 │   │   │   └── types.ts
 │   │   └── package.json
 │   │
-│   ├── ui-react/                # @apps-builder/ui-react
+│   ├── ui-react/                # @mcp-apps-kit/ui-react
 │   │   ├── src/
 │   │   │   ├── index.ts
 │   │   │   ├── context.tsx
@@ -312,7 +312,7 @@ apps-builder/
 │   │   │   └── components.tsx
 │   │   └── package.json
 │   │
-│   └── create-app/              # @apps-builder/create-app
+│   └── create-app/              # @mcp-apps-kit/create-app
 │       ├── src/
 │       │   ├── cli.ts
 │       │   └── templates/

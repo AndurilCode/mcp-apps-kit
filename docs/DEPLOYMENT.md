@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This guide covers the various deployment options for apps built with `@apps-builder/core`.
+This guide covers the various deployment options for apps built with `@mcp-apps-kit/core`.
 
 ## Table of Contents
 
@@ -14,7 +14,7 @@ This guide covers the various deployment options for apps built with `@apps-buil
 The simplest way to run your app is using the built-in server:
 
 ```typescript
-import { createApp } from "@apps-builder/core";
+import { createApp } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 const app = createApp({
@@ -50,7 +50,7 @@ For integration with existing Express servers, use `app.handler()`:
 
 ```typescript
 import express from "express";
-import { createApp } from "@apps-builder/core";
+import { createApp } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 // Create your MCP app
@@ -104,7 +104,7 @@ Use `app.handleRequest()` for serverless platforms like Cloudflare Workers, Verc
 
 ```typescript
 // src/worker.ts
-import { createApp } from "@apps-builder/core";
+import { createApp } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 const app = createApp({
@@ -131,7 +131,7 @@ export default {
 
 ```typescript
 // api/mcp.ts
-import { createApp } from "@apps-builder/core";
+import { createApp } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 const app = createApp({
@@ -160,7 +160,7 @@ export default async function handler(request: Request) {
 
 ```typescript
 // handler.ts
-import { createApp } from "@apps-builder/core";
+import { createApp } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 const app = createApp({
@@ -206,7 +206,7 @@ For Claude Desktop integration using stdio transport:
 
 ```typescript
 // server.ts
-import { createApp } from "@apps-builder/core";
+import { createApp } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 const app = createApp({

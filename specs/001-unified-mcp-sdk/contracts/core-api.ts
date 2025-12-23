@@ -1,5 +1,5 @@
 /**
- * @apps-builder/core API Contract
+ * @mcp-apps-kit/core API Contract
  *
  * This file defines the public API surface for the core package.
  * All exports listed here MUST be implemented and tested.

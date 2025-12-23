@@ -1,7 +1,7 @@
 /**
  * Restaurant Finder UI
  *
- * React widget demonstrating @apps-builder/ui-react usage:
+ * React widget demonstrating @mcp-apps-kit/ui-react usage:
  * - useAppsClient hook
  * - useHostContext for theme
  * - sendFollowUpMessage for interactions
@@ -14,7 +14,7 @@ import {
   useAppsClient,
   useHostContext,
   useDocumentTheme,
-} from "@apps-builder/ui-react";
+} from "@mcp-apps-kit/ui-react";
 import "./styles.css";
 
 interface Restaurant {

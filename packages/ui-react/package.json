@@ -1,5 +1,5 @@
 {
-  "name": "@apps-builder/ui-react",
+  "name": "@mcp-apps-kit/ui-react",
   "version": "0.1.0",
   "description": "React bindings for MCP applications",
   "type": "module",
@@ -31,7 +31,7 @@
   "keywords": ["mcp", "model-context-protocol", "sdk", "react", "hooks"],
   "license": "MIT",
   "dependencies": {
-    "@apps-builder/ui": "workspace:*"
+    "@mcp-apps-kit/ui": "workspace:*"
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",

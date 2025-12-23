@@ -1,13 +1,13 @@
 /**
  * Minimal Example App
  *
- * A simple "hello world" example demonstrating basic @apps-builder/core usage:
+ * A simple "hello world" example demonstrating basic @mcp-apps-kit/core usage:
  * - Simple tool definition with Zod schema
  * - UI resource binding
  * - Server startup
  */
 
-import { createApp } from "@apps-builder/core";
+import { createApp } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 const app = createApp({

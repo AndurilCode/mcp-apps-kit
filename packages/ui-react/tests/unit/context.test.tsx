@@ -7,8 +7,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { AppsProvider, useAppsClient } from "../../src";
-import type { AppsClient, ToolDefs } from "@apps-builder/ui";
-import { MockAdapter, createAppsClient } from "@apps-builder/ui";
+import type { AppsClient, ToolDefs } from "@mcp-apps-kit/ui";
+import { MockAdapter, createAppsClient } from "@mcp-apps-kit/ui";
 
 // Create a mock client for testing
 async function createMockClient(): Promise<AppsClient<ToolDefs>> {
@@ -87,8 +87,8 @@ describe("AppsProvider", () => {
       );
 
       // Mock createClient to fail
-      vi.mock("@apps-builder/ui", async (importOriginal) => {
-        const original = await importOriginal<typeof import("@apps-builder/ui")>();
+      vi.mock("@mcp-apps-kit/ui", async (importOriginal) => {
+        const original = await importOriginal<typeof import("@mcp-apps-kit/ui")>();
         return {
           ...original,
           createClient: vi.fn().mockRejectedValue(new Error("Connection failed")),

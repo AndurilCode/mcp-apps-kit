@@ -1,11 +1,11 @@
 /**
- * @apps-builder/ui-react
+ * @mcp-apps-kit/ui-react
  *
  * React bindings for MCP applications.
  */
 
-// Re-export types from @apps-builder/ui
-export type { HostContext, ToolResult, AppsClient } from "@apps-builder/ui";
+// Re-export types from @mcp-apps-kit/ui
+export type { HostContext, ToolResult, AppsClient } from "@mcp-apps-kit/ui";
 
 // Context (placeholder - will be implemented in Phase 6)
 export { AppsProvider } from "./context";
@@ -37,5 +37,5 @@ export {
 // File operation types
 export type { FileUploadResult, UseFileUploadState } from "./hooks";
 
-// Re-export modal types from @apps-builder/ui
-export type { ModalButton, ModalInput, ModalOptions, ModalResult } from "@apps-builder/ui";
+// Re-export modal types from @mcp-apps-kit/ui
+export type { ModalButton, ModalInput, ModalOptions, ModalResult } from "@mcp-apps-kit/ui";

@@ -1,8 +1,8 @@
 {
-  "name": "@apps-builder/example-minimal",
+  "name": "@mcp-apps-kit/example-minimal",
   "version": "0.1.0",
   "private": true,
-  "description": "Minimal example demonstrating basic @apps-builder/core usage",
+  "description": "Minimal example demonstrating basic @mcp-apps-kit/core usage",
   "type": "module",
   "scripts": {
     "dev": "concurrently \"pnpm dev:server\" \"pnpm dev:ui\"",
@@ -14,8 +14,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@apps-builder/core": "workspace:*",
-    "@apps-builder/ui": "workspace:*",
+    "@mcp-apps-kit/core": "workspace:*",
+    "@mcp-apps-kit/ui": "workspace:*",
     "zod": "^3.25.0"
   },
   "devDependencies": {

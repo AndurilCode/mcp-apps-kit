@@ -1,5 +1,5 @@
 /**
- * @apps-builder/ui-react API Contract
+ * @mcp-apps-kit/ui-react API Contract
  *
  * This file defines the public API surface for the React bindings package.
  * All exports listed here MUST be implemented and tested.
@@ -43,7 +43,7 @@ export interface AppsProviderProps<T extends ToolDefs = ToolDefs> {
 }
 
 /**
- * Context provider for apps-builder React integration
+ * Context provider for mcp-apps-kit React integration
  *
  * Wraps your app and provides the client instance to all hooks.
  *

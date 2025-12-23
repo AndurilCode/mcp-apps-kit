@@ -80,7 +80,7 @@ Runtime behavior MUST match compile-time type guarantees.
 
 The NX monorepo structure MUST maintain clear package boundaries while enabling efficient development.
 
-- Each package (`@apps-builder/core`, `@apps-builder/ui`, `@apps-builder/ui-react`, `@apps-builder/create-app`) MUST be independently publishable
+- Each package (`@mcp-apps-kit/core`, `@mcp-apps-kit/ui`, `@mcp-apps-kit/ui-react`, `@mcp-apps-kit/create-app`) MUST be independently publishable
 - Internal dependencies MUST use workspace protocols, never version ranges
 - Shared code MUST live in explicitly designated internal packages, not duplicated
 - The published npm package MUST be a single cohesive bundle with all necessary dependencies properly declared

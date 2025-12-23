@@ -1,5 +1,5 @@
 /**
- * Core type definitions for @apps-builder/core
+ * Core type definitions for @mcp-apps-kit/core
  */
 
 import type { z } from "zod";
@@ -322,16 +322,16 @@ export type InferToolOutputs<T extends ToolDefs> = {
 };
 
 /**
- * Convert @apps-builder/core tool definitions (Zod-based) into the tool type
- * shape expected by @apps-builder/ui.
+ * Convert @mcp-apps-kit/core tool definitions (Zod-based) into the tool type
+ * shape expected by @mcp-apps-kit/ui.
  *
  * This is the recommended way to get end-to-end typing for UI clients without
  * duplicating schemas.
  *
  * @example
  * ```ts
- * import type { ClientToolsFromCore } from "@apps-builder/core";
- * import { createClient } from "@apps-builder/ui";
+ * import type { ClientToolsFromCore } from "@mcp-apps-kit/core";
+ * import { createClient } from "@mcp-apps-kit/ui";
  *
  * type AppClientTools = ClientToolsFromCore<typeof app.tools>;
  * const client = await createClient<AppClientTools>();

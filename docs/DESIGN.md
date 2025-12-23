@@ -73,7 +73,7 @@ Developers building interactive MCP applications face:
 ### 1. `createApp()` Function Signature
 
 ```typescript
-import { createApp } from "@apps-builder/core";
+import { createApp } from "@mcp-apps-kit/core";
 
 const app = createApp({
   name: "my-app",
@@ -184,7 +184,7 @@ The framework provides a unified client SDK for the UI that works on both platfo
 
 ```typescript
 // In your React/vanilla UI code
-import { useAppsClient, useToolResult, useHostContext } from "@apps-builder/ui-react";
+import { useAppsClient, useToolResult, useHostContext } from "@mcp-apps-kit/ui-react";
 
 // Types are inferred from your tool definitions
 type AppTools = typeof app.tools;
@@ -228,7 +228,7 @@ function RestaurantList() {
 ### 4. Vanilla JS Client
 
 ```typescript
-import { createClient } from "@apps-builder/ui";
+import { createClient } from "@mcp-apps-kit/ui";
 
 // Initialize client
 const client = await createClient<AppTools>();
@@ -669,7 +669,7 @@ result.unknownField; // ✓ allowed (additive), typed as unknown
 ## Package Structure
 
 ```
-@apps-builder/
+@mcp-apps-kit/
 ├── core/                    # Server-side framework
 │   ├── src/
 │   │   ├── createApp.ts     # Main entry point
@@ -720,7 +720,7 @@ result.unknownField; // ✓ allowed (additive), typed as unknown
 **Server (`server/index.ts`):**
 
 ```typescript
-import { createApp } from "@apps-builder/core";
+import { createApp } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 const app = createApp({
@@ -827,7 +827,7 @@ await app.start({ port: 3000 });
 **UI (`ui/src/RestaurantList.tsx`):**
 
 ```typescript
-import { useAppsClient, useToolResult, useHostContext } from "@apps-builder/ui-react";
+import { useAppsClient, useToolResult, useHostContext } from "@mcp-apps-kit/ui-react";
 import type { AppTools } from "../server"; // Import types from server
 
 function RestaurantList() {
@@ -1130,4 +1130,4 @@ const client = await createClient(); // Works on all platforms
 5. Add React bindings
 6. Create CLI scaffolding tool
 7. Write comprehensive documentation and examples
-8. Publish to npm as `@apps-builder/*` packages
+8. Publish to npm as `@mcp-apps-kit/*` packages

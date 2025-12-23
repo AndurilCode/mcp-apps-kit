@@ -1,9 +1,9 @@
 /**
- * React hooks for @apps-builder/ui-react
+ * React hooks for @mcp-apps-kit/ui-react
  */
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import type { AppsClient, HostContext, ToolDefs, ToolResult, ModalOptions, ModalResult } from "@apps-builder/ui";
+import type { AppsClient, HostContext, ToolDefs, ToolResult, ModalOptions, ModalResult } from "@mcp-apps-kit/ui";
 import { useAppsContext } from "./context";
 
 // =============================================================================

@@ -34,9 +34,9 @@ This project may be a poor fit if you:
 
 ## Compatibility Policy
 
-- **Node.js**: `>= 18` (see `@apps-builder/core` engines)
-- **MCP SDK**: `@apps-builder/core` depends on `@modelcontextprotocol/sdk` and is the only place that should need to change when the MCP SDK changes.
-- **Versioning**: breaking changes in supported protocol behavior or public APIs ship as a new major of `@apps-builder/*`.
+- **Node.js**: `>= 18` (see `@mcp-apps-kit/core` engines)
+- **MCP SDK**: `@mcp-apps-kit/core` depends on `@modelcontextprotocol/sdk` and is the only place that should need to change when the MCP SDK changes.
+- **Versioning**: breaking changes in supported protocol behavior or public APIs ship as a new major of `@mcp-apps-kit/*`.
 
 ## Quick Start
 
@@ -56,14 +56,14 @@ Then open:
 ### Installation
 
 ```bash
-npm install @apps-builder/core @apps-builder/ui-react zod
+npm install @mcp-apps-kit/core @mcp-apps-kit/ui-react zod
 ```
 
 ### Server Setup
 
 ```typescript
 // server/index.ts
-import { createApp, type ClientToolsFromCore } from "@apps-builder/core";
+import { createApp, type ClientToolsFromCore } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 const app = createApp({
@@ -119,7 +119,7 @@ export type AppClientTools = ClientToolsFromCore<AppTools>;
 
 ```typescript
 // ui/src/App.tsx
-import { useAppsClient, useToolResult, useHostContext } from "@apps-builder/ui-react";
+import { useAppsClient, useToolResult, useHostContext } from "@mcp-apps-kit/ui-react";
 import type { AppTools } from "../../server";
 import type { AppClientTools } from "../../server";
 
@@ -166,10 +166,10 @@ function RestaurantList() {
 
 | Package | Description |
 |---------|-------------|
-| `@apps-builder/core` | Server-side framework |
-| `@apps-builder/ui` | Client-side SDK (vanilla JS) |
-| `@apps-builder/ui-react` | React bindings |
-| `@apps-builder/create-app` | CLI scaffolding tool |
+| `@mcp-apps-kit/core` | Server-side framework |
+| `@mcp-apps-kit/ui` | Client-side SDK (vanilla JS) |
+| `@mcp-apps-kit/ui-react` | React bindings |
+| `@mcp-apps-kit/create-app` | CLI scaffolding tool |
 
 ## How It Works
 

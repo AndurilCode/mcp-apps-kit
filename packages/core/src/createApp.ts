@@ -1,5 +1,5 @@
 /**
- * createApp implementation for @apps-builder/core
+ * createApp implementation for @mcp-apps-kit/core
  *
  * Creates an MCP app with unified tool and UI definitions.
  */
