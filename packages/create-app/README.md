@@ -53,7 +53,6 @@ pnpm dev
 ## Documentation & examples
 
 - Project overview: ../../README.md
-- API reference: ../../docs/API-REFERENCE.md
 - Example projects (if you prefer copying instead of scaffolding):
   - ../../examples/minimal
   - ../../examples/kanban

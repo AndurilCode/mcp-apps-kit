@@ -13,13 +13,13 @@ import { zodToJsonSchema } from "./schema";
 // =============================================================================
 
 /**
- * MCP visibility value per PROTOCOL-COMPARISON.md
+ * MCP visibility value
  * Array of who can invoke: "model", "app", or both
  */
 export type McpVisibilityValue = ("model" | "app")[];
 
 /**
- * MCP UI metadata structure per PROTOCOL-COMPARISON.md
+ * MCP UI metadata structure
  * All MCP-specific metadata goes under _meta.ui.*
  */
 export interface McpUIMeta {
@@ -30,10 +30,10 @@ export interface McpUIMeta {
 /**
  * Map visibility to MCP protocol format
  *
- * Per PROTOCOL-COMPARISON.md:
- * - Model + UI: ["model", "app"]
- * - Model Only: ["model"]
- * - UI Only: ["app"]
+ * Visibility mappings:
+ * - "both" (default): ["model", "app"] - Tool accessible to both model and UI
+ * - "model": ["model"] - Tool only accessible to the model
+ * - "app": ["app"] - Tool only accessible to the UI
  *
  * @param visibility - Tool visibility setting
  * @returns MCP visibility array
@@ -56,9 +56,10 @@ export function mapVisibilityToMcp(visibility?: Visibility): McpVisibilityValue 
 
 /**
  * OpenAI visibility settings with proper openai/ prefixed keys
- * Per PROTOCOL-COMPARISON.md:
- * - openai/visibility: "public" | "private"
- * - openai/widgetAccessible: boolean
+ *
+ * Settings:
+ * - openai/visibility: "public" | "private" - Controls model access
+ * - openai/widgetAccessible: boolean - Controls UI access
  */
 export interface OpenAIVisibilitySettings {
   "openai/visibility": "public" | "private";
@@ -68,10 +69,10 @@ export interface OpenAIVisibilitySettings {
 /**
  * Map visibility to OpenAI/ChatGPT protocol settings
  *
- * Per PROTOCOL-COMPARISON.md:
- * - Model + UI: "public" + widgetAccessible: true
- * - Model Only: "public" + widgetAccessible: false
- * - UI Only: "private" + widgetAccessible: true
+ * Visibility mappings:
+ * - "both" (default): visibility="public", widgetAccessible=true - Tool accessible to both model and UI
+ * - "model": visibility="public", widgetAccessible=false - Tool only accessible to model
+ * - "app": visibility="private", widgetAccessible=true - Tool only accessible to UI
  *
  * @param visibility - Tool visibility setting
  * @returns OpenAI-specific visibility settings with openai/ prefixes
