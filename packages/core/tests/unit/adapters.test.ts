@@ -52,10 +52,15 @@ describe("McpAdapter", () => {
   describe("buildToolMeta", () => {
     it("should return visibility under _meta.ui namespace", () => {
       const result = adapter.buildToolMeta(sampleToolDef, "test-server");
-      expect(result._meta).toEqual({
+      expect(result._meta).toMatchObject({
         ui: {
           visibility: ["model", "app"],
         },
+      });
+
+      // MCPJam Inspector compatibility: also expose a flat key.
+      expect(result._meta).toMatchObject({
+        "ui/visibility": ["model", "app"],
       });
     });
 

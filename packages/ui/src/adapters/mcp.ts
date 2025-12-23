@@ -6,12 +6,31 @@
  */
 
 import { App } from "@modelcontextprotocol/ext-apps";
-import {
-  ReadResourceResultSchema,
-  type CallToolResult,
-  type LoggingMessageNotification,
-  type ReadResourceResult,
-} from "@modelcontextprotocol/sdk/types.js";
+
+type ResourceReadResult = {
+  contents: Array<{
+    uri: string;
+    mimeType?: string;
+    text?: string;
+    blob?: string; // base64
+  }>;
+};
+
+const AnySchema = {
+  // ext-apps expects a schema-like object with a parse() method.
+  // We keep this permissive to avoid depending on @modelcontextprotocol/sdk.
+  parse: (value: unknown) => value,
+} as const;
+
+type ExtAppsLogLevel =
+  | "debug"
+  | "info"
+  | "notice"
+  | "warning"
+  | "error"
+  | "critical"
+  | "alert"
+  | "emergency";
 
 import type { ProtocolAdapter } from "./types";
 import type { HostContext, ResourceContent } from "../types";
@@ -202,7 +221,7 @@ export class McpAdapter implements ProtocolAdapter {
     return { toolInfo: hc.toolInfo as Record<string, unknown> };
   }
 
-  private extractToolOutput(result: CallToolResult): Record<string, unknown> {
+  private extractToolOutput(result: unknown): Record<string, unknown> {
     const structured = (result as { structuredContent?: unknown }).structuredContent;
     const meta = (result as { _meta?: unknown })._meta;
 
@@ -319,12 +338,12 @@ export class McpAdapter implements ProtocolAdapter {
 
     const result = (await request(
       { method: "resources/read", params: { uri } },
-      ReadResourceResultSchema,
-    )) as ReadResourceResult;
+      AnySchema,
+    )) as ResourceReadResult;
 
     // Normalize to our ResourceContent shape.
     return {
-      contents: result.contents.map((c) => {
+      contents: (Array.isArray(result?.contents) ? result.contents : []).map((c) => {
         const base = {
           uri: c.uri,
           mimeType: c.mimeType ?? "application/octet-stream",
@@ -346,11 +365,26 @@ export class McpAdapter implements ProtocolAdapter {
 
   log(level: string, data: unknown): void {
     if (this.app) {
+      const normalizedLevel: ExtAppsLogLevel = (
+        [
+          "debug",
+          "info",
+          "notice",
+          "warning",
+          "error",
+          "critical",
+          "alert",
+          "emergency",
+        ] as const
+      ).includes(level as ExtAppsLogLevel)
+        ? (level as ExtAppsLogLevel)
+        : "info";
+
       const params = {
-        level: (level as LoggingMessageNotification["params"]["level"]) || "info",
+        level: normalizedLevel,
         data,
         logger: "@mcp-apps-kit/ui",
-      } satisfies LoggingMessageNotification["params"];
+      };
       try {
         this.app.sendLog(params);
         return;
