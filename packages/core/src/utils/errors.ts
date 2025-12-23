@@ -159,42 +159,58 @@ export class AppError extends Error {
 function formatZodIssue(issue: ZodIssue): string {
   const path = issue.path.length > 0 ? issue.path.join(".") : "input";
 
+  // Zod v4 tightened issue unions and changed some issue shapes.
+  // Use small runtime checks for optional fields to keep this formatter stable across Zod versions.
+  const issueAny = issue as unknown as Record<string, unknown>;
+
   switch (issue.code) {
     case "invalid_type":
-      return `${path}: expected ${issue.expected}, got ${issue.received}`;
-    case "invalid_literal":
-      return `${path}: expected ${JSON.stringify(issue.expected)}`;
+      return `${path}: expected ${String(issueAny.expected ?? "<unknown>")}, got ${String(
+        issueAny.received ?? issueAny.input ?? "<unknown>"
+      )}`;
     case "unrecognized_keys":
-      return `${path}: unrecognized keys: ${issue.keys.join(", ")}`;
+      if (Array.isArray(issueAny.keys)) {
+        return `${path}: unrecognized keys: ${(issueAny.keys as unknown[]).map(String).join(", ")}`;
+      }
+      return `${path}: unrecognized keys`;
     case "invalid_union":
       return `${path}: invalid value for union type`;
-    case "invalid_enum_value":
-      return `${path}: expected one of ${issue.options.join(", ")}`;
-    case "invalid_arguments":
-      return `${path}: invalid function arguments`;
-    case "invalid_return_type":
-      return `${path}: invalid function return type`;
-    case "invalid_date":
-      return `${path}: invalid date`;
-    case "invalid_string":
-      if (issue.validation === "email") return `${path}: invalid email address`;
-      if (issue.validation === "url") return `${path}: invalid URL`;
-      if (issue.validation === "uuid") return `${path}: invalid UUID`;
-      return `${path}: invalid string format`;
+    case "invalid_format": {
+      const format = issueAny.format;
+      if (format === "email") return `${path}: invalid email address`;
+      if (format === "url") return `${path}: invalid URL`;
+      if (format === "uuid") return `${path}: invalid UUID`;
+      if (typeof format === "string") return `${path}: invalid ${format} format`;
+      return `${path}: invalid format`;
+    }
     case "too_small":
-      if (issue.type === "string") return `${path}: must be at least ${issue.minimum} characters`;
-      if (issue.type === "number") return `${path}: must be at least ${issue.minimum}`;
-      if (issue.type === "array") return `${path}: must have at least ${issue.minimum} items`;
+      if (issueAny.origin === "string")
+        return `${path}: must be at least ${String(issueAny.minimum ?? "")} characters`;
+      if (issueAny.origin === "number")
+        return `${path}: must be at least ${String(issueAny.minimum ?? "")}`;
+      if (issueAny.origin === "array")
+        return `${path}: must have at least ${String(issueAny.minimum ?? "")} items`;
       return `${path}: value too small`;
     case "too_big":
-      if (issue.type === "string") return `${path}: must be at most ${issue.maximum} characters`;
-      if (issue.type === "number") return `${path}: must be at most ${issue.maximum}`;
-      if (issue.type === "array") return `${path}: must have at most ${issue.maximum} items`;
+      if (issueAny.origin === "string")
+        return `${path}: must be at most ${String(issueAny.maximum ?? "")} characters`;
+      if (issueAny.origin === "number")
+        return `${path}: must be at most ${String(issueAny.maximum ?? "")}`;
+      if (issueAny.origin === "array")
+        return `${path}: must have at most ${String(issueAny.maximum ?? "")} items`;
       return `${path}: value too large`;
+    case "not_multiple_of":
+      return `${path}: must be a multiple of ${String(issueAny.multipleOf ?? issueAny.divisor ?? "")}`;
+    case "invalid_key":
+      return `${path}: invalid key`;
+    case "invalid_element":
+      return `${path}: invalid element`;
+    case "invalid_value":
+      return `${path}: ${String(issueAny.message ?? issue.message)}`;
     case "custom":
-      return `${path}: ${issue.message}`;
+      return `${path}: ${String(issueAny.message ?? issue.message)}`;
     default:
-      return `${path}: ${issue.message}`;
+      return `${path}: ${String(issueAny.message ?? "")}`;
   }
 }
 

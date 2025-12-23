@@ -116,10 +116,15 @@ describe("zodToJsonSchema", () => {
       const schema = z.union([z.string(), z.number()]);
       const jsonSchema = zodToJsonSchema(schema);
 
-      // zod-to-json-schema uses "type" array for simple type unions
-      expect(jsonSchema).toMatchObject({
-        type: ["string", "number"],
-      });
+      // Different generators represent unions differently:
+      // - zod-to-json-schema: { type: ["string", "number"] }
+      // - Zod v4 toJSONSchema: { anyOf: [{type:"string"},{type:"number"}] }
+      const jsonAny = jsonSchema as unknown as Record<string, unknown>;
+      if (Array.isArray(jsonAny.type)) {
+        expect(jsonAny.type).toEqual(["string", "number"]);
+      } else {
+        expect(jsonAny.anyOf).toEqual([{ type: "string" }, { type: "number" }]);
+      }
     });
 
     it("should convert nested object schema", () => {

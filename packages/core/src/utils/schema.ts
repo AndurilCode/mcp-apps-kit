@@ -18,14 +18,12 @@ import type { z } from "zod";
 export type JSONSchema = Record<string, unknown>;
 
 /**
- * A structural Zod schema type.
+ * A Zod schema accepted by this package.
  *
- * We intentionally avoid tying our public types to `zod-to-json-schema`'s Zod typings.
- * In CI (clean installs) it’s easier to end up with type-level Zod v3/v4 mismatches during
- * DTS emit even when runtime is fine. Zod objects expose `_def` across versions, which is
- * enough for our runtime checks.
+ * Zod v4 provides a built-in `toJSONSchema()` method, which we prefer.
+ * We keep a fallback path via `zod-to-json-schema` for older/foreign schema objects.
  */
-export type ZodSchema = { readonly _def: unknown };
+export type ZodSchema = z.ZodType<any, any, any>;
 
 /**
  * Options for zodToJsonSchema conversion
@@ -91,6 +89,27 @@ export function zodToJsonSchema(
 ): JSONSchema {
   const { name, refStrategy = "none", target = "jsonSchema7" } = options;
 
+  // Zod v4: use the built-in JSON Schema generator.
+  const schemaAny = schema as unknown as { toJSONSchema?: (params?: unknown) => unknown };
+  if (typeof schemaAny.toJSONSchema === "function") {
+    const json = schemaAny.toJSONSchema({
+      target: target === "openApi3" ? "openapi-3.0" : "draft-07",
+      // Prefer inlining by default to match prior behavior.
+      reused: refStrategy === "root" ? "ref" : "inline",
+      // Cycles can't be inlined safely; use refs.
+      cycles: "ref",
+      // Keep behavior tolerant for edge/unrepresentable cases.
+      unrepresentable: "any",
+    });
+
+    // `name` previously affected `$ref` extraction with `zod-to-json-schema`.
+    // With Zod v4's generator, we treat `name` as a no-op to keep the API stable.
+    void name;
+
+    return json as JSONSchema;
+  }
+
+  // Fallback: legacy path for schema objects without `toJSONSchema`.
   const result = zodToJsonSchemaLib(schema as unknown as never, {
     name,
     $refStrategy: refStrategy,
@@ -165,4 +184,3 @@ export function isZodSchema(value: unknown): value is ZodSchema {
     typeof (value as { _def: unknown })._def === "object"
   );
 }
-
