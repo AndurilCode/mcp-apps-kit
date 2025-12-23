@@ -1,0 +1,88 @@
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+concurrency:
+  group: publish-npm
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.19.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Run tests
+        run: pnpm test
+
+      # Bootstrap path (one-time): uses an npm Automation token stored in GitHub Secrets.
+      # Ongoing: remove the secret and use npm Trusted Publishers (OIDC) instead.
+      - name: Publish @mcp-apps-kit/core (token)
+        if: env.NPM_TOKEN != ''
+        run: pnpm --filter @mcp-apps-kit/core exec npm publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
+
+      - name: Publish @mcp-apps-kit/ui (token)
+        if: env.NPM_TOKEN != ''
+        run: pnpm --filter @mcp-apps-kit/ui exec npm publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
+
+      - name: Publish @mcp-apps-kit/ui-react (token)
+        if: env.NPM_TOKEN != ''
+        run: pnpm --filter @mcp-apps-kit/ui-react exec npm publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
+
+      - name: Publish @mcp-apps-kit/create-app (token)
+        if: env.NPM_TOKEN != ''
+        run: pnpm --filter @mcp-apps-kit/create-app exec npm publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
+
+      # Trusted Publisher path (OIDC): add each package under npm "Trusted Publishers" pointing at this workflow.
+      # This publishes with provenance and does not require an npm token.
+      - name: Publish @mcp-apps-kit/core (OIDC)
+        if: env.NPM_TOKEN == ''
+        run: pnpm --filter @mcp-apps-kit/core exec npm publish --access public --no-git-checks --provenance
+
+      - name: Publish @mcp-apps-kit/ui (OIDC)
+        if: env.NPM_TOKEN == ''
+        run: pnpm --filter @mcp-apps-kit/ui exec npm publish --access public --no-git-checks --provenance
+
+      - name: Publish @mcp-apps-kit/ui-react (OIDC)
+        if: env.NPM_TOKEN == ''
+        run: pnpm --filter @mcp-apps-kit/ui-react exec npm publish --access public --no-git-checks --provenance
+
+      - name: Publish @mcp-apps-kit/create-app (OIDC)
+        if: env.NPM_TOKEN == ''
+        run: pnpm --filter @mcp-apps-kit/create-app exec npm publish --access public --no-git-checks --provenance
