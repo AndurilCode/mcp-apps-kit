@@ -162,15 +162,6 @@ function RestaurantList() {
 }
 ```
 
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [Design Document](./docs/DESIGN.md) | Architecture overview and core concepts |
-| [Protocol Comparison](./docs/PROTOCOL-COMPARISON.md) | Detailed MCP Apps vs ChatGPT Apps mapping |
-| [API Reference](./docs/API-REFERENCE.md) | Complete API documentation |
-| [Implementation TODO](./docs/TODO.md) | Development roadmap and priorities |
-
 ## Packages
 
 | Package | Description |

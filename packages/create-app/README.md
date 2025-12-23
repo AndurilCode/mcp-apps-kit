@@ -11,7 +11,7 @@ It generates a ready-to-run project with server + UI code, so you can focus on t
 You can run it without installing:
 
 ```bash
-npx create-mcp-apps-kit@latest
+npx @mcp-apps-kit/create-app@latest
 ```
 
 Or install globally:
@@ -25,18 +25,18 @@ create-mcp-apps-kit
 
 ```bash
 # Provide a name (otherwise it prompts)
-npx create-mcp-apps-kit@latest my-app
+npx @mcp-apps-kit/create-app@latest my-app
 
 # Choose template
-npx create-mcp-apps-kit@latest my-app --template react
-npx create-mcp-apps-kit@latest my-app --template vanilla
+npx @mcp-apps-kit/create-app@latest my-app --template react
+npx @mcp-apps-kit/create-app@latest my-app --template vanilla
 
 # Pick output directory
-npx create-mcp-apps-kit@latest my-app --directory ./apps/my-app
+npx @mcp-apps-kit/create-app@latest my-app --directory ./apps/my-app
 
 # Skip install / git init
-npx create-mcp-apps-kit@latest my-app --skip-install
-npx create-mcp-apps-kit@latest my-app --skip-git
+npx @mcp-apps-kit/create-app@latest my-app --skip-install
+npx @mcp-apps-kit/create-app@latest my-app --skip-git
 ```
 
 Templates:
