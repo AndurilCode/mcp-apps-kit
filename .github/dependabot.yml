@@ -5,7 +5,123 @@
 
 version: 2
 updates:
+  # Root package.json
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      patch-updates:
+        update-types:
+          - "patch"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "automated"
+
+  # Core package
+  - package-ecosystem: "npm"
+    directory: "/packages/core"
+    schedule:
+      interval: "weekly"
+    groups:
+      patch-updates:
+        update-types:
+          - "patch"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "automated"
+
+  # UI package
+  - package-ecosystem: "npm"
+    directory: "/packages/ui"
+    schedule:
+      interval: "weekly"
+    groups:
+      patch-updates:
+        update-types:
+          - "patch"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "automated"
+
+  # UI React package
+  - package-ecosystem: "npm"
+    directory: "/packages/ui-react"
+    schedule:
+      interval: "weekly"
+    groups:
+      patch-updates:
+        update-types:
+          - "patch"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "automated"
+
+  # Create App package
+  - package-ecosystem: "npm"
+    directory: "/packages/create-app"
+    schedule:
+      interval: "weekly"
+    groups:
+      patch-updates:
+        update-types:
+          - "patch"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "automated"
+
+  # Kanban example
+  - package-ecosystem: "npm"
+    directory: "/examples/kanban"
+    schedule:
+      interval: "weekly"
+    groups:
+      patch-updates:
+        update-types:
+          - "patch"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "automated"
+
+  # Minimal example
+  - package-ecosystem: "npm"
+    directory: "/examples/minimal"
+    schedule:
+      interval: "weekly"
+    groups:
+      patch-updates:
+        update-types:
+          - "patch"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "automated"
+
+  # Restaurant Finder example
+  - package-ecosystem: "npm"
+    directory: "/examples/restaurant-finder"
+    schedule:
+      interval: "weekly"
+    groups:
+      patch-updates:
+        update-types:
+          - "patch"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "automated"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "automated"
