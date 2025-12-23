@@ -21,7 +21,37 @@ Building interactive MCP apps today requires:
 - **Flexible deployment** - Express server, custom transport, or serverless
 - **Framework agnostic** - React, Vue, Svelte, or vanilla JS for UI
 
+## Who Is This For?
+
+This project is most useful if you:
+- Want one codebase that can serve **MCP Apps (Claude Desktop)** and **ChatGPT Apps**
+- Prefer defining tools with runtime validation (Zod) and strong TypeScript inference
+- Want a first-class pattern for **tool output → widget/UI rendering**
+
+This project may be a poor fit if you:
+- Only target a single host/protocol and want direct, low-level control
+- Need custom transport/session behavior that doesn’t fit the built-in server (you can still use `app.handler()` / `app.getServer()`, but you’ll be closer to the metal)
+
+## Compatibility Policy
+
+- **Node.js**: `>= 18` (see `@apps-builder/core` engines)
+- **MCP SDK**: `@apps-builder/core` depends on `@modelcontextprotocol/sdk` and is the only place that should need to change when the MCP SDK changes.
+- **Versioning**: breaking changes in supported protocol behavior or public APIs ship as a new major of `@apps-builder/*`.
+
 ## Quick Start
+
+### 5-minute Demo (Kanban Example)
+
+Run the included Kanban board example, which demonstrates tool calling + a React widget:
+
+```bash
+pnpm install
+pnpm -C examples/kanban dev
+```
+
+Then open:
+- http://localhost:3001/health
+- http://localhost:3001/mcp
 
 ### Installation
 
