@@ -40,6 +40,7 @@ npx @mcp-apps-kit/create-app@latest my-app --skip-git
 ```
 
 Templates:
+
 - `react`: React + TypeScript UI with hooks
 - `vanilla`: Vanilla TypeScript UI
 

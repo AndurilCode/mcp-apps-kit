@@ -58,8 +58,10 @@ minimal/
 Greet someone by name.
 
 **Input:**
+
 - `name` (string): Name to greet
 
 **Output:**
+
 - `message` (string): Greeting message
 - `timestamp` (string): ISO timestamp

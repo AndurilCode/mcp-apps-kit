@@ -121,8 +121,7 @@ const app = createApp({
     // =========================================================================
     listTasks: {
       title: "List Tasks",
-      description:
-        "List all tasks on the Kanban board, optionally filtered by status",
+      description: "List all tasks on the Kanban board, optionally filtered by status",
       input: z.object({
         status: TaskStatusSchema.optional().describe(
           "Filter tasks by status: 'todo', 'in_progress', or 'done'"
@@ -171,9 +170,7 @@ const app = createApp({
       input: z.object({
         title: z.string().min(1).describe("Task title (required)"),
         description: z.string().optional().describe("Task description"),
-        status: TaskStatusSchema.default("todo").describe(
-          "Initial status (defaults to 'todo')"
-        ),
+        status: TaskStatusSchema.default("todo").describe("Initial status (defaults to 'todo')"),
         attachmentId: z.string().optional().describe("Optional file attachment ID"),
       }),
       output: z.object({
@@ -349,9 +346,10 @@ const app = createApp({
       title: "Clear Completed Tasks",
       description: "Remove all completed tasks from the board and close the widget",
       input: z.object({
-        closeWidget: z.boolean().default(false).describe(
-          "Whether to close the widget after clearing (ChatGPT only)"
-        ),
+        closeWidget: z
+          .boolean()
+          .default(false)
+          .describe("Whether to close the widget after clearing (ChatGPT only)"),
       }),
       output: z.object({
         success: z.boolean(),
@@ -415,8 +413,9 @@ const app = createApp({
         let data: string;
         if (format === "csv") {
           const header = "id,title,description,status,createdAt,updatedAt";
-          const rows = allTasks.map((t) =>
-            `${t.id},"${t.title}","${t.description ?? ""}",${t.status},${t.createdAt},${t.updatedAt}`
+          const rows = allTasks.map(
+            (t) =>
+              `${t.id},"${t.title}","${t.description ?? ""}",${t.status},${t.createdAt},${t.updatedAt}`
           );
           data = [header, ...rows].join("\n");
         } else {
@@ -449,8 +448,7 @@ const app = createApp({
     // =========================================================================
     getBoardSummary: {
       title: "Get Board Summary",
-      description:
-        "Get a summary of the Kanban board with task counts per column",
+      description: "Get a summary of the Kanban board with task counts per column",
       input: z.object({}),
       output: z.object({
         columns: z.array(

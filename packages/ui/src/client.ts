@@ -28,10 +28,7 @@ export function createAppsClient<T extends ToolDefs = ToolDefs>(
       name: K,
       args: InferToolInputs<T>[K]
     ): Promise<InferToolOutputs<T>[K]> {
-      const result = await adapter.callTool(
-        name as string,
-        args as Record<string, unknown>
-      );
+      const result = await adapter.callTool(name as string, args as Record<string, unknown>);
       return result as InferToolOutputs<T>[K];
     },
 
@@ -51,9 +48,7 @@ export function createAppsClient<T extends ToolDefs = ToolDefs>(
       await adapter.openLink(url);
     },
 
-    async requestDisplayMode(
-      mode: "inline" | "fullscreen" | "pip"
-    ): Promise<{ mode: string }> {
+    async requestDisplayMode(mode: "inline" | "fullscreen" | "pip"): Promise<{ mode: string }> {
       return adapter.requestDisplayMode(mode);
     },
 

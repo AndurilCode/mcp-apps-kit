@@ -3,6 +3,7 @@
 [![npm](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fcore)](https://www.npmjs.com/package/@mcp-apps-kit/core) [![node](https://img.shields.io/node/v/%40mcp-apps-kit%2Fcore)](https://www.npmjs.com/package/@mcp-apps-kit/core) [![license](https://img.shields.io/npm/l/%40mcp-apps-kit%2Fcore)](https://www.npmjs.com/package/@mcp-apps-kit/core)
 
 Server-side TypeScript framework for building interactive MCP apps that can run on both:
+
 - **Claude Desktop (MCP Apps)**
 - **ChatGPT (OpenAI Apps SDK)**
 
@@ -46,6 +47,7 @@ await app.start({ port: 3000 });
 Tools can optionally reference a UI resource by ID (e.g. `"restaurant-list"`). The host can then render the returned HTML as a widget.
 
 A common pattern is to return both:
+
 - the model-visible output (typed by your Zod `output` schema), and
 - UI-only payload in `_meta`.
 

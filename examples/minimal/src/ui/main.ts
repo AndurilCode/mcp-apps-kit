@@ -28,11 +28,7 @@ async function main() {
   });
 }
 
-function render(
-  container: HTMLElement,
-  output: GreetingOutput | undefined,
-  theme: string
-) {
+function render(container: HTMLElement, output: GreetingOutput | undefined, theme: string) {
   document.documentElement.className = theme;
 
   if (output?.message) {

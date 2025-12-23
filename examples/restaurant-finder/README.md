@@ -46,6 +46,7 @@ restaurant-finder/
 Search for restaurants with filters.
 
 **Input:**
+
 - `cuisine` (optional): Filter by cuisine type
 - `maxDistance` (optional): Maximum distance in km
 - `minRating` (optional): Minimum rating (1-5)
@@ -57,6 +58,7 @@ Search for restaurants with filters.
 Get detailed information about a specific restaurant.
 
 **Input:**
+
 - `restaurantId`: Restaurant ID
 
 ### `getRecommendations`
@@ -64,6 +66,7 @@ Get detailed information about a specific restaurant.
 Get mood-based restaurant recommendations.
 
 **Input:**
+
 - `mood`: One of "quick", "romantic", "family", "business"
 
 ## Connecting to Claude Desktop

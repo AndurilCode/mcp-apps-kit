@@ -5,6 +5,7 @@
 Client-side (UI/widget) SDK for MCP apps.
 
 Use this package inside the HTML/JS UI that your tool returns (a widget). It gives you a single `createClient()` API that **auto-detects the host** and lets you:
+
 - call tools
 - read tool results and tool inputs
 - react to host context (theme, display mode, safe areas, etc.)

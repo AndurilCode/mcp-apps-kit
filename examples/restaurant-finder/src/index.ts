@@ -98,14 +98,7 @@ const RestaurantSchema = z.object({
   openNow: z.boolean(),
 });
 
-const CuisineTypeSchema = z.enum([
-  "Japanese",
-  "Italian",
-  "Chinese",
-  "French",
-  "Mexican",
-  "any",
-]);
+const CuisineTypeSchema = z.enum(["Japanese", "Italian", "Chinese", "French", "Mexican", "any"]);
 
 // =============================================================================
 // APP DEFINITION
@@ -141,10 +134,7 @@ const app = createApp({
         readOnlyHint: true,
         idempotentHint: true,
       },
-      handler: async (
-        { cuisine, maxDistance, minRating, maxPrice, openOnly },
-        context
-      ) => {
+      handler: async ({ cuisine, maxDistance, minRating, maxPrice, openOnly }, context) => {
         let results = [...restaurants];
 
         // Apply filters
@@ -238,27 +228,19 @@ const app = createApp({
 
         switch (mood) {
           case "quick":
-            filtered = restaurants
-              .filter((r) => r.distance < 1 && r.priceLevel <= 2)
-              .slice(0, 3);
+            filtered = restaurants.filter((r) => r.distance < 1 && r.priceLevel <= 2).slice(0, 3);
             reason = "Quick bites near you";
             break;
           case "romantic":
-            filtered = restaurants
-              .filter((r) => r.rating >= 4.5 && r.priceLevel >= 3)
-              .slice(0, 3);
+            filtered = restaurants.filter((r) => r.rating >= 4.5 && r.priceLevel >= 3).slice(0, 3);
             reason = "Romantic dining options";
             break;
           case "family":
-            filtered = restaurants
-              .filter((r) => r.priceLevel <= 2 && r.rating >= 4.0)
-              .slice(0, 3);
+            filtered = restaurants.filter((r) => r.priceLevel <= 2 && r.rating >= 4.0).slice(0, 3);
             reason = "Family-friendly choices";
             break;
           case "business":
-            filtered = restaurants
-              .filter((r) => r.priceLevel >= 3 && r.rating >= 4.2)
-              .slice(0, 3);
+            filtered = restaurants.filter((r) => r.priceLevel >= 3 && r.rating >= 4.2).slice(0, 3);
             reason = "Professional dining venues";
             break;
           default:

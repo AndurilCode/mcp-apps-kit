@@ -2,7 +2,14 @@
  * React context and provider for @mcp-apps-kit/ui-react
  */
 
-import React, { createContext, useContext, useState, useEffect, type ReactNode, type ComponentType } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  type ReactNode,
+  type ComponentType,
+} from "react";
 import type { AppsClient, ToolDefs } from "@mcp-apps-kit/ui";
 import { createClient } from "@mcp-apps-kit/ui";
 
@@ -115,9 +122,7 @@ export function AppsProvider<T extends ToolDefs = ToolDefs>({
   }
 
   return (
-    <AppsContext.Provider value={{ client, isConnecting, error }}>
-      {children}
-    </AppsContext.Provider>
+    <AppsContext.Provider value={{ client, isConnecting, error }}>{children}</AppsContext.Provider>
   );
 }
 

@@ -47,12 +47,8 @@ function App() {
       {output?.restaurants && output.restaurants.length > 0 ? (
         <>
           <header className="header">
-            <h1>
-              {output.reason || `${output.count} restaurants found`}
-            </h1>
-            {output.searchArea && (
-              <p className="subtitle">in {output.searchArea}</p>
-            )}
+            <h1>{output.reason || `${output.count} restaurants found`}</h1>
+            {output.searchArea && <p className="subtitle">in {output.searchArea}</p>}
           </header>
           <ul className="restaurant-list">
             {output.restaurants.map((restaurant) => (
@@ -60,9 +56,7 @@ function App() {
                 key={restaurant.id}
                 restaurant={restaurant}
                 onSelect={(id) => {
-                  client.sendFollowUpMessage(
-                    `Tell me more about the restaurant with ID ${id}`
-                  );
+                  client.sendFollowUpMessage(`Tell me more about the restaurant with ID ${id}`);
                 }}
               />
             ))}
@@ -79,9 +73,7 @@ function App() {
           </button>
         </div>
       )}
-      <footer className="footer">
-        Theme: {context.theme}
-      </footer>
+      <footer className="footer">Theme: {context.theme}</footer>
     </div>
   );
 }
@@ -105,7 +97,9 @@ function RestaurantCard({
       </div>
       <div className="card-details">
         <span className="cuisine">{restaurant.cuisine}</span>
-        <span className="rating">{"*".repeat(Math.round(restaurant.rating))} {restaurant.rating}</span>
+        <span className="rating">
+          {"*".repeat(Math.round(restaurant.rating))} {restaurant.rating}
+        </span>
         <span className="price">{priceSymbol}</span>
       </div>
       <div className="card-footer">

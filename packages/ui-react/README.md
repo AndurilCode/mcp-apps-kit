@@ -5,6 +5,7 @@
 React bindings for MCP app UIs/widgets.
 
 This package builds on `@mcp-apps-kit/ui` and provides:
+
 - an `AppsProvider`
 - React hooks for host context + tool interactions
 
@@ -17,6 +18,7 @@ npm install @mcp-apps-kit/ui-react @mcp-apps-kit/ui
 ```
 
 Peer dependencies:
+
 - `react` `^18 || ^19`
 - `react-dom` `^18 || ^19`
 

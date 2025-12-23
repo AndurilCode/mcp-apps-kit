@@ -27,7 +27,7 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
   background-color: var(--bg-color);
   color: var(--text-primary);
   padding: 16px;
@@ -160,9 +160,15 @@ body {
   border-radius: 50%;
 }
 
-.column--todo .column-indicator { background-color: var(--todo-color); }
-.column--in_progress .column-indicator { background-color: var(--progress-color); }
-.column--done .column-indicator { background-color: var(--done-color); }
+.column--todo .column-indicator {
+  background-color: var(--todo-color);
+}
+.column--in_progress .column-indicator {
+  background-color: var(--progress-color);
+}
+.column--done .column-indicator {
+  background-color: var(--done-color);
+}
 
 .column-count {
   background-color: var(--bg-color);
@@ -185,7 +191,10 @@ body {
   border-radius: 8px;
   padding: 12px;
   border-left: 3px solid transparent;
-  transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s,
+    opacity 0.2s;
   cursor: grab;
   user-select: none;
 }
@@ -200,9 +209,15 @@ body {
   cursor: grabbing;
 }
 
-.column--todo .task-card { border-left-color: var(--todo-color); }
-.column--in_progress .task-card { border-left-color: var(--progress-color); }
-.column--done .task-card { border-left-color: var(--done-color); }
+.column--todo .task-card {
+  border-left-color: var(--todo-color);
+}
+.column--in_progress .task-card {
+  border-left-color: var(--progress-color);
+}
+.column--done .task-card {
+  border-left-color: var(--done-color);
+}
 
 .task-title {
   font-weight: 500;
@@ -249,7 +264,9 @@ body {
   cursor: pointer;
   color: var(--text-secondary);
   border-radius: 4px;
-  transition: background-color 0.2s, color 0.2s;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
 }
 
 .task-action-btn:hover {
@@ -318,7 +335,9 @@ body {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Modal styles */
