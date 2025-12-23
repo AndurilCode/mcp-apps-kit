@@ -18,12 +18,14 @@ import type { z } from "zod";
 export type JSONSchema = Record<string, unknown>;
 
 /**
- * The schema type expected by `zod-to-json-schema`.
+ * A structural Zod schema type.
  *
- * This avoids brittle coupling to Zod's internal generic parameters, which changed in Zod v4
- * and can cause DTS build failures if the libraries' types don't line up perfectly.
+ * We intentionally avoid tying our public types to `zod-to-json-schema`'s Zod typings.
+ * In CI (clean installs) it’s easier to end up with type-level Zod v3/v4 mismatches during
+ * DTS emit even when runtime is fine. Zod objects expose `_def` across versions, which is
+ * enough for our runtime checks.
  */
-export type ZodSchema = Parameters<typeof zodToJsonSchemaLib>[0];
+export type ZodSchema = { readonly _def: unknown };
 
 /**
  * Options for zodToJsonSchema conversion
@@ -89,7 +91,7 @@ export function zodToJsonSchema(
 ): JSONSchema {
   const { name, refStrategy = "none", target = "jsonSchema7" } = options;
 
-  const result = zodToJsonSchemaLib(schema, {
+  const result = zodToJsonSchemaLib(schema as unknown as never, {
     name,
     $refStrategy: refStrategy,
     target,
