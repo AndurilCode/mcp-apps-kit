@@ -18,6 +18,14 @@ import type { z } from "zod";
 export type JSONSchema = Record<string, unknown>;
 
 /**
+ * The schema type expected by `zod-to-json-schema`.
+ *
+ * This avoids brittle coupling to Zod's internal generic parameters, which changed in Zod v4
+ * and can cause DTS build failures if the libraries' types don't line up perfectly.
+ */
+export type ZodSchema = Parameters<typeof zodToJsonSchemaLib>[0];
+
+/**
  * Options for zodToJsonSchema conversion
  */
 export interface ZodToJsonSchemaOptions {
@@ -76,7 +84,7 @@ export interface ZodToJsonSchemaOptions {
  * ```
  */
 export function zodToJsonSchema(
-  schema: z.ZodType,
+  schema: ZodSchema,
   options: ZodToJsonSchemaOptions = {}
 ): JSONSchema {
   const { name, refStrategy = "none", target = "jsonSchema7" } = options;
@@ -147,7 +155,7 @@ export function extractPropertyDescriptions(
  * @param value - Value to check
  * @returns True if the value is a Zod schema
  */
-export function isZodSchema(value: unknown): value is z.ZodType {
+export function isZodSchema(value: unknown): value is ZodSchema {
   return (
     typeof value === "object" &&
     value !== null &&
@@ -155,3 +163,4 @@ export function isZodSchema(value: unknown): value is z.ZodType {
     typeof (value as { _def: unknown })._def === "object"
   );
 }
+
