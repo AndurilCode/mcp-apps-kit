@@ -2,10 +2,10 @@
  * Schema utilities for @mcp-apps-kit/core
  *
  * Provides Zod to JSON Schema conversion and related utilities.
+ * Uses Zod v4's native JSON Schema support.
  */
 
-import { zodToJsonSchema as zodToJsonSchemaLib } from "zod-to-json-schema";
-import type { z } from "zod";
+import { z } from "zod";
 
 // =============================================================================
 // TYPES
@@ -22,7 +22,7 @@ export type JSONSchema = Record<string, unknown>;
  */
 export interface ZodToJsonSchemaOptions {
   /**
-   * Name for the schema (used in $ref strategy)
+   * Name for the schema (used in definitions)
    */
   name?: string;
 
@@ -34,11 +34,16 @@ export interface ZodToJsonSchemaOptions {
   refStrategy?: "root" | "none";
 
   /**
-   * Target schema format
-   * - "jsonSchema7": Standard JSON Schema draft-07
-   * - "openApi3": OpenAPI 3.0 compatible
+   * Target schema format (maintained for backwards compatibility)
+   * Note: Zod v4 native conversion uses JSON Schema 2020-12
    */
   target?: "jsonSchema7" | "openApi3";
+
+  /**
+   * Whether to include the $schema property
+   * @default false
+   */
+  includeSchema?: boolean;
 }
 
 // =============================================================================
@@ -79,26 +84,15 @@ export function zodToJsonSchema(
   schema: z.ZodType,
   options: ZodToJsonSchemaOptions = {}
 ): JSONSchema {
-  const { name, refStrategy = "none", target = "jsonSchema7" } = options;
+  const { includeSchema = false } = options;
 
-  const result = zodToJsonSchemaLib(schema, {
-    name,
-    $refStrategy: refStrategy,
-    target,
-  }) as JSONSchema;
+  // Use Zod v4's native JSON Schema conversion
+  const result = z.toJSONSchema(schema) as JSONSchema;
 
-  // If a name was provided, the schema is wrapped in definitions
-  // We need to extract just the schema for MCP tools
-  if (name && typeof result === "object" && result !== null) {
-    const definitions = result["definitions"] as Record<string, JSONSchema> | undefined;
-    const ref = result["$ref"] as string | undefined;
-    if (definitions && ref) {
-      const defName = ref.replace("#/definitions/", "");
-      const extracted = definitions[defName];
-      if (extracted) {
-        return extracted;
-      }
-    }
+  // Strip $schema unless explicitly requested (for MCP compatibility)
+  if (!includeSchema && "$schema" in result) {
+    const { $schema: _, ...rest } = result;
+    return rest as JSONSchema;
   }
 
   return result;

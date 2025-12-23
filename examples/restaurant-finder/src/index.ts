@@ -134,23 +134,24 @@ const app = createApp({
         readOnlyHint: true,
         idempotentHint: true,
       },
-      handler: async ({ cuisine, maxDistance, minRating, maxPrice, openOnly }, context) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      handler: async (input: any, context) => {
         let results = [...restaurants];
 
         // Apply filters
-        if (cuisine && cuisine !== "any") {
-          results = results.filter((r) => r.cuisine === cuisine);
+        if (input.cuisine && input.cuisine !== "any") {
+          results = results.filter((r) => r.cuisine === input.cuisine);
         }
-        if (maxDistance !== undefined) {
-          results = results.filter((r) => r.distance <= maxDistance);
+        if (input.maxDistance !== undefined) {
+          results = results.filter((r) => r.distance <= input.maxDistance);
         }
-        if (minRating !== undefined) {
-          results = results.filter((r) => r.rating >= minRating);
+        if (input.minRating !== undefined) {
+          results = results.filter((r) => r.rating >= input.minRating);
         }
-        if (maxPrice !== undefined) {
-          results = results.filter((r) => r.priceLevel <= maxPrice);
+        if (input.maxPrice !== undefined) {
+          results = results.filter((r) => r.priceLevel <= input.maxPrice);
         }
-        if (openOnly) {
+        if (input.openOnly) {
           results = results.filter((r) => r.openNow);
         }
 
@@ -164,6 +165,7 @@ const app = createApp({
           restaurants: results,
           count: results.length,
           searchArea,
+          _text: `Found ${results.length} restaurant${results.length !== 1 ? "s" : ""}`,
         };
       },
     },
@@ -187,19 +189,22 @@ const app = createApp({
         readOnlyHint: true,
         idempotentHint: true,
       },
-      handler: async ({ restaurantId }) => {
-        const restaurant = restaurants.find((r) => r.id === restaurantId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      handler: async (input: any) => {
+        const restaurant = restaurants.find((r) => r.id === input.restaurantId);
 
         if (!restaurant) {
           return {
             restaurant: null,
-            message: `Restaurant with ID "${restaurantId}" not found`,
+            message: `Restaurant with ID "${input.restaurantId}" not found`,
+            _text: `Restaurant with ID "${input.restaurantId}" not found`,
           };
         }
 
         return {
           restaurant,
           message: `Found ${restaurant.name}`,
+          _text: `Found ${restaurant.name}`,
         };
       },
     },
@@ -222,11 +227,12 @@ const app = createApp({
       annotations: {
         readOnlyHint: true,
       },
-      handler: async ({ mood }, context) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      handler: async (input: any, context) => {
         let filtered: Restaurant[];
         let reason: string;
 
-        switch (mood) {
+        switch (input.mood) {
           case "quick":
             filtered = restaurants.filter((r) => r.distance < 1 && r.priceLevel <= 2).slice(0, 3);
             reason = "Quick bites near you";
@@ -254,7 +260,7 @@ const app = createApp({
         return {
           recommendations: filtered,
           reason,
-          _meta: { timezone, mood },
+          _meta: { timezone, mood: input.mood },
         };
       },
     },

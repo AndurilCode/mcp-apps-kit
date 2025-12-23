@@ -116,9 +116,9 @@ describe("zodToJsonSchema", () => {
       const schema = z.union([z.string(), z.number()]);
       const jsonSchema = zodToJsonSchema(schema);
 
-      // zod-to-json-schema uses "type" array for simple type unions
+      // Zod v4 native JSON Schema uses anyOf for unions
       expect(jsonSchema).toMatchObject({
-        type: ["string", "number"],
+        anyOf: [{ type: "string" }, { type: "number" }],
       });
     });
 

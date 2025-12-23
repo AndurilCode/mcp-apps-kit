@@ -142,8 +142,9 @@ const app = createApp({
         readOnlyHint: true,
         idempotentHint: true,
       },
-      handler: async ({ status }, context) => {
-        const filteredTasks = status ? getTasksByStatus(status) : getAllTasks();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      handler: async (input: any, context) => {
+        const filteredTasks = input.status ? getTasksByStatus(input.status) : getAllTasks();
 
         // Use context.locale for potential localization (example)
         const locale = context.locale ?? "en-US";
@@ -186,23 +187,24 @@ const app = createApp({
       annotations: {
         readOnlyHint: false,
       },
-      handler: async ({ title, description, status, attachmentId }, context) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      handler: async (input: any, context) => {
         // Format timestamp using user's timezone if available
         const timezone = context.userLocation?.timezone ?? "UTC";
         const now = new Date().toISOString();
         const task: Task = {
           id: generateId(),
-          title,
-          description,
-          status,
+          title: input.title,
+          description: input.description,
+          status: input.status,
           createdAt: now,
           updatedAt: now,
-          attachmentId,
+          attachmentId: input.attachmentId,
         };
 
         tasks.set(task.id, task);
 
-        const message = `Created task "${title}" in ${status} column${attachmentId ? " with attachment" : ""}`;
+        const message = `Created task "${input.title}" in ${input.status} column${input.attachmentId ? " with attachment" : ""}`;
         return {
           task,
           message,
@@ -234,20 +236,21 @@ const app = createApp({
         readOnlyHint: false,
         idempotentHint: true,
       },
-      handler: async ({ taskId, newStatus }, context) => {
-        const task = tasks.get(taskId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      handler: async (input: any, context) => {
+        const task = tasks.get(input.taskId);
         if (!task) {
-          throw new Error(`Task with ID "${taskId}" not found`);
+          throw new Error(`Task with ID "${input.taskId}" not found`);
         }
 
         const oldStatus = task.status;
-        task.status = newStatus;
+        task.status = input.newStatus;
         task.updatedAt = new Date().toISOString();
 
         // Track who performed the action (anonymized)
         const performer = context.subject ?? "anonymous";
 
-        const message = `Moved "${task.title}" from ${oldStatus} to ${newStatus}`;
+        const message = `Moved "${task.title}" from ${oldStatus} to ${input.newStatus}`;
         return {
           task,
           message,
@@ -278,17 +281,18 @@ const app = createApp({
         readOnlyHint: false,
         idempotentHint: true,
       },
-      handler: async ({ taskId, title, description }, _context) => {
-        const task = tasks.get(taskId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      handler: async (input: any, _context) => {
+        const task = tasks.get(input.taskId);
         if (!task) {
-          throw new Error(`Task with ID "${taskId}" not found`);
+          throw new Error(`Task with ID "${input.taskId}" not found`);
         }
 
-        if (title !== undefined) {
-          task.title = title;
+        if (input.title !== undefined) {
+          task.title = input.title;
         }
-        if (description !== undefined) {
-          task.description = description;
+        if (input.description !== undefined) {
+          task.description = input.description;
         }
         task.updatedAt = new Date().toISOString();
 
@@ -322,13 +326,14 @@ const app = createApp({
         destructiveHint: true,
         idempotentHint: true,
       },
-      handler: async ({ taskId }, _context) => {
-        const task = tasks.get(taskId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      handler: async (input: any, _context) => {
+        const task = tasks.get(input.taskId);
         if (!task) {
-          throw new Error(`Task with ID "${taskId}" not found`);
+          throw new Error(`Task with ID "${input.taskId}" not found`);
         }
 
-        tasks.delete(taskId);
+        tasks.delete(input.taskId);
 
         const message = `Deleted task "${task.title}"`;
         return {
@@ -363,7 +368,8 @@ const app = createApp({
       annotations: {
         destructiveHint: true,
       },
-      handler: async ({ closeWidget }, _context) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      handler: async (input: any, _context) => {
         const completedTasks = getTasksByStatus("done");
         const deletedCount = completedTasks.length;
 
@@ -380,7 +386,7 @@ const app = createApp({
           deletedCount,
           _text: message,
           // Signal to close the widget after this action (ChatGPT only)
-          _closeWidget: closeWidget,
+          _closeWidget: input.closeWidget,
         };
       },
     },
@@ -407,11 +413,12 @@ const app = createApp({
         // This tool would interact with external systems in a real app
         openWorldHint: true,
       },
-      handler: async ({ format, includeMetadata }, context) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      handler: async (input: any, context) => {
         const allTasks = getAllTasks();
 
         let data: string;
-        if (format === "csv") {
+        if (input.format === "csv") {
           const header = "id,title,description,status,createdAt,updatedAt";
           const rows = allTasks.map(
             (t) =>
@@ -420,7 +427,7 @@ const app = createApp({
           data = [header, ...rows].join("\n");
         } else {
           data = JSON.stringify(
-            includeMetadata
+            input.includeMetadata
               ? allTasks
               : allTasks.map((t) => ({ id: t.id, title: t.title, status: t.status })),
             null,
@@ -431,7 +438,7 @@ const app = createApp({
         // Log export action with user info if available
         const userInfo = context.userAgent ?? "Unknown client";
 
-        const message = `Exported ${allTasks.length} tasks as ${format.toUpperCase()}`;
+        const message = `Exported ${allTasks.length} tasks as ${String(input.format).toUpperCase()}`;
         return {
           success: true,
           message,

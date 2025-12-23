@@ -10,6 +10,16 @@
 import { createApp } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
+// Define schemas separately for better type inference with Zod v4
+const greetInput = z.object({
+  name: z.string().describe("Name to greet"),
+});
+
+const greetOutput = z.object({
+  message: z.string(),
+  timestamp: z.string(),
+});
+
 const app = createApp({
   name: "minimal-app",
   version: "1.0.0",
@@ -18,17 +28,13 @@ const app = createApp({
     greet: {
       title: "Greet",
       description: "Greet someone by name",
-      input: z.object({
-        name: z.string().describe("Name to greet"),
-      }),
-      output: z.object({
-        message: z.string(),
-        timestamp: z.string(),
-      }),
+      input: greetInput,
+      output: greetOutput,
       ui: "greeting-widget",
       visibility: "both",
-      handler: async ({ name }) => {
-        const message = `Hello, ${name}!`;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      handler: async (input: any) => {
+        const message = `Hello, ${input.name}!`;
         return {
           message,
           timestamp: new Date().toISOString(),

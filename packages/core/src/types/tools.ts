@@ -2,7 +2,9 @@
  * Core type definitions for @mcp-apps-kit/core
  */
 
-import type { z } from "zod";
+import { z } from "zod";
+
+// Use Zod's built-in type inference utilities directly
 
 // =============================================================================
 // TOOL DEFINITIONS
