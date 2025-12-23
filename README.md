@@ -1,11 +1,20 @@
-# Unified MCP Apps Builder
+# MCP AppsKit
 
-A TypeScript framework for building interactive MCP applications that work seamlessly with both **Claude Desktop (MCP Apps)** and **ChatGPT (OpenAI Apps SDK)** from a single codebase.
+[![Publish to npm](https://github.com/AndurilCode/mcp-apps-kit/actions/workflows/publish.yml/badge.svg?branch=main)](https://github.com/AndurilCode/mcp-apps-kit/actions/workflows/publish.yml)
+[![Node >=18](https://img.shields.io/node/v/%40mcp-apps-kit%2Fcore?label=node&logo=node.js&logoColor=white)](https://www.npmjs.com/package/@mcp-apps-kit/core)
+[![License MIT](https://img.shields.io/npm/l/%40mcp-apps-kit%2Fcore?label=license)](https://github.com/AndurilCode/mcp-apps-kit/blob/main/LICENSE)
+
+[![npm @mcp-apps-kit/core](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fcore?label=%40mcp-apps-kit%2Fcore&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/core)
+[![npm @mcp-apps-kit/ui](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fui?label=%40mcp-apps-kit%2Fui&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/ui)
+[![npm @mcp-apps-kit/ui-react](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fui-react?label=%40mcp-apps-kit%2Fui-react&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/ui-react)
+[![npm @mcp-apps-kit/create-app](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fcreate-app?label=%40mcp-apps-kit%2Fcreate-app&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/create-app)
+
+A TypeScript framework for building interactive MCP applications that work seamlessly with both **MCP Apps** and **ChatGPT (OpenAI Apps SDK)** from a single codebase.
 
 ## Why?
 
 Building interactive MCP apps today requires:
-- Different codebases for Claude vs ChatGPT
+- Different codebases for MCP Apps vs ChatGPT Apps
 - Different APIs (`@modelcontextprotocol/ext-apps` vs `window.openai`)
 - Different metadata schemas (`_meta.ui` vs `_meta["openai/..."]`)
 - Different MIME types (`text/html;profile=mcp-app` vs `text/html+skybridge`)
@@ -24,7 +33,7 @@ Building interactive MCP apps today requires:
 ## Who Is This For?
 
 This project is most useful if you:
-- Want one codebase that can serve **MCP Apps (Claude Desktop)** and **ChatGPT Apps**
+- Want one codebase that can serve **MCP Apps** and **ChatGPT Apps**
 - Prefer defining tools with runtime validation (Zod) and strong TypeScript inference
 - Want a first-class pattern for **tool output → widget/UI rendering**
 
@@ -186,7 +195,7 @@ tools: {
   }
 }
 
-// Generated for MCP Apps (Claude Desktop)
+// Generated for MCP Apps
 _meta: {
   ui: {
     resourceUri: "ui://my-app/widget",
@@ -252,7 +261,7 @@ export default {
 
 ## Platform Support
 
-| Feature | Claude Desktop | ChatGPT |
+| Feature | MCP Apps | ChatGPT Apps |
 |---------|---------------|---------|
 | Tool Calling | ✅ | ✅ |
 | Structured Data | ✅ | ✅ |
