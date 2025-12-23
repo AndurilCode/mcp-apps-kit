@@ -183,13 +183,11 @@ export class McpAdapter implements ProtocolAdapter {
       ? (ctx.availableDisplayModes.filter((m): m is string => typeof m === "string"))
       : base.availableDisplayModes;
 
-    const viewport =
-      typeof ctx.viewport === "object" && ctx.viewport !== null
-        ? {
-            ...base.viewport,
-            ...(ctx.viewport as unknown as Record<string, unknown>),
-          }
-        : base.viewport;
+    const isViewportObject = (v: unknown): v is Record<string, unknown> =>
+      v !== null && typeof v === "object" && !Array.isArray(v);
+    const viewport = isViewportObject(ctx.viewport)
+      ? { ...base.viewport, ...ctx.viewport }
+      : base.viewport;
 
     const locale = typeof ctx.locale === "string" ? ctx.locale : base.locale;
     const timeZone = typeof ctx.timeZone === "string" ? ctx.timeZone : base.timeZone;
@@ -215,8 +213,8 @@ export class McpAdapter implements ProtocolAdapter {
   }
 
   private extractToolMeta(rawHostContext: unknown): Record<string, unknown> | undefined {
+    if (rawHostContext === null || typeof rawHostContext !== "object") return undefined;
     const hc = rawHostContext as { toolInfo?: unknown };
-    if (!hc || typeof hc !== "object") return undefined;
     if (!hc.toolInfo || typeof hc.toolInfo !== "object") return undefined;
     return { toolInfo: hc.toolInfo as Record<string, unknown> };
   }
@@ -238,11 +236,11 @@ export class McpAdapter implements ProtocolAdapter {
     if (Object.keys(base).length === 0) {
       const content = (result as { content?: unknown }).content;
       if (Array.isArray(content) && content.length > 0) {
-        const first = content[0] as { type?: unknown; text?: unknown };
+        const first = content[0] as { type?: unknown; text?: unknown } | undefined;
         if (first?.type === "text" && typeof first.text === "string") {
           try {
-            const parsed = JSON.parse(first.text);
-            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            const parsed: unknown = JSON.parse(first.text);
+            if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
               return parsed as Record<string, unknown>;
             }
           } catch {
@@ -330,11 +328,8 @@ export class McpAdapter implements ProtocolAdapter {
 
     // App.request() is strongly typed (schema-driven) and can trip TS into
     // extremely deep instantiations. We only need a runtime-validated result.
-    const request = (this.app.request as unknown as (
-      req: unknown,
-      schema: unknown,
-      options?: unknown,
-    ) => Promise<unknown>);
+    type RequestFn = (req: unknown, schema: unknown, options?: unknown) => Promise<unknown>;
+    const request = (this.app.request as unknown as RequestFn).bind(this.app);
 
     const result = (await request(
       { method: "resources/read", params: { uri } },
@@ -343,7 +338,7 @@ export class McpAdapter implements ProtocolAdapter {
 
     // Normalize to our ResourceContent shape.
     return {
-      contents: (Array.isArray(result?.contents) ? result.contents : []).map((c) => {
+      contents: (Array.isArray(result.contents) ? result.contents : []).map((c) => {
         const base = {
           uri: c.uri,
           mimeType: c.mimeType ?? "application/octet-stream",
@@ -386,20 +381,15 @@ export class McpAdapter implements ProtocolAdapter {
         logger: "@mcp-apps-kit/ui",
       };
       try {
-        this.app.sendLog(params);
+        void this.app.sendLog(params);
         return;
       } catch {
         // fall back to console below
       }
     }
 
-    const logFn =
-      {
-        debug: console.debug,
-        info: console.info,
-        warning: console.warn,
-        error: console.error,
-      }[level] ?? console.log;
+    // eslint-disable-next-line no-console -- Fallback logging when MCP logging unavailable
+    const logFn = { debug: console.debug, info: console.info, warning: console.warn, error: console.error }[level] ?? console.log;
     logFn("[MCP Apps]", data);
   }
 

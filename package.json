@@ -32,6 +32,7 @@
     "node": ">=18.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@nx/js": "^22.3.3",
     "@nx/workspace": "^22.3.3",
     "@testing-library/jest-dom": "^6.9.1",

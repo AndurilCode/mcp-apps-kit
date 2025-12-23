@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- Debug logging is intentional for this adapter */
 /**
  * OpenAI/ChatGPT Apps adapter
  *
