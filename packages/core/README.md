@@ -7,7 +7,7 @@ Server-side TypeScript framework for building interactive MCP apps that can run 
 - **Claude Desktop (MCP Apps)**
 - **ChatGPT (OpenAI Apps SDK)**
 
-It provides a single `createApp()` API to define tools, validate inputs/outputs with Zod, and attach UI resources to tool responses.
+It provides a single `createApp()` API to define tools, validate inputs/outputs with Zod v4, and attach UI resources to tool responses.
 
 ## Install
 
@@ -16,6 +16,7 @@ npm install @mcp-apps-kit/core zod
 ```
 
 - Node.js: `>=18`
+- Zod: `^4.0.0`
 
 ## Quick start
 
@@ -25,6 +26,11 @@ Create an app with one tool:
 import { createApp } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
+// Define input schema separately for better type inference
+const greetInput = z.object({
+  name: z.string().describe("Name to greet"),
+});
+
 const app = createApp({
   name: "my-app",
   version: "1.0.0",
@@ -32,15 +38,72 @@ const app = createApp({
   tools: {
     greet: {
       description: "Greet a user",
-      input: z.object({ name: z.string() }),
+      input: greetInput,
       output: z.object({ message: z.string() }),
-      handler: async ({ name }) => ({ message: `Hello, ${name}!` }),
+      handler: async (input) => {
+        // Type assertion for Zod v4 cross-module type inference
+        const { name } = input as z.infer<typeof greetInput>;
+        return { message: `Hello, ${name}!` };
+      },
     },
   },
 });
 
 await app.start({ port: 3000 });
 ```
+
+## Zod v4 Best Practices
+
+This package uses **Zod v4** with its native JSON Schema conversion. For best results:
+
+### Define Schemas Separately
+
+Extract input schemas before tool definitions for better type inference:
+
+```ts
+// ✅ Good - schemas defined separately
+const searchInput = z.object({
+  query: z.string(),
+  maxResults: z.number().optional(),
+});
+
+const app = createApp({
+  tools: {
+    search: {
+      input: searchInput,
+      handler: async (input) => {
+        const typed = input as z.infer<typeof searchInput>;
+        // typed.query and typed.maxResults are properly typed
+      },
+    },
+  },
+});
+```
+
+```ts
+// ❌ Avoid - inline schemas can cause type inference issues
+const app = createApp({
+  tools: {
+    search: {
+      input: z.object({ query: z.string() }), // inline
+      handler: async (input) => {
+        // input may be 'unknown' in strict TypeScript
+      },
+    },
+  },
+});
+```
+
+### Handler Type Assertions
+
+Use type assertions within handlers to work around Zod v4's cross-module type inference limitations:
+
+````ts
+handler: async (input, context) => {
+  const typedInput = input as z.infer<typeof myInputSchema>;
+  // Now typedInput has full type safety
+  const value = typedInput.someProperty;
+}
 
 ## Attach UI to tool outputs
 
@@ -79,7 +142,7 @@ const app = createApp({
     },
   },
 });
-```
+````
 
 ## What you get
 

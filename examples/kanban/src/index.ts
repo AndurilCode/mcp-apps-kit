@@ -107,6 +107,49 @@ const TaskSchema = z.object({
   attachmentId: z.string().optional(),
 });
 
+// Tool input schemas (extracted for type inference)
+const ListTasksInput = z.object({
+  status: TaskStatusSchema.optional().describe(
+    "Filter tasks by status: 'todo', 'in_progress', or 'done'"
+  ),
+});
+
+const CreateTaskInput = z.object({
+  title: z.string().min(1).describe("Task title (required)"),
+  description: z.string().optional().describe("Task description"),
+  status: TaskStatusSchema.default("todo").describe("Initial status (defaults to 'todo')"),
+  attachmentId: z.string().optional().describe("Optional file attachment ID"),
+});
+
+const MoveTaskInput = z.object({
+  taskId: z.string().describe("ID of the task to move"),
+  newStatus: TaskStatusSchema.describe("Target column/status"),
+});
+
+const UpdateTaskInput = z.object({
+  taskId: z.string().describe("ID of the task to update"),
+  title: z.string().optional().describe("New title"),
+  description: z.string().optional().describe("New description"),
+});
+
+const DeleteTaskInput = z.object({
+  taskId: z.string().describe("ID of the task to delete"),
+});
+
+const ClearCompletedInput = z.object({
+  closeWidget: z
+    .boolean()
+    .default(false)
+    .describe("Whether to close the widget after clearing (ChatGPT only)"),
+});
+
+const ExportBoardInput = z.object({
+  format: z.enum(["json", "csv"]).default("json").describe("Export format"),
+  includeMetadata: z.boolean().default(true).describe("Include task metadata"),
+});
+
+const GetBoardSummaryInput = z.object({});
+
 // =============================================================================
 // APP DEFINITION
 // =============================================================================
@@ -122,11 +165,7 @@ const app = createApp({
     listTasks: {
       title: "List Tasks",
       description: "List all tasks on the Kanban board, optionally filtered by status",
-      input: z.object({
-        status: TaskStatusSchema.optional().describe(
-          "Filter tasks by status: 'todo', 'in_progress', or 'done'"
-        ),
-      }),
+      input: ListTasksInput,
       output: z.object({
         tasks: z.array(TaskSchema),
         counts: z.object({
@@ -142,9 +181,11 @@ const app = createApp({
         readOnlyHint: true,
         idempotentHint: true,
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      handler: async (input: any, context) => {
-        const filteredTasks = input.status ? getTasksByStatus(input.status) : getAllTasks();
+      handler: async (input, context) => {
+        const typedInput = input as z.infer<typeof ListTasksInput>;
+        const filteredTasks = typedInput.status
+          ? getTasksByStatus(typedInput.status)
+          : getAllTasks();
 
         // Use context.locale for potential localization (example)
         const locale = context.locale ?? "en-US";
@@ -168,12 +209,7 @@ const app = createApp({
     createTask: {
       title: "Create Task",
       description: "Create a new task on the Kanban board with optional file attachment",
-      input: z.object({
-        title: z.string().min(1).describe("Task title (required)"),
-        description: z.string().optional().describe("Task description"),
-        status: TaskStatusSchema.default("todo").describe("Initial status (defaults to 'todo')"),
-        attachmentId: z.string().optional().describe("Optional file attachment ID"),
-      }),
+      input: CreateTaskInput,
       output: z.object({
         task: TaskSchema,
         message: z.string(),
@@ -187,24 +223,24 @@ const app = createApp({
       annotations: {
         readOnlyHint: false,
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      handler: async (input: any, context) => {
+      handler: async (input, context) => {
+        const typedInput = input as z.infer<typeof CreateTaskInput>;
         // Format timestamp using user's timezone if available
         const timezone = context.userLocation?.timezone ?? "UTC";
         const now = new Date().toISOString();
         const task: Task = {
           id: generateId(),
-          title: input.title,
-          description: input.description,
-          status: input.status,
+          title: typedInput.title,
+          description: typedInput.description,
+          status: typedInput.status,
           createdAt: now,
           updatedAt: now,
-          attachmentId: input.attachmentId,
+          attachmentId: typedInput.attachmentId,
         };
 
         tasks.set(task.id, task);
 
-        const message = `Created task "${input.title}" in ${input.status} column${input.attachmentId ? " with attachment" : ""}`;
+        const message = `Created task "${typedInput.title}" in ${typedInput.status} column${typedInput.attachmentId ? " with attachment" : ""}`;
         return {
           task,
           message,
@@ -220,10 +256,7 @@ const app = createApp({
     moveTask: {
       title: "Move Task",
       description: "Move a task to a different column on the Kanban board",
-      input: z.object({
-        taskId: z.string().describe("ID of the task to move"),
-        newStatus: TaskStatusSchema.describe("Target column/status"),
-      }),
+      input: MoveTaskInput,
       output: z.object({
         task: TaskSchema,
         message: z.string(),
@@ -236,21 +269,21 @@ const app = createApp({
         readOnlyHint: false,
         idempotentHint: true,
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      handler: async (input: any, context) => {
-        const task = tasks.get(input.taskId);
+      handler: async (input, context) => {
+        const typedInput = input as z.infer<typeof MoveTaskInput>;
+        const task = tasks.get(typedInput.taskId);
         if (!task) {
-          throw new Error(`Task with ID "${input.taskId}" not found`);
+          throw new Error(`Task with ID "${typedInput.taskId}" not found`);
         }
 
         const oldStatus = task.status;
-        task.status = input.newStatus;
+        task.status = typedInput.newStatus;
         task.updatedAt = new Date().toISOString();
 
         // Track who performed the action (anonymized)
         const performer = context.subject ?? "anonymous";
 
-        const message = `Moved "${task.title}" from ${oldStatus} to ${input.newStatus}`;
+        const message = `Moved "${task.title}" from ${oldStatus} to ${typedInput.newStatus}`;
         return {
           task,
           message,
@@ -266,11 +299,7 @@ const app = createApp({
     updateTask: {
       title: "Update Task",
       description: "Update a task's title or description",
-      input: z.object({
-        taskId: z.string().describe("ID of the task to update"),
-        title: z.string().optional().describe("New title"),
-        description: z.string().optional().describe("New description"),
-      }),
+      input: UpdateTaskInput,
       output: z.object({
         task: TaskSchema,
         message: z.string(),
@@ -281,18 +310,18 @@ const app = createApp({
         readOnlyHint: false,
         idempotentHint: true,
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      handler: async (input: any, _context) => {
-        const task = tasks.get(input.taskId);
+      handler: async (input, _context) => {
+        const typedInput = input as z.infer<typeof UpdateTaskInput>;
+        const task = tasks.get(typedInput.taskId);
         if (!task) {
-          throw new Error(`Task with ID "${input.taskId}" not found`);
+          throw new Error(`Task with ID "${typedInput.taskId}" not found`);
         }
 
-        if (input.title !== undefined) {
-          task.title = input.title;
+        if (typedInput.title !== undefined) {
+          task.title = typedInput.title;
         }
-        if (input.description !== undefined) {
-          task.description = input.description;
+        if (typedInput.description !== undefined) {
+          task.description = typedInput.description;
         }
         task.updatedAt = new Date().toISOString();
 
@@ -311,9 +340,7 @@ const app = createApp({
     deleteTask: {
       title: "Delete Task",
       description: "Delete a task from the Kanban board",
-      input: z.object({
-        taskId: z.string().describe("ID of the task to delete"),
-      }),
+      input: DeleteTaskInput,
       output: z.object({
         success: z.boolean(),
         message: z.string(),
@@ -326,14 +353,14 @@ const app = createApp({
         destructiveHint: true,
         idempotentHint: true,
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      handler: async (input: any, _context) => {
-        const task = tasks.get(input.taskId);
+      handler: async (input, _context) => {
+        const typedInput = input as z.infer<typeof DeleteTaskInput>;
+        const task = tasks.get(typedInput.taskId);
         if (!task) {
-          throw new Error(`Task with ID "${input.taskId}" not found`);
+          throw new Error(`Task with ID "${typedInput.taskId}" not found`);
         }
 
-        tasks.delete(input.taskId);
+        tasks.delete(typedInput.taskId);
 
         const message = `Deleted task "${task.title}"`;
         return {
@@ -350,12 +377,7 @@ const app = createApp({
     clearCompleted: {
       title: "Clear Completed Tasks",
       description: "Remove all completed tasks from the board and close the widget",
-      input: z.object({
-        closeWidget: z
-          .boolean()
-          .default(false)
-          .describe("Whether to close the widget after clearing (ChatGPT only)"),
-      }),
+      input: ClearCompletedInput,
       output: z.object({
         success: z.boolean(),
         message: z.string(),
@@ -368,8 +390,8 @@ const app = createApp({
       annotations: {
         destructiveHint: true,
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      handler: async (input: any, _context) => {
+      handler: async (input, _context) => {
+        const typedInput = input as z.infer<typeof ClearCompletedInput>;
         const completedTasks = getTasksByStatus("done");
         const deletedCount = completedTasks.length;
 
@@ -386,7 +408,7 @@ const app = createApp({
           deletedCount,
           _text: message,
           // Signal to close the widget after this action (ChatGPT only)
-          _closeWidget: input.closeWidget,
+          _closeWidget: typedInput.closeWidget,
         };
       },
     },
@@ -397,10 +419,7 @@ const app = createApp({
     exportBoard: {
       title: "Export Board",
       description: "Export the Kanban board data as JSON (simulates external API call)",
-      input: z.object({
-        format: z.enum(["json", "csv"]).default("json").describe("Export format"),
-        includeMetadata: z.boolean().default(true).describe("Include task metadata"),
-      }),
+      input: ExportBoardInput,
       output: z.object({
         success: z.boolean(),
         message: z.string(),
@@ -413,12 +432,12 @@ const app = createApp({
         // This tool would interact with external systems in a real app
         openWorldHint: true,
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      handler: async (input: any, context) => {
+      handler: async (input, context) => {
+        const typedInput = input as z.infer<typeof ExportBoardInput>;
         const allTasks = getAllTasks();
 
         let data: string;
-        if (input.format === "csv") {
+        if (typedInput.format === "csv") {
           const header = "id,title,description,status,createdAt,updatedAt";
           const rows = allTasks.map(
             (t) =>
@@ -427,7 +446,7 @@ const app = createApp({
           data = [header, ...rows].join("\n");
         } else {
           data = JSON.stringify(
-            input.includeMetadata
+            typedInput.includeMetadata
               ? allTasks
               : allTasks.map((t) => ({ id: t.id, title: t.title, status: t.status })),
             null,
@@ -438,7 +457,7 @@ const app = createApp({
         // Log export action with user info if available
         const userInfo = context.userAgent ?? "Unknown client";
 
-        const message = `Exported ${allTasks.length} tasks as ${String(input.format).toUpperCase()}`;
+        const message = `Exported ${allTasks.length} tasks as ${String(typedInput.format).toUpperCase()}`;
         return {
           success: true,
           message,
@@ -456,7 +475,7 @@ const app = createApp({
     getBoardSummary: {
       title: "Get Board Summary",
       description: "Get a summary of the Kanban board with task counts per column",
-      input: z.object({}),
+      input: GetBoardSummaryInput,
       output: z.object({
         columns: z.array(
           z.object({

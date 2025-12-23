@@ -32,9 +32,9 @@ const app = createApp({
       output: greetOutput,
       ui: "greeting-widget",
       visibility: "both",
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      handler: async (input: any) => {
-        const message = `Hello, ${input.name}!`;
+      handler: async (input) => {
+        const typedInput = input as z.infer<typeof greetInput>;
+        const message = `Hello, ${typedInput.name}!`;
         return {
           message,
           timestamp: new Date().toISOString(),

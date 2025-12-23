@@ -19,28 +19,15 @@ export type JSONSchema = Record<string, unknown>;
 
 /**
  * Options for zodToJsonSchema conversion
+ *
+ * Note: Zod v4 uses native JSON Schema 2020-12 conversion.
  */
 export interface ZodToJsonSchemaOptions {
   /**
-   * Name for the schema (used in definitions)
-   */
-  name?: string;
-
-  /**
-   * How to handle recursive types
-   * - "root": Use $ref from root
-   * - "none": Inline all schemas
-   */
-  refStrategy?: "root" | "none";
-
-  /**
-   * Target schema format (maintained for backwards compatibility)
-   * Note: Zod v4 native conversion uses JSON Schema 2020-12
-   */
-  target?: "jsonSchema7" | "openApi3";
-
-  /**
-   * Whether to include the $schema property
+   * Whether to include the $schema property in the output
+   *
+   * When false (default), the $schema property is stripped for MCP compatibility.
+   *
    * @default false
    */
   includeSchema?: boolean;

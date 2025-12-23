@@ -8,7 +8,7 @@
  * - Widget with complex data
  */
 
-import { createApp, type ClientToolsFromCore } from "@mcp-apps-kit/core";
+import { createApp, type ClientToolsFromCore, type ToolContext } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 // =============================================================================
@@ -100,6 +100,23 @@ const RestaurantSchema = z.object({
 
 const CuisineTypeSchema = z.enum(["Japanese", "Italian", "Chinese", "French", "Mexican", "any"]);
 
+// Tool input schemas (extracted for type inference)
+const SearchRestaurantsInput = z.object({
+  cuisine: CuisineTypeSchema.optional().describe("Filter by cuisine type"),
+  maxDistance: z.number().optional().describe("Maximum distance in km"),
+  minRating: z.number().min(1).max(5).optional().describe("Minimum rating"),
+  maxPrice: z.number().min(1).max(4).optional().describe("Maximum price level (1-4)"),
+  openOnly: z.boolean().optional().describe("Only show open restaurants"),
+});
+
+const GetRestaurantDetailsInput = z.object({
+  restaurantId: z.string().describe("Restaurant ID"),
+});
+
+const GetRecommendationsInput = z.object({
+  mood: z.enum(["quick", "romantic", "family", "business"]).describe("Dining mood"),
+});
+
 // =============================================================================
 // APP DEFINITION
 // =============================================================================
@@ -115,13 +132,7 @@ const app = createApp({
     searchRestaurants: {
       title: "Search Restaurants",
       description: "Search for restaurants with filters",
-      input: z.object({
-        cuisine: CuisineTypeSchema.optional().describe("Filter by cuisine type"),
-        maxDistance: z.number().optional().describe("Maximum distance in km"),
-        minRating: z.number().min(1).max(5).optional().describe("Minimum rating"),
-        maxPrice: z.number().min(1).max(4).optional().describe("Maximum price level (1-4)"),
-        openOnly: z.boolean().optional().describe("Only show open restaurants"),
-      }),
+      input: SearchRestaurantsInput,
       output: z.object({
         restaurants: z.array(RestaurantSchema),
         count: z.number(),
@@ -134,24 +145,24 @@ const app = createApp({
         readOnlyHint: true,
         idempotentHint: true,
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      handler: async (input: any, context) => {
+      handler: async (input, context) => {
+        const typedInput = input as z.infer<typeof SearchRestaurantsInput>;
         let results = [...restaurants];
 
         // Apply filters
-        if (input.cuisine && input.cuisine !== "any") {
-          results = results.filter((r) => r.cuisine === input.cuisine);
+        if (typedInput.cuisine && typedInput.cuisine !== "any") {
+          results = results.filter((r) => r.cuisine === typedInput.cuisine);
         }
-        if (input.maxDistance !== undefined) {
-          results = results.filter((r) => r.distance <= input.maxDistance);
+        if (typedInput.maxDistance !== undefined) {
+          results = results.filter((r) => r.distance <= typedInput.maxDistance!);
         }
-        if (input.minRating !== undefined) {
-          results = results.filter((r) => r.rating >= input.minRating);
+        if (typedInput.minRating !== undefined) {
+          results = results.filter((r) => r.rating >= typedInput.minRating!);
         }
-        if (input.maxPrice !== undefined) {
-          results = results.filter((r) => r.priceLevel <= input.maxPrice);
+        if (typedInput.maxPrice !== undefined) {
+          results = results.filter((r) => r.priceLevel <= typedInput.maxPrice!);
         }
-        if (input.openOnly) {
+        if (typedInput.openOnly) {
           results = results.filter((r) => r.openNow);
         }
 
@@ -176,9 +187,7 @@ const app = createApp({
     getRestaurantDetails: {
       title: "Get Restaurant Details",
       description: "Get detailed information about a specific restaurant",
-      input: z.object({
-        restaurantId: z.string().describe("Restaurant ID"),
-      }),
+      input: GetRestaurantDetailsInput,
       output: z.object({
         restaurant: RestaurantSchema.nullable(),
         message: z.string(),
@@ -189,15 +198,15 @@ const app = createApp({
         readOnlyHint: true,
         idempotentHint: true,
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      handler: async (input: any) => {
-        const restaurant = restaurants.find((r) => r.id === input.restaurantId);
+      handler: async (input) => {
+        const typedInput = input as z.infer<typeof GetRestaurantDetailsInput>;
+        const restaurant = restaurants.find((r) => r.id === typedInput.restaurantId);
 
         if (!restaurant) {
           return {
             restaurant: null,
-            message: `Restaurant with ID "${input.restaurantId}" not found`,
-            _text: `Restaurant with ID "${input.restaurantId}" not found`,
+            message: `Restaurant with ID "${typedInput.restaurantId}" not found`,
+            _text: `Restaurant with ID "${typedInput.restaurantId}" not found`,
           };
         }
 
@@ -215,9 +224,7 @@ const app = createApp({
     getRecommendations: {
       title: "Get Recommendations",
       description: "Get personalized restaurant recommendations",
-      input: z.object({
-        mood: z.enum(["quick", "romantic", "family", "business"]).describe("Dining mood"),
-      }),
+      input: GetRecommendationsInput,
       output: z.object({
         recommendations: z.array(RestaurantSchema),
         reason: z.string(),
@@ -227,12 +234,12 @@ const app = createApp({
       annotations: {
         readOnlyHint: true,
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      handler: async (input: any, context) => {
+      handler: async (input, context) => {
+        const typedInput = input as z.infer<typeof GetRecommendationsInput>;
         let filtered: Restaurant[];
         let reason: string;
 
-        switch (input.mood) {
+        switch (typedInput.mood) {
           case "quick":
             filtered = restaurants.filter((r) => r.distance < 1 && r.priceLevel <= 2).slice(0, 3);
             reason = "Quick bites near you";
@@ -260,7 +267,7 @@ const app = createApp({
         return {
           recommendations: filtered,
           reason,
-          _meta: { timezone, mood: input.mood },
+          _meta: { timezone, mood: typedInput.mood },
         };
       },
     },
