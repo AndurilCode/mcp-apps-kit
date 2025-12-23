@@ -138,10 +138,16 @@ export interface ToolAnnotations {
 
 /**
  * Single tool definition with Zod schemas
+ *
+ * Uses `z.ZodTypeAny` for proper type inference in generic contexts.
+ * Per Zod v4 documentation, `ZodTypeAny` preserves the specific schema subclass
+ * type information (e.g., `ZodString`, `ZodObject`), while `ZodType<T>` loses this.
+ *
+ * @see https://github.com/colinhacks/zod/blob/v4.0.1/packages/docs/content/generic-functions.mdx
  */
 export interface ToolDef<
-  TInput extends z.ZodType = z.ZodType,
-  TOutput extends z.ZodType = z.ZodType,
+  TInput extends z.ZodTypeAny = z.ZodTypeAny,
+  TOutput extends z.ZodTypeAny = z.ZodTypeAny,
 > {
   /** Human-readable description for the LLM */
   description: string;

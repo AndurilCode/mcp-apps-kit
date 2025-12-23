@@ -146,6 +146,8 @@ const app = createApp({
         idempotentHint: true,
       },
       handler: async (input, context) => {
+        // Type assertion required for Zod v4 generic function inference
+        // See: https://github.com/colinhacks/zod/blob/v4.0.1/packages/docs/content/generic-functions.mdx
         const typedInput = input as z.infer<typeof SearchRestaurantsInput>;
         let results = [...restaurants];
 

@@ -304,8 +304,12 @@ function registerTools(
       },
       async (args: Record<string, unknown>, extra?: { _meta?: Record<string, unknown> }) => {
         try {
-          // Validate input with Zod
-          const parsed: unknown = toolDef.input.parse(args);
+          // Validate input with Zod and apply type inference
+          // Per Zod v4 docs: When using generic ZodType in functions, we must use
+          // `as z.infer<T>` to correctly infer the parsed type. Without this,
+          // TypeScript infers `unknown` instead of the schema's type.
+          // See: https://github.com/colinhacks/zod/blob/v4.0.1/packages/docs/content/generic-functions.mdx
+          const parsed = toolDef.input.parse(args) as z.infer<typeof toolDef.input>;
 
           // Parse client-supplied _meta into typed context
           const context = parseToolContext(extra?._meta);
