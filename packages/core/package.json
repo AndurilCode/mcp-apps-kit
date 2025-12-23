@@ -1,6 +1,6 @@
 {
   "name": "@mcp-apps-kit/core",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Server-side framework for building MCP applications",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -17,7 +17,9 @@
       }
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -27,7 +29,12 @@
     "lint": "eslint src",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["mcp", "model-context-protocol", "sdk", "server"],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "sdk",
+    "server"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",

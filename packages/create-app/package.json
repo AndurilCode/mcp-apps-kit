@@ -1,6 +1,6 @@
 {
   "name": "@mcp-apps-kit/create-app",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "CLI tool for scaffolding MCP applications",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -21,7 +21,10 @@
       }
     }
   },
-  "files": ["dist", "templates"],
+  "files": [
+    "dist",
+    "templates"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -31,7 +34,13 @@
     "lint": "eslint src",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["mcp", "model-context-protocol", "cli", "scaffold", "create"],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "cli",
+    "scaffold",
+    "create"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",

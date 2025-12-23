@@ -1,6 +1,6 @@
 {
   "name": "@mcp-apps-kit/ui-react",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "React bindings for MCP applications",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -18,7 +18,9 @@
       }
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -28,7 +30,13 @@
     "lint": "eslint src",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["mcp", "model-context-protocol", "sdk", "react", "hooks"],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "sdk",
+    "react",
+    "hooks"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
