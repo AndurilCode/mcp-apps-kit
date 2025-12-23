@@ -197,7 +197,7 @@ const app = createApp({
           id: generateId(),
           title,
           description,
-          status: status ?? "todo",
+          status,
           createdAt: now,
           updatedAt: now,
           attachmentId,
@@ -205,7 +205,7 @@ const app = createApp({
 
         tasks.set(task.id, task);
 
-        const message = `Created task "${title}" in ${status ?? "todo"} column${attachmentId ? " with attachment" : ""}`;
+        const message = `Created task "${title}" in ${status} column${attachmentId ? " with attachment" : ""}`;
         return {
           task,
           message,
