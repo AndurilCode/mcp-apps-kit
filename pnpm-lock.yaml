@@ -233,7 +233,7 @@ importers:
   packages/ui-react:
     dependencies:
       '@mcp-apps-kit/ui':
-        specifier: workspace:*
+        specifier: ^0.1.1
         version: link:../ui
     devDependencies:
       '@testing-library/react':
