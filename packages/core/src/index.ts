@@ -52,6 +52,36 @@ export type { CSPConfig, UIDef, UIDefs } from "./types/ui";
 // Config types
 export type { Protocol, AuthConfig, CORSConfig, GlobalConfig, AppConfig } from "./types/config";
 
+// Plugin types
+export type {
+  Plugin,
+  PluginInitContext,
+  PluginStartContext,
+  PluginShutdownContext,
+  ToolCallContext,
+  RequestContext,
+  ResponseContext,
+  UILoadContext,
+  InferPluginConfig,
+} from "./plugins/types";
+
+// Middleware types
+export type { Middleware, MiddlewareContext, MultipleNextCallsError, MiddlewareTimeoutError } from "./middleware/types";
+
+// Event types
+export type {
+  EventMap,
+  EventHandler,
+  AnyEventHandler,
+  UnsubscribeFn,
+  EventNames,
+  EventPayload,
+  EventEmitterOptions,
+  EventEmitterStats,
+  EventListenerInfo,
+  MaxListenersExceededError,
+} from "./events/types";
+
 // =============================================================================
 // UTILITY EXPORTS
 // =============================================================================
