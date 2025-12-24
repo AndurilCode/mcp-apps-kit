@@ -14,6 +14,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createApp } from "../../src/createApp";
 import type { EventMap } from "../../src/events/types";
+import { TypedEventEmitter } from "../../src/events/EventEmitter";
 import { z } from "zod";
 
 describe("Event Emission Integration", () => {
@@ -27,7 +28,8 @@ describe("Event Emission Integration", () => {
 
   describe("app:init Event", () => {
     it("should emit app:init when createApp is called", () => {
-      const initHandler = vi.fn();
+      // Spy on the emit method before creating the app
+      const emitSpy = vi.spyOn(TypedEventEmitter.prototype, 'emit');
 
       const app = createApp({
         name: "test-app",
@@ -35,15 +37,24 @@ describe("Event Emission Integration", () => {
         tools: {},
       });
 
-      app.on("app:init", initHandler);
+      // Verify app:init was emitted during createApp
+      expect(emitSpy).toHaveBeenCalledWith(
+        "app:init",
+        expect.objectContaining({
+          config: expect.objectContaining({
+            name: "test-app",
+            version: "1.0.0",
+          }),
+        })
+      );
 
-      // Note: app:init is emitted during createApp, so handler registered after won't receive it
-      // This test verifies the event system is properly integrated
       expect(app).toBeDefined();
+      
+      emitSpy.mockRestore();
     });
 
-    it("should include config in app:init payload", async () => {
-      const initHandler = vi.fn<[EventMap["app:init"]]>();
+    it("should include config in app:init payload", () => {
+      const emitSpy = vi.spyOn(TypedEventEmitter.prototype, 'emit');
 
       const app = createApp({
         name: "event-test",
@@ -51,16 +62,25 @@ describe("Event Emission Integration", () => {
         tools: {},
       });
 
-      app.on("app:init", initHandler);
+      // Verify the config was passed correctly in the payload
+      expect(emitSpy).toHaveBeenCalledWith(
+        "app:init",
+        expect.objectContaining({
+          config: expect.objectContaining({
+            name: "event-test",
+            version: "2.0.0",
+            tools: {},
+          }),
+        })
+      );
 
-      // Trigger a manual emit for testing (real app:init happens in createApp)
-      // In production, app:init would be emitted during app creation
+      emitSpy.mockRestore();
     });
   });
 
   describe("app:start Event", () => {
     it("should emit app:start when server starts", async () => {
-      const startHandler = vi.fn<[EventMap["app:start"]]>();
+      const startHandler = vi.fn();
 
       const app = createApp({
         name: "test-app",
@@ -81,7 +101,7 @@ describe("Event Emission Integration", () => {
     });
 
     it("should include port for HTTP transport", async () => {
-      const startHandler = vi.fn<[EventMap["app:start"]]>();
+      const startHandler = vi.fn();
 
       const app = createApp({
         name: "test-app",
@@ -98,7 +118,7 @@ describe("Event Emission Integration", () => {
 
   describe("tool:* Events", () => {
     it("should emit tool:called before tool execution", async () => {
-      const calledHandler = vi.fn<[EventMap["tool:called"]]>();
+      const calledHandler = vi.fn();
 
       const app = createApp({
         name: "test-app",
@@ -108,9 +128,9 @@ describe("Event Emission Integration", () => {
             description: "Greet someone",
             input: z.object({ name: z.string() }),
             output: z.object({ message: z.string() }),
-            handler: async ({ name }) => ({
+            handler: (async ({ name }: { name: string }) => ({
               message: `Hello, ${name}!`,
-            }),
+            })) as any,
           },
         },
       });
@@ -122,7 +142,7 @@ describe("Event Emission Integration", () => {
     });
 
     it("should emit tool:success after successful execution", async () => {
-      const successHandler = vi.fn<[EventMap["tool:success"]]>();
+      const successHandler = vi.fn();
 
       const app = createApp({
         name: "test-app",
@@ -132,9 +152,9 @@ describe("Event Emission Integration", () => {
             description: "Add numbers",
             input: z.object({ a: z.number(), b: z.number() }),
             output: z.object({ result: z.number() }),
-            handler: async ({ a, b }) => ({
+            handler: (async ({ a, b }: { a: number; b: number }) => ({
               result: a + b,
-            }),
+            })) as any,
           },
         },
       });
@@ -145,7 +165,7 @@ describe("Event Emission Integration", () => {
     });
 
     it("should emit tool:error when tool fails", async () => {
-      const errorHandler = vi.fn<[EventMap["tool:error"]]>();
+      const errorHandler = vi.fn();
 
       const app = createApp({
         name: "test-app",
@@ -167,7 +187,7 @@ describe("Event Emission Integration", () => {
     });
 
     it("should include timing information in events", async () => {
-      const successHandler = vi.fn<[EventMap["tool:success"]]>();
+      const successHandler = vi.fn();
 
       const app = createApp({
         name: "test-app",
@@ -230,9 +250,9 @@ describe("Event Emission Integration", () => {
             description: "Test tool",
             input: z.object({}),
             output: z.object({ status: z.string() }),
-            handler: async () => ({
+            handler: (async () => ({
               status: "success",
-            }),
+            })) as any,
           },
         },
       });
