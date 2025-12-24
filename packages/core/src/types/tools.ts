@@ -241,10 +241,10 @@ export type ToolDefs = Record<string, ToolDef>;
 
 /**
  * Helper function to define a tool with proper type inference.
- * 
+ *
  * This helper solves TypeScript's generic type inference limitations
  * by capturing the specific schema types at the call site.
- * 
+ *
  * @example
  * ```typescript
  * const myTool = defineTool({
@@ -258,19 +258,18 @@ export type ToolDefs = Record<string, ToolDef>;
  * });
  * ```
  */
-export function defineTool<
-  TInput extends z.ZodType,
-  TOutput extends z.ZodType,
->(
+export function defineTool<TInput extends z.ZodType, TOutput extends z.ZodType>(
   definition: Omit<ToolDef<TInput, TOutput>, "handler"> & {
     handler: (
       input: z.infer<TInput>,
       context: ToolContext
-    ) => Promise<z.infer<TOutput> & {
-      _meta?: Record<string, unknown>;
-      _text?: string;
-      _closeWidget?: boolean;
-    }>;
+    ) => Promise<
+      z.infer<TOutput> & {
+        _meta?: Record<string, unknown>;
+        _text?: string;
+        _closeWidget?: boolean;
+      }
+    >;
   }
 ): ToolDef<TInput, TOutput> {
   return definition as ToolDef<TInput, TOutput>;

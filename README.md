@@ -203,6 +203,7 @@ tools: {
 With Zod v4, TypeScript cannot infer concrete schema types across module boundaries when using generic `z.ZodType`. The `defineTool` helper captures the specific schema type at the call site, enabling proper type inference without manual `as z.infer<typeof Schema>` assertions.
 
 This pattern is similar to helpers in other TypeScript frameworks:
+
 - tRPC's `procedure()`
 - Hono's `createRoute()`
 - Fastify's `route<{ Body: ... }>()`

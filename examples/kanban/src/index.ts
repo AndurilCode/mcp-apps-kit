@@ -182,9 +182,7 @@ const app = createApp({
         idempotentHint: true,
       },
       handler: async (input, context) => {
-        const filteredTasks = input.status
-          ? getTasksByStatus(input.status)
-          : getAllTasks();
+        const filteredTasks = input.status ? getTasksByStatus(input.status) : getAllTasks();
 
         // Use context.locale for potential localization (example)
         const locale = context.locale ?? "en-US";

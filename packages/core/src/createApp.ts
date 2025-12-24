@@ -152,19 +152,18 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
  * });
  * ```
  */
-export function defineTool<
-  TInput extends z.ZodType,
-  TOutput extends z.ZodType = z.ZodType,
->(
+export function defineTool<TInput extends z.ZodType, TOutput extends z.ZodType = z.ZodType>(
   def: Omit<ToolDef<TInput, TOutput>, "handler"> & {
     handler: (
       input: z.infer<TInput>,
       context: ToolContext
-    ) => Promise<z.infer<TOutput> & {
-      _meta?: Record<string, unknown>;
-      _text?: string;
-      _closeWidget?: boolean;
-    }>;
+    ) => Promise<
+      z.infer<TOutput> & {
+        _meta?: Record<string, unknown>;
+        _text?: string;
+        _closeWidget?: boolean;
+      }
+    >;
   }
 ): ToolDef<TInput, TOutput> {
   return def as ToolDef<TInput, TOutput>;

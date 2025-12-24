@@ -9,7 +9,12 @@
  * - Type-safe handlers using defineTool (no type assertions!)
  */
 
-import { createApp, defineTool, type ClientToolsFromCore, type ToolContext } from "@mcp-apps-kit/core";
+import {
+  createApp,
+  defineTool,
+  type ClientToolsFromCore,
+  type ToolContext,
+} from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 // =============================================================================
