@@ -426,7 +426,6 @@ describe("formatZodError", () => {
   describe("edge cases", () => {
     it("should handle missing minimum/maximum values", () => {
       // This tests the fallback when minimum/maximum is undefined
-      const schema = z.string();
       const error = new z.ZodError([
         {
           code: "too_small",
