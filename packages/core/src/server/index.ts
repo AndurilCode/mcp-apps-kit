@@ -107,7 +107,7 @@ export function createServerInstance<T extends ToolDefs>(
       method: req.method,
       path: req.path,
       headers: req.headers as Record<string, string>,
-      metadata: req.body?._meta,
+      metadata: (req.body as { _meta?: unknown } | undefined)?._meta,
     });
 
     // Create stateless transport (sessionIdGenerator: undefined)
@@ -132,7 +132,7 @@ export function createServerInstance<T extends ToolDefs>(
       method: req.method,
       path: req.path,
       headers: req.headers as Record<string, string>,
-      metadata: req.body?._meta,
+      metadata: (req.body as { _meta?: unknown } | undefined)?._meta,
       statusCode: res.statusCode,
     });
   });
