@@ -166,9 +166,6 @@ export function createServerInstance<T extends ToolDefs>(
         // Use stdio transport
         const stdioTransport = new StdioServerTransport();
         await mcpServer.connect(stdioTransport);
-
-        // Call plugin onStart hooks
-        await pluginManager.start({ transport: "stdio" });
         return;
       }
 
@@ -177,15 +174,7 @@ export function createServerInstance<T extends ToolDefs>(
         try {
           httpServer = expressApp.listen(port, () => {
             instance.httpServer = httpServer;
-
-            // Call plugin onStart hooks
-            pluginManager.start({ port, transport: "http" })
-              .then(() => {
-                resolve();
-              })
-              .catch((error: unknown) => {
-                reject(wrapError(error));
-              });
+            resolve();
           });
           httpServer.on("error", reject);
         } catch (error) {

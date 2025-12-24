@@ -122,6 +122,12 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
       const server = getServerInstance();
       await server.start(options);
 
+      // Call plugin onStart hooks after server starts
+      await pluginManager.start({
+        port: options?.port,
+        transport: options?.transport ?? "http",
+      });
+
       // Emit app:start event after server starts
       await eventEmitter.emit("app:start", {
         port: options?.port,

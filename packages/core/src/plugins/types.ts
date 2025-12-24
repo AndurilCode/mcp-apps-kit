@@ -13,6 +13,32 @@ import type { AppConfig } from "../types/config";
 // =============================================================================
 
 /**
+ * Base context provided to all plugin hooks
+ *
+ * Contains app metadata and plugin reference.
+ */
+export interface PluginContext {
+  /** App metadata */
+  app: {
+    /** App name */
+    name: string;
+    /** App version */
+    version: string;
+  };
+  /** Current environment (test, development, production) */
+  environment?: string;
+  /** Reference to the plugin (config and metadata) */
+  plugin: {
+    /** Plugin name */
+    name: string;
+    /** Plugin version */
+    version?: string;
+    /** Plugin configuration */
+    config?: unknown;
+  };
+}
+
+/**
  * Context provided to plugin onInit hook
  */
 export interface PluginInitContext {
