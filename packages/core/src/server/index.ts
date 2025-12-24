@@ -20,9 +20,11 @@ import type {
 } from "../types/tools";
 import type { AppConfig, CORSConfig } from "../types/config";
 import type { UIDefs, UIDef } from "../types/ui";
+import type { MiddlewareContext } from "../middleware/types";
 import { formatZodError, wrapError } from "../utils/errors";
 import { createAdapter, type ProtocolAdapter } from "../adapters";
 import { PluginManager } from "../plugins/PluginManager";
+import { MiddlewareChain } from "../middleware/MiddlewareChain";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
@@ -38,6 +40,8 @@ export interface ServerInstance {
   expressApp: Express;
   /** HTTP server (when running) */
   httpServer?: Server;
+  /** Set middleware chain (called by createApp) */
+  setMiddlewareChain: (chain: MiddlewareChain) => void;
   /** Start the server */
   start: (options?: StartOptions) => Promise<void>;
   /** Stop the server */
@@ -67,8 +71,11 @@ export function createServerInstance<T extends ToolDefs>(
   // Compute UI resource URIs with content hashes for cache busting
   const uiUriMap = config.ui ? computeUIUris(config.name, config.ui) : {};
 
+  // Will be set by createApp
+  let middlewareChainRef: MiddlewareChain | undefined;
+
   // Register tools with MCP server (pass UI URIs for correct binding and pluginManager)
-  registerTools(mcpServer, config.tools, adapter, config.name, uiUriMap, pluginManager);
+  registerTools(mcpServer, config.tools, adapter, config.name, uiUriMap, pluginManager, () => middlewareChainRef);
 
   // Register UI resources with MCP server
   if (config.ui) {
@@ -138,6 +145,10 @@ export function createServerInstance<T extends ToolDefs>(
     mcpServer,
     expressApp,
     httpServer,
+
+    setMiddlewareChain: (chain: MiddlewareChain) => {
+      middlewareChainRef = chain;
+    },
 
     start: async (options: StartOptions = {}) => {
       const { port = 3000, transport = "http" } = options;
@@ -288,7 +299,8 @@ function registerTools(
   adapter: ProtocolAdapter,
   serverName: string,
   uiUriMap: Record<string, { uri: string; html: string }>,
-  pluginManager: PluginManager
+  pluginManager: PluginManager,
+  getMiddlewareChain: () => MiddlewareChain | undefined
 ): void {
   for (const [name, toolDef] of Object.entries(tools)) {
     // Extract the Zod shape from z.object() for MCP SDK
@@ -318,24 +330,55 @@ function registerTools(
       async (args: Record<string, unknown>, extra?: { _meta?: Record<string, unknown> }) => {
         // Declare in outer scope for error handling
         let parsed: unknown;
-        let context: ToolContext | undefined = undefined;
+        let contextForErrorHandling: ToolContext | undefined = undefined;
 
         try {
           // Validate input with Zod
           parsed = toolDef.input.parse(args);
 
           // Parse client-supplied _meta into typed context
-          context = parseToolContext(extra?._meta);
+          const baseContext = parseToolContext(extra?._meta);
 
-          // Execute plugin beforeToolCall hooks
-          await pluginManager.executeHook("beforeToolCall", {
+          // Create state map for middleware
+          const state = new Map<string, unknown>();
+
+          // Create full context with state
+          const context: ToolContext = { ...baseContext, state };
+          contextForErrorHandling = context;
+
+          // Create middleware context
+          const middlewareContext: MiddlewareContext = {
             toolName: name,
             input: parsed,
             metadata: context,
-          });
+            state,
+          };
 
-          // Execute handler with input and context
-          const result = await toolDef.handler(parsed, context);
+          // Define the tool execution logic
+          const executeToolLogic = async (): Promise<unknown> => {
+            // Execute plugin beforeToolCall hooks
+            await pluginManager.executeHook("beforeToolCall", {
+              toolName: name,
+              input: parsed,
+              metadata: context,
+            });
+
+            // Execute handler with input and context (context now includes state)
+            const result = await toolDef.handler(parsed, context);
+
+            return result;
+          };
+
+          // Execute middleware chain if present, otherwise execute tool logic directly
+          let result: unknown;
+          const middlewareChain = getMiddlewareChain();
+          if (middlewareChain?.hasMiddleware()) {
+            await middlewareChain.execute(middlewareContext, async () => {
+              result = await executeToolLogic();
+            });
+          } else {
+            result = await executeToolLogic();
+          }
 
           // Execute plugin afterToolCall hooks
           await pluginManager.executeHook("afterToolCall", {
@@ -399,11 +442,11 @@ function registerTools(
           };
         } catch (error) {
           // Execute plugin onToolError hooks (only if context was initialized)
-          if (context !== undefined) {
+          if (contextForErrorHandling !== undefined) {
             await pluginManager.executeHook("onToolError", {
               toolName: name,
               input: parsed,
-              metadata: context,
+              metadata: contextForErrorHandling,
             }, error as Error);
           }
 

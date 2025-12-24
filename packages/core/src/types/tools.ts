@@ -96,6 +96,21 @@ export interface ToolContext {
    * Access protocol-specific fields not mapped to typed properties.
    */
   raw?: Record<string, unknown>;
+
+  /**
+   * Shared state map populated by middleware.
+   * Middleware can use state.set() to share data with tool handlers.
+   *
+   * @example
+   * ```typescript
+   * // In middleware
+   * context.state.set("userId", "user-123");
+   *
+   * // In tool handler
+   * const userId = context.state?.get("userId");
+   * ```
+   */
+  state?: Map<string, unknown>;
 }
 
 /**

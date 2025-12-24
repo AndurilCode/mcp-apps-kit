@@ -83,9 +83,11 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
   let serverInstance: ServerInstance | null = null;
 
   function getServerInstance(): ServerInstance {
-    serverInstance ??= createServerInstance(config, pluginManager);
-    // Attach middleware chain to server instance for tool execution
-    (serverInstance as any).middlewareChain = middlewareChain;
+    if (!serverInstance) {
+      serverInstance = createServerInstance(config, pluginManager);
+      // Attach middleware chain to server instance for tool execution
+      serverInstance.setMiddlewareChain(middlewareChain);
+    }
     return serverInstance;
   }
 
