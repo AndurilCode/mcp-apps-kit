@@ -6,9 +6,15 @@
  * - ToolContext usage (location, timezone)
  * - Different visibility settings
  * - Widget with complex data
+ * - Type-safe handlers using defineTool (no type assertions!)
  */
 
-import { createApp, type ClientToolsFromCore } from "@mcp-apps-kit/core";
+import {
+  createApp,
+  defineTool,
+  type ClientToolsFromCore,
+  type ToolContext,
+} from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 // =============================================================================
@@ -100,6 +106,23 @@ const RestaurantSchema = z.object({
 
 const CuisineTypeSchema = z.enum(["Japanese", "Italian", "Chinese", "French", "Mexican", "any"]);
 
+// Tool input schemas (extracted for type inference)
+const SearchRestaurantsInput = z.object({
+  cuisine: CuisineTypeSchema.optional().describe("Filter by cuisine type"),
+  maxDistance: z.number().optional().describe("Maximum distance in km"),
+  minRating: z.number().min(1).max(5).optional().describe("Minimum rating"),
+  maxPrice: z.number().min(1).max(4).optional().describe("Maximum price level (1-4)"),
+  openOnly: z.boolean().optional().describe("Only show open restaurants"),
+});
+
+const GetRestaurantDetailsInput = z.object({
+  restaurantId: z.string().describe("Restaurant ID"),
+});
+
+const GetRecommendationsInput = z.object({
+  mood: z.enum(["quick", "romantic", "family", "business"]).describe("Dining mood"),
+});
+
 // =============================================================================
 // APP DEFINITION
 // =============================================================================
@@ -110,18 +133,12 @@ const app = createApp({
 
   tools: {
     // =========================================================================
-    // SEARCH RESTAURANTS
+    // SEARCH RESTAURANTS (Model + Widget tool)
     // =========================================================================
-    searchRestaurants: {
+    searchRestaurants: defineTool({
       title: "Search Restaurants",
       description: "Search for restaurants with filters",
-      input: z.object({
-        cuisine: CuisineTypeSchema.optional().describe("Filter by cuisine type"),
-        maxDistance: z.number().optional().describe("Maximum distance in km"),
-        minRating: z.number().min(1).max(5).optional().describe("Minimum rating"),
-        maxPrice: z.number().min(1).max(4).optional().describe("Maximum price level (1-4)"),
-        openOnly: z.boolean().optional().describe("Only show open restaurants"),
-      }),
+      input: SearchRestaurantsInput,
       output: z.object({
         restaurants: z.array(RestaurantSchema),
         count: z.number(),
@@ -134,23 +151,26 @@ const app = createApp({
         readOnlyHint: true,
         idempotentHint: true,
       },
-      handler: async ({ cuisine, maxDistance, minRating, maxPrice, openOnly }, context) => {
+      handler: async (input, context) => {
         let results = [...restaurants];
 
         // Apply filters
-        if (cuisine && cuisine !== "any") {
-          results = results.filter((r) => r.cuisine === cuisine);
+        if (input.cuisine && input.cuisine !== "any") {
+          results = results.filter((r) => r.cuisine === input.cuisine);
         }
-        if (maxDistance !== undefined) {
+        if (input.maxDistance !== undefined) {
+          const maxDistance = input.maxDistance;
           results = results.filter((r) => r.distance <= maxDistance);
         }
-        if (minRating !== undefined) {
+        if (input.minRating !== undefined) {
+          const minRating = input.minRating;
           results = results.filter((r) => r.rating >= minRating);
         }
-        if (maxPrice !== undefined) {
+        if (input.maxPrice !== undefined) {
+          const maxPrice = input.maxPrice;
           results = results.filter((r) => r.priceLevel <= maxPrice);
         }
-        if (openOnly) {
+        if (input.openOnly) {
           results = results.filter((r) => r.openNow);
         }
 
@@ -164,19 +184,18 @@ const app = createApp({
           restaurants: results,
           count: results.length,
           searchArea,
+          _text: `Found ${results.length} restaurant${results.length !== 1 ? "s" : ""}`,
         };
       },
-    },
+    }),
 
     // =========================================================================
     // GET RESTAURANT DETAILS
     // =========================================================================
-    getRestaurantDetails: {
+    getRestaurantDetails: defineTool({
       title: "Get Restaurant Details",
       description: "Get detailed information about a specific restaurant",
-      input: z.object({
-        restaurantId: z.string().describe("Restaurant ID"),
-      }),
+      input: GetRestaurantDetailsInput,
       output: z.object({
         restaurant: RestaurantSchema.nullable(),
         message: z.string(),
@@ -187,32 +206,32 @@ const app = createApp({
         readOnlyHint: true,
         idempotentHint: true,
       },
-      handler: async ({ restaurantId }) => {
-        const restaurant = restaurants.find((r) => r.id === restaurantId);
+      handler: async (input) => {
+        const restaurant = restaurants.find((r) => r.id === input.restaurantId);
 
         if (!restaurant) {
           return {
             restaurant: null,
-            message: `Restaurant with ID "${restaurantId}" not found`,
+            message: `Restaurant with ID "${input.restaurantId}" not found`,
+            _text: `Restaurant with ID "${input.restaurantId}" not found`,
           };
         }
 
         return {
           restaurant,
           message: `Found ${restaurant.name}`,
+          _text: `Found ${restaurant.name}`,
         };
       },
-    },
+    }),
 
     // =========================================================================
     // GET RECOMMENDATIONS
     // =========================================================================
-    getRecommendations: {
+    getRecommendations: defineTool({
       title: "Get Recommendations",
       description: "Get personalized restaurant recommendations",
-      input: z.object({
-        mood: z.enum(["quick", "romantic", "family", "business"]).describe("Dining mood"),
-      }),
+      input: GetRecommendationsInput,
       output: z.object({
         recommendations: z.array(RestaurantSchema),
         reason: z.string(),
@@ -222,11 +241,11 @@ const app = createApp({
       annotations: {
         readOnlyHint: true,
       },
-      handler: async ({ mood }, context) => {
+      handler: async (input, context) => {
         let filtered: Restaurant[];
         let reason: string;
 
-        switch (mood) {
+        switch (input.mood) {
           case "quick":
             filtered = restaurants.filter((r) => r.distance < 1 && r.priceLevel <= 2).slice(0, 3);
             reason = "Quick bites near you";
@@ -254,10 +273,10 @@ const app = createApp({
         return {
           recommendations: filtered,
           reason,
-          _meta: { timezone, mood },
+          _meta: { timezone, mood: input.mood },
         };
       },
-    },
+    }),
   },
 
   // ===========================================================================

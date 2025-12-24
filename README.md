@@ -1,7 +1,7 @@
 # MCP AppsKit
 
 [![Publish to npm](https://github.com/AndurilCode/mcp-apps-kit/actions/workflows/publish.yml/badge.svg?branch=main)](https://github.com/AndurilCode/mcp-apps-kit/actions/workflows/publish.yml)
-[![Node >=18](https://img.shields.io/node/v/%40mcp-apps-kit%2Fcore?label=node&logo=node.js&logoColor=white)](https://www.npmjs.com/package/@mcp-apps-kit/core)
+[![Node >=20](https://img.shields.io/node/v/%40mcp-apps-kit%2Fcore?label=node&logo=node.js&logoColor=white)](https://www.npmjs.com/package/@mcp-apps-kit/core)
 [![License MIT](https://img.shields.io/npm/l/%40mcp-apps-kit%2Fcore?label=license)](https://github.com/AndurilCode/mcp-apps-kit/blob/main/LICENSE)
 
 [![npm @mcp-apps-kit/core](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fcore?label=%40mcp-apps-kit%2Fcore&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/core)
@@ -46,7 +46,7 @@ This project may be a poor fit if you:
 
 ## Compatibility Policy
 
-- **Node.js**: `>= 18` (see `@mcp-apps-kit/core` engines)
+- **Node.js**: `>= 20` (see `@mcp-apps-kit/core` engines)
 - **MCP SDK**: `@mcp-apps-kit/core` depends on `@modelcontextprotocol/sdk` and is the only place that should need to change when the MCP SDK changes.
 - **Versioning**: breaking changes in supported protocol behavior or public APIs ship as a new major of `@mcp-apps-kit/*`.
 
@@ -76,7 +76,7 @@ npm install @mcp-apps-kit/core @mcp-apps-kit/ui-react zod
 
 ```typescript
 // server/index.ts
-import { createApp, type ClientToolsFromCore } from "@mcp-apps-kit/core";
+import { createApp, defineTool, type ClientToolsFromCore } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 const app = createApp({
@@ -84,7 +84,7 @@ const app = createApp({
   version: "1.0.0",
 
   tools: {
-    search_restaurants: {
+    search_restaurants: defineTool({
       description: "Search for restaurants by location",
       input: z.object({
         location: z.string(),
@@ -100,8 +100,9 @@ const app = createApp({
           })
         ),
       }),
-      handler: async ({ location, cuisine }) => {
-        const results = await fetchRestaurants(location, cuisine);
+      handler: async (input) => {
+        // input is fully typed! No type assertion needed
+        const results = await fetchRestaurants(input.location, input.cuisine);
         return {
           count: results.length,
           restaurants: results,
@@ -109,7 +110,7 @@ const app = createApp({
         };
       },
       ui: "restaurant-list",
-    },
+    }),
   },
 
   ui: {
@@ -176,6 +177,51 @@ function RestaurantList() {
 | `@mcp-apps-kit/ui`         | Client-side SDK (vanilla JS) |
 | `@mcp-apps-kit/ui-react`   | React bindings               |
 | `@mcp-apps-kit/create-app` | CLI scaffolding tool         |
+
+## Type-Safe Tool Definitions
+
+### The `defineTool` Helper
+
+Use the `defineTool` helper function to get full TypeScript type inference in your handlers without manual type assertions:
+
+```typescript
+import { defineTool } from "@mcp-apps-kit/core";
+
+tools: {
+  greet: defineTool({
+    input: z.object({ name: z.string() }),
+    handler: async (input, context) => {
+      // ✅ input.name is fully typed - no assertion needed!
+      return { message: `Hello ${input.name}` };
+    }
+  }),
+}
+```
+
+**Why `defineTool`?**
+
+With Zod v4, TypeScript cannot infer concrete schema types across module boundaries when using generic `z.ZodType`. The `defineTool` helper captures the specific schema type at the call site, enabling proper type inference without manual `as z.infer<typeof Schema>` assertions.
+
+This pattern is similar to helpers in other TypeScript frameworks:
+
+- tRPC's `procedure()`
+- Hono's `createRoute()`
+- Fastify's `route<{ Body: ... }>()`
+
+**Note:** You can still use the object syntax without `defineTool`, but you'll need to add type assertions in your handlers:
+
+```typescript
+// Without defineTool (requires type assertion)
+tools: {
+  greet: {
+    input: GreetSchema,
+    handler: async (input) => {
+      const typed = input as z.infer<typeof GreetSchema>;
+      return { message: `Hello ${typed.name}` };
+    }
+  }
+}
+```
 
 ## How It Works
 
