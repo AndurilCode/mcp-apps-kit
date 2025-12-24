@@ -79,6 +79,7 @@ export {
   createConditionalMiddleware,
   createTimeoutMiddleware,
 } from "./middleware/types";
+export { MiddlewareChain } from "./middleware/MiddlewareChain";
 
 // Event types
 export type {

@@ -44,21 +44,25 @@ export class MiddlewareChain {
 
     let index = 0;
 
-    const dispatch = async (): Promise<void> => {
+    const dispatch = async (fromMiddlewareIndex?: number): Promise<void> => {
+      // Track next() calls for the middleware that called dispatch
+      if (fromMiddlewareIndex !== undefined) {
+        const callCount = this.nextCallCounts.get(fromMiddlewareIndex) ?? 0;
+        if (callCount > 0) {
+          throw new MultipleNextCallsError(fromMiddlewareIndex);
+        }
+        this.nextCallCounts.set(fromMiddlewareIndex, callCount + 1);
+      }
+
       if (index < this.middleware.length) {
         const currentMiddlewareIndex = index;
         index++;
-        
-        // Check if this middleware has already called next()
-        const callCount = this.nextCallCounts.get(currentMiddlewareIndex) ?? 0;
-        if (callCount > 0) {
-          throw new MultipleNextCallsError(currentMiddlewareIndex);
-        }
-        this.nextCallCounts.set(currentMiddlewareIndex, callCount + 1);
-        
+
         const fn = this.middleware[currentMiddlewareIndex];
         if (fn) {
-          await fn(context, dispatch);
+          // Create a next() function that tracks which middleware is calling it
+          const next = () => dispatch(currentMiddlewareIndex);
+          await fn(context, next);
         }
       } else {
         // All middleware complete, execute handler
@@ -66,6 +70,7 @@ export class MiddlewareChain {
       }
     };
 
+    // Start the chain (not called by any middleware)
     await dispatch();
   }
 

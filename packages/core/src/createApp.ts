@@ -7,9 +7,11 @@
 import type { ToolDefs, App, StartOptions, McpServer, ExpressMiddleware } from "./types/tools";
 import type { AppConfig } from "./types/config";
 import type { UIDefs } from "./types/ui";
+import type { Middleware } from "./middleware/types";
 import { AppError, ErrorCode } from "./utils/errors";
 import { createServerInstance, type ServerInstance } from "./server/index";
 import { PluginManager } from "./plugins/PluginManager";
+import { MiddlewareChain } from "./middleware/MiddlewareChain";
 
 /**
  * Validate app configuration
@@ -74,11 +76,16 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
   const pluginManager = new PluginManager(config.plugins ?? []);
   let pluginInitialized = false;
 
+  // Initialize middleware chain
+  const middlewareChain = new MiddlewareChain();
+
   // Create server instance (lazy initialization)
   let serverInstance: ServerInstance | null = null;
 
   function getServerInstance(): ServerInstance {
     serverInstance ??= createServerInstance(config, pluginManager);
+    // Attach middleware chain to server instance for tool execution
+    (serverInstance as any).middlewareChain = middlewareChain;
     return serverInstance;
   }
 
@@ -132,10 +139,14 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
     },
 
     /**
-     * Register middleware (stub - not yet implemented)
+     * Register middleware
+     *
+     * Middleware executes in registration order before tool handlers.
+     *
+     * @param middleware - Middleware function to register
      */
-    use: () => {
-      throw new Error("Middleware not yet implemented");
+    use: (middleware: Middleware) => {
+      middlewareChain.use(middleware);
     },
 
     /**
