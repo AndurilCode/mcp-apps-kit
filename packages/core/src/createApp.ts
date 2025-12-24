@@ -4,16 +4,7 @@
  * Creates an MCP app with unified tool and UI definitions.
  */
 
-import type { z } from "zod";
-import type {
-  ToolDefs,
-  ToolDef,
-  ToolContext,
-  App,
-  StartOptions,
-  McpServer,
-  ExpressMiddleware,
-} from "./types/tools";
+import type { ToolDefs, App, StartOptions, McpServer, ExpressMiddleware } from "./types/tools";
 import type { AppConfig } from "./types/config";
 import type { UIDefs } from "./types/ui";
 import { AppError, ErrorCode } from "./utils/errors";
@@ -131,45 +122,6 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
 }
 
 /**
- * Define a tool with type inference (optional helper)
- *
- * This is an optional helper for better IDE experience.
- * You can also define tools inline in the `tools` object.
- *
- * @param def - Tool definition
- * @returns The same tool definition (for type inference)
- *
- * @example
- * ```typescript
- * const greetTool = defineTool({
- *   description: "Greet a user",
- *   input: z.object({ name: z.string() }),
- *   output: z.object({ message: z.string() }),
- *   handler: async (input, context) => {
- *     // input is properly typed as { name: string }
- *     return { message: `Hello, ${input.name}!` };
- *   },
- * });
- * ```
- */
-export function defineTool<TInput extends z.ZodType, TOutput extends z.ZodType = z.ZodType>(
-  def: Omit<ToolDef<TInput, TOutput>, "handler"> & {
-    handler: (
-      input: z.infer<TInput>,
-      context: ToolContext
-    ) => Promise<
-      z.infer<TOutput> & {
-        _meta?: Record<string, unknown>;
-        _text?: string;
-        _closeWidget?: boolean;
-      }
-    >;
-  }
-): ToolDef<TInput, TOutput> {
-  return def as ToolDef<TInput, TOutput>;
-}
-
-/**
  * Define a UI resource with type inference (optional helper)
  *
  * @param def - UI resource definition
@@ -186,3 +138,6 @@ export function defineTool<TInput extends z.ZodType, TOutput extends z.ZodType =
 export function defineUI<T>(def: T): T {
   return def;
 }
+
+// Re-export defineTool from types/tools for convenience
+export { defineTool } from "./types/tools";

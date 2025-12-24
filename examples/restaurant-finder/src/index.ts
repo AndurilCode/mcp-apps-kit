@@ -159,13 +159,16 @@ const app = createApp({
           results = results.filter((r) => r.cuisine === input.cuisine);
         }
         if (input.maxDistance !== undefined) {
-          results = results.filter((r) => r.distance <= input.maxDistance!);
+          const maxDistance = input.maxDistance;
+          results = results.filter((r) => r.distance <= maxDistance);
         }
         if (input.minRating !== undefined) {
-          results = results.filter((r) => r.rating >= input.minRating!);
+          const minRating = input.minRating;
+          results = results.filter((r) => r.rating >= minRating);
         }
         if (input.maxPrice !== undefined) {
-          results = results.filter((r) => r.priceLevel <= input.maxPrice!);
+          const maxPrice = input.maxPrice;
+          results = results.filter((r) => r.priceLevel <= maxPrice);
         }
         if (input.openOnly) {
           results = results.filter((r) => r.openNow);

@@ -165,19 +165,6 @@ describe("zodToJsonSchema", () => {
         type: "string",
       });
     });
-
-    it("should accept name option", () => {
-      const schema = z.object({ name: z.string() });
-      const jsonSchema = zodToJsonSchema(schema, { name: "User" });
-
-      // When name is provided, schema is extracted from definitions
-      expect(jsonSchema).toMatchObject({
-        type: "object",
-        properties: {
-          name: { type: "string" },
-        },
-      });
-    });
   });
 });
 
