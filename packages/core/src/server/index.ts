@@ -134,7 +134,6 @@ export function createServerInstance<T extends ToolDefs>(
       headers: req.headers as Record<string, string>,
       metadata: req.body?._meta,
       statusCode: res.statusCode,
-      body: req.body,
     });
   });
 
