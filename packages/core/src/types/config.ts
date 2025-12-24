@@ -4,6 +4,7 @@
 
 import type { ToolDefs } from "./tools";
 import type { UIDefs } from "./ui";
+import type { Plugin } from "../plugins/types";
 
 // =============================================================================
 // PROTOCOL CONFIGURATION
@@ -152,4 +153,22 @@ export interface AppConfig<T extends ToolDefs = ToolDefs> {
    * Global configuration options.
    */
   config?: GlobalConfig;
+
+  /**
+   * Plugins to extend app behavior.
+   * Plugins provide lifecycle hooks and execution hooks without modifying tool handlers.
+   *
+   * @example
+   * ```typescript
+   * import { loggingPlugin } from '@mcp-apps-kit/core';
+   *
+   * const config = {
+   *   // ... other config
+   *   plugins: [
+   *     loggingPlugin({ level: 'info' })
+   *   ]
+   * };
+   * ```
+   */
+  plugins?: Plugin[];
 }

@@ -64,9 +64,19 @@ export type {
   UILoadContext,
   InferPluginConfig,
 } from "./plugins/types";
+export { createPlugin } from "./plugins/types";
 
 // Middleware types
-export type { Middleware, MiddlewareContext, MultipleNextCallsError, MiddlewareTimeoutError } from "./middleware/types";
+export type { Middleware, MiddlewareContext } from "./middleware/types";
+export {
+  MultipleNextCallsError,
+  MiddlewareTimeoutError,
+  createTypedMiddleware,
+  composeMiddleware,
+  createErrorHandler,
+  createConditionalMiddleware,
+  createTimeoutMiddleware,
+} from "./middleware/types";
 
 // Event types
 export type {
@@ -79,7 +89,12 @@ export type {
   EventEmitterOptions,
   EventEmitterStats,
   EventListenerInfo,
+} from "./events/types";
+export {
   MaxListenersExceededError,
+  createValidatedHandler,
+  createDebouncedHandler,
+  createBatchedHandler,
 } from "./events/types";
 
 // =============================================================================
