@@ -4,7 +4,7 @@ Thanks for contributing! This repo is a PNPM + Nx monorepo.
 
 ## Prerequisites
 
-- Node.js `>= 18`
+- Node.js `>= 20`
 - PNPM (this repo pins `pnpm@10.x` via `packageManager`)
 
 ## Setup
