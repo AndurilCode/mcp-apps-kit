@@ -99,6 +99,7 @@ export {
   createDebouncedHandler,
   createBatchedHandler,
 } from "./events/types";
+export { TypedEventEmitter } from "./events/EventEmitter";
 
 // =============================================================================
 // UTILITY EXPORTS
