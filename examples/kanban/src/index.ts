@@ -331,8 +331,6 @@ const app = createApp({
     // =========================================================================
     // DELETE TASK (Widget-only tool)
     // =========================================================================
-    // DELETE TASK (Widget-only tool)
-    // =========================================================================
     deleteTask: defineTool({
       title: "Delete Task",
       description: "Delete a task from the Kanban board",
