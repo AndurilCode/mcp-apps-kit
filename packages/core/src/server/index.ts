@@ -84,7 +84,7 @@ export function createServerInstance<T extends ToolDefs>(
 
   // Register UI resources with MCP server
   if (config.ui) {
-    registerUIResources(mcpServer, config.ui, adapter, uiUriMap);
+    registerUIResources(mcpServer, config.ui, adapter, uiUriMap, pluginManager);
   }
 
   // Create Express app
@@ -102,6 +102,14 @@ export function createServerInstance<T extends ToolDefs>(
   // Setup stateless Streamable HTTP endpoint for MCP
   // Each request creates a fresh transport (no session management)
   expressApp.post("/mcp", async (req: Request, res: Response) => {
+    // Call onRequest hook
+    void pluginManager.executeHook("onRequest", {
+      method: req.method,
+      path: req.path,
+      headers: req.headers as Record<string, string>,
+      metadata: req.body?._meta,
+    });
+
     // Create stateless transport (sessionIdGenerator: undefined)
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
@@ -118,6 +126,16 @@ export function createServerInstance<T extends ToolDefs>(
 
     // Handle the request
     await transport.handleRequest(req, res, req.body);
+
+    // Call onResponse hook after request is handled
+    void pluginManager.executeHook("onResponse", {
+      method: req.method,
+      path: req.path,
+      headers: req.headers as Record<string, string>,
+      metadata: req.body?._meta,
+      statusCode: res.statusCode,
+      body: req.body,
+    });
   });
 
   // GET endpoint - not needed for stateless mode
@@ -632,7 +650,8 @@ function registerUIResources(
   mcpServer: McpServer,
   ui: UIDefs,
   adapter: ProtocolAdapter,
-  uiUriMap: Record<string, { uri: string; html: string }>
+  uiUriMap: Record<string, { uri: string; html: string }>,
+  pluginManager: PluginManager
 ): void {
   for (const [key, uiDef] of Object.entries(ui)) {
     const uiEntry = uiUriMap[key];
@@ -655,16 +674,24 @@ function registerUIResources(
     }
 
     // Register the resource with pre-loaded HTML
-    mcpServer.registerResource(uiDef.name ?? key, uri, metadata, () => ({
-      contents: [
-        {
-          uri,
-          mimeType,
-          text: html,
-          ...(_meta && { _meta }),
-        },
-      ],
-    }));
+    mcpServer.registerResource(uiDef.name ?? key, uri, metadata, () => {
+      // Call onUILoad hook when UI resource is loaded
+      void pluginManager.executeHook("onUILoad", {
+        uiKey: key,
+        uri,
+      });
+
+      return {
+        contents: [
+          {
+            uri,
+            mimeType,
+            text: html,
+            ...(_meta && { _meta }),
+          },
+        ],
+      };
+    });
   }
 }
 
