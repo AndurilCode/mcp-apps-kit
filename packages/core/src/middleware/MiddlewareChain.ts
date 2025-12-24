@@ -19,7 +19,6 @@ import { MultipleNextCallsError } from "./types";
  */
 export class MiddlewareChain {
   private middleware: Middleware[] = [];
-  private nextCallCounts: Map<number, number> = new Map();
 
   /**
    * Register middleware function
@@ -39,19 +38,19 @@ export class MiddlewareChain {
    * @param handler - Final handler to execute after middleware
    */
   async execute(context: MiddlewareContext, handler: () => Promise<void>): Promise<void> {
-    // Reset next() call tracking for this execution
-    this.nextCallCounts.clear();
+    // Create per-execution next() call tracking to prevent race conditions
+    const nextCallCounts: Map<number, number> = new Map();
 
     let index = 0;
 
     const dispatch = async (fromMiddlewareIndex?: number): Promise<void> => {
       // Track next() calls for the middleware that called dispatch
       if (fromMiddlewareIndex !== undefined) {
-        const callCount = this.nextCallCounts.get(fromMiddlewareIndex) ?? 0;
+        const callCount = nextCallCounts.get(fromMiddlewareIndex) ?? 0;
         if (callCount > 0) {
           throw new MultipleNextCallsError(fromMiddlewareIndex);
         }
-        this.nextCallCounts.set(fromMiddlewareIndex, callCount + 1);
+        nextCallCounts.set(fromMiddlewareIndex, callCount + 1);
       }
 
       if (index < this.middleware.length) {

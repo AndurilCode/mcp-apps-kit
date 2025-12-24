@@ -12,15 +12,34 @@
  * - Real tool execution with plugins
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createApp } from "../../src/createApp";
 import { createPlugin } from "../../src/index";
 import type { Plugin } from "../../src/index";
 import { z } from "zod";
+import express from "express";
+import type { AddressInfo } from "node:net";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
+
+let server: ReturnType<ReturnType<typeof express>["listen"]> | undefined;
+let transport: StreamableHTTPClientTransport | undefined;
 
 describe("Plugin Lifecycle Integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(async () => {
+    if (transport) {
+      await transport.close();
+      transport = undefined;
+    }
+    if (server) {
+      await new Promise<void>((resolve) => server!.close(() => resolve()));
+      server = undefined;
+    }
   });
 
   describe("Plugin Registration", () => {
@@ -267,9 +286,11 @@ describe("Plugin Lifecycle Integration", () => {
         },
       });
 
+      const onStartSpy = vi.fn();
+
       const goodPlugin = createPlugin({
         name: "good-plugin",
-        onStart: vi.fn(),
+        onStart: onStartSpy,
       });
 
       const app = createApp({
@@ -279,8 +300,19 @@ describe("Plugin Lifecycle Integration", () => {
         plugins: [badPlugin, goodPlugin],
       });
 
-      expect(app).toBeDefined();
-      // onStart errors are logged but don't prevent startup
+      // Start the app - it should succeed despite bad plugin throwing
+      await app.start({ transport: "stdio" });
+
+      // Good plugin's onStart should have been called
+      expect(onStartSpy).toHaveBeenCalled();
+      expect(onStartSpy).toHaveBeenCalledWith({ transport: "stdio" });
+
+      // Error from bad plugin should have been logged
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("bad-start-plugin"),
+        expect.anything()
+      );
 
       consoleErrorSpy.mockRestore();
     });
@@ -295,10 +327,13 @@ describe("Plugin Lifecycle Integration", () => {
         },
       });
 
+      const beforeToolCallSpy = vi.fn();
+      const afterToolCallSpy = vi.fn();
+
       const goodPlugin = createPlugin({
         name: "good-plugin",
-        beforeToolCall: vi.fn(),
-        afterToolCall: vi.fn(),
+        beforeToolCall: beforeToolCallSpy,
+        afterToolCall: afterToolCallSpy,
       });
 
       const app = createApp({
@@ -317,8 +352,39 @@ describe("Plugin Lifecycle Integration", () => {
         plugins: [badPlugin, goodPlugin],
       });
 
-      expect(app).toBeDefined();
-      // Tool should still execute even if plugin hook fails
+      // Set up HTTP server to test tool invocation through MCP protocol
+      const host = express();
+      host.use(app.handler());
+      server = host.listen(0);
+      const port = (server.address() as AddressInfo).port;
+
+      // Create MCP client and connect
+      const client = new Client({ name: "test-client", version: "1.0.0" });
+      transport = new StreamableHTTPClientTransport(new URL(`http://localhost:${port}/mcp`));
+      await client.connect(transport);
+
+      // Invoke the tool through the MCP protocol
+      const result = await client.request(
+        {
+          method: "tools/call",
+          params: {
+            name: "greet",
+            arguments: { name: "World" },
+          },
+        },
+        CallToolResultSchema
+      );
+
+      // Tool should still execute successfully despite bad plugin throwing
+      expect(result.isError).toBeFalsy();
+      expect(result.structuredContent).toEqual({ message: "Hello, World!" });
+
+      // Good plugin hooks should have been called
+      expect(beforeToolCallSpy).toHaveBeenCalled();
+      expect(afterToolCallSpy).toHaveBeenCalled();
+
+      // Error from bad plugin should have been logged
+      expect(consoleErrorSpy).toHaveBeenCalled();
 
       consoleErrorSpy.mockRestore();
     });

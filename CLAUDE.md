@@ -4,7 +4,7 @@ Auto-generated from all feature plans. Last updated: 2025-12-21
 
 ## Active Technologies
 - TypeScript >= 5.0.0 (strict mode enabled) (001-plugin-middleware-events)
-- N/A (stateless plugins, in-memory event handlers) (001-plugin-middleware-events)
+- Architecture: Stateless plugins, in-memory event handlers (001-plugin-middleware-events)
 
 - TypeScript >= 5.0.0 (strict mode) + Zod (schema validation), @modelcontextprotocol/sdk (MCP server), Express (HTTP server) (001-unified-mcp-sdk)
 

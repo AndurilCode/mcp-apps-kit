@@ -170,10 +170,13 @@ export function createServerInstance<T extends ToolDefs>(
             instance.httpServer = httpServer;
 
             // Call plugin onStart hooks
-            void (async () => {
-              await pluginManager.start({ port, transport: "http" });
-              resolve();
-            })();
+            pluginManager.start({ port, transport: "http" })
+              .then(() => {
+                resolve();
+              })
+              .catch((error: unknown) => {
+                reject(wrapError(error));
+              });
           });
           httpServer.on("error", reject);
         } catch (error) {
@@ -445,7 +448,7 @@ function registerTools(
           if (contextForErrorHandling !== undefined) {
             await pluginManager.executeHook("onToolError", {
               toolName: name,
-              input: parsed,
+              input: parsed ?? args,
               metadata: contextForErrorHandling,
             }, error as Error);
           }
