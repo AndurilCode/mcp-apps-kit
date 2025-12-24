@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createApp } from "../../src/createApp";
+import { createApp, defineTool } from "../../src/createApp";
 import type { EventMap } from "../../src/events/types";
 import { TypedEventEmitter } from "../../src/events/EventEmitter";
 import { z } from "zod";
@@ -124,14 +124,14 @@ describe("Event Emission Integration", () => {
         name: "test-app",
         version: "1.0.0",
         tools: {
-          greet: {
+          greet: defineTool({
             description: "Greet someone",
             input: z.object({ name: z.string() }),
             output: z.object({ message: z.string() }),
-            handler: (async ({ name }: { name: string }) => ({
+            handler: async ({ name }) => ({
               message: `Hello, ${name}!`,
-            })) as any,
-          },
+            }),
+          }),
         },
       });
 
@@ -148,14 +148,14 @@ describe("Event Emission Integration", () => {
         name: "test-app",
         version: "1.0.0",
         tools: {
-          add: {
+          add: defineTool({
             description: "Add numbers",
             input: z.object({ a: z.number(), b: z.number() }),
             output: z.object({ result: z.number() }),
-            handler: (async ({ a, b }: { a: number; b: number }) => ({
+            handler: async ({ a, b }) => ({
               result: a + b,
-            })) as any,
-          },
+            }),
+          }),
         },
       });
 
@@ -246,14 +246,14 @@ describe("Event Emission Integration", () => {
         name: "test-app",
         version: "1.0.0",
         tools: {
-          test: {
+          test: defineTool({
             description: "Test tool",
             input: z.object({}),
             output: z.object({ status: z.string() }),
-            handler: (async () => ({
+            handler: async () => ({
               status: "success",
-            })) as any,
-          },
+            }),
+          }),
         },
       });
 

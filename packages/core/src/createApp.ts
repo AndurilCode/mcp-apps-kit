@@ -92,6 +92,8 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
       serverInstance = createServerInstance(config, pluginManager);
       // Attach middleware chain to server instance for tool execution
       serverInstance.setMiddlewareChain(middlewareChain);
+      // Attach event emitter to server instance for event emission
+      serverInstance.setEventEmitter(eventEmitter);
     }
     return serverInstance;
   }

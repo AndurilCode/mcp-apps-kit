@@ -21,6 +21,8 @@ import type {
 import type { AppConfig, CORSConfig } from "../types/config";
 import type { UIDefs, UIDef } from "../types/ui";
 import type { MiddlewareContext } from "../middleware/types";
+import type { EventMap } from "../events/types";
+import type { TypedEventEmitter } from "../events/EventEmitter";
 import { formatZodError, wrapError } from "../utils/errors";
 import { createAdapter, type ProtocolAdapter } from "../adapters";
 import { PluginManager } from "../plugins/PluginManager";
@@ -42,6 +44,8 @@ export interface ServerInstance {
   httpServer?: Server;
   /** Set middleware chain (called by createApp) */
   setMiddlewareChain: (chain: MiddlewareChain) => void;
+  /** Set event emitter (called by createApp) */
+  setEventEmitter: (emitter: TypedEventEmitter<EventMap & Record<string, unknown>>) => void;
   /** Start the server */
   start: (options?: StartOptions) => Promise<void>;
   /** Stop the server */
@@ -73,9 +77,10 @@ export function createServerInstance<T extends ToolDefs>(
 
   // Will be set by createApp
   let middlewareChainRef: MiddlewareChain | undefined;
+  let eventEmitterRef: TypedEventEmitter<EventMap & Record<string, unknown>> | undefined;
 
   // Register tools with MCP server (pass UI URIs for correct binding and pluginManager)
-  registerTools(mcpServer, config.tools, adapter, config.name, uiUriMap, pluginManager, () => middlewareChainRef);
+  registerTools(mcpServer, config.tools, adapter, config.name, uiUriMap, pluginManager, () => middlewareChainRef, () => eventEmitterRef);
 
   // Register UI resources with MCP server
   if (config.ui) {
@@ -148,6 +153,10 @@ export function createServerInstance<T extends ToolDefs>(
 
     setMiddlewareChain: (chain: MiddlewareChain) => {
       middlewareChainRef = chain;
+    },
+
+    setEventEmitter: (emitter: TypedEventEmitter<EventMap & Record<string, unknown>>) => {
+      eventEmitterRef = emitter;
     },
 
     start: async (options: StartOptions = {}) => {
@@ -303,7 +312,8 @@ function registerTools(
   serverName: string,
   uiUriMap: Record<string, { uri: string; html: string }>,
   pluginManager: PluginManager,
-  getMiddlewareChain: () => MiddlewareChain | undefined
+  getMiddlewareChain: () => MiddlewareChain | undefined,
+  getEventEmitter: () => TypedEventEmitter<EventMap & Record<string, unknown>> | undefined
 ): void {
   for (const [name, toolDef] of Object.entries(tools)) {
     // Extract the Zod shape from z.object() for MCP SDK
@@ -334,6 +344,7 @@ function registerTools(
         // Declare in outer scope for error handling
         let parsed: unknown;
         let contextForErrorHandling: ToolContext | undefined = undefined;
+        const startTime = Date.now();
 
         try {
           // Validate input with Zod
@@ -348,6 +359,16 @@ function registerTools(
           // Create full context with state
           const context: ToolContext = { ...baseContext, state };
           contextForErrorHandling = context;
+
+          // Emit tool:called event
+          const eventEmitter = getEventEmitter();
+          if (eventEmitter) {
+            void eventEmitter.emit("tool:called", {
+              toolName: name,
+              input: parsed,
+              context,
+            });
+          }
 
           // Create middleware context
           const middlewareContext: MiddlewareContext = {
@@ -389,6 +410,16 @@ function registerTools(
             input: parsed,
             metadata: context,
           }, result);
+
+          // Emit tool:success event
+          const duration = Date.now() - startTime;
+          if (eventEmitter) {
+            void eventEmitter.emit("tool:success", {
+              toolName: name,
+              result,
+              duration,
+            });
+          }
 
           // Extract special fields from result
           const resultObj = result as Record<string, unknown>;
@@ -444,6 +475,8 @@ function registerTools(
             _meta: responseMeta,
           };
         } catch (error) {
+          const duration = Date.now() - startTime;
+
           // Execute plugin onToolError hooks (only if context was initialized)
           if (contextForErrorHandling !== undefined) {
             await pluginManager.executeHook("onToolError", {
@@ -451,6 +484,16 @@ function registerTools(
               input: parsed ?? args,
               metadata: contextForErrorHandling,
             }, error as Error);
+          }
+
+          // Emit tool:error event
+          const eventEmitter = getEventEmitter();
+          if (eventEmitter) {
+            void eventEmitter.emit("tool:error", {
+              toolName: name,
+              error: error as Error,
+              duration,
+            });
           }
 
           const appError = wrapError(error);
