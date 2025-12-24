@@ -154,6 +154,102 @@ const app = createApp({
 });
 ````
 
+## Plugins, Middleware & Events
+
+Extend your app with cross-cutting concerns (logging, authentication, analytics) using plugins, middleware, and events.
+
+### Plugins
+
+Plugins provide hooks into the application lifecycle and tool execution:
+
+```ts
+import { createPlugin } from "@mcp-apps-kit/core";
+
+const loggingPlugin = createPlugin({
+  name: "logger",
+  version: "1.0.0",
+
+  // Lifecycle hooks
+  onInit: async () => console.log("App initializing..."),
+  onStart: async () => console.log("App started"),
+
+  // Tool execution hooks
+  beforeToolCall: async (context) => {
+    console.log(`Tool called: ${context.toolName}`);
+  },
+  afterToolCall: async (context, result) => {
+    console.log(`Tool completed: ${context.toolName}`);
+  },
+  onToolError: async (context, error) => {
+    console.error(`Tool failed: ${context.toolName}`, error);
+  },
+});
+
+const app = createApp({
+  name: "my-app",
+  version: "1.0.0",
+  plugins: [loggingPlugin],
+  tools: { /* ... */ },
+});
+```
+
+### Middleware
+
+Middleware processes requests in a pipeline, similar to Express or Koa:
+
+```ts
+import type { Middleware } from "@mcp-apps-kit/core";
+
+// Request logging middleware
+const logger: Middleware = async (context, next) => {
+  const start = Date.now();
+  console.log(`Processing ${context.toolName}...`);
+
+  // Store data in context.state (shared with other middleware & handler)
+  context.state.set("startTime", start);
+
+  await next(); // Call next middleware or tool handler
+
+  const duration = Date.now() - start;
+  console.log(`${context.toolName} completed in ${duration}ms`);
+};
+
+// Register middleware (executed in order)
+app.use(logger);
+app.use(rateLimiter);
+app.use(authenticator);
+```
+
+### Events
+
+Listen to application events for analytics and monitoring:
+
+```ts
+// Track application lifecycle
+app.on("app:init", ({ config }) => {
+  console.log(`App initialized: ${config.name}`);
+});
+
+app.on("app:start", ({ transport }) => {
+  console.log(`Started with transport: ${transport}`);
+});
+
+// Monitor tool execution
+app.on("tool:called", ({ toolName, input }) => {
+  analytics.track("tool_called", { tool: toolName });
+});
+
+app.on("tool:success", ({ toolName, duration }) => {
+  metrics.timing("tool_duration", duration, { tool: toolName });
+});
+
+app.on("tool:error", ({ toolName, error }) => {
+  errorTracker.report(error, { tool: toolName });
+});
+```
+
+**See the [kanban example](../../examples/kanban/src/index.ts) for a complete demonstration.**
+
 ## What you get
 
 - A single place to define **tools** + **UI resources**
