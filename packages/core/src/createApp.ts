@@ -9,6 +9,7 @@ import type { AppConfig } from "./types/config";
 import type { UIDefs } from "./types/ui";
 import { AppError, ErrorCode } from "./utils/errors";
 import { createServerInstance, type ServerInstance } from "./server/index";
+import { PluginManager } from "./plugins/PluginManager";
 
 /**
  * Validate app configuration
@@ -69,11 +70,29 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
   // Validate config at runtime
   validateConfig<T>(config);
 
+  // Initialize plugin manager
+  const pluginManager = new PluginManager(config.plugins || []);
+
+  // Call plugin onInit hooks - this is intentionally synchronous (fire-and-forget)
+  // If plugins need to validate prerequisites, they should throw in onInit
+  // Note: We use a self-executing async function to handle the async init
+  (async () => {
+    try {
+      await pluginManager.init({
+        config,
+        tools: config.tools,
+      });
+    } catch (error) {
+      // Re-throw to propagate plugin init errors
+      throw error;
+    }
+  })();
+
   // Create server instance (lazy initialization)
   let serverInstance: ServerInstance | null = null;
 
   function getServerInstance(): ServerInstance {
-    serverInstance ??= createServerInstance(config);
+    serverInstance ??= createServerInstance(config, pluginManager);
     return serverInstance;
   }
 
@@ -115,6 +134,34 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
     handleRequest: async (req: Request, env?: unknown): Promise<Response> => {
       const server = getServerInstance();
       return server.handleRequest(req, env);
+    },
+
+    /**
+     * Register middleware (stub - not yet implemented)
+     */
+    use: () => {
+      throw new Error("Middleware not yet implemented");
+    },
+
+    /**
+     * Subscribe to event (stub - not yet implemented)
+     */
+    on: () => {
+      throw new Error("Events not yet implemented");
+    },
+
+    /**
+     * Subscribe to event once (stub - not yet implemented)
+     */
+    once: () => {
+      throw new Error("Events not yet implemented");
+    },
+
+    /**
+     * Subscribe to all events (stub - not yet implemented)
+     */
+    onAny: () => {
+      throw new Error("Events not yet implemented");
     },
   };
 

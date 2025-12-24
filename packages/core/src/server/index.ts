@@ -22,6 +22,7 @@ import type { AppConfig, CORSConfig } from "../types/config";
 import type { UIDefs, UIDef } from "../types/ui";
 import { formatZodError, wrapError } from "../utils/errors";
 import { createAdapter, type ProtocolAdapter } from "../adapters";
+import { PluginManager } from "../plugins/PluginManager";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
@@ -50,7 +51,10 @@ export interface ServerInstance {
 /**
  * Create an MCP server instance with tools registered
  */
-export function createServerInstance<T extends ToolDefs>(config: AppConfig<T>): ServerInstance {
+export function createServerInstance<T extends ToolDefs>(
+  config: AppConfig<T>,
+  pluginManager: PluginManager
+): ServerInstance {
   // Create protocol adapter
   const adapter = createAdapter(config.config?.protocol ?? "mcp");
 
@@ -63,8 +67,8 @@ export function createServerInstance<T extends ToolDefs>(config: AppConfig<T>): 
   // Compute UI resource URIs with content hashes for cache busting
   const uiUriMap = config.ui ? computeUIUris(config.name, config.ui) : {};
 
-  // Register tools with MCP server (pass UI URIs for correct binding)
-  registerTools(mcpServer, config.tools, adapter, config.name, uiUriMap);
+  // Register tools with MCP server (pass UI URIs for correct binding and pluginManager)
+  registerTools(mcpServer, config.tools, adapter, config.name, uiUriMap, pluginManager);
 
   // Register UI resources with MCP server
   if (config.ui) {
@@ -142,14 +146,21 @@ export function createServerInstance<T extends ToolDefs>(config: AppConfig<T>): 
         // Use stdio transport
         const stdioTransport = new StdioServerTransport();
         await mcpServer.connect(stdioTransport);
+
+        // Call plugin onStart hooks
+        await pluginManager.start({ transport: "stdio" });
         return;
       }
 
       // HTTP transport (default)
       return new Promise<void>((resolve, reject) => {
         try {
-          httpServer = expressApp.listen(port, () => {
+          httpServer = expressApp.listen(port, async () => {
             instance.httpServer = httpServer;
+
+            // Call plugin onStart hooks
+            await pluginManager.start({ port, transport: "http" });
+
             resolve();
           });
           httpServer.on("error", reject);
@@ -275,7 +286,8 @@ function registerTools(
   tools: ToolDefs,
   adapter: ProtocolAdapter,
   serverName: string,
-  uiUriMap: Record<string, { uri: string; html: string }>
+  uiUriMap: Record<string, { uri: string; html: string }>,
+  pluginManager: PluginManager
 ): void {
   for (const [name, toolDef] of Object.entries(tools)) {
     // Extract the Zod shape from z.object() for MCP SDK
@@ -303,15 +315,33 @@ function registerTools(
         _meta,
       },
       async (args: Record<string, unknown>, extra?: { _meta?: Record<string, unknown> }) => {
+        // Declare in outer scope for error handling
+        let parsed: unknown;
+        let context: ToolContext = {} as ToolContext;
+
         try {
           // Validate input with Zod
-          const parsed = toolDef.input.parse(args);
+          parsed = toolDef.input.parse(args);
 
           // Parse client-supplied _meta into typed context
-          const context = parseToolContext(extra?._meta);
+          context = parseToolContext(extra?._meta);
+
+          // Execute plugin beforeToolCall hooks
+          await pluginManager.executeHook("beforeToolCall", {
+            toolName: name,
+            input: parsed,
+            metadata: context,
+          });
 
           // Execute handler with input and context
           const result = await toolDef.handler(parsed, context);
+
+          // Execute plugin afterToolCall hooks
+          await pluginManager.executeHook("afterToolCall", {
+            toolName: name,
+            input: parsed,
+            metadata: context,
+          }, result);
 
           // Extract special fields from result
           const resultObj = result as Record<string, unknown>;
@@ -367,6 +397,15 @@ function registerTools(
             _meta: responseMeta,
           };
         } catch (error) {
+          // Execute plugin onToolError hooks (only if context was initialized)
+          if (context) {
+            await pluginManager.executeHook("onToolError", {
+              toolName: name,
+              input: parsed,
+              metadata: context,
+            }, error as Error);
+          }
+
           const appError = wrapError(error);
           throw new Error(`Tool execution failed: ${appError.message}`);
         }

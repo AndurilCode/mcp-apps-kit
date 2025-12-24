@@ -18,3 +18,9 @@ export type {
 } from "./types";
 
 export { createPlugin } from "./types";
+
+// Export PluginManager (internal use)
+export { PluginManager } from "./PluginManager";
+
+// Export built-in plugins
+export { loggingPlugin } from "./builtin/logging";

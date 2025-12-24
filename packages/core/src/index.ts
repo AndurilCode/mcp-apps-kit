@@ -65,6 +65,8 @@ export type {
   InferPluginConfig,
 } from "./plugins/types";
 export { createPlugin } from "./plugins/types";
+export { PluginManager } from "./plugins/PluginManager";
+export { loggingPlugin } from "./plugins/builtin/logging";
 
 // Middleware types
 export type { Middleware, MiddlewareContext } from "./middleware/types";
