@@ -29,7 +29,12 @@ describe("AppError", () => {
 
     it("should create error with cause", () => {
       const cause = new Error("Original error");
-      const error = new AppError(ErrorCode.INTERNAL_ERROR, "Something went wrong", undefined, cause);
+      const error = new AppError(
+        ErrorCode.INTERNAL_ERROR,
+        "Something went wrong",
+        undefined,
+        cause
+      );
 
       expect(error.cause).toBe(cause);
     });
@@ -54,11 +59,10 @@ describe("AppError", () => {
     });
 
     it("should include details in message", () => {
-      const error = new AppError(
-        ErrorCode.INVALID_INPUT,
-        "Validation failed",
-        { field: "email", reason: "invalid format" }
-      );
+      const error = new AppError(ErrorCode.INVALID_INPUT, "Validation failed", {
+        field: "email",
+        reason: "invalid format",
+      });
       const response = error.toMcpResponse();
 
       expect(response.content[0].text).toContain("Validation failed");
@@ -81,11 +85,7 @@ describe("AppError", () => {
 
   describe("toJSON", () => {
     it("should serialize error to JSON", () => {
-      const error = new AppError(
-        ErrorCode.VALIDATION_ERROR,
-        "Test error",
-        { key: "value" }
-      );
+      const error = new AppError(ErrorCode.VALIDATION_ERROR, "Test error", { key: "value" });
       const json = error.toJSON();
 
       expect(json).toMatchObject({
