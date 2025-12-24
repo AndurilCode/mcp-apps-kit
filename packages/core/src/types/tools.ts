@@ -4,6 +4,8 @@
 
 import type { z } from "zod";
 
+// Use Zod's built-in type inference utilities directly
+
 // =============================================================================
 // TOOL DEFINITIONS
 // =============================================================================
@@ -232,6 +234,46 @@ export interface ToolDef<
  * Collection of tool definitions
  */
 export type ToolDefs = Record<string, ToolDef>;
+
+// =============================================================================
+// TOOL DEFINITION HELPER
+// =============================================================================
+
+/**
+ * Helper function to define a tool with proper type inference.
+ *
+ * This helper solves TypeScript's generic type inference limitations
+ * by capturing the specific schema types at the call site.
+ *
+ * @example
+ * ```typescript
+ * const myTool = defineTool({
+ *   description: "My tool description",
+ *   input: z.object({ name: z.string() }),
+ *   output: z.object({ result: z.string() }),
+ *   handler: async (input, context) => {
+ *     // input is fully typed as { name: string }
+ *     return { result: `Hello ${input.name}` };
+ *   }
+ * });
+ * ```
+ */
+export function defineTool<TInput extends z.ZodType, TOutput extends z.ZodType>(
+  definition: Omit<ToolDef<TInput, TOutput>, "handler"> & {
+    handler: (
+      input: z.infer<TInput>,
+      context: ToolContext
+    ) => Promise<
+      z.infer<TOutput> & {
+        _meta?: Record<string, unknown>;
+        _text?: string;
+        _closeWidget?: boolean;
+      }
+    >;
+  }
+): ToolDef<TInput, TOutput> {
+  return definition as ToolDef<TInput, TOutput>;
+}
 
 // =============================================================================
 // APP INSTANCE

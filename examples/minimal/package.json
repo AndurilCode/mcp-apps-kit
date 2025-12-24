@@ -16,7 +16,7 @@
   "dependencies": {
     "@mcp-apps-kit/core": "workspace:*",
     "@mcp-apps-kit/ui": "workspace:*",
-    "zod": "^3.25.0"
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

@@ -4,7 +4,7 @@
  * Provides custom error classes and error formatting utilities.
  */
 
-import type { ZodError, ZodIssue } from "zod";
+import { z, type ZodError } from "zod";
 
 // =============================================================================
 // ERROR CODES
@@ -151,57 +151,9 @@ export class AppError extends Error {
 // =============================================================================
 
 /**
- * Format a single Zod issue into a human-readable message
- *
- * @param issue - Zod validation issue
- * @returns Formatted error message
- */
-function formatZodIssue(issue: ZodIssue): string {
-  const path = issue.path.length > 0 ? issue.path.join(".") : "input";
-
-  switch (issue.code) {
-    case "invalid_type":
-      return `${path}: expected ${issue.expected}, got ${issue.received}`;
-    case "invalid_literal":
-      return `${path}: expected ${JSON.stringify(issue.expected)}`;
-    case "unrecognized_keys":
-      return `${path}: unrecognized keys: ${issue.keys.join(", ")}`;
-    case "invalid_union":
-      return `${path}: invalid value for union type`;
-    case "invalid_enum_value":
-      return `${path}: expected one of ${issue.options.join(", ")}`;
-    case "invalid_arguments":
-      return `${path}: invalid function arguments`;
-    case "invalid_return_type":
-      return `${path}: invalid function return type`;
-    case "invalid_date":
-      return `${path}: invalid date`;
-    case "invalid_string":
-      if (issue.validation === "email") return `${path}: invalid email address`;
-      if (issue.validation === "url") return `${path}: invalid URL`;
-      if (issue.validation === "uuid") return `${path}: invalid UUID`;
-      return `${path}: invalid string format`;
-    case "too_small":
-      if (issue.type === "string") return `${path}: must be at least ${issue.minimum} characters`;
-      if (issue.type === "number") return `${path}: must be at least ${issue.minimum}`;
-      if (issue.type === "array") return `${path}: must have at least ${issue.minimum} items`;
-      return `${path}: value too small`;
-    case "too_big":
-      if (issue.type === "string") return `${path}: must be at most ${issue.maximum} characters`;
-      if (issue.type === "number") return `${path}: must be at most ${issue.maximum}`;
-      if (issue.type === "array") return `${path}: must have at most ${issue.maximum} items`;
-      return `${path}: value too large`;
-    case "custom":
-      return `${path}: ${issue.message}`;
-    default:
-      return `${path}: ${issue.message}`;
-  }
-}
-
-/**
  * Format a Zod error into a user-friendly AppError
  *
- * Converts raw Zod validation errors into readable messages.
+ * Uses Zod's built-in prettifyError for consistent, human-readable error messages.
  *
  * @param error - Zod validation error
  * @returns AppError with formatted message
@@ -215,12 +167,8 @@ function formatZodIssue(issue: ZodIssue): string {
  * ```
  */
 export function formatZodError(error: ZodError): AppError {
-  const issues = error.issues.map(formatZodIssue);
-
-  const message =
-    issues.length === 1
-      ? `Validation error: ${issues[0]}`
-      : `Validation errors:\n${issues.map((i) => `  - ${i}`).join("\n")}`;
+  // Use Zod's built-in prettifyError for human-readable formatting
+  const message = z.prettifyError(error);
 
   return new AppError(ErrorCode.VALIDATION_ERROR, message, {
     issues: error.issues.map((issue) => ({
