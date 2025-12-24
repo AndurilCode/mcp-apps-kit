@@ -8,10 +8,12 @@ import type { ToolDefs, App, StartOptions, McpServer, ExpressMiddleware } from "
 import type { AppConfig } from "./types/config";
 import type { UIDefs } from "./types/ui";
 import type { Middleware } from "./middleware/types";
+import type { EventMap } from "./events/types";
 import { AppError, ErrorCode } from "./utils/errors";
 import { createServerInstance, type ServerInstance } from "./server/index";
 import { PluginManager } from "./plugins/PluginManager";
 import { MiddlewareChain } from "./middleware/MiddlewareChain";
+import { TypedEventEmitter } from "./events/EventEmitter";
 
 /**
  * Validate app configuration
@@ -79,6 +81,9 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
   // Initialize middleware chain
   const middlewareChain = new MiddlewareChain();
 
+  // Initialize event emitter
+  const eventEmitter = new TypedEventEmitter<EventMap & Record<string, unknown>>();
+
   // Create server instance (lazy initialization)
   let serverInstance: ServerInstance | null = null;
 
@@ -111,9 +116,15 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
         });
         pluginInitialized = true;
       }
-      
+
       const server = getServerInstance();
       await server.start(options);
+
+      // Emit app:start event after server starts
+      await eventEmitter.emit("app:start", {
+        port: options?.port,
+        transport: options?.transport ?? "http",
+      });
     },
 
     /**
@@ -152,26 +163,30 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
     },
 
     /**
-     * Subscribe to event (stub - not yet implemented)
+     * Subscribe to event
      */
-    on: () => {
-      throw new Error("Events not yet implemented");
+    on: (event, handler) => {
+      return eventEmitter.on(event, handler);
     },
 
     /**
-     * Subscribe to event once (stub - not yet implemented)
+     * Subscribe to event once
      */
-    once: () => {
-      throw new Error("Events not yet implemented");
+    once: (event, handler) => {
+      return eventEmitter.once(event, handler);
     },
 
     /**
-     * Subscribe to all events (stub - not yet implemented)
+     * Subscribe to all events
      */
-    onAny: () => {
-      throw new Error("Events not yet implemented");
+    onAny: (handler) => {
+      return eventEmitter.onAny(handler);
     },
   };
+
+  // Emit app:init event after app is created
+  // Note: This happens synchronously during createApp
+  void eventEmitter.emit("app:init", { config });
 
   return app;
 }
