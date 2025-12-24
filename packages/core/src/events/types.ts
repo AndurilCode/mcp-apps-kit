@@ -4,7 +4,7 @@
  * @module events/types
  */
 
-import type { ToolContext, ToolDefs } from "../types/tools";
+import type { ToolContext, ToolDefs as _ToolDefs } from "../types/tools";
 import type { AppConfig } from "../types/config";
 
 // =============================================================================
@@ -25,7 +25,7 @@ export interface EventMap {
    */
   "app:init": {
     /** App configuration */
-    config: AppConfig<ToolDefs>;
+    config: AppConfig;
   };
 
   /**
@@ -270,7 +270,7 @@ export function createDebouncedHandler<T>(
   handler: EventHandler<T>,
   delayMs: number
 ): EventHandler<T> {
-  let timeoutId: NodeJS.Timeout | null = null;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
   let lastPayload: T | null = null;
 
   return (payload: T) => {
@@ -280,11 +280,22 @@ export function createDebouncedHandler<T>(
       clearTimeout(timeoutId);
     }
 
-    timeoutId = setTimeout(async () => {
-      if (lastPayload !== null) {
-        await handler(lastPayload);
-        lastPayload = null;
-      }
+    timeoutId = setTimeout(() => {
+      void (async () => {
+        if (lastPayload !== null) {
+          try {
+            await handler(lastPayload);
+          } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error(
+              'Debounced handler error:',
+              error instanceof Error ? error.message : String(error)
+            );
+          } finally {
+            lastPayload = null;
+          }
+        }
+      })();
     }, delayMs);
   };
 }
@@ -304,7 +315,7 @@ export function createBatchedHandler<T>(
   }
 ): EventHandler<T> {
   const batch: T[] = [];
-  let timeoutId: NodeJS.Timeout | null = null;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
   const flush = async (): Promise<void> => {
     if (batch.length === 0) return;

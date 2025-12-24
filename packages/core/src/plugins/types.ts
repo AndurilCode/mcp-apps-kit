@@ -17,7 +17,7 @@ import type { AppConfig } from "../types/config";
  */
 export interface PluginInitContext {
   /** App configuration */
-  config: AppConfig<ToolDefs>;
+  config: AppConfig;
   /** Tool definitions */
   tools: ToolDefs;
 }

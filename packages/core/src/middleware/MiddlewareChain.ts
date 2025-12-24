@@ -45,19 +45,21 @@ export class MiddlewareChain {
     let index = 0;
 
     const dispatch = async (): Promise<void> => {
-      // Check if this middleware has already called next()
-      const currentIndex = index - 1;
-      if (currentIndex >= 0) {
-        const callCount = this.nextCallCounts.get(currentIndex) || 0;
-        if (callCount > 0) {
-          throw new MultipleNextCallsError(currentIndex);
-        }
-        this.nextCallCounts.set(currentIndex, callCount + 1);
-      }
-
       if (index < this.middleware.length) {
-        const fn = this.middleware[index++];
-        await fn(context, dispatch);
+        const currentMiddlewareIndex = index;
+        index++;
+        
+        // Check if this middleware has already called next()
+        const callCount = this.nextCallCounts.get(currentMiddlewareIndex) ?? 0;
+        if (callCount > 0) {
+          throw new MultipleNextCallsError(currentMiddlewareIndex);
+        }
+        this.nextCallCounts.set(currentMiddlewareIndex, callCount + 1);
+        
+        const fn = this.middleware[currentMiddlewareIndex];
+        if (fn) {
+          await fn(context, dispatch);
+        }
       } else {
         // All middleware complete, execute handler
         await handler();

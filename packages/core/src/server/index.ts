@@ -155,13 +155,14 @@ export function createServerInstance<T extends ToolDefs>(
       // HTTP transport (default)
       return new Promise<void>((resolve, reject) => {
         try {
-          httpServer = expressApp.listen(port, async () => {
+          httpServer = expressApp.listen(port, () => {
             instance.httpServer = httpServer;
 
             // Call plugin onStart hooks
-            await pluginManager.start({ port, transport: "http" });
-
-            resolve();
+            void (async () => {
+              await pluginManager.start({ port, transport: "http" });
+              resolve();
+            })();
           });
           httpServer.on("error", reject);
         } catch (error) {
@@ -317,7 +318,7 @@ function registerTools(
       async (args: Record<string, unknown>, extra?: { _meta?: Record<string, unknown> }) => {
         // Declare in outer scope for error handling
         let parsed: unknown;
-        let context: ToolContext = {} as ToolContext;
+        let context: ToolContext | undefined = undefined;
 
         try {
           // Validate input with Zod
@@ -398,7 +399,7 @@ function registerTools(
           };
         } catch (error) {
           // Execute plugin onToolError hooks (only if context was initialized)
-          if (context) {
+          if (context !== undefined) {
             await pluginManager.executeHook("onToolError", {
               toolName: name,
               input: parsed,

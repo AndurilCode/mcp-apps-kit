@@ -70,23 +70,9 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
   // Validate config at runtime
   validateConfig<T>(config);
 
-  // Initialize plugin manager
-  const pluginManager = new PluginManager(config.plugins || []);
-
-  // Call plugin onInit hooks - this is intentionally synchronous (fire-and-forget)
-  // If plugins need to validate prerequisites, they should throw in onInit
-  // Note: We use a self-executing async function to handle the async init
-  (async () => {
-    try {
-      await pluginManager.init({
-        config,
-        tools: config.tools,
-      });
-    } catch (error) {
-      // Re-throw to propagate plugin init errors
-      throw error;
-    }
-  })();
+  // Initialize plugin manager (but defer init() call to app.start())
+  const pluginManager = new PluginManager(config.plugins ?? []);
+  let pluginInitialized = false;
 
   // Create server instance (lazy initialization)
   let serverInstance: ServerInstance | null = null;
@@ -108,6 +94,15 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
      * Start the built-in Express server
      */
     start: async (options?: StartOptions): Promise<void> => {
+      // Initialize plugins if not already done
+      if (!pluginInitialized) {
+        await pluginManager.init({
+          config,
+          tools: config.tools,
+        });
+        pluginInitialized = true;
+      }
+      
       const server = getServerInstance();
       await server.start(options);
     },

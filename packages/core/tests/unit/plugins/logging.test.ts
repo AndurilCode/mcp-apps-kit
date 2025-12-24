@@ -124,9 +124,9 @@ describe("Logging Plugin", () => {
     it("should log tool input", async () => {
       await loggingPlugin.beforeToolCall?.(toolContext);
 
-      expect(consoleLogSpy).toHaveBeenCalled();
-      const logMessage = consoleLogSpy.mock.calls[0][0];
-      expect(logMessage).toContain("Alice");
+      expect(consoleLogSpy).toHaveBeenCalledTimes(2); // Tool name + input
+      const inputLog = consoleLogSpy.mock.calls[1][0]; // Second call is input
+      expect(inputLog).toContain("Alice");
     });
 
     it("should log after tool call with result", async () => {
@@ -134,10 +134,11 @@ describe("Logging Plugin", () => {
 
       await loggingPlugin.afterToolCall?.(toolContext, result);
 
-      expect(consoleLogSpy).toHaveBeenCalled();
-      const logMessage = consoleLogSpy.mock.calls[0][0];
-      expect(logMessage).toContain("greet");
-      expect(logMessage).toContain("Hello, Alice!");
+      expect(consoleLogSpy).toHaveBeenCalledTimes(2); // Tool name + result
+      const toolNameLog = consoleLogSpy.mock.calls[0][0];
+      const resultLog = consoleLogSpy.mock.calls[1][0];
+      expect(toolNameLog).toContain("greet");
+      expect(resultLog).toContain("Hello, Alice!");
     });
 
     it("should log tool errors", async () => {
@@ -145,10 +146,11 @@ describe("Logging Plugin", () => {
 
       await loggingPlugin.onToolError?.(toolContext, error);
 
-      expect(consoleErrorSpy).toHaveBeenCalled();
-      const logMessage = consoleErrorSpy.mock.calls[0][0];
-      expect(logMessage).toContain("greet");
-      expect(logMessage).toContain("Tool execution failed");
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(3); // Tool name + error + stack
+      const toolNameLog = consoleErrorSpy.mock.calls[0][0];
+      const errorLog = consoleErrorSpy.mock.calls[1][0];
+      expect(toolNameLog).toContain("greet");
+      expect(errorLog).toContain("Tool execution failed");
     });
 
     it("should include error stack in error logs", async () => {
@@ -163,11 +165,17 @@ describe("Logging Plugin", () => {
   });
 
   describe("Log Level Filtering", () => {
+    beforeEach(() => {
+      consoleLogSpy.mockClear();
+      consoleErrorSpy.mockClear();
+    });
+
     it("should respect debug level configuration", async () => {
-      const debugPlugin = {
-        ...loggingPlugin,
-        config: { level: "debug" },
-      };
+      // Temporarily change config
+      const originalLevel = loggingPlugin.config?.level;
+      if (loggingPlugin.config) {
+        loggingPlugin.config.level = "debug";
+      }
 
       const context: ToolCallContext = {
         toolName: "greet",
@@ -175,16 +183,22 @@ describe("Logging Plugin", () => {
         metadata: {},
       };
 
-      await debugPlugin.beforeToolCall?.(context);
+      await loggingPlugin.beforeToolCall?.(context);
 
       expect(consoleLogSpy).toHaveBeenCalled();
+
+      // Restore original config
+      if (loggingPlugin.config && originalLevel) {
+        loggingPlugin.config.level = originalLevel;
+      }
     });
 
     it("should filter out debug logs when level is 'error'", async () => {
-      const errorOnlyPlugin = {
-        ...loggingPlugin,
-        config: { level: "error" },
-      };
+      // Temporarily change config
+      const originalLevel = loggingPlugin.config?.level;
+      if (loggingPlugin.config) {
+        loggingPlugin.config.level = "error";
+      }
 
       const context: ToolCallContext = {
         toolName: "greet",
@@ -192,14 +206,24 @@ describe("Logging Plugin", () => {
         metadata: {},
       };
 
-      await errorOnlyPlugin.beforeToolCall?.(context);
+      await loggingPlugin.beforeToolCall?.(context);
 
       // Debug/info logs should not appear
       expect(consoleLogSpy).not.toHaveBeenCalled();
+
+      // Restore original config
+      if (loggingPlugin.config && originalLevel) {
+        loggingPlugin.config.level = originalLevel;
+      }
     });
   });
 
   describe("Output Formatting", () => {
+    beforeEach(() => {
+      consoleLogSpy.mockClear();
+      consoleErrorSpy.mockClear();
+    });
+
     it("should format timestamps as ISO 8601", async () => {
       const context: ToolCallContext = {
         toolName: "greet",
@@ -224,10 +248,10 @@ describe("Logging Plugin", () => {
 
       await loggingPlugin.beforeToolCall?.(context);
 
-      expect(consoleLogSpy).toHaveBeenCalled();
-      const logMessage = consoleLogSpy.mock.calls[0][0];
-      expect(logMessage).toContain("Alice");
-      expect(logMessage).toContain("30");
+      expect(consoleLogSpy).toHaveBeenCalledTimes(2); // Tool name + input
+      const inputLog = consoleLogSpy.mock.calls[1][0]; // Second call is input
+      expect(inputLog).toContain("Alice");
+      expect(inputLog).toContain("30");
     });
 
     it("should handle circular references in objects", async () => {

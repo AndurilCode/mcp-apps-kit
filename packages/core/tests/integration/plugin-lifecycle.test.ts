@@ -104,21 +104,24 @@ describe("Plugin Lifecycle Integration", () => {
           greet: {
             description: "Greet a user",
             input: z.object({ name: z.string() }),
-            handler: async ({ name }) => {
+            handler: async (input, _context) => {
+              const { name } = input as { name: string };
               lifecycle.push("handler");
-              return { message: `Hello, ${name}!` };
+              return { message: `Hello, ${name}!` } as any;
             },
           },
         },
         plugins: [plugin],
       });
 
-      // App is created and initialized (onInit should be called)
-      expect(lifecycle).toContain("init");
+      // App is created but not yet initialized
+      expect(lifecycle).not.toContain("init");
 
-      // Simulate server start
-      // await app.start(); // This would call onStart
-      // For now, we test the structure
+      // Start the app (this triggers onInit and onStart)
+      await app.start({ transport: "stdio" });
+      
+      expect(lifecycle).toContain("init");
+      expect(lifecycle).toContain("start");
 
       expect(lifecycle.length).toBeGreaterThan(0);
     });
@@ -159,6 +162,12 @@ describe("Plugin Lifecycle Integration", () => {
         plugins: [plugin1, plugin2],
       });
 
+      // Init has not been called yet (deferred to start())
+      expect(hookOrder).toEqual([]);
+      
+      // Start the app to trigger onInit hooks
+      await app.start({ transport: "stdio" });
+
       // Verify init order
       expect(hookOrder).toEqual(["plugin-1:init", "plugin-2:init"]);
     });
@@ -185,9 +194,10 @@ describe("Plugin Lifecycle Integration", () => {
           greet: {
             description: "Greet a user",
             input: z.object({ name: z.string() }),
-            handler: async ({ name }) => {
-              executionLog.push(`handler:${name}`);
-              return { message: `Hello, ${name}!` };
+            handler: async (input, _context) => {
+              const { name } = input as { name: string };
+              executionLog.push("handler");
+              return { message: `Hello, ${name}!` } as any;
             },
           },
         },
@@ -229,7 +239,7 @@ describe("Plugin Lifecycle Integration", () => {
   });
 
   describe("Error Handling and Isolation", () => {
-    it("should fail app creation if plugin onInit throws", () => {
+    it("should fail app start if plugin onInit throws", async () => {
       const badPlugin = createPlugin({
         name: "bad-plugin",
         onInit: async () => {
@@ -237,14 +247,14 @@ describe("Plugin Lifecycle Integration", () => {
         },
       });
 
-      expect(() => {
-        createApp({
-          name: "test-app",
-          version: "1.0.0",
-          tools: {},
-          plugins: [badPlugin],
-        });
-      }).toThrow("Init failed");
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {},
+        plugins: [badPlugin],
+      });
+
+      await expect(app.start()).rejects.toThrow("Init failed");
     });
 
     it("should isolate errors in onStart - app still starts", async () => {
@@ -298,7 +308,10 @@ describe("Plugin Lifecycle Integration", () => {
           greet: {
             description: "Greet a user",
             input: z.object({ name: z.string() }),
-            handler: async ({ name }) => ({ message: `Hello, ${name}!` }),
+            handler: async (input, _context) => {
+              const { name } = input as { name: string };
+              return { message: `Hello, ${name}!` } as any;
+            },
           },
         },
         plugins: [badPlugin, goodPlugin],
@@ -385,7 +398,10 @@ describe("Plugin Lifecycle Integration", () => {
           greet: {
             description: "Greet a user",
             input: z.object({ name: z.string() }),
-            handler: async ({ name }) => ({ message: `Hello, ${name}!` }),
+            handler: async (input, _context) => {
+              const { name } = input as { name: string };
+              return { message: `Hello, ${name}!` } as any;
+            },
           },
         },
         plugins: [authPlugin, loggingPlugin, analyticsPlugin],
@@ -433,7 +449,10 @@ describe("Plugin Lifecycle Integration", () => {
           greet: {
             description: "Greet a user",
             input: z.object({ name: z.string() }),
-            handler: async ({ name }) => ({ message: `Hello, ${name}!` }),
+            handler: async (input, _context) => {
+              const { name } = input as { name: string };
+              return { message: `Hello, ${name}!` } as any;
+            },
           },
         },
       });

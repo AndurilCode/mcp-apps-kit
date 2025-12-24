@@ -65,7 +65,7 @@ function timestamp(): string {
 function safeStringify(obj: unknown): string {
   try {
     return JSON.stringify(obj, null, 2);
-  } catch (error) {
+  } catch {
     try {
       return JSON.stringify(obj, getCircularReplacer(), 2);
     } catch {
@@ -79,7 +79,7 @@ function safeStringify(obj: unknown): string {
  */
 function getCircularReplacer() {
   const seen = new WeakSet();
-  return (key: string, value: any) => {
+  return (_key: string, value: unknown): unknown => {
     if (typeof value === "object" && value !== null) {
       if (seen.has(value)) {
         return "[Circular]";
@@ -116,9 +116,10 @@ export const loggingPlugin = createPlugin({
   },
 
   onInit: async (context: PluginInitContext) => {
-    const level = getLogLevel(loggingPlugin.config?.level || "info");
+    const level = getLogLevel(loggingPlugin.config?.level ?? "info");
     if (level <= LogLevel.INFO) {
       const toolCount = Object.keys(context.tools).length;
+      // eslint-disable-next-line no-console
       console.log(
         `[${timestamp()}] [INFO] App initialized: ${context.config.name} v${context.config.version} (${toolCount} tools)`
       );
@@ -126,41 +127,50 @@ export const loggingPlugin = createPlugin({
   },
 
   onStart: async (context: PluginStartContext) => {
-    const level = getLogLevel(loggingPlugin.config?.level || "info");
+    const level = getLogLevel(loggingPlugin.config?.level ?? "info");
     if (level <= LogLevel.INFO) {
       if (context.transport === "http" && context.port) {
+        // eslint-disable-next-line no-console
         console.log(`[${timestamp()}] [INFO] Server started on port ${context.port} (HTTP)`);
       } else {
+        // eslint-disable-next-line no-console
         console.log(`[${timestamp()}] [INFO] Server started (stdio)`);
       }
     }
   },
 
   beforeToolCall: async (context: ToolCallContext) => {
-    const level = getLogLevel(loggingPlugin.config?.level || "info");
+    const level = getLogLevel(loggingPlugin.config?.level ?? "info");
     if (level <= LogLevel.INFO) {
       const inputStr = safeStringify(context.input);
       const metadataStr = context.metadata.locale ? ` [locale: ${context.metadata.locale}]` : "";
+      // eslint-disable-next-line no-console
       console.log(`[${timestamp()}] [INFO] Tool called: ${context.toolName}${metadataStr}`);
+      // eslint-disable-next-line no-console
       console.log(`  Input: ${inputStr}`);
     }
   },
 
   afterToolCall: async (context: ToolCallContext, result: unknown) => {
-    const level = getLogLevel(loggingPlugin.config?.level || "info");
+    const level = getLogLevel(loggingPlugin.config?.level ?? "info");
     if (level <= LogLevel.INFO) {
       const resultStr = safeStringify(result);
+      // eslint-disable-next-line no-console
       console.log(`[${timestamp()}] [INFO] Tool completed: ${context.toolName}`);
+      // eslint-disable-next-line no-console
       console.log(`  Result: ${resultStr}`);
     }
   },
 
   onToolError: async (context: ToolCallContext, error: Error) => {
-    const level = getLogLevel(loggingPlugin.config?.level || "info");
+    const level = getLogLevel(loggingPlugin.config?.level ?? "info");
     if (level <= LogLevel.ERROR) {
+      // eslint-disable-next-line no-console
       console.error(`[${timestamp()}] [ERROR] Tool failed: ${context.toolName}`);
+      // eslint-disable-next-line no-console
       console.error(`  Error: ${error.message}`);
       if (error.stack) {
+        // eslint-disable-next-line no-console
         console.error(`  Stack: ${error.stack}`);
       }
     }

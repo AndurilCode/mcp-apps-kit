@@ -126,7 +126,9 @@ export function composeMiddleware(middleware: Middleware[]): Middleware {
     const dispatch = async (): Promise<void> => {
       if (index < middleware.length) {
         const fn = middleware[index++];
-        await fn(context, dispatch);
+        if (fn) {
+          await fn(context, dispatch);
+        }
       } else {
         await next();
       }
@@ -182,13 +184,20 @@ export function createConditionalMiddleware(
  * Enforces timeout on middleware chain execution.
  */
 export function createTimeoutMiddleware(timeoutMs: number): Middleware {
-  return async (context, next) => {
+  return async (_context, next) => {
+    let timerId: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+      timerId = setTimeout(() => {
         reject(new MiddlewareTimeoutError(timeoutMs));
       }, timeoutMs);
     });
 
-    await Promise.race([next(), timeoutPromise]);
+    try {
+      await Promise.race([next(), timeoutPromise]);
+    } finally {
+      if (timerId !== undefined) {
+        clearTimeout(timerId);
+      }
+    }
   };
 }
