@@ -4,8 +4,7 @@
  * Provides custom error classes and error formatting utilities.
  */
 
-import type { ZodError } from "zod";
-import type { $ZodIssue } from "zod/v4/core";
+import { z, type ZodError } from "zod";
 
 // =============================================================================
 // ERROR CODES
@@ -152,171 +151,9 @@ export class AppError extends Error {
 // =============================================================================
 
 /**
- * Format a single Zod issue into a human-readable message
- *
- * Updated for Zod v4 issue format with comprehensive error code coverage.
- *
- * @param issue - Zod validation issue
- * @returns Formatted error message
- */
-function formatZodIssue(issue: $ZodIssue): string {
-  const path = issue.path.length > 0 ? issue.path.join(".") : "input";
-
-  // Use type assertion for accessing optional properties
-  const issueAny = issue as unknown as Record<string, unknown>;
-
-  switch (issue.code) {
-    case "invalid_type": {
-      const expectedVal = issueAny.expected;
-      const receivedVal = issueAny.received;
-
-      let expected = "unknown";
-      if (expectedVal !== null && expectedVal !== undefined) {
-        if (typeof expectedVal === "object") {
-          expected = JSON.stringify(expectedVal);
-        } else {
-          // eslint-disable-next-line @typescript-eslint/no-base-to-string -- typeof check ensures this is a primitive
-          expected = String(expectedVal);
-        }
-      }
-
-      let received = "unknown";
-      if (receivedVal !== null && receivedVal !== undefined) {
-        if (typeof receivedVal === "object") {
-          received = JSON.stringify(receivedVal);
-        } else {
-          // eslint-disable-next-line @typescript-eslint/no-base-to-string -- typeof check ensures this is a primitive
-          received = String(receivedVal);
-        }
-      }
-
-      return `${path}: expected ${expected}, received ${received}`;
-    }
-
-    case "unrecognized_keys": {
-      const keys = Array.isArray(issueAny.keys)
-        ? (issueAny.keys as string[]).join(", ")
-        : "unknown";
-      return `${path}: unrecognized keys: ${keys}`;
-    }
-
-    case "invalid_union":
-      return `${path}: invalid value for union type`;
-
-    case "invalid_value": {
-      // Handles enums and literal values in Zod v4
-      if (Array.isArray(issueAny.values) && issueAny.values.length > 0) {
-        const values = (issueAny.values as unknown[]).map((v) => JSON.stringify(v)).join(", ");
-        return `${path}: expected one of ${values}`;
-      }
-      return `${path}: invalid value`;
-    }
-
-    case "invalid_format": {
-      // Handles string format validations in Zod v4
-      const format = issueAny.format;
-      if (format === "email") return `${path}: invalid email address`;
-      if (format === "url") return `${path}: invalid URL`;
-      if (format === "uuid") return `${path}: invalid UUID`;
-      if (format === "cuid") return `${path}: invalid CUID`;
-      if (format === "cuid2") return `${path}: invalid CUID2`;
-      if (format === "ulid") return `${path}: invalid ULID`;
-      if (format === "datetime") return `${path}: invalid datetime format`;
-      if (format === "ip") return `${path}: invalid IP address`;
-      return `${path}: invalid ${typeof format === "string" ? format : "format"}`;
-    }
-
-    case "too_small": {
-      const origin = issueAny.origin as string | undefined;
-      const minimum = issueAny.minimum as number | undefined;
-      const inclusive = issueAny.inclusive !== false;
-
-      if (minimum === undefined) {
-        return `${path}: value too small`;
-      }
-
-      if (origin === "string") {
-        return `${path}: must be at least ${minimum} character${minimum !== 1 ? "s" : ""}`;
-      }
-      if (origin === "number") {
-        return `${path}: must be ${inclusive ? "at least" : "greater than"} ${minimum}`;
-      }
-      if (origin === "array") {
-        return `${path}: must have at least ${minimum} item${minimum !== 1 ? "s" : ""}`;
-      }
-      if (origin === "set") {
-        return `${path}: must have at least ${minimum} item${minimum !== 1 ? "s" : ""}`;
-      }
-      if (origin === "date") {
-        try {
-          const dateStr = new Date(minimum).toISOString();
-          return `${path}: date must be ${inclusive ? "on or after" : "after"} ${dateStr}`;
-        } catch {
-          return `${path}: date must be ${inclusive ? "on or after" : "after"} ${minimum}`;
-        }
-      }
-      return `${path}: value too small (minimum: ${minimum})`;
-    }
-
-    case "too_big": {
-      const origin = issueAny.origin as string | undefined;
-      const maximum = issueAny.maximum as number | undefined;
-      const inclusive = issueAny.inclusive !== false;
-
-      if (maximum === undefined) {
-        return `${path}: value too large`;
-      }
-
-      if (origin === "string") {
-        return `${path}: must be at most ${maximum} character${maximum !== 1 ? "s" : ""}`;
-      }
-      if (origin === "number") {
-        return `${path}: must be ${inclusive ? "at most" : "less than"} ${maximum}`;
-      }
-      if (origin === "array") {
-        return `${path}: must have at most ${maximum} item${maximum !== 1 ? "s" : ""}`;
-      }
-      if (origin === "set") {
-        return `${path}: must have at most ${maximum} item${maximum !== 1 ? "s" : ""}`;
-      }
-      if (origin === "date") {
-        try {
-          const dateStr = new Date(maximum).toISOString();
-          return `${path}: date must be ${inclusive ? "on or before" : "before"} ${dateStr}`;
-        } catch {
-          return `${path}: date must be ${inclusive ? "on or before" : "before"} ${maximum}`;
-        }
-      }
-      return `${path}: value too large (maximum: ${maximum})`;
-    }
-
-    case "not_multiple_of": {
-      const multipleOfVal = issueAny.multipleOf;
-      let multipleOf = "unknown";
-      if (multipleOfVal !== null && multipleOfVal !== undefined) {
-        if (typeof multipleOfVal === "object") {
-          multipleOf = JSON.stringify(multipleOfVal);
-        } else {
-          // eslint-disable-next-line @typescript-eslint/no-base-to-string -- typeof check ensures this is a primitive
-          multipleOf = String(multipleOfVal);
-        }
-      }
-      return `${path}: must be a multiple of ${multipleOf}`;
-    }
-
-    case "custom":
-      return `${path}: ${issue.message}`;
-
-    default:
-      // Fallback for any unmapped error codes
-      return `${path}: ${issue.message || "validation error"}`;
-  }
-}
-
-/**
  * Format a Zod error into a user-friendly AppError
  *
- * Converts raw Zod validation errors into readable messages.
+ * Uses Zod's built-in prettifyError for consistent, human-readable error messages.
  *
  * @param error - Zod validation error
  * @returns AppError with formatted message
@@ -330,12 +167,8 @@ function formatZodIssue(issue: $ZodIssue): string {
  * ```
  */
 export function formatZodError(error: ZodError): AppError {
-  const issues = error.issues.map(formatZodIssue);
-
-  const message =
-    issues.length === 1
-      ? `Validation error: ${issues[0]}`
-      : `Validation errors:\n${issues.map((i) => `  - ${i}`).join("\n")}`;
+  // Use Zod's built-in prettifyError for human-readable formatting
+  const message = z.prettifyError(error);
 
   return new AppError(ErrorCode.VALIDATION_ERROR, message, {
     issues: error.issues.map((issue) => ({
