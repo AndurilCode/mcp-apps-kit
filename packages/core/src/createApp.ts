@@ -4,7 +4,16 @@
  * Creates an MCP app with unified tool and UI definitions.
  */
 
-import type { ToolDefs, App, StartOptions, McpServer, ExpressMiddleware } from "./types/tools";
+import type { z } from "zod";
+import type {
+  ToolDefs,
+  ToolDef,
+  ToolContext,
+  App,
+  StartOptions,
+  McpServer,
+  ExpressMiddleware,
+} from "./types/tools";
 import type { AppConfig } from "./types/config";
 import type { UIDefs } from "./types/ui";
 import { AppError, ErrorCode } from "./utils/errors";
@@ -136,12 +145,29 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
  *   description: "Greet a user",
  *   input: z.object({ name: z.string() }),
  *   output: z.object({ message: z.string() }),
- *   handler: async ({ name }) => ({ message: `Hello, ${name}!` }),
+ *   handler: async (input, context) => {
+ *     // input is properly typed as { name: string }
+ *     return { message: `Hello, ${input.name}!` };
+ *   },
  * });
  * ```
  */
-export function defineTool<T>(def: T): T {
-  return def;
+export function defineTool<
+  TInput extends z.ZodType,
+  TOutput extends z.ZodType = z.ZodType,
+>(
+  def: Omit<ToolDef<TInput, TOutput>, "handler"> & {
+    handler: (
+      input: z.infer<TInput>,
+      context: ToolContext
+    ) => Promise<z.infer<TOutput> & {
+      _meta?: Record<string, unknown>;
+      _text?: string;
+      _closeWidget?: boolean;
+    }>;
+  }
+): ToolDef<TInput, TOutput> {
+  return def as ToolDef<TInput, TOutput>;
 }
 
 /**

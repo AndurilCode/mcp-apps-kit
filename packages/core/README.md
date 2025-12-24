@@ -20,48 +20,71 @@ npm install @mcp-apps-kit/core zod
 
 ## Quick start
 
-Create an app with one tool:
+Create an app with one tool using the `defineTool` helper for full type safety:
 
 ```ts
-import { createApp } from "@mcp-apps-kit/core";
+import { createApp, defineTool } from "@mcp-apps-kit/core";
 import { z } from "zod";
-
-// Define input schema separately for better type inference
-const greetInput = z.object({
-  name: z.string().describe("Name to greet"),
-});
 
 const app = createApp({
   name: "my-app",
   version: "1.0.0",
 
   tools: {
-    greet: {
+    greet: defineTool({
       description: "Greet a user",
-      input: greetInput,
+      input: z.object({
+        name: z.string().describe("Name to greet"),
+      }),
       output: z.object({ message: z.string() }),
       handler: async (input) => {
-        // Type assertion for Zod v4 cross-module type inference
-        const { name } = input as z.infer<typeof greetInput>;
-        return { message: `Hello, ${name}!` };
+        // input.name is fully typed - no assertion needed!
+        return { message: `Hello, ${input.name}!` };
       },
-    },
+    }),
   },
 });
 
 await app.start({ port: 3000 });
 ```
 
-## Zod v4 Best Practices
+## Type-Safe Tool Definitions
 
-This package uses **Zod v4** with its native JSON Schema conversion. For best results:
+### The `defineTool` Helper
 
-### Define Schemas Separately
-
-Extract input schemas before tool definitions for better type inference:
+Use `defineTool` to get automatic type inference in your handlers:
 
 ```ts
-// ✅ Good - schemas defined separately
+import { defineTool } from "@mcp-apps-kit/core";
+
+tools: {
+  search: defineTool({
+    input: z.object({
+      query: z.string(),
+      maxResults: z.number().optional(),
+    }),
+    handler: async (input) => {
+      // ✅ input.query and input.maxResults are fully typed!
+      return { results: await search(input.query, input.maxResults) };
+    },
+  }),
+}
+```
+
+**Why `defineTool`?**
+
+With Zod v4, TypeScript cannot infer concrete schema types across module boundaries when using generic `z.ZodType`. The `defineTool` helper captures specific schema types at the call site, enabling proper type inference without manual type assertions.
+
+### Alternative: Object Syntax with Type Assertions
+
+If you prefer not to use `defineTool`, you can use the object syntax directly, but you'll need type assertions:
+
+### Alternative: Object Syntax with Type Assertions
+
+If you prefer not to use `defineTool`, you can use the object syntax directly, but you'll need type assertions:
+
+```ts
+// Define schema separately
 const searchInput = z.object({
   query: z.string(),
   maxResults: z.number().optional(),
@@ -72,31 +95,18 @@ const app = createApp({
     search: {
       input: searchInput,
       handler: async (input) => {
+        // Manual type assertion required
         const typed = input as z.infer<typeof searchInput>;
-        // typed.query and typed.maxResults are properly typed
+        return { results: await search(typed.query, typed.maxResults) };
       },
     },
   },
 });
 ```
 
-```ts
-// ❌ Avoid - inline schemas can cause type inference issues
-const app = createApp({
-  tools: {
-    search: {
-      input: z.object({ query: z.string() }), // inline
-      handler: async (input) => {
-        // input may be 'unknown' in strict TypeScript
-      },
-    },
-  },
-});
-```
+## Zod v4 Schema Descriptions
 
-### Handler Type Assertions
-
-Use type assertions within handlers to work around Zod v4's cross-module type inference limitations:
+Use `.describe()` to add descriptions that appear in tool parameter documentation:
 
 ````ts
 handler: async (input, context) => {

@@ -6,9 +6,10 @@
  * - ToolContext usage (location, timezone)
  * - Different visibility settings
  * - Widget with complex data
+ * - Type-safe handlers using defineTool (no type assertions!)
  */
 
-import { createApp, type ClientToolsFromCore, type ToolContext } from "@mcp-apps-kit/core";
+import { createApp, defineTool, type ClientToolsFromCore, type ToolContext } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 // =============================================================================
@@ -127,9 +128,9 @@ const app = createApp({
 
   tools: {
     // =========================================================================
-    // SEARCH RESTAURANTS
+    // SEARCH RESTAURANTS (Model + Widget tool)
     // =========================================================================
-    searchRestaurants: {
+    searchRestaurants: defineTool({
       title: "Search Restaurants",
       description: "Search for restaurants with filters",
       input: SearchRestaurantsInput,
@@ -146,25 +147,22 @@ const app = createApp({
         idempotentHint: true,
       },
       handler: async (input, context) => {
-        // Type assertion required for Zod v4 generic function inference
-        // See: https://github.com/colinhacks/zod/blob/v4.0.1/packages/docs/content/generic-functions.mdx
-        const typedInput = input as z.infer<typeof SearchRestaurantsInput>;
         let results = [...restaurants];
 
         // Apply filters
-        if (typedInput.cuisine && typedInput.cuisine !== "any") {
-          results = results.filter((r) => r.cuisine === typedInput.cuisine);
+        if (input.cuisine && input.cuisine !== "any") {
+          results = results.filter((r) => r.cuisine === input.cuisine);
         }
-        if (typedInput.maxDistance !== undefined) {
-          results = results.filter((r) => r.distance <= typedInput.maxDistance!);
+        if (input.maxDistance !== undefined) {
+          results = results.filter((r) => r.distance <= input.maxDistance!);
         }
-        if (typedInput.minRating !== undefined) {
-          results = results.filter((r) => r.rating >= typedInput.minRating!);
+        if (input.minRating !== undefined) {
+          results = results.filter((r) => r.rating >= input.minRating!);
         }
-        if (typedInput.maxPrice !== undefined) {
-          results = results.filter((r) => r.priceLevel <= typedInput.maxPrice!);
+        if (input.maxPrice !== undefined) {
+          results = results.filter((r) => r.priceLevel <= input.maxPrice!);
         }
-        if (typedInput.openOnly) {
+        if (input.openOnly) {
           results = results.filter((r) => r.openNow);
         }
 
@@ -181,12 +179,12 @@ const app = createApp({
           _text: `Found ${results.length} restaurant${results.length !== 1 ? "s" : ""}`,
         };
       },
-    },
+    }),
 
     // =========================================================================
     // GET RESTAURANT DETAILS
     // =========================================================================
-    getRestaurantDetails: {
+    getRestaurantDetails: defineTool({
       title: "Get Restaurant Details",
       description: "Get detailed information about a specific restaurant",
       input: GetRestaurantDetailsInput,
@@ -201,14 +199,13 @@ const app = createApp({
         idempotentHint: true,
       },
       handler: async (input) => {
-        const typedInput = input as z.infer<typeof GetRestaurantDetailsInput>;
-        const restaurant = restaurants.find((r) => r.id === typedInput.restaurantId);
+        const restaurant = restaurants.find((r) => r.id === input.restaurantId);
 
         if (!restaurant) {
           return {
             restaurant: null,
-            message: `Restaurant with ID "${typedInput.restaurantId}" not found`,
-            _text: `Restaurant with ID "${typedInput.restaurantId}" not found`,
+            message: `Restaurant with ID "${input.restaurantId}" not found`,
+            _text: `Restaurant with ID "${input.restaurantId}" not found`,
           };
         }
 
@@ -218,12 +215,12 @@ const app = createApp({
           _text: `Found ${restaurant.name}`,
         };
       },
-    },
+    }),
 
     // =========================================================================
     // GET RECOMMENDATIONS
     // =========================================================================
-    getRecommendations: {
+    getRecommendations: defineTool({
       title: "Get Recommendations",
       description: "Get personalized restaurant recommendations",
       input: GetRecommendationsInput,
@@ -237,11 +234,10 @@ const app = createApp({
         readOnlyHint: true,
       },
       handler: async (input, context) => {
-        const typedInput = input as z.infer<typeof GetRecommendationsInput>;
         let filtered: Restaurant[];
         let reason: string;
 
-        switch (typedInput.mood) {
+        switch (input.mood) {
           case "quick":
             filtered = restaurants.filter((r) => r.distance < 1 && r.priceLevel <= 2).slice(0, 3);
             reason = "Quick bites near you";
@@ -269,10 +265,10 @@ const app = createApp({
         return {
           recommendations: filtered,
           reason,
-          _meta: { timezone, mood: typedInput.mood },
+          _meta: { timezone, mood: input.mood },
         };
       },
-    },
+    }),
   },
 
   // ===========================================================================
