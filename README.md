@@ -1,7 +1,7 @@
 # MCP AppsKit
 
 [![Publish to npm](https://github.com/AndurilCode/mcp-apps-kit/actions/workflows/publish.yml/badge.svg?branch=main)](https://github.com/AndurilCode/mcp-apps-kit/actions/workflows/publish.yml)
-[![Node >=18](https://img.shields.io/node/v/%40mcp-apps-kit%2Fcore?label=node&logo=node.js&logoColor=white)](https://www.npmjs.com/package/@mcp-apps-kit/core)
+[![Node >=20](https://img.shields.io/node/v/%40mcp-apps-kit%2Fcore?label=node&logo=node.js&logoColor=white)](https://www.npmjs.com/package/@mcp-apps-kit/core)
 [![License MIT](https://img.shields.io/npm/l/%40mcp-apps-kit%2Fcore?label=license)](https://github.com/AndurilCode/mcp-apps-kit/blob/main/LICENSE)
 
 [![npm @mcp-apps-kit/core](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fcore?label=%40mcp-apps-kit%2Fcore&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/core)
@@ -46,7 +46,7 @@ This project may be a poor fit if you:
 
 ## Compatibility Policy
 
-- **Node.js**: `>= 18` (see `@mcp-apps-kit/core` engines)
+- **Node.js**: `>= 20` (see `@mcp-apps-kit/core` engines)
 - **MCP SDK**: `@mcp-apps-kit/core` depends on `@modelcontextprotocol/sdk` and is the only place that should need to change when the MCP SDK changes.
 - **Versioning**: breaking changes in supported protocol behavior or public APIs ship as a new major of `@mcp-apps-kit/*`.
 
