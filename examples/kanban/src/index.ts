@@ -2,12 +2,12 @@
  * Kanban Board Example App
  *
  * A simple Kanban board implementation demonstrating @mcp-apps-kit/core features:
- * - Type-safe tool definitions with Zod schemas
+ * - Type-safe tool definitions with Zod schemas (using defineTool helper)
  * - UI resource binding for rich visualizations
  * - Protocol-agnostic design (works with MCP and OpenAI)
  */
 
-import { createApp, type ClientToolsFromCore } from "@mcp-apps-kit/core";
+import { createApp, defineTool, type ClientToolsFromCore } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 // =============================================================================
@@ -107,6 +107,49 @@ const TaskSchema = z.object({
   attachmentId: z.string().optional(),
 });
 
+// Tool input schemas (extracted for type inference)
+const ListTasksInput = z.object({
+  status: TaskStatusSchema.optional().describe(
+    "Filter tasks by status: 'todo', 'in_progress', or 'done'"
+  ),
+});
+
+const CreateTaskInput = z.object({
+  title: z.string().min(1).describe("Task title (required)"),
+  description: z.string().optional().describe("Task description"),
+  status: TaskStatusSchema.default("todo").describe("Initial status (defaults to 'todo')"),
+  attachmentId: z.string().optional().describe("Optional file attachment ID"),
+});
+
+const MoveTaskInput = z.object({
+  taskId: z.string().describe("ID of the task to move"),
+  newStatus: TaskStatusSchema.describe("Target column/status"),
+});
+
+const UpdateTaskInput = z.object({
+  taskId: z.string().describe("ID of the task to update"),
+  title: z.string().optional().describe("New title"),
+  description: z.string().optional().describe("New description"),
+});
+
+const DeleteTaskInput = z.object({
+  taskId: z.string().describe("ID of the task to delete"),
+});
+
+const ClearCompletedInput = z.object({
+  closeWidget: z
+    .boolean()
+    .default(false)
+    .describe("Whether to close the widget after clearing (ChatGPT only)"),
+});
+
+const ExportBoardInput = z.object({
+  format: z.enum(["json", "csv"]).default("json").describe("Export format"),
+  includeMetadata: z.boolean().default(true).describe("Include task metadata"),
+});
+
+const GetBoardSummaryInput = z.object({});
+
 // =============================================================================
 // APP DEFINITION
 // =============================================================================
@@ -119,14 +162,10 @@ const app = createApp({
     // =========================================================================
     // LIST TASKS (Widget-only tool)
     // =========================================================================
-    listTasks: {
+    listTasks: defineTool({
       title: "List Tasks",
       description: "List all tasks on the Kanban board, optionally filtered by status",
-      input: z.object({
-        status: TaskStatusSchema.optional().describe(
-          "Filter tasks by status: 'todo', 'in_progress', or 'done'"
-        ),
-      }),
+      input: ListTasksInput,
       output: z.object({
         tasks: z.array(TaskSchema),
         counts: z.object({
@@ -142,8 +181,8 @@ const app = createApp({
         readOnlyHint: true,
         idempotentHint: true,
       },
-      handler: async ({ status }, context) => {
-        const filteredTasks = status ? getTasksByStatus(status) : getAllTasks();
+      handler: async (input, context) => {
+        const filteredTasks = input.status ? getTasksByStatus(input.status) : getAllTasks();
 
         // Use context.locale for potential localization (example)
         const locale = context.locale ?? "en-US";
@@ -159,20 +198,15 @@ const app = createApp({
           _meta: { locale },
         };
       },
-    },
+    }),
 
     // =========================================================================
     // CREATE TASK (Widget-only tool with file attachment support)
     // =========================================================================
-    createTask: {
+    createTask: defineTool({
       title: "Create Task",
       description: "Create a new task on the Kanban board with optional file attachment",
-      input: z.object({
-        title: z.string().min(1).describe("Task title (required)"),
-        description: z.string().optional().describe("Task description"),
-        status: TaskStatusSchema.default("todo").describe("Initial status (defaults to 'todo')"),
-        attachmentId: z.string().optional().describe("Optional file attachment ID"),
-      }),
+      input: CreateTaskInput,
       output: z.object({
         task: TaskSchema,
         message: z.string(),
@@ -186,23 +220,23 @@ const app = createApp({
       annotations: {
         readOnlyHint: false,
       },
-      handler: async ({ title, description, status, attachmentId }, context) => {
+      handler: async (input, context) => {
         // Format timestamp using user's timezone if available
         const timezone = context.userLocation?.timezone ?? "UTC";
         const now = new Date().toISOString();
         const task: Task = {
           id: generateId(),
-          title,
-          description,
-          status,
+          title: input.title,
+          description: input.description,
+          status: input.status,
           createdAt: now,
           updatedAt: now,
-          attachmentId,
+          attachmentId: input.attachmentId,
         };
 
         tasks.set(task.id, task);
 
-        const message = `Created task "${title}" in ${status} column${attachmentId ? " with attachment" : ""}`;
+        const message = `Created task "${input.title}" in ${input.status} column${input.attachmentId ? " with attachment" : ""}`;
         return {
           task,
           message,
@@ -210,18 +244,15 @@ const app = createApp({
           _meta: { timezone },
         };
       },
-    },
+    }),
 
     // =========================================================================
     // MOVE TASK (Widget-only tool)
     // =========================================================================
-    moveTask: {
+    moveTask: defineTool({
       title: "Move Task",
       description: "Move a task to a different column on the Kanban board",
-      input: z.object({
-        taskId: z.string().describe("ID of the task to move"),
-        newStatus: TaskStatusSchema.describe("Target column/status"),
-      }),
+      input: MoveTaskInput,
       output: z.object({
         task: TaskSchema,
         message: z.string(),
@@ -234,20 +265,20 @@ const app = createApp({
         readOnlyHint: false,
         idempotentHint: true,
       },
-      handler: async ({ taskId, newStatus }, context) => {
-        const task = tasks.get(taskId);
+      handler: async (input, context) => {
+        const task = tasks.get(input.taskId);
         if (!task) {
-          throw new Error(`Task with ID "${taskId}" not found`);
+          throw new Error(`Task with ID "${input.taskId}" not found`);
         }
 
         const oldStatus = task.status;
-        task.status = newStatus;
+        task.status = input.newStatus;
         task.updatedAt = new Date().toISOString();
 
         // Track who performed the action (anonymized)
         const performer = context.subject ?? "anonymous";
 
-        const message = `Moved "${task.title}" from ${oldStatus} to ${newStatus}`;
+        const message = `Moved "${task.title}" from ${oldStatus} to ${input.newStatus}`;
         return {
           task,
           message,
@@ -255,19 +286,15 @@ const app = createApp({
           _meta: { performer },
         };
       },
-    },
+    }),
 
     // =========================================================================
     // UPDATE TASK (Widget-only tool)
     // =========================================================================
-    updateTask: {
+    updateTask: defineTool({
       title: "Update Task",
       description: "Update a task's title or description",
-      input: z.object({
-        taskId: z.string().describe("ID of the task to update"),
-        title: z.string().optional().describe("New title"),
-        description: z.string().optional().describe("New description"),
-      }),
+      input: UpdateTaskInput,
       output: z.object({
         task: TaskSchema,
         message: z.string(),
@@ -278,17 +305,17 @@ const app = createApp({
         readOnlyHint: false,
         idempotentHint: true,
       },
-      handler: async ({ taskId, title, description }, _context) => {
-        const task = tasks.get(taskId);
+      handler: async (input, _context) => {
+        const task = tasks.get(input.taskId);
         if (!task) {
-          throw new Error(`Task with ID "${taskId}" not found`);
+          throw new Error(`Task with ID "${input.taskId}" not found`);
         }
 
-        if (title !== undefined) {
-          task.title = title;
+        if (input.title !== undefined) {
+          task.title = input.title;
         }
-        if (description !== undefined) {
-          task.description = description;
+        if (input.description !== undefined) {
+          task.description = input.description;
         }
         task.updatedAt = new Date().toISOString();
 
@@ -299,17 +326,15 @@ const app = createApp({
           _text: message,
         };
       },
-    },
+    }),
 
     // =========================================================================
     // DELETE TASK (Widget-only tool)
     // =========================================================================
-    deleteTask: {
+    deleteTask: defineTool({
       title: "Delete Task",
       description: "Delete a task from the Kanban board",
-      input: z.object({
-        taskId: z.string().describe("ID of the task to delete"),
-      }),
+      input: DeleteTaskInput,
       output: z.object({
         success: z.boolean(),
         message: z.string(),
@@ -322,13 +347,13 @@ const app = createApp({
         destructiveHint: true,
         idempotentHint: true,
       },
-      handler: async ({ taskId }, _context) => {
-        const task = tasks.get(taskId);
+      handler: async (input, _context) => {
+        const task = tasks.get(input.taskId);
         if (!task) {
-          throw new Error(`Task with ID "${taskId}" not found`);
+          throw new Error(`Task with ID "${input.taskId}" not found`);
         }
 
-        tasks.delete(taskId);
+        tasks.delete(input.taskId);
 
         const message = `Deleted task "${task.title}"`;
         return {
@@ -337,20 +362,15 @@ const app = createApp({
           _text: message,
         };
       },
-    },
+    }),
 
     // =========================================================================
     // CLEAR COMPLETED (Demonstrates _closeWidget for widget dismissal)
     // =========================================================================
-    clearCompleted: {
+    clearCompleted: defineTool({
       title: "Clear Completed Tasks",
       description: "Remove all completed tasks from the board and close the widget",
-      input: z.object({
-        closeWidget: z
-          .boolean()
-          .default(false)
-          .describe("Whether to close the widget after clearing (ChatGPT only)"),
-      }),
+      input: ClearCompletedInput,
       output: z.object({
         success: z.boolean(),
         message: z.string(),
@@ -363,7 +383,7 @@ const app = createApp({
       annotations: {
         destructiveHint: true,
       },
-      handler: async ({ closeWidget }, _context) => {
+      handler: async (input, _context) => {
         const completedTasks = getTasksByStatus("done");
         const deletedCount = completedTasks.length;
 
@@ -380,21 +400,18 @@ const app = createApp({
           deletedCount,
           _text: message,
           // Signal to close the widget after this action (ChatGPT only)
-          _closeWidget: closeWidget,
+          _closeWidget: input.closeWidget,
         };
       },
-    },
+    }),
 
     // =========================================================================
     // EXPORT BOARD (Demonstrates openWorldHint for external operations)
     // =========================================================================
-    exportBoard: {
+    exportBoard: defineTool({
       title: "Export Board",
       description: "Export the Kanban board data as JSON (simulates external API call)",
-      input: z.object({
-        format: z.enum(["json", "csv"]).default("json").describe("Export format"),
-        includeMetadata: z.boolean().default(true).describe("Include task metadata"),
-      }),
+      input: ExportBoardInput,
       output: z.object({
         success: z.boolean(),
         message: z.string(),
@@ -407,11 +424,11 @@ const app = createApp({
         // This tool would interact with external systems in a real app
         openWorldHint: true,
       },
-      handler: async ({ format, includeMetadata }, context) => {
+      handler: async (input, context) => {
         const allTasks = getAllTasks();
 
         let data: string;
-        if (format === "csv") {
+        if (input.format === "csv") {
           const header = "id,title,description,status,createdAt,updatedAt";
           const rows = allTasks.map(
             (t) =>
@@ -420,7 +437,7 @@ const app = createApp({
           data = [header, ...rows].join("\n");
         } else {
           data = JSON.stringify(
-            includeMetadata
+            input.includeMetadata
               ? allTasks
               : allTasks.map((t) => ({ id: t.id, title: t.title, status: t.status })),
             null,
@@ -431,7 +448,7 @@ const app = createApp({
         // Log export action with user info if available
         const userInfo = context.userAgent ?? "Unknown client";
 
-        const message = `Exported ${allTasks.length} tasks as ${format.toUpperCase()}`;
+        const message = `Exported ${allTasks.length} tasks as ${String(input.format).toUpperCase()}`;
         return {
           success: true,
           message,
@@ -441,15 +458,15 @@ const app = createApp({
           _meta: { exportedBy: userInfo },
         };
       },
-    },
+    }),
 
     // =========================================================================
     // GET BOARD SUMMARY
     // =========================================================================
-    getBoardSummary: {
+    getBoardSummary: defineTool({
       title: "Get Board Summary",
       description: "Get a summary of the Kanban board with task counts per column",
-      input: z.object({}),
+      input: GetBoardSummaryInput,
       output: z.object({
         columns: z.array(
           z.object({
@@ -497,7 +514,7 @@ const app = createApp({
           _meta: widgetSession ? { widgetSession } : undefined,
         };
       },
-    },
+    }),
   },
 
   // ===========================================================================

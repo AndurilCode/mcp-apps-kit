@@ -7,7 +7,7 @@ Server-side TypeScript framework for building interactive MCP apps that can run 
 - **Claude Desktop (MCP Apps)**
 - **ChatGPT (OpenAI Apps SDK)**
 
-It provides a single `createApp()` API to define tools, validate inputs/outputs with Zod, and attach UI resources to tool responses.
+It provides a single `createApp()` API to define tools, validate inputs/outputs with Zod v4, and attach UI resources to tool responses.
 
 ## Install
 
@@ -16,13 +16,14 @@ npm install @mcp-apps-kit/core zod
 ```
 
 - Node.js: `>=18`
+- Zod: `^4.0.0`
 
 ## Quick start
 
-Create an app with one tool:
+Create an app with one tool using the `defineTool` helper for full type safety:
 
 ```ts
-import { createApp } from "@mcp-apps-kit/core";
+import { createApp, defineTool } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 const app = createApp({
@@ -30,17 +31,89 @@ const app = createApp({
   version: "1.0.0",
 
   tools: {
-    greet: {
+    greet: defineTool({
       description: "Greet a user",
-      input: z.object({ name: z.string() }),
+      input: z.object({
+        name: z.string().describe("Name to greet"),
+      }),
       output: z.object({ message: z.string() }),
-      handler: async ({ name }) => ({ message: `Hello, ${name}!` }),
-    },
+      handler: async (input) => {
+        // input.name is fully typed - no assertion needed!
+        return { message: `Hello, ${input.name}!` };
+      },
+    }),
   },
 });
 
 await app.start({ port: 3000 });
 ```
+
+## Type-Safe Tool Definitions
+
+### The `defineTool` Helper
+
+Use `defineTool` to get automatic type inference in your handlers:
+
+```ts
+import { defineTool } from "@mcp-apps-kit/core";
+
+tools: {
+  search: defineTool({
+    input: z.object({
+      query: z.string(),
+      maxResults: z.number().optional(),
+    }),
+    handler: async (input) => {
+      // ✅ input.query and input.maxResults are fully typed!
+      return { results: await search(input.query, input.maxResults) };
+    },
+  }),
+}
+```
+
+**Why `defineTool`?**
+
+With Zod v4, TypeScript cannot infer concrete schema types across module boundaries when using generic `z.ZodType`. The `defineTool` helper captures specific schema types at the call site, enabling proper type inference without manual type assertions.
+
+### Alternative: Object Syntax with Type Assertions
+
+If you prefer not to use `defineTool`, you can use the object syntax directly, but you'll need type assertions:
+
+### Alternative: Object Syntax with Type Assertions
+
+If you prefer not to use `defineTool`, you can use the object syntax directly, but you'll need type assertions:
+
+```ts
+// Define schema separately
+const searchInput = z.object({
+  query: z.string(),
+  maxResults: z.number().optional(),
+});
+
+const app = createApp({
+  tools: {
+    search: {
+      input: searchInput,
+      handler: async (input) => {
+        // Manual type assertion required
+        const typed = input as z.infer<typeof searchInput>;
+        return { results: await search(typed.query, typed.maxResults) };
+      },
+    },
+  },
+});
+```
+
+## Zod v4 Schema Descriptions
+
+Use `.describe()` to add descriptions that appear in tool parameter documentation:
+
+````ts
+handler: async (input, context) => {
+  const typedInput = input as z.infer<typeof myInputSchema>;
+  // Now typedInput has full type safety
+  const value = typedInput.someProperty;
+}
 
 ## Attach UI to tool outputs
 
@@ -79,7 +152,7 @@ const app = createApp({
     },
   },
 });
-```
+````
 
 ## What you get
 

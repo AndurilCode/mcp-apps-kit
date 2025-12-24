@@ -122,29 +122,6 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
 }
 
 /**
- * Define a tool with type inference (optional helper)
- *
- * This is an optional helper for better IDE experience.
- * You can also define tools inline in the `tools` object.
- *
- * @param def - Tool definition
- * @returns The same tool definition (for type inference)
- *
- * @example
- * ```typescript
- * const greetTool = defineTool({
- *   description: "Greet a user",
- *   input: z.object({ name: z.string() }),
- *   output: z.object({ message: z.string() }),
- *   handler: async ({ name }) => ({ message: `Hello, ${name}!` }),
- * });
- * ```
- */
-export function defineTool<T>(def: T): T {
-  return def;
-}
-
-/**
  * Define a UI resource with type inference (optional helper)
  *
  * @param def - UI resource definition
@@ -161,3 +138,6 @@ export function defineTool<T>(def: T): T {
 export function defineUI<T>(def: T): T {
   return def;
 }
+
+// Re-export defineTool from types/tools for convenience
+export { defineTool } from "./types/tools";
