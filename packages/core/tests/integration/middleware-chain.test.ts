@@ -390,6 +390,94 @@ describe("Middleware Chain Integration", () => {
       expect(app).toBeDefined();
     });
 
+    it("should throw error when middleware short-circuits without providing result", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {
+          greet: {
+            description: "Greet a user",
+            input: z.object({ name: z.string() }),
+            handler: async (input, _context) => {
+              const { name } = input as { name: string };
+              return { message: `Hello, ${name}!` };
+            },
+          },
+        },
+      });
+
+      // Middleware that short-circuits without calling next() or providing a result
+      app.use(async (_context, _next) => {
+        // Intentionally not calling next() and not setting response
+        return;
+      });
+
+      await app.start({ transport: "stdio" });
+
+      // Attempt to call the greet tool - should fail with clear error
+      const handler = app.handler();
+      const req = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: {
+          name: "greet",
+          arguments: { name: "World" },
+        },
+      };
+
+      const result = await handler(req);
+
+      // Should return an error result
+      expect(result).toHaveProperty("error");
+      expect((result as any).error.message).toContain("Middleware short-circuited");
+      expect((result as any).error.message).toContain("without providing a result");
+    });
+
+    it("should allow middleware to provide result via state when short-circuiting", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {
+          greet: {
+            description: "Greet a user",
+            input: z.object({ name: z.string() }),
+            handler: async (input, _context) => {
+              const { name } = input as { name: string };
+              return { message: `Hello, ${name}!` };
+            },
+          },
+        },
+      });
+
+      // Middleware that short-circuits but provides a result via state
+      app.use(async (context, _next) => {
+        // Set custom response in state instead of calling next()
+        context.state.set("response", { message: "Cached response" });
+        return;
+      });
+
+      await app.start({ transport: "stdio" });
+
+      // Call the greet tool - should succeed with cached response
+      const handler = app.handler();
+      const req = {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: {
+          name: "greet",
+          arguments: { name: "World" },
+        },
+      };
+
+      const result = await handler(req);
+
+      // Should return the cached response from middleware
+      expect(result).toHaveProperty("result");
+      expect((result as any).result.structuredContent).toEqual({ message: "Cached response" });
+    });
+
     it("should allow multiple middleware registration", async () => {
       const app = createApp({
         name: "test-app",

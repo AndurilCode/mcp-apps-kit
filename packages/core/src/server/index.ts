@@ -415,6 +415,21 @@ function registerTools(
             await middlewareChain.execute(middlewareContext, async () => {
               result = await executeToolLogic();
             });
+
+            // Validate that middleware didn't short-circuit without providing a result
+            if (result === undefined) {
+              // Check if middleware set a response in context state
+              if (middlewareContext.state.has("response")) {
+                result = middlewareContext.state.get("response");
+              } else {
+                // Middleware short-circuited without calling next() or providing a result
+                throw new Error(
+                  `Middleware short-circuited tool execution for '${name}' without providing a result. ` +
+                    `Either call next() to continue execution, or set context.state.set('response', ...) ` +
+                    `to provide a response.`
+                );
+              }
+            }
           } else {
             result = await executeToolLogic();
           }
