@@ -1,6 +1,6 @@
 {
   "name": "@mcp-apps-kit/ui-react",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "React bindings for MCP applications",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -44,7 +44,7 @@
     "directory": "packages/ui-react"
   },
   "dependencies": {
-    "@mcp-apps-kit/ui": "^0.1.2"
+    "@mcp-apps-kit/ui": "^0.2.0"
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",
