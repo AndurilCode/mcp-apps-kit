@@ -30,6 +30,7 @@ Building interactive MCP apps today requires:
 - **Protocol abstraction** - UI code works identically on both platforms
 - **Flexible deployment** - Express server, custom transport, or serverless
 - **Framework agnostic** - React, Vue, Svelte, or vanilla JS for UI
+- **Plugins, Middleware & Events** - Extensible architecture for logging, authentication, analytics
 
 ## Who Is This For?
 

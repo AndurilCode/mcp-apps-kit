@@ -5,9 +5,14 @@
  * - Type-safe tool definitions with Zod schemas (using defineTool helper)
  * - UI resource binding for rich visualizations
  * - Protocol-agnostic design (works with MCP and OpenAI)
+ * - Plugin system for cross-cutting concerns (logging, analytics)
+ * - Middleware for request processing (rate limiting, authentication)
+ * - Event system for observability and analytics
  */
 
 import { createApp, defineTool, type ClientToolsFromCore } from "@mcp-apps-kit/core";
+import { createPlugin } from "@mcp-apps-kit/core";
+import type { Middleware } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 // =============================================================================
@@ -151,12 +156,88 @@ const ExportBoardInput = z.object({
 const GetBoardSummaryInput = z.object({});
 
 // =============================================================================
+// PLUGINS: Cross-cutting concerns like logging and analytics
+// =============================================================================
+
+/**
+ * Simple logging plugin that logs all tool calls
+ * Plugins allow you to add functionality without modifying tool handlers
+ */
+const loggingPlugin = createPlugin({
+  name: "kanban-logger",
+  version: "1.0.0",
+
+  // Called when app initializes
+  onInit: async () => {
+    console.log("[Plugin] Kanban board initializing...");
+  },
+
+  // Called before every tool execution
+  beforeToolCall: async (context) => {
+    console.log(`[Plugin] Tool called: ${context.toolName}`);
+  },
+
+  // Called after successful tool execution
+  afterToolCall: async (context, result) => {
+    console.log(`[Plugin] Tool ${context.toolName} completed successfully`);
+  },
+
+  // Called when a tool throws an error
+  onToolError: async (context, error) => {
+    console.error(`[Plugin] Tool ${context.toolName} failed:`, error.message);
+  },
+});
+
+// =============================================================================
+// MIDDLEWARE: Request processing pipeline
+// =============================================================================
+
+/**
+ * Simple request logging middleware
+ * Middleware processes requests in order and can modify context.state
+ */
+const requestLoggingMiddleware: Middleware = async (context, next) => {
+  const startTime = Date.now();
+
+  console.log(`[Middleware] Processing ${context.toolName}...`);
+
+  // Store timestamp in shared state (accessible to other middleware and tool handler)
+  context.state.set("requestStartTime", startTime);
+
+  // Call next middleware or tool handler
+  await next();
+
+  const duration = Date.now() - startTime;
+  console.log(`[Middleware] ${context.toolName} completed in ${duration}ms`);
+};
+
+/**
+ * Simple rate limiting middleware (demonstration only)
+ * In production, you'd use a proper rate limiting strategy
+ */
+const rateLimitingMiddleware: Middleware = async (context, next) => {
+  // Get or initialize request count from state
+  const requestCount = (context.state.get("requestCount") as number) || 0;
+  context.state.set("requestCount", requestCount + 1);
+
+  // Example: Log every 10th request
+  if (requestCount > 0 && requestCount % 10 === 0) {
+    console.log(`[Middleware] Processed ${requestCount} requests`);
+  }
+
+  await next();
+};
+
+// =============================================================================
 // APP DEFINITION
 // =============================================================================
 
 const app = createApp({
   name: "kanban-board",
   version: "1.0.0",
+
+  // Register plugins for cross-cutting concerns
+  plugins: [loggingPlugin],
 
   tools: {
     // =========================================================================
@@ -551,6 +632,49 @@ const app = createApp({
 export type KanbanClientTools = ClientToolsFromCore<typeof app.tools>;
 
 // =============================================================================
+// REGISTER MIDDLEWARE: Applied in order to all tool calls
+// =============================================================================
+
+// Request logging middleware (executes first)
+app.use(requestLoggingMiddleware);
+
+// Rate limiting middleware (executes second)
+app.use(rateLimitingMiddleware);
+
+// =============================================================================
+// EVENT LISTENERS: React to application events for analytics and monitoring
+// =============================================================================
+
+/**
+ * Events provide observability into the application lifecycle
+ * Use them for analytics, monitoring, debugging, and audit logs
+ */
+
+// Track application lifecycle
+app.on("app:init", ({ config }) => {
+  console.log(`[Event] App initialized: ${config.name} v${config.version}`);
+});
+
+app.on("app:start", ({ transport }) => {
+  console.log(`[Event] App started with transport: ${transport}`);
+});
+
+// Track tool execution for analytics
+let toolCallCount = 0;
+app.on("tool:called", ({ toolName }) => {
+  toolCallCount++;
+  console.log(`[Event] Tool call #${toolCallCount}: ${toolName}`);
+});
+
+app.on("tool:success", ({ toolName, duration }) => {
+  console.log(`[Event] Tool ${toolName} succeeded in ${duration}ms`);
+});
+
+app.on("tool:error", ({ toolName, error, duration }) => {
+  console.error(`[Event] Tool ${toolName} failed after ${duration}ms:`, error.message);
+});
+
+// =============================================================================
 // START SERVER
 // =============================================================================
 
@@ -582,6 +706,9 @@ app.start({ port }).then(() => {
 ║  • fileParams: File upload support (ChatGPT only)                     ║
 ║  • _closeWidget: Widget dismissal after action                        ║
 ║  • widgetDescription: Model-readable widget summary                   ║
+║  • Plugins: Logging plugin for cross-cutting concerns                 ║
+║  • Middleware: Request logging and rate limiting                      ║
+║  • Events: Lifecycle and tool execution monitoring                    ║
 ╚═══════════════════════════════════════════════════════════════════════╝
   `);
 });

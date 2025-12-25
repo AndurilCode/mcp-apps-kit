@@ -7,8 +7,13 @@
 import type { ToolDefs, App, StartOptions, McpServer, ExpressMiddleware } from "./types/tools";
 import type { AppConfig } from "./types/config";
 import type { UIDefs } from "./types/ui";
+import type { Middleware } from "./middleware/types";
+import type { EventMap } from "./events/types";
 import { AppError, ErrorCode } from "./utils/errors";
 import { createServerInstance, type ServerInstance } from "./server/index";
+import { PluginManager } from "./plugins/PluginManager";
+import { MiddlewareChain } from "./middleware/MiddlewareChain";
+import { TypedEventEmitter } from "./events/EventEmitter";
 
 /**
  * Validate app configuration
@@ -69,11 +74,27 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
   // Validate config at runtime
   validateConfig<T>(config);
 
+  // Initialize plugin manager (but defer init() call to app.start())
+  const pluginManager = new PluginManager(config.plugins ?? []);
+  let pluginInitialized = false;
+
+  // Initialize middleware chain
+  const middlewareChain = new MiddlewareChain();
+
+  // Initialize event emitter
+  const eventEmitter = new TypedEventEmitter<EventMap & Record<string, unknown>>();
+
   // Create server instance (lazy initialization)
   let serverInstance: ServerInstance | null = null;
 
   function getServerInstance(): ServerInstance {
-    serverInstance ??= createServerInstance(config);
+    if (!serverInstance) {
+      serverInstance = createServerInstance(config, pluginManager);
+      // Attach middleware chain to server instance for tool execution
+      serverInstance.setMiddlewareChain(middlewareChain);
+      // Attach event emitter to server instance for event emission
+      serverInstance.setEventEmitter(eventEmitter);
+    }
     return serverInstance;
   }
 
@@ -89,8 +110,29 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
      * Start the built-in Express server
      */
     start: async (options?: StartOptions): Promise<void> => {
+      // Initialize plugins if not already done
+      if (!pluginInitialized) {
+        await pluginManager.init({
+          config,
+          tools: config.tools,
+        });
+        pluginInitialized = true;
+      }
+
       const server = getServerInstance();
       await server.start(options);
+
+      // Call plugin onStart hooks after server starts
+      await pluginManager.start({
+        port: options?.port,
+        transport: options?.transport ?? "http",
+      });
+
+      // Emit app:start event after server starts
+      await eventEmitter.emit("app:start", {
+        port: options?.port,
+        transport: options?.transport ?? "http",
+      });
     },
 
     /**
@@ -116,7 +158,43 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
       const server = getServerInstance();
       return server.handleRequest(req, env);
     },
+
+    /**
+     * Register middleware
+     *
+     * Middleware executes in registration order before tool handlers.
+     *
+     * @param middleware - Middleware function to register
+     */
+    use: (middleware: Middleware) => {
+      middlewareChain.use(middleware);
+    },
+
+    /**
+     * Subscribe to event
+     */
+    on: (event, handler) => {
+      return eventEmitter.on(event, handler);
+    },
+
+    /**
+     * Subscribe to event once
+     */
+    once: (event, handler) => {
+      return eventEmitter.once(event, handler);
+    },
+
+    /**
+     * Subscribe to all events
+     */
+    onAny: (handler) => {
+      return eventEmitter.onAny(handler);
+    },
   };
+
+  // Emit app:init event after app is created
+  // Note: This happens synchronously during createApp
+  void eventEmitter.emit("app:init", { config });
 
   return app;
 }
