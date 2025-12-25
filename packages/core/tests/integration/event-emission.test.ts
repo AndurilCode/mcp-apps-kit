@@ -56,7 +56,7 @@ describe("Event Emission Integration", () => {
     it("should include config in app:init payload", () => {
       const emitSpy = vi.spyOn(TypedEventEmitter.prototype, "emit");
 
-      const app = createApp({
+      createApp({
         name: "event-test",
         version: "2.0.0",
         tools: {},

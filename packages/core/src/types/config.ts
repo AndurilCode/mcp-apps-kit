@@ -165,7 +165,7 @@ export interface AppConfig<T extends ToolDefs = ToolDefs> {
    * const config = {
    *   // ... other config
    *   plugins: [
-   *     loggingPlugin({ level: 'info' })
+   *     loggingPlugin
    *   ]
    * };
    * ```

@@ -9,11 +9,19 @@
  * - Performance impact
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createApp } from "../../src/createApp";
 import { MiddlewareChain } from "../../src/middleware/MiddlewareChain";
 import type { Middleware, MiddlewareContext } from "../../src/middleware/types";
 import { z } from "zod";
+import express from "express";
+import type { AddressInfo } from "node:net";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
+
+let server: ReturnType<ReturnType<typeof express>["listen"]> | undefined;
+let transport: StreamableHTTPClientTransport | undefined;
 
 // Helper to create simple middleware
 function createLoggingMiddleware(log: string[]): Middleware {
@@ -62,6 +70,22 @@ function createRateLimitMiddleware(options: { maxRequests: number }): Middleware
 describe("Middleware Chain Integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(async () => {
+    // Cleanup MCP client and server
+    if (transport) {
+      await transport.close();
+      transport = undefined;
+    }
+    if (server) {
+      await new Promise<void>((resolve) => {
+        server!.close(() => {
+          server = undefined;
+          resolve();
+        });
+      });
+    }
   });
 
   describe("Multiple Middleware Execution", () => {
@@ -412,26 +436,36 @@ describe("Middleware Chain Integration", () => {
         return;
       });
 
-      await app.start({ transport: "stdio" });
+      // Set up HTTP server to test tool invocation through MCP protocol
+      const host = express();
+      host.use(app.handler());
+      server = host.listen(0);
+      const port = (server.address() as AddressInfo).port;
+
+      // Create MCP client and connect
+      const client = new Client({ name: "test-client", version: "1.0.0" });
+      transport = new StreamableHTTPClientTransport(new URL(`http://localhost:${port}/mcp`));
+      await client.connect(transport);
 
       // Attempt to call the greet tool - should fail with clear error
-      const handler = app.handler();
-      const req = {
-        jsonrpc: "2.0",
-        id: 1,
-        method: "tools/call",
-        params: {
-          name: "greet",
-          arguments: { name: "World" },
+      const result = await client.request(
+        {
+          method: "tools/call",
+          params: {
+            name: "greet",
+            arguments: { name: "World" },
+          },
         },
-      };
-
-      const result = await handler(req);
+        CallToolResultSchema
+      );
 
       // Should return an error result
-      expect(result).toHaveProperty("error");
-      expect((result as any).error.message).toContain("Middleware short-circuited");
-      expect((result as any).error.message).toContain("without providing a result");
+      expect(result.isError).toBeTruthy();
+      if (result.isError) {
+        const errorText = result.content[0]?.text || "";
+        expect(errorText).toContain("Middleware short-circuited");
+        expect(errorText).toContain("without providing a result");
+      }
     });
 
     it("should allow middleware to provide result via state when short-circuiting", async () => {
@@ -457,25 +491,32 @@ describe("Middleware Chain Integration", () => {
         return;
       });
 
-      await app.start({ transport: "stdio" });
+      // Set up HTTP server to test tool invocation through MCP protocol
+      const host = express();
+      host.use(app.handler());
+      server = host.listen(0);
+      const port = (server.address() as AddressInfo).port;
+
+      // Create MCP client and connect
+      const client = new Client({ name: "test-client", version: "1.0.0" });
+      transport = new StreamableHTTPClientTransport(new URL(`http://localhost:${port}/mcp`));
+      await client.connect(transport);
 
       // Call the greet tool - should succeed with cached response
-      const handler = app.handler();
-      const req = {
-        jsonrpc: "2.0",
-        id: 1,
-        method: "tools/call",
-        params: {
-          name: "greet",
-          arguments: { name: "World" },
+      const result = await client.request(
+        {
+          method: "tools/call",
+          params: {
+            name: "greet",
+            arguments: { name: "World" },
+          },
         },
-      };
-
-      const result = await handler(req);
+        CallToolResultSchema
+      );
 
       // Should return the cached response from middleware
-      expect(result).toHaveProperty("result");
-      expect((result as any).result.structuredContent).toEqual({ message: "Cached response" });
+      expect(result.isError).toBeFalsy();
+      expect(result.structuredContent).toEqual({ message: "Cached response" });
     });
 
     it("should allow multiple middleware registration", async () => {

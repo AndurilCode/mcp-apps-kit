@@ -10,7 +10,7 @@
  * @module integration/plugin-middleware-events
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, beforeEach, vi } from "vitest";
 import { z } from "zod";
 import { createApp, defineTool } from "../../src/createApp";
 import { createPlugin } from "../../src/plugins/types";

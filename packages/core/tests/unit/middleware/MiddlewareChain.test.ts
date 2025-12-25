@@ -9,7 +9,7 @@
  * - State isolation between executions
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { MiddlewareChain } from "../../../src/middleware/MiddlewareChain";
 import type { Middleware, MiddlewareContext } from "../../../src/middleware/types";
 import { MultipleNextCallsError } from "../../../src/middleware/types";

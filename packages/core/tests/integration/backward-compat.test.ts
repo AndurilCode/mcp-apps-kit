@@ -7,7 +7,7 @@
  * @module integration/backward-compat
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it } from "vitest";
 import { z } from "zod";
 import { createApp, defineTool } from "../../src/createApp";
 

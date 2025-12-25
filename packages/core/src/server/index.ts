@@ -434,16 +434,24 @@ function registerTools(
             result = await executeToolLogic();
           }
 
-          // Execute plugin afterToolCall hooks
-          await pluginManager.executeHook(
-            "afterToolCall",
-            {
-              toolName: name,
-              input: parsed,
-              metadata: context,
-            },
-            result
-          );
+          // Execute plugin afterToolCall hooks (isolated error handling)
+          try {
+            await pluginManager.executeHook(
+              "afterToolCall",
+              {
+                toolName: name,
+                input: parsed,
+                metadata: context,
+              },
+              result
+            );
+          } catch (hookError) {
+            // Log hook error but don't disrupt success flow
+            console.error(
+              `[Plugin Hook Error] afterToolCall hook failed for tool "${name}":`,
+              hookError
+            );
+          }
 
           // Emit tool:success event
           const duration = Date.now() - startTime;
