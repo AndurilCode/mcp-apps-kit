@@ -20,8 +20,13 @@ import type {
 } from "../types/tools";
 import type { AppConfig, CORSConfig } from "../types/config";
 import type { UIDefs, UIDef } from "../types/ui";
+import type { MiddlewareContext } from "../middleware/types";
+import type { EventMap } from "../events/types";
+import type { TypedEventEmitter } from "../events/EventEmitter";
 import { formatZodError, wrapError } from "../utils/errors";
 import { createAdapter, type ProtocolAdapter } from "../adapters";
+import { PluginManager } from "../plugins/PluginManager";
+import { MiddlewareChain } from "../middleware/MiddlewareChain";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
@@ -37,6 +42,10 @@ export interface ServerInstance {
   expressApp: Express;
   /** HTTP server (when running) */
   httpServer?: Server;
+  /** Set middleware chain (called by createApp) */
+  setMiddlewareChain: (chain: MiddlewareChain) => void;
+  /** Set event emitter (called by createApp) */
+  setEventEmitter: (emitter: TypedEventEmitter<EventMap & Record<string, unknown>>) => void;
   /** Start the server */
   start: (options?: StartOptions) => Promise<void>;
   /** Stop the server */
@@ -50,7 +59,10 @@ export interface ServerInstance {
 /**
  * Create an MCP server instance with tools registered
  */
-export function createServerInstance<T extends ToolDefs>(config: AppConfig<T>): ServerInstance {
+export function createServerInstance<T extends ToolDefs>(
+  config: AppConfig<T>,
+  pluginManager: PluginManager
+): ServerInstance {
   // Create protocol adapter
   const adapter = createAdapter(config.config?.protocol ?? "mcp");
 
@@ -63,12 +75,25 @@ export function createServerInstance<T extends ToolDefs>(config: AppConfig<T>): 
   // Compute UI resource URIs with content hashes for cache busting
   const uiUriMap = config.ui ? computeUIUris(config.name, config.ui) : {};
 
-  // Register tools with MCP server (pass UI URIs for correct binding)
-  registerTools(mcpServer, config.tools, adapter, config.name, uiUriMap);
+  // Will be set by createApp
+  let middlewareChainRef: MiddlewareChain | undefined;
+  let eventEmitterRef: TypedEventEmitter<EventMap & Record<string, unknown>> | undefined;
+
+  // Register tools with MCP server (pass UI URIs for correct binding and pluginManager)
+  registerTools(
+    mcpServer,
+    config.tools,
+    adapter,
+    config.name,
+    uiUriMap,
+    pluginManager,
+    () => middlewareChainRef,
+    () => eventEmitterRef
+  );
 
   // Register UI resources with MCP server
   if (config.ui) {
-    registerUIResources(mcpServer, config.ui, adapter, uiUriMap);
+    registerUIResources(mcpServer, config.ui, adapter, uiUriMap, pluginManager);
   }
 
   // Create Express app
@@ -86,6 +111,14 @@ export function createServerInstance<T extends ToolDefs>(config: AppConfig<T>): 
   // Setup stateless Streamable HTTP endpoint for MCP
   // Each request creates a fresh transport (no session management)
   expressApp.post("/mcp", async (req: Request, res: Response) => {
+    // Call onRequest hook
+    void pluginManager.executeHook("onRequest", {
+      method: req.method,
+      path: req.path,
+      headers: req.headers as Record<string, string>,
+      metadata: (req.body as { _meta?: unknown } | undefined)?._meta,
+    });
+
     // Create stateless transport (sessionIdGenerator: undefined)
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
@@ -102,6 +135,15 @@ export function createServerInstance<T extends ToolDefs>(config: AppConfig<T>): 
 
     // Handle the request
     await transport.handleRequest(req, res, req.body);
+
+    // Call onResponse hook after request is handled
+    void pluginManager.executeHook("onResponse", {
+      method: req.method,
+      path: req.path,
+      headers: req.headers as Record<string, string>,
+      metadata: (req.body as { _meta?: unknown } | undefined)?._meta,
+      statusCode: res.statusCode,
+    });
   });
 
   // GET endpoint - not needed for stateless mode
@@ -134,6 +176,14 @@ export function createServerInstance<T extends ToolDefs>(config: AppConfig<T>): 
     mcpServer,
     expressApp,
     httpServer,
+
+    setMiddlewareChain: (chain: MiddlewareChain) => {
+      middlewareChainRef = chain;
+    },
+
+    setEventEmitter: (emitter: TypedEventEmitter<EventMap & Record<string, unknown>>) => {
+      eventEmitterRef = emitter;
+    },
 
     start: async (options: StartOptions = {}) => {
       const { port = 3000, transport = "http" } = options;
@@ -275,7 +325,10 @@ function registerTools(
   tools: ToolDefs,
   adapter: ProtocolAdapter,
   serverName: string,
-  uiUriMap: Record<string, { uri: string; html: string }>
+  uiUriMap: Record<string, { uri: string; html: string }>,
+  pluginManager: PluginManager,
+  getMiddlewareChain: () => MiddlewareChain | undefined,
+  getEventEmitter: () => TypedEventEmitter<EventMap & Record<string, unknown>> | undefined
 ): void {
   for (const [name, toolDef] of Object.entries(tools)) {
     // Extract the Zod shape from z.object() for MCP SDK
@@ -303,15 +356,112 @@ function registerTools(
         _meta,
       },
       async (args: Record<string, unknown>, extra?: { _meta?: Record<string, unknown> }) => {
+        // Declare in outer scope for error handling
+        let parsed: unknown;
+        let contextForErrorHandling: ToolContext | undefined = undefined;
+        const startTime = Date.now();
+
         try {
           // Validate input with Zod
-          const parsed = toolDef.input.parse(args);
+          parsed = toolDef.input.parse(args);
 
           // Parse client-supplied _meta into typed context
-          const context = parseToolContext(extra?._meta);
+          const baseContext = parseToolContext(extra?._meta);
 
-          // Execute handler with input and context
-          const result = await toolDef.handler(parsed, context);
+          // Create state map for middleware
+          const state = new Map<string, unknown>();
+
+          // Create full context with state
+          const context: ToolContext = { ...baseContext, state };
+          contextForErrorHandling = context;
+
+          // Emit tool:called event
+          const eventEmitter = getEventEmitter();
+          if (eventEmitter) {
+            void eventEmitter.emit("tool:called", {
+              toolName: name,
+              input: parsed,
+              context,
+            });
+          }
+
+          // Create middleware context
+          const middlewareContext: MiddlewareContext = {
+            toolName: name,
+            input: parsed,
+            metadata: context,
+            state,
+          };
+
+          // Define the tool execution logic
+          const executeToolLogic = async (): Promise<unknown> => {
+            // Execute plugin beforeToolCall hooks
+            await pluginManager.executeHook("beforeToolCall", {
+              toolName: name,
+              input: parsed,
+              metadata: context,
+            });
+
+            // Execute handler with input and context (context now includes state)
+            const result = await toolDef.handler(parsed, context);
+
+            return result;
+          };
+
+          // Execute middleware chain if present, otherwise execute tool logic directly
+          let result: unknown;
+          const middlewareChain = getMiddlewareChain();
+          if (middlewareChain?.hasMiddleware()) {
+            await middlewareChain.execute(middlewareContext, async () => {
+              result = await executeToolLogic();
+            });
+
+            // Validate that middleware didn't short-circuit without providing a result
+            if (result === undefined) {
+              // Check if middleware set a response in context state
+              if (middlewareContext.state.has("response")) {
+                result = middlewareContext.state.get("response");
+              } else {
+                // Middleware short-circuited without calling next() or providing a result
+                throw new Error(
+                  `Middleware short-circuited tool execution for '${name}' without providing a result. ` +
+                    `Either call next() to continue execution, or set context.state.set('response', ...) ` +
+                    `to provide a response.`
+                );
+              }
+            }
+          } else {
+            result = await executeToolLogic();
+          }
+
+          // Execute plugin afterToolCall hooks (isolated error handling)
+          try {
+            await pluginManager.executeHook(
+              "afterToolCall",
+              {
+                toolName: name,
+                input: parsed,
+                metadata: context,
+              },
+              result
+            );
+          } catch (hookError) {
+            // Log hook error but don't disrupt success flow
+            console.error(
+              `[Plugin Hook Error] afterToolCall hook failed for tool "${name}":`,
+              hookError
+            );
+          }
+
+          // Emit tool:success event
+          const duration = Date.now() - startTime;
+          if (eventEmitter) {
+            void eventEmitter.emit("tool:success", {
+              toolName: name,
+              result,
+              duration,
+            });
+          }
 
           // Extract special fields from result
           const resultObj = result as Record<string, unknown>;
@@ -367,6 +517,31 @@ function registerTools(
             _meta: responseMeta,
           };
         } catch (error) {
+          const duration = Date.now() - startTime;
+
+          // Execute plugin onToolError hooks (only if context was initialized)
+          if (contextForErrorHandling !== undefined) {
+            await pluginManager.executeHook(
+              "onToolError",
+              {
+                toolName: name,
+                input: parsed ?? args,
+                metadata: contextForErrorHandling,
+              },
+              error as Error
+            );
+          }
+
+          // Emit tool:error event
+          const eventEmitter = getEventEmitter();
+          if (eventEmitter) {
+            void eventEmitter.emit("tool:error", {
+              toolName: name,
+              error: error as Error,
+              duration,
+            });
+          }
+
           const appError = wrapError(error);
           throw new Error(`Tool execution failed: ${appError.message}`);
         }
@@ -514,7 +689,8 @@ function registerUIResources(
   mcpServer: McpServer,
   ui: UIDefs,
   adapter: ProtocolAdapter,
-  uiUriMap: Record<string, { uri: string; html: string }>
+  uiUriMap: Record<string, { uri: string; html: string }>,
+  pluginManager: PluginManager
 ): void {
   for (const [key, uiDef] of Object.entries(ui)) {
     const uiEntry = uiUriMap[key];
@@ -537,16 +713,24 @@ function registerUIResources(
     }
 
     // Register the resource with pre-loaded HTML
-    mcpServer.registerResource(uiDef.name ?? key, uri, metadata, () => ({
-      contents: [
-        {
-          uri,
-          mimeType,
-          text: html,
-          ...(_meta && { _meta }),
-        },
-      ],
-    }));
+    mcpServer.registerResource(uiDef.name ?? key, uri, metadata, () => {
+      // Call onUILoad hook when UI resource is loaded
+      void pluginManager.executeHook("onUILoad", {
+        uiKey: key,
+        uri,
+      });
+
+      return {
+        contents: [
+          {
+            uri,
+            mimeType,
+            text: html,
+            ...(_meta && { _meta }),
+          },
+        ],
+      };
+    });
   }
 }
 
