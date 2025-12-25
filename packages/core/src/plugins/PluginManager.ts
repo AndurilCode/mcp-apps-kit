@@ -96,18 +96,22 @@ export class PluginManager {
         const timeoutPromise = new Promise<void>((resolve) => {
           timer = setTimeout(() => {
             // eslint-disable-next-line no-console
-            console.warn(`Plugin '${plugin.name}' onShutdown timed out after ${context.timeoutMs}ms`);
+            console.warn(
+              `Plugin '${plugin.name}' onShutdown timed out after ${context.timeoutMs}ms`
+            );
             resolve();
           }, context.timeoutMs);
         });
 
-        const shutdownPromise = Promise.resolve(plugin.onShutdown(context)).catch((error: unknown) => {
-          // eslint-disable-next-line no-console
-          console.error(
-            `Plugin '${plugin.name}' onShutdown failed:`,
-            error instanceof Error ? error.message : String(error)
-          );
-        });
+        const shutdownPromise = Promise.resolve(plugin.onShutdown(context)).catch(
+          (error: unknown) => {
+            // eslint-disable-next-line no-console
+            console.error(
+              `Plugin '${plugin.name}' onShutdown failed:`,
+              error instanceof Error ? error.message : String(error)
+            );
+          }
+        );
 
         try {
           await Promise.race([shutdownPromise, timeoutPromise]);
@@ -130,10 +134,7 @@ export class PluginManager {
    * @param hookName - Name of hook to execute
    * @param args - Arguments to pass to hook
    */
-  async executeHook(
-    hookName: keyof Plugin,
-    ...args: unknown[]
-  ): Promise<void> {
+  async executeHook(hookName: keyof Plugin, ...args: unknown[]): Promise<void> {
     for (const plugin of this.plugins) {
       const hook = plugin[hookName];
       if (hook && typeof hook === "function") {

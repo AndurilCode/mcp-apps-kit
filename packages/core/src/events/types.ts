@@ -288,7 +288,7 @@ export function createDebouncedHandler<T>(
           } catch (error) {
             // eslint-disable-next-line no-console
             console.error(
-              'Debounced handler error:',
+              "Debounced handler error:",
               error instanceof Error ? error.message : String(error)
             );
           } finally {

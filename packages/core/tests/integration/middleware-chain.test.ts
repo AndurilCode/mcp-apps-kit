@@ -46,7 +46,7 @@ function createRateLimitMiddleware(options: { maxRequests: number }): Middleware
   const counts = new Map<string, number>();
 
   return async (context, next) => {
-    const userId = context.state.get("userId") as string || "anonymous";
+    const userId = (context.state.get("userId") as string) || "anonymous";
     const count = counts.get(userId) || 0;
 
     if (count >= options.maxRequests) {
@@ -201,9 +201,7 @@ describe("Middleware Chain Integration", () => {
         state: new Map(),
       };
 
-      await expect(
-        chain.execute(context, async () => {})
-      ).rejects.toThrow("Unauthorized");
+      await expect(chain.execute(context, async () => {})).rejects.toThrow("Unauthorized");
 
       // Rate limit middleware should not be called
       expect(rateLimitMiddleware).not.toHaveBeenCalled();
@@ -234,9 +232,7 @@ describe("Middleware Chain Integration", () => {
 
       // 3rd request should be rate limited
       context.state = new Map();
-      await expect(
-        chain.execute(context, async () => {})
-      ).rejects.toThrow("Rate limit exceeded");
+      await expect(chain.execute(context, async () => {})).rejects.toThrow("Rate limit exceeded");
     });
   });
 
@@ -310,9 +306,7 @@ describe("Middleware Chain Integration", () => {
       };
 
       // Should not throw because error is caught
-      await expect(
-        chain.execute(context, async () => {})
-      ).resolves.not.toThrow();
+      await expect(chain.execute(context, async () => {})).resolves.not.toThrow();
 
       expect(errors).toEqual(["Test error"]);
       expect(context.state.get("errorHandled")).toBe(true);
@@ -515,9 +509,7 @@ describe("Middleware Chain Integration", () => {
       };
 
       // Regular user should be rejected
-      await expect(
-        chain.execute(context, async () => {})
-      ).rejects.toThrow("Forbidden: Admin only");
+      await expect(chain.execute(context, async () => {})).rejects.toThrow("Forbidden: Admin only");
 
       // Admin should succeed
       context.state = new Map();
@@ -571,9 +563,9 @@ describe("Middleware Chain Integration", () => {
         state: new Map(),
       };
 
-      await expect(
-        chain.execute(context, async () => {})
-      ).rejects.toThrow("Auth required for user_ tools");
+      await expect(chain.execute(context, async () => {})).rejects.toThrow(
+        "Auth required for user_ tools"
+      );
 
       // Private tool with auth should work
       context.metadata = { token: "valid-token" };

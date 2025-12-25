@@ -137,7 +137,11 @@ describe("TypedEventEmitter", () => {
 
       expect(emitter.listenerCount("tool:error")).toBe(1);
 
-      await emitter.emit("tool:error", { toolName: "test", error: new Error("test"), duration: 50 });
+      await emitter.emit("tool:error", {
+        toolName: "test",
+        error: new Error("test"),
+        duration: 50,
+      });
 
       expect(emitter.listenerCount("tool:error")).toBe(0);
     });
@@ -409,8 +413,8 @@ describe("TypedEventEmitter", () => {
       const stats = emitter.getStats();
 
       expect(stats.listeners).toHaveLength(2);
-      expect(stats.listeners.some(l => l.event === "app:init" && !l.once)).toBe(true);
-      expect(stats.listeners.some(l => l.event === "app:start" && l.once)).toBe(true);
+      expect(stats.listeners.some((l) => l.event === "app:init" && !l.once)).toBe(true);
+      expect(stats.listeners.some((l) => l.event === "app:start" && l.once)).toBe(true);
     });
   });
 

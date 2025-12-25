@@ -8,7 +8,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { EventMap, EventHandler, AnyEventHandler, UnsubscribeFn } from "../../src/events/types";
+import type {
+  EventMap,
+  EventHandler,
+  AnyEventHandler,
+  UnsubscribeFn,
+} from "../../src/events/types";
 
 // Mock EventEmitter interface for contract testing
 interface EventEmitter {

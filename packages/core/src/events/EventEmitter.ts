@@ -79,10 +79,7 @@ export class TypedEventEmitter<TEventMap extends Record<string, unknown>> {
    * @param handler - Event handler function
    * @returns Unsubscribe function
    */
-  on<K extends keyof TEventMap>(
-    event: K,
-    handler: EventHandler<TEventMap[K]>
-  ): UnsubscribeFn {
+  on<K extends keyof TEventMap>(event: K, handler: EventHandler<TEventMap[K]>): UnsubscribeFn {
     return this.addListener(event, handler, false);
   }
 
@@ -95,10 +92,7 @@ export class TypedEventEmitter<TEventMap extends Record<string, unknown>> {
    * @param handler - Event handler function
    * @returns Unsubscribe function (can call to cancel before event fires)
    */
-  once<K extends keyof TEventMap>(
-    event: K,
-    handler: EventHandler<TEventMap[K]>
-  ): UnsubscribeFn {
+  once<K extends keyof TEventMap>(event: K, handler: EventHandler<TEventMap[K]>): UnsubscribeFn {
     return this.addListener(event, handler, true);
   }
 
@@ -139,11 +133,13 @@ export class TypedEventEmitter<TEventMap extends Record<string, unknown>> {
       // Execute specific event handlers
       ...eventListeners.map((wrapper) => this.executeHandler(wrapper.handler, payload, event)),
       // Execute wildcard handlers
-      ...this.wildcardListeners.map((handler) => this.executeWildcardHandler(handler, event, payload)),
+      ...this.wildcardListeners.map((handler) =>
+        this.executeWildcardHandler(handler, event, payload)
+      ),
     ]);
 
     // Remove one-time listeners
-    const persistentListeners = eventListeners.filter(wrapper => !wrapper.once);
+    const persistentListeners = eventListeners.filter((wrapper) => !wrapper.once);
     if (persistentListeners.length !== eventListeners.length) {
       this.listeners.set(event, persistentListeners);
     }

@@ -80,7 +80,16 @@ export function createServerInstance<T extends ToolDefs>(
   let eventEmitterRef: TypedEventEmitter<EventMap & Record<string, unknown>> | undefined;
 
   // Register tools with MCP server (pass UI URIs for correct binding and pluginManager)
-  registerTools(mcpServer, config.tools, adapter, config.name, uiUriMap, pluginManager, () => middlewareChainRef, () => eventEmitterRef);
+  registerTools(
+    mcpServer,
+    config.tools,
+    adapter,
+    config.name,
+    uiUriMap,
+    pluginManager,
+    () => middlewareChainRef,
+    () => eventEmitterRef
+  );
 
   // Register UI resources with MCP server
   if (config.ui) {
@@ -411,11 +420,15 @@ function registerTools(
           }
 
           // Execute plugin afterToolCall hooks
-          await pluginManager.executeHook("afterToolCall", {
-            toolName: name,
-            input: parsed,
-            metadata: context,
-          }, result);
+          await pluginManager.executeHook(
+            "afterToolCall",
+            {
+              toolName: name,
+              input: parsed,
+              metadata: context,
+            },
+            result
+          );
 
           // Emit tool:success event
           const duration = Date.now() - startTime;
@@ -485,11 +498,15 @@ function registerTools(
 
           // Execute plugin onToolError hooks (only if context was initialized)
           if (contextForErrorHandling !== undefined) {
-            await pluginManager.executeHook("onToolError", {
-              toolName: name,
-              input: parsed ?? args,
-              metadata: contextForErrorHandling,
-            }, error as Error);
+            await pluginManager.executeHook(
+              "onToolError",
+              {
+                toolName: name,
+                input: parsed ?? args,
+                metadata: contextForErrorHandling,
+              },
+              error as Error
+            );
           }
 
           // Emit tool:error event

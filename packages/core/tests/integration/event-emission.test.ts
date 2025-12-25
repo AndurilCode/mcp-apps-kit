@@ -29,7 +29,7 @@ describe("Event Emission Integration", () => {
   describe("app:init Event", () => {
     it("should emit app:init when createApp is called", () => {
       // Spy on the emit method before creating the app
-      const emitSpy = vi.spyOn(TypedEventEmitter.prototype, 'emit');
+      const emitSpy = vi.spyOn(TypedEventEmitter.prototype, "emit");
 
       const app = createApp({
         name: "test-app",
@@ -49,12 +49,12 @@ describe("Event Emission Integration", () => {
       );
 
       expect(app).toBeDefined();
-      
+
       emitSpy.mockRestore();
     });
 
     it("should include config in app:init payload", () => {
-      const emitSpy = vi.spyOn(TypedEventEmitter.prototype, 'emit');
+      const emitSpy = vi.spyOn(TypedEventEmitter.prototype, "emit");
 
       const app = createApp({
         name: "event-test",

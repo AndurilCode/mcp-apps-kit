@@ -50,11 +50,7 @@ describe("PluginManager", () => {
     });
 
     it("should accept multiple plugins", () => {
-      const plugins: Plugin[] = [
-        { name: "plugin-1" },
-        { name: "plugin-2" },
-        { name: "plugin-3" },
-      ];
+      const plugins: Plugin[] = [{ name: "plugin-1" }, { name: "plugin-2" }, { name: "plugin-3" }];
 
       const pluginManager = new PluginManager(plugins);
       expect(pluginManager).toBeDefined();

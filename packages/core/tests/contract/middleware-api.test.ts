@@ -151,11 +151,7 @@ describe("Middleware API Contract", () => {
         executionOrder.push("handler");
       });
 
-      expect(executionOrder).toEqual([
-        "middleware-before",
-        "handler",
-        "middleware-after",
-      ]);
+      expect(executionOrder).toEqual(["middleware-before", "handler", "middleware-after"]);
     });
 
     it("should allow async middleware", async () => {
@@ -333,9 +329,7 @@ describe("Middleware API Contract", () => {
         state: new Map(),
       };
 
-      await expect(
-        chain.execute(context, async () => {})
-      ).rejects.toThrow(/index 1/);
+      await expect(chain.execute(context, async () => {})).rejects.toThrow(/index 1/);
     });
   });
 
@@ -355,9 +349,7 @@ describe("Middleware API Contract", () => {
         state: new Map(),
       };
 
-      await expect(
-        chain.execute(context, async () => {})
-      ).rejects.toThrow("Middleware error");
+      await expect(chain.execute(context, async () => {})).rejects.toThrow("Middleware error");
     });
 
     it("should propagate errors from handler through middleware", async () => {
@@ -436,9 +428,7 @@ describe("Middleware API Contract", () => {
         state: new Map(),
       };
 
-      expect(
-        chain.execute(context, async () => {})
-      ).toBeInstanceOf(Promise);
+      expect(chain.execute(context, async () => {})).toBeInstanceOf(Promise);
     });
 
     it("should have hasMiddleware() method to check if middleware registered", () => {

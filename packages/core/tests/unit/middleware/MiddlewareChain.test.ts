@@ -188,9 +188,7 @@ describe("MiddlewareChain", () => {
 
       chain.use(badMiddleware);
 
-      await expect(
-        chain.execute(context, async () => {})
-      ).rejects.toThrow(MultipleNextCallsError);
+      await expect(chain.execute(context, async () => {})).rejects.toThrow(MultipleNextCallsError);
     });
 
     it("should include middleware index in error message", async () => {
@@ -226,9 +224,7 @@ describe("MiddlewareChain", () => {
       await chain.execute(context, async () => {});
 
       // Second execution should not throw
-      await expect(
-        chain.execute(context, async () => {})
-      ).resolves.not.toThrow();
+      await expect(chain.execute(context, async () => {})).resolves.not.toThrow();
     });
 
     it("should track next() calls independently per middleware", async () => {
@@ -243,9 +239,7 @@ describe("MiddlewareChain", () => {
       chain.use(m1);
       chain.use(m2);
 
-      await expect(
-        chain.execute(context, async () => {})
-      ).resolves.not.toThrow();
+      await expect(chain.execute(context, async () => {})).resolves.not.toThrow();
     });
   });
 
@@ -257,9 +251,7 @@ describe("MiddlewareChain", () => {
 
       chain.use(errorMiddleware);
 
-      await expect(
-        chain.execute(context, async () => {})
-      ).rejects.toThrow("Middleware error");
+      await expect(chain.execute(context, async () => {})).rejects.toThrow("Middleware error");
     });
 
     it("should propagate errors from handler", async () => {
@@ -385,7 +377,7 @@ describe("MiddlewareChain", () => {
 
     it("should isolate state between different executions", async () => {
       const middleware: Middleware = async (context, next) => {
-        context.state.set("counter", (context.state.get("counter") as number || 0) + 1);
+        context.state.set("counter", ((context.state.get("counter") as number) || 0) + 1);
         await next();
       };
 
@@ -459,9 +451,7 @@ describe("MiddlewareChain", () => {
 
       chain.use(syncThrowMiddleware);
 
-      await expect(
-        chain.execute(context, async () => {})
-      ).rejects.toThrow("Sync error");
+      await expect(chain.execute(context, async () => {})).rejects.toThrow("Sync error");
     });
 
     it("should handle handler that returns value", async () => {

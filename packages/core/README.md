@@ -189,7 +189,9 @@ const app = createApp({
   name: "my-app",
   version: "1.0.0",
   plugins: [loggingPlugin],
-  tools: { /* ... */ },
+  tools: {
+    /* ... */
+  },
 });
 ```
 

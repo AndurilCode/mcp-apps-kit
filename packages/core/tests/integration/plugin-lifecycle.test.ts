@@ -60,11 +60,7 @@ describe("Plugin Lifecycle Integration", () => {
     });
 
     it("should register multiple plugins", () => {
-      const plugins: Plugin[] = [
-        { name: "plugin-1" },
-        { name: "plugin-2" },
-        { name: "plugin-3" },
-      ];
+      const plugins: Plugin[] = [{ name: "plugin-1" }, { name: "plugin-2" }, { name: "plugin-3" }];
 
       const app = createApp({
         name: "test-app",
@@ -138,7 +134,7 @@ describe("Plugin Lifecycle Integration", () => {
 
       // Start the app (this triggers onInit and onStart)
       await app.start({ transport: "stdio" });
-      
+
       expect(lifecycle).toContain("init");
       expect(lifecycle).toContain("start");
 
@@ -183,7 +179,7 @@ describe("Plugin Lifecycle Integration", () => {
 
       // Init has not been called yet (deferred to start())
       expect(hookOrder).toEqual([]);
-      
+
       // Start the app to trigger onInit hooks
       await app.start({ transport: "stdio" });
 
