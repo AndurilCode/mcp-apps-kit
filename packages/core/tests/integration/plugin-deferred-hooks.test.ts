@@ -60,7 +60,7 @@ describe("Plugin Deferred Hooks Integration", () => {
       });
 
       expect(plugin.onUILoad).toBeDefined();
-      expect(typeof plugin.onUILoad).toBeDefined();
+      expect(typeof plugin.onUILoad).toBe("function");
     });
 
     it("should support all deferred hooks together", () => {
