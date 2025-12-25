@@ -3,6 +3,8 @@
  */
 
 import type { z } from "zod";
+import type { Middleware } from "../middleware/types";
+import type { EventMap, EventHandler, AnyEventHandler, UnsubscribeFn } from "../events/types";
 
 // Use Zod's built-in type inference utilities directly
 
@@ -94,6 +96,21 @@ export interface ToolContext {
    * Access protocol-specific fields not mapped to typed properties.
    */
   raw?: Record<string, unknown>;
+
+  /**
+   * Shared state map populated by middleware.
+   * Middleware can use state.set() to share data with tool handlers.
+   *
+   * @example
+   * ```typescript
+   * // In middleware
+   * context.state.set("userId", "user-123");
+   *
+   * // In tool handler
+   * const userId = context.state?.get("userId");
+   * ```
+   */
+  state?: Map<string, unknown>;
 }
 
 /**
@@ -334,6 +351,67 @@ export interface App<
 
   /** UI resource definitions (for type inference) */
   readonly ui: U;
+
+  // ---------------------------------------------------------------------------
+  // MIDDLEWARE
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Register middleware function
+   *
+   * Middleware executes in registration order before tool handlers.
+   * Multiple middleware can be registered via multiple use() calls.
+   *
+   * @param middleware - Middleware function
+   *
+   * @example
+   * ```typescript
+   * app.use(loggingMiddleware);
+   * app.use(authMiddleware);
+   * app.use(rateLimitMiddleware);
+   * ```
+   */
+  use(middleware: Middleware): void;
+
+  // ---------------------------------------------------------------------------
+  // EVENTS
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Subscribe to event
+   *
+   * Handler called every time event is emitted until unsubscribed.
+   * Handlers execute in registration order.
+   * Errors in handlers are isolated (logged but don't affect other handlers).
+   *
+   * @param event - Event name (type-checked)
+   * @param handler - Handler function (payload type inferred)
+   * @returns Unsubscribe function
+   */
+  on<K extends keyof EventMap>(event: K, handler: EventHandler<EventMap[K]>): UnsubscribeFn;
+
+  /**
+   * Subscribe to event (one-time)
+   *
+   * Handler called once, then automatically unsubscribed.
+   * Useful for initialization events or one-time setup.
+   *
+   * @param event - Event name (type-checked)
+   * @param handler - Handler function (payload type inferred)
+   * @returns Unsubscribe function (can call to cancel before event fires)
+   */
+  once<K extends keyof EventMap>(event: K, handler: EventHandler<EventMap[K]>): UnsubscribeFn;
+
+  /**
+   * Subscribe to all events (wildcard listener)
+   *
+   * Handler receives every event with event name and payload.
+   * Useful for logging, debugging, or analytics.
+   *
+   * @param handler - Handler function receiving all events
+   * @returns Unsubscribe function
+   */
+  onAny(handler: AnyEventHandler): UnsubscribeFn;
 }
 
 // =============================================================================
