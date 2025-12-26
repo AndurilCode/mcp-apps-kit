@@ -192,6 +192,7 @@ export class ClientDebugLogger {
   private buffer: LogEntry[] = [];
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private isFlushing = false;
+  private mcpTransportFailed = false;
 
   /**
    * Create a client debug logger
@@ -213,9 +214,14 @@ export class ClientDebugLogger {
    *
    * Must be called after the adapter is connected for
    * logs to be transported through MCP.
+   *
+   * Note: Setting a new adapter resets the transport failure state,
+   * allowing MCP transport to be retried with the new adapter.
    */
   setAdapter(adapter: ProtocolAdapter): void {
     this.adapter = adapter;
+    // Reset failure state when adapter changes - new adapter might have log_debug tool
+    this.mcpTransportFailed = false;
   }
 
   /**
@@ -249,7 +255,7 @@ export class ClientDebugLogger {
    * Check if MCP transport is enabled and available
    */
   private canUseMcpTransport(): boolean {
-    return this.config.enabled && this.adapter?.isConnected() === true;
+    return this.config.enabled && !this.mcpTransportFailed && this.adapter?.isConnected() === true;
   }
 
   /**
@@ -311,14 +317,19 @@ export class ClientDebugLogger {
       if (this.adapter) {
         await this.adapter.callTool("log_debug", { entries: entriesToFlush });
       }
-    } catch (error) {
-      // If MCP call fails, output to console as fallback
+    } catch {
+      // If MCP call fails (e.g., log_debug tool not registered),
+      // disable MCP transport and fall back to console permanently
+      if (!this.mcpTransportFailed) {
+        this.mcpTransportFailed = true;
+        // Log once that we're falling back to console
+        // eslint-disable-next-line no-console
+        console.info("[ClientDebugLogger] MCP log transport unavailable, using console fallback");
+      }
+      // Output failed entries to console
       for (const entry of entriesToFlush) {
         this.outputToConsole(entry);
       }
-      // Also log the transport error
-      // eslint-disable-next-line no-console
-      console.warn("[ClientDebugLogger] Failed to flush logs via MCP:", error);
     } finally {
       this.isFlushing = false;
 
@@ -334,7 +345,8 @@ export class ClientDebugLogger {
    */
   private outputToConsole(entry: LogEntry): void {
     const prefix = `[${entry.timestamp}] [${entry.level.toUpperCase()}]`;
-    const message = entry.data !== undefined ? `${entry.message} ${safeStringify(entry.data)}` : entry.message;
+    const message =
+      entry.data !== undefined ? `${entry.message} ${safeStringify(entry.data)}` : entry.message;
     const formattedMessage = `${prefix} ${message}`;
 
     try {

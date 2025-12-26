@@ -27,7 +27,7 @@ afterEach(async () => {
     await transport.close().catch(() => {});
   }
   transports.length = 0;
-  
+
   // Close all servers after each test
   for (const server of servers) {
     await new Promise<void>((resolve) => {

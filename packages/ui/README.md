@@ -68,8 +68,8 @@ import { clientDebugLogger } from "@mcp-apps-kit/ui";
 
 // Configure the logger (call once at app startup)
 clientDebugLogger.configure({
-  enabled: true,       // Enable MCP transport
-  level: "debug",      // Minimum level to log
+  enabled: true, // Enable MCP transport
+  level: "debug", // Minimum level to log
   source: "my-widget", // Identifier for log entries
 });
 
@@ -92,11 +92,11 @@ clientDebugLogger.error("API request failed", { error: err.message });
 
 ```ts
 clientDebugLogger.configure({
-  enabled: true,           // Enable/disable MCP transport
-  level: "info",           // "debug" | "info" | "warn" | "error"
-  batchSize: 10,           // Flush after N log entries
-  flushIntervalMs: 5000,   // Max time between flushes (ms)
-  source: "my-app",        // Source identifier for logs
+  enabled: true, // Enable/disable MCP transport
+  level: "info", // "debug" | "info" | "warn" | "error"
+  batchSize: 10, // Flush after N log entries
+  flushIntervalMs: 5000, // Max time between flushes (ms)
+  source: "my-app", // Source identifier for logs
 });
 ```
 

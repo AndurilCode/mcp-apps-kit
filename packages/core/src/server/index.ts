@@ -356,10 +356,7 @@ export function createServerInstance<T extends ToolDefs>(
  * This internal tool receives batched log entries from client UIs
  * and processes them through the server-side debug logger.
  */
-function registerDebugLogTool(
-  mcpServer: McpServer,
-  debugConfig: DebugConfig | undefined
-): void {
+function registerDebugLogTool(mcpServer: McpServer, debugConfig: DebugConfig | undefined): void {
   // Only register if log tool is enabled
   if (!debugConfig?.logTool) {
     return;
@@ -551,7 +548,10 @@ function registerTools(
             );
           } catch (hookError) {
             // Log hook error but don't disrupt success flow
-            debugLogger.error(`[Plugin Hook Error] afterToolCall hook failed for tool "${name}"`, hookError);
+            debugLogger.error(
+              `[Plugin Hook Error] afterToolCall hook failed for tool "${name}"`,
+              hookError
+            );
           }
 
           // Emit tool:success event

@@ -25,7 +25,9 @@ import {
 import type { ProtocolAdapter } from "../../../src/adapters/types";
 
 // Mock adapter for testing
-function createMockAdapter(options: { connected?: boolean; callToolError?: Error } = {}): ProtocolAdapter {
+function createMockAdapter(
+  options: { connected?: boolean; callToolError?: Error } = {}
+): ProtocolAdapter {
   const { connected = true, callToolError } = options;
 
   return {
@@ -225,7 +227,9 @@ describe("Client Debug Logger", () => {
       if ((mockAdapter.callTool as ReturnType<typeof vi.fn>).mock.calls.length > 0) {
         const call = (mockAdapter.callTool as ReturnType<typeof vi.fn>).mock.calls[0];
         // Only warn and error should be logged
-        expect(call[1].entries.every((e: LogEntry) => e.level === "warn" || e.level === "error")).toBe(true);
+        expect(
+          call[1].entries.every((e: LogEntry) => e.level === "warn" || e.level === "error")
+        ).toBe(true);
       }
     });
 

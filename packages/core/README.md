@@ -262,29 +262,32 @@ Enable debug logging to receive structured logs from client UIs through the MCP 
 const app = createApp({
   name: "my-app",
   version: "1.0.0",
-  tools: { /* ... */ },
+  tools: {
+    /* ... */
+  },
   config: {
     debug: {
-      enabled: true,           // Enable debug logging
-      level: "debug",          // "debug" | "info" | "warn" | "error"
+      enabled: true, // Enable debug logging
+      level: "debug", // "debug" | "info" | "warn" | "error"
     },
   },
 });
 ```
 
 When enabled, the server:
+
 - Registers an internal `log_debug` tool (hidden from the model)
 - Receives batched log entries from connected client UIs
 - Outputs logs to the server console with timestamps and source info
 
 ### Log Levels
 
-| Level   | Description                    |
-| ------- | ------------------------------ |
-| `debug` | All logs including debug info  |
-| `info`  | Info, warning, and error logs  |
-| `warn`  | Warning and error logs only    |
-| `error` | Error logs only                |
+| Level   | Description                   |
+| ------- | ----------------------------- |
+| `debug` | All logs including debug info |
+| `info`  | Info, warning, and error logs |
+| `warn`  | Warning and error logs only   |
+| `error` | Error logs only               |
 
 ### Using the Debug Logger (Server-side)
 

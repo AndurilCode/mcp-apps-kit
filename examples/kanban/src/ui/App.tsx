@@ -582,7 +582,9 @@ export function App() {
     setIsLoading(true);
     try {
       const result = (await client.callTool("listTasks", {})) as Record<string, unknown>;
-      clientDebugLogger.debug("Refresh board result received", { taskCount: (result as { tasks?: Task[] }).tasks?.length });
+      clientDebugLogger.debug("Refresh board result received", {
+        taskCount: (result as { tasks?: Task[] }).tasks?.length,
+      });
 
       let data: Record<string, unknown> | null = null;
 
@@ -634,7 +636,11 @@ export function App() {
   // Create task
   const handleCreateTask = useCallback(
     async (title: string, description?: string, attachmentId?: string) => {
-      clientDebugLogger.info("Creating task", { title, hasDescription: !!description, hasAttachment: !!attachmentId });
+      clientDebugLogger.info("Creating task", {
+        title,
+        hasDescription: !!description,
+        hasAttachment: !!attachmentId,
+      });
       setIsLoading(true);
       try {
         const result = (await client.callTool("createTask", {
