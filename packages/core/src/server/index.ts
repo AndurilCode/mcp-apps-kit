@@ -165,6 +165,11 @@ export function createServerInstance<T extends ToolDefs>(
     res.json({ status: "ok", name: config.name, version: config.version });
   });
 
+  // Catch-all 404 handler for unregistered routes
+  expressApp.use((_req: Request, res: Response) => {
+    res.status(404).json({ error: "Not found" });
+  });
+
   // Error handler middleware
   expressApp.use((err: Error, _req: Request, res: Response, _next: () => void) => {
     const appError = wrapError(err);
@@ -243,7 +248,7 @@ export function createServerInstance<T extends ToolDefs>(
 
         // Health check endpoint
         if (url.pathname === "/health") {
-          return new Response(
+          return new globalThis.Response(
             JSON.stringify({ status: "ok", name: config.name, version: config.version }),
             {
               status: 200,
@@ -254,7 +259,7 @@ export function createServerInstance<T extends ToolDefs>(
 
         // Validate request matches the configured serverRoute
         if (url.pathname !== serverRoute) {
-          return new Response(JSON.stringify({ error: "Not found" }), {
+          return new globalThis.Response(JSON.stringify({ error: "Not found" }), {
             status: 404,
             headers: { "Content-Type": "application/json" },
           });
@@ -262,7 +267,7 @@ export function createServerInstance<T extends ToolDefs>(
 
         // Only POST is supported for MCP requests
         if (req.method !== "POST") {
-          return new Response(
+          return new globalThis.Response(
             JSON.stringify({ error: `${req.method} not supported in stateless mode` }),
             {
               status: 405,
@@ -320,13 +325,13 @@ export function createServerInstance<T extends ToolDefs>(
 
         await transport.close();
 
-        return new Response(responseBody, {
+        return new globalThis.Response(responseBody, {
           status: responseStatus,
           headers: responseHeaders,
         });
       } catch (error) {
         const appError = wrapError(error);
-        return new Response(JSON.stringify({ error: appError.message }), {
+        return new globalThis.Response(JSON.stringify({ error: appError.message }), {
           status: 500,
           headers: { "Content-Type": "application/json" },
         });
