@@ -18,7 +18,7 @@ import type {
   ToolContext,
   UserLocation,
 } from "../types/tools";
-import type { AppConfig, CORSConfig } from "../types/config";
+import type { AppConfig, CORSConfig, DebugConfig } from "../types/config";
 import type { UIDefs, UIDef } from "../types/ui";
 import type { MiddlewareContext } from "../middleware/types";
 import type { EventMap } from "../events/types";
@@ -27,6 +27,7 @@ import { formatZodError, wrapError } from "../utils/errors";
 import { createAdapter, type ProtocolAdapter } from "../adapters";
 import { PluginManager } from "../plugins/PluginManager";
 import { MiddlewareChain } from "../middleware/MiddlewareChain";
+import { debugLogger, type LogEntry } from "../debug/logger";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
@@ -78,6 +79,9 @@ export function createServerInstance<T extends ToolDefs>(
   // Will be set by createApp
   let middlewareChainRef: MiddlewareChain | undefined;
   let eventEmitterRef: TypedEventEmitter<EventMap & Record<string, unknown>> | undefined;
+
+  // Register debug log tool if debug logging is enabled
+  registerDebugLogTool(mcpServer, config.config?.debug);
 
   // Register tools with MCP server (pass UI URIs for correct binding and pluginManager)
   registerTools(
@@ -347,6 +351,73 @@ export function createServerInstance<T extends ToolDefs>(
 // =============================================================================
 
 /**
+ * Register the log_debug tool for client-side debug log transport
+ *
+ * This internal tool receives batched log entries from client UIs
+ * and processes them through the server-side debug logger.
+ */
+function registerDebugLogTool(
+  mcpServer: McpServer,
+  debugConfig: DebugConfig | undefined
+): void {
+  // Only register if debug logging is enabled
+  if (!debugConfig?.enabled) {
+    return;
+  }
+
+  // Define the log entry schema
+  const logEntrySchema = z.object({
+    level: z.enum(["debug", "info", "warn", "error"]),
+    message: z.string(),
+    data: z.unknown().optional(),
+    timestamp: z.string(),
+    source: z.string().optional(),
+  });
+
+  const inputSchema = {
+    entries: z.array(logEntrySchema).describe("Array of log entries to process"),
+  };
+
+  const outputSchema = {
+    processed: z.number().describe("Number of entries processed"),
+  };
+
+  // Register the log_debug tool
+  // This is an internal tool for transporting debug logs from client UIs
+  mcpServer.registerTool(
+    "log_debug",
+    {
+      title: "Debug Log",
+      description: "Internal tool for transporting debug logs from client UIs to the server",
+      inputSchema,
+      outputSchema,
+      _meta: {
+        // Metadata to indicate this is an internal tool
+        internal: true,
+        // Visibility hint for hosts that support it
+        visibility: "app",
+      },
+    },
+    async (args: Record<string, unknown>) => {
+      const { entries } = args as { entries: LogEntry[] };
+
+      // Process entries through the debug logger
+      const processed = debugLogger.processEntries(entries);
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ processed }),
+          },
+        ],
+        structuredContent: { processed },
+      };
+    }
+  );
+}
+
+/**
  * Register tools with the MCP server
  */
 function registerTools(
@@ -476,10 +547,7 @@ function registerTools(
             );
           } catch (hookError) {
             // Log hook error but don't disrupt success flow
-            console.error(
-              `[Plugin Hook Error] afterToolCall hook failed for tool "${name}":`,
-              hookError
-            );
+            debugLogger.error(`[Plugin Hook Error] afterToolCall hook failed for tool "${name}"`, hookError);
           }
 
           // Emit tool:success event

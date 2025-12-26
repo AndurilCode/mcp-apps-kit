@@ -5,7 +5,7 @@
  */
 
 import type { ToolDefs, App, StartOptions, McpServer, ExpressMiddleware } from "./types/tools";
-import type { AppConfig } from "./types/config";
+import type { AppConfig, DebugConfig } from "./types/config";
 import type { UIDefs } from "./types/ui";
 import type { Middleware } from "./middleware/types";
 import type { EventMap } from "./events/types";
@@ -14,6 +14,7 @@ import { createServerInstance, type ServerInstance } from "./server/index";
 import { PluginManager } from "./plugins/PluginManager";
 import { MiddlewareChain } from "./middleware/MiddlewareChain";
 import { TypedEventEmitter } from "./events/EventEmitter";
+import { configureDebugLogger } from "./debug/logger";
 
 /**
  * Validate app configuration
@@ -63,6 +64,45 @@ function validateConfig<T extends ToolDefs>(config: unknown): asserts config is 
       );
     }
   }
+
+  // Validate debug config if provided
+  if (globalConfig?.debug !== undefined) {
+    const debug = globalConfig.debug as DebugConfig;
+    if (typeof debug !== "object" || debug === null) {
+      throw new AppError(ErrorCode.INVALID_CONFIG, "Config.config.debug must be an object");
+    }
+    if (typeof debug.enabled !== "boolean") {
+      throw new AppError(
+        ErrorCode.INVALID_CONFIG,
+        "Config.config.debug.enabled is required and must be a boolean"
+      );
+    }
+    if (debug.level !== undefined) {
+      const validLevels = ["debug", "info", "warn", "error"];
+      if (!validLevels.includes(debug.level)) {
+        throw new AppError(
+          ErrorCode.INVALID_CONFIG,
+          `Config.config.debug.level must be one of: ${validLevels.join(", ")}`
+        );
+      }
+    }
+    if (debug.batchSize !== undefined) {
+      if (typeof debug.batchSize !== "number" || debug.batchSize < 1) {
+        throw new AppError(
+          ErrorCode.INVALID_CONFIG,
+          "Config.config.debug.batchSize must be a positive number"
+        );
+      }
+    }
+    if (debug.flushIntervalMs !== undefined) {
+      if (typeof debug.flushIntervalMs !== "number" || debug.flushIntervalMs < 0) {
+        throw new AppError(
+          ErrorCode.INVALID_CONFIG,
+          "Config.config.debug.flushIntervalMs must be a non-negative number"
+        );
+      }
+    }
+  }
 }
 
 /**
@@ -94,6 +134,11 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
 ): App<T, U> {
   // Validate config at runtime
   validateConfig<T>(config);
+
+  // Configure debug logger if enabled
+  if (config.config?.debug?.enabled) {
+    configureDebugLogger(config.config.debug);
+  }
 
   // Initialize plugin manager (but defer init() call to app.start())
   const pluginManager = new PluginManager(config.plugins ?? []);

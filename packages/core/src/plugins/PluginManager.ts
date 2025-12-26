@@ -16,6 +16,7 @@
  */
 
 import type { Plugin } from "./types";
+import { debugLogger } from "../debug/logger";
 
 /**
  * PluginManager class
@@ -71,9 +72,8 @@ export class PluginManager {
         try {
           await plugin.onStart(context);
         } catch (error) {
-          // eslint-disable-next-line no-console
-          console.error(
-            `Plugin '${plugin.name}' onStart failed:`,
+          debugLogger.error(
+            `Plugin '${plugin.name}' onStart failed`,
             error instanceof Error ? error.message : String(error)
           );
         }
@@ -95,9 +95,8 @@ export class PluginManager {
         let timer: ReturnType<typeof setTimeout> | undefined;
         const timeoutPromise = new Promise<void>((resolve) => {
           timer = setTimeout(() => {
-            // eslint-disable-next-line no-console
-            console.warn(
-              `Plugin '${plugin.name}' onShutdown timed out after ${context.timeoutMs}ms`
+            debugLogger.warn(
+              `Plugin '${plugin.name}' onShutdown timed out after ${String(context.timeoutMs)}ms`
             );
             resolve();
           }, context.timeoutMs);
@@ -105,9 +104,8 @@ export class PluginManager {
 
         const shutdownPromise = Promise.resolve(plugin.onShutdown(context)).catch(
           (error: unknown) => {
-            // eslint-disable-next-line no-console
-            console.error(
-              `Plugin '${plugin.name}' onShutdown failed:`,
+            debugLogger.error(
+              `Plugin '${plugin.name}' onShutdown failed`,
               error instanceof Error ? error.message : String(error)
             );
           }
@@ -141,9 +139,8 @@ export class PluginManager {
         try {
           await (hook as (...args: unknown[]) => Promise<void>).apply(plugin, args);
         } catch (error) {
-          // eslint-disable-next-line no-console
-          console.error(
-            `Plugin '${plugin.name}' ${hookName} failed:`,
+          debugLogger.error(
+            `Plugin '${plugin.name}' ${hookName} failed`,
             error instanceof Error ? error.message : String(error)
           );
         }
