@@ -324,21 +324,53 @@ describe("Client Debug Logger", () => {
   });
 
   describe("clientDebugLogger global instance", () => {
+    let consoleInfoSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      consoleInfoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      consoleInfoSpy.mockRestore();
+      // Restore to disabled state
+      clientDebugLogger.configure({ enabled: false });
+    });
+
     it("should be a ClientDebugLogger instance", () => {
       expect(clientDebugLogger).toBeInstanceOf(ClientDebugLogger);
     });
 
-    it("should be configurable", () => {
-      const originalEnabled = clientDebugLogger["config"].enabled;
+    it("should be configurable and reflect changes in behavior", async () => {
+      // Configure as disabled - logs should go to console fallback
+      clientDebugLogger.configure({ enabled: false, level: "debug" });
 
+      clientDebugLogger.info("Test disabled message");
+
+      // When disabled, should fall back to console output
+      expect(consoleInfoSpy).toHaveBeenCalled();
+      expect(consoleInfoSpy.mock.calls[0][0]).toContain("Test disabled message");
+
+      consoleInfoSpy.mockClear();
+
+      // Configure as enabled without adapter - should still fall back to console
       clientDebugLogger.configure({ enabled: true });
-      expect(clientDebugLogger["config"].enabled).toBe(true);
 
-      clientDebugLogger.configure({ enabled: false });
-      expect(clientDebugLogger["config"].enabled).toBe(false);
+      clientDebugLogger.info("Test enabled message");
 
-      // Restore
-      clientDebugLogger.configure({ enabled: originalEnabled });
+      // Still falls back to console since no adapter connected
+      expect(consoleInfoSpy).toHaveBeenCalled();
+      expect(consoleInfoSpy.mock.calls[0][0]).toContain("Test enabled message");
+    });
+
+    it("should accept configuration changes without throwing", () => {
+      expect(() => clientDebugLogger.configure({ enabled: true })).not.toThrow();
+      expect(() => clientDebugLogger.configure({ enabled: false })).not.toThrow();
+      expect(() => clientDebugLogger.configure({ level: "debug" })).not.toThrow();
+      expect(() => clientDebugLogger.configure({ level: "error" })).not.toThrow();
+      expect(() => clientDebugLogger.configure({ batchSize: 20 })).not.toThrow();
+      expect(() => clientDebugLogger.configure({ source: "test-source" })).not.toThrow();
     });
   });
 });

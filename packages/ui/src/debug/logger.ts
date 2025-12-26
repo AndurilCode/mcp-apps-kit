@@ -57,6 +57,13 @@ export interface ClientDebugConfig {
   batchSize?: number;
 
   /**
+   * Maximum buffer size to prevent memory overflow.
+   * When exceeded, oldest entries are dropped.
+   * @default 100
+   */
+  maxBufferSize?: number;
+
+  /**
    * Maximum time in milliseconds between flushes
    * @default 5000
    */
@@ -204,6 +211,7 @@ export class ClientDebugLogger {
       enabled: config.enabled ?? false,
       level: config.level ?? "info",
       batchSize: config.batchSize ?? 10,
+      maxBufferSize: config.maxBufferSize ?? 100,
       flushIntervalMs: config.flushIntervalMs ?? 5000,
       source: config.source ?? "mcp-apps-ui",
     };
@@ -236,6 +244,9 @@ export class ClientDebugLogger {
     }
     if (config.batchSize !== undefined) {
       this.config.batchSize = config.batchSize;
+    }
+    if (config.maxBufferSize !== undefined) {
+      this.config.maxBufferSize = config.maxBufferSize;
     }
     if (config.flushIntervalMs !== undefined) {
       this.config.flushIntervalMs = config.flushIntervalMs;
@@ -375,6 +386,15 @@ export class ClientDebugLogger {
    * Add a log entry to the buffer
    */
   private addToBuffer(entry: LogEntry): void {
+    // Handle buffer overflow - drop oldest entries if we've reached max size
+    if (this.buffer.length >= this.config.maxBufferSize) {
+      const dropped = this.buffer.shift();
+      if (dropped) {
+        // Output dropped entry to console as fallback
+        this.outputToConsole(dropped);
+      }
+    }
+
     this.buffer.push(entry);
 
     // Immediate flush for error-level logs

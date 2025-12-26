@@ -400,10 +400,29 @@ function registerDebugLogTool(mcpServer: McpServer, debugConfig: DebugConfig | u
       },
     },
     async (args: Record<string, unknown>) => {
-      const { entries } = args as { entries: LogEntry[] };
+      // Validate input with Zod schema for type safety
+      const parseResult = z.object(inputSchema).safeParse(args);
+
+      if (!parseResult.success) {
+        // Return error response for invalid input
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({
+                error: "Invalid log entries",
+                details: z.treeifyError(parseResult.error),
+              }),
+            },
+          ],
+          structuredContent: { processed: 0 },
+        };
+      }
+
+      const { entries } = parseResult.data;
 
       // Process entries through the debug logger
-      const processed = debugLogger.processEntries(entries);
+      const processed = debugLogger.processEntries(entries as LogEntry[]);
 
       return {
         content: [
