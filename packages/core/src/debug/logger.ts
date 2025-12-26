@@ -167,7 +167,8 @@ export function safeSerialize(data: unknown): unknown {
  */
 export const consoleOutputHandler: LogOutputHandler = (entry: LogEntry): void => {
   const prefix = `[${entry.timestamp}] [${entry.level.toUpperCase()}]${entry.source ? ` [${entry.source}]` : ""}`;
-  const message = entry.data !== undefined ? `${entry.message} ${safeStringify(entry.data)}` : entry.message;
+  const message =
+    entry.data !== undefined ? `${entry.message} ${safeStringify(entry.data)}` : entry.message;
   const formattedMessage = `${prefix} ${message}`;
 
   /* eslint-disable no-console */
