@@ -108,9 +108,12 @@ export function createServerInstance<T extends ToolDefs>(
   // Track HTTP server
   let httpServer: Server | undefined;
 
+  // Get configurable server route (default: "/mcp")
+  const serverRoute = config.config?.serverRoute ?? "/mcp";
+
   // Setup stateless Streamable HTTP endpoint for MCP
   // Each request creates a fresh transport (no session management)
-  expressApp.post("/mcp", async (req: Request, res: Response) => {
+  expressApp.post(serverRoute, async (req: Request, res: Response) => {
     // Call onRequest hook
     void pluginManager.executeHook("onRequest", {
       method: req.method,
@@ -147,12 +150,12 @@ export function createServerInstance<T extends ToolDefs>(
   });
 
   // GET endpoint - not needed for stateless mode
-  expressApp.get("/mcp", (_req: Request, res: Response) => {
+  expressApp.get(serverRoute, (_req: Request, res: Response) => {
     res.status(405).json({ error: "GET not supported in stateless mode" });
   });
 
   // DELETE endpoint - not needed for stateless mode
-  expressApp.delete("/mcp", (_req: Request, res: Response) => {
+  expressApp.delete(serverRoute, (_req: Request, res: Response) => {
     res.status(405).json({ error: "DELETE not supported in stateless mode" });
   });
 

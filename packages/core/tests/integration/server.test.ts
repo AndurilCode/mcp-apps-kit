@@ -162,4 +162,80 @@ describe("app.start() integration", () => {
       // CORS would be verified through HTTP headers in actual requests
     });
   });
+
+  describe("serverRoute configuration", () => {
+    it("should use default /mcp route when not configured", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {
+          ping: {
+            description: "Ping",
+            input: z.object({}),
+            output: z.object({ pong: z.boolean() }),
+            handler: async () => ({ pong: true }),
+          },
+        },
+      });
+
+      await app.start({ port: 3006 });
+
+      // Verify health endpoint works (server is running)
+      const healthResponse = await fetch("http://localhost:3006/health");
+      expect(healthResponse.ok).toBe(true);
+
+      // Default route should be /mcp - GET should return 405 (method not allowed)
+      const mcpGetResponse = await fetch("http://localhost:3006/mcp");
+      expect(mcpGetResponse.status).toBe(405);
+    });
+
+    it("should use custom serverRoute when configured", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {
+          ping: {
+            description: "Ping",
+            input: z.object({}),
+            output: z.object({ pong: z.boolean() }),
+            handler: async () => ({ pong: true }),
+          },
+        },
+        config: {
+          serverRoute: "/api/mcp",
+        },
+      });
+
+      await app.start({ port: 3007 });
+
+      // Verify health endpoint works (server is running)
+      const healthResponse = await fetch("http://localhost:3007/health");
+      expect(healthResponse.ok).toBe(true);
+
+      // Custom route should be /api/mcp - GET should return 405
+      const mcpGetResponse = await fetch("http://localhost:3007/api/mcp");
+      expect(mcpGetResponse.status).toBe(405);
+
+      // Default /mcp should not be registered (404)
+      const defaultRouteResponse = await fetch("http://localhost:3007/mcp");
+      expect(defaultRouteResponse.status).toBe(404);
+    });
+
+    it("should accept deeply nested custom routes", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {},
+        config: {
+          serverRoute: "/v1/api/services/mcp",
+        },
+      });
+
+      await app.start({ port: 3008 });
+
+      // Custom nested route should work
+      const mcpGetResponse = await fetch("http://localhost:3008/v1/api/services/mcp");
+      expect(mcpGetResponse.status).toBe(405);
+    });
+  });
 });
