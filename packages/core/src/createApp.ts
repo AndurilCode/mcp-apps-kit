@@ -71,10 +71,10 @@ function validateConfig<T extends ToolDefs>(config: unknown): asserts config is 
     if (typeof debug !== "object" || debug === null) {
       throw new AppError(ErrorCode.INVALID_CONFIG, "Config.config.debug must be an object");
     }
-    if (typeof debug.enabled !== "boolean") {
+    if (debug.enabled !== undefined && typeof debug.enabled !== "boolean") {
       throw new AppError(
         ErrorCode.INVALID_CONFIG,
-        "Config.config.debug.enabled is required and must be a boolean"
+        "Config.config.debug.enabled must be a boolean if provided"
       );
     }
     if (debug.level !== undefined) {
