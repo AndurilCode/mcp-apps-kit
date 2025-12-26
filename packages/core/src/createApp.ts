@@ -42,6 +42,27 @@ function validateConfig<T extends ToolDefs>(config: unknown): asserts config is 
   if (typeof cfg.tools !== "object" || cfg.tools === null) {
     throw new AppError(ErrorCode.INVALID_CONFIG, "Config.tools is required and must be an object");
   }
+
+  // Validate serverRoute if provided
+  const globalConfig = cfg.config as Record<string, unknown> | undefined;
+  if (globalConfig?.serverRoute !== undefined) {
+    const serverRoute = globalConfig.serverRoute;
+    if (typeof serverRoute !== "string") {
+      throw new AppError(ErrorCode.INVALID_CONFIG, "Config.config.serverRoute must be a string");
+    }
+    if (!serverRoute.startsWith("/")) {
+      throw new AppError(
+        ErrorCode.INVALID_CONFIG,
+        `Config.config.serverRoute must start with "/", got: "${serverRoute}"`
+      );
+    }
+    if (serverRoute === "/health") {
+      throw new AppError(
+        ErrorCode.INVALID_CONFIG,
+        'Config.config.serverRoute cannot be "/health" as it conflicts with the health check endpoint'
+      );
+    }
+  }
 }
 
 /**

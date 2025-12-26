@@ -108,9 +108,13 @@ export function createServerInstance<T extends ToolDefs>(
   // Track HTTP server
   let httpServer: Server | undefined;
 
+  // Get configurable server route (default: "/mcp")
+  // Note: Validation is done in createApp's validateConfig function
+  const serverRoute = config.config?.serverRoute ?? "/mcp";
+
   // Setup stateless Streamable HTTP endpoint for MCP
   // Each request creates a fresh transport (no session management)
-  expressApp.post("/mcp", async (req: Request, res: Response) => {
+  expressApp.post(serverRoute, async (req: Request, res: Response) => {
     // Call onRequest hook
     void pluginManager.executeHook("onRequest", {
       method: req.method,
@@ -147,18 +151,23 @@ export function createServerInstance<T extends ToolDefs>(
   });
 
   // GET endpoint - not needed for stateless mode
-  expressApp.get("/mcp", (_req: Request, res: Response) => {
+  expressApp.get(serverRoute, (_req: Request, res: Response) => {
     res.status(405).json({ error: "GET not supported in stateless mode" });
   });
 
   // DELETE endpoint - not needed for stateless mode
-  expressApp.delete("/mcp", (_req: Request, res: Response) => {
+  expressApp.delete(serverRoute, (_req: Request, res: Response) => {
     res.status(405).json({ error: "DELETE not supported in stateless mode" });
   });
 
   // Health check endpoint
   expressApp.get("/health", (_req: Request, res: Response) => {
     res.json({ status: "ok", name: config.name, version: config.version });
+  });
+
+  // Catch-all 404 handler for unregistered routes
+  expressApp.use((_req: Request, res: Response) => {
+    res.status(404).json({ error: "Not found" });
   });
 
   // Error handler middleware
@@ -237,11 +246,31 @@ export function createServerInstance<T extends ToolDefs>(
       try {
         const url = new URL(req.url);
 
+        // Health check endpoint
         if (url.pathname === "/health") {
-          return new Response(
+          return new globalThis.Response(
             JSON.stringify({ status: "ok", name: config.name, version: config.version }),
             {
               status: 200,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        // Validate request matches the configured serverRoute
+        if (url.pathname !== serverRoute) {
+          return new globalThis.Response(JSON.stringify({ error: "Not found" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        // Only POST is supported for MCP requests
+        if (req.method !== "POST") {
+          return new globalThis.Response(
+            JSON.stringify({ error: `${req.method} not supported in stateless mode` }),
+            {
+              status: 405,
               headers: { "Content-Type": "application/json" },
             }
           );
@@ -296,13 +325,13 @@ export function createServerInstance<T extends ToolDefs>(
 
         await transport.close();
 
-        return new Response(responseBody, {
+        return new globalThis.Response(responseBody, {
           status: responseStatus,
           headers: responseHeaders,
         });
       } catch (error) {
         const appError = wrapError(error);
-        return new Response(JSON.stringify({ error: appError.message }), {
+        return new globalThis.Response(JSON.stringify({ error: appError.message }), {
           status: 500,
           headers: { "Content-Type": "application/json" },
         });

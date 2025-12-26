@@ -92,6 +92,23 @@ export interface GlobalConfig {
    * @default "mcp"
    */
   protocol?: Protocol;
+
+  /**
+   * The route path for the MCP server endpoint.
+   *
+   * This is the path where the MCP server will listen for requests.
+   * Must start with a forward slash.
+   *
+   * @default "/mcp"
+   *
+   * @example
+   * ```typescript
+   * config: {
+   *   serverRoute: "/api/mcp"
+   * }
+   * ```
+   */
+  serverRoute?: string;
 }
 
 /**
