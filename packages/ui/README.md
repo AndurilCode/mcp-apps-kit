@@ -57,6 +57,64 @@ import { createClient } from "@mcp-apps-kit/ui";
 const client = await createClient({ forceAdapter: "mock" });
 ```
 
+## Debug Logging
+
+The client debug logger allows you to send structured logs from your UI to the server through the MCP protocol. This bypasses sandbox restrictions in iframe environments where `console` access may be unavailable (e.g., mobile ChatGPT).
+
+### Basic Usage
+
+```ts
+import { clientDebugLogger } from "@mcp-apps-kit/ui";
+
+// Configure the logger (call once at app startup)
+clientDebugLogger.configure({
+  enabled: true,       // Enable MCP transport
+  level: "debug",      // Minimum level to log
+  source: "my-widget", // Identifier for log entries
+});
+
+// Log messages at different levels
+clientDebugLogger.debug("Component mounted", { props });
+clientDebugLogger.info("User action", { action: "click", target: "button" });
+clientDebugLogger.warn("Validation warning", { field: "email" });
+clientDebugLogger.error("API request failed", { error: err.message });
+```
+
+### Features
+
+- **Intelligent batching**: Logs are batched to reduce MCP calls (default: 10 entries or 5 seconds)
+- **Immediate flush on errors**: Error-level logs are flushed immediately
+- **Automatic fallback**: Falls back to `console` when MCP transport is unavailable
+- **Circular reference handling**: Safely serializes objects with circular references
+- **Graceful degradation**: Works silently in restricted environments
+
+### Configuration Options
+
+```ts
+clientDebugLogger.configure({
+  enabled: true,           // Enable/disable MCP transport
+  level: "info",           // "debug" | "info" | "warn" | "error"
+  batchSize: 10,           // Flush after N log entries
+  flushIntervalMs: 5000,   // Max time between flushes (ms)
+  source: "my-app",        // Source identifier for logs
+});
+```
+
+### Server-Side Setup
+
+For the logs to be received, the server must have debug logging enabled:
+
+```ts
+// server/index.ts
+const app = createApp({
+  config: {
+    debug: { enabled: true, level: "debug" },
+  },
+});
+```
+
+**See also:** [@mcp-apps-kit/core README](../core/README.md) for server-side configuration.
+
 ## Documentation & examples
 
 - Project overview: ../../README.md

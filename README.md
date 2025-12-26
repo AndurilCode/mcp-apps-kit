@@ -31,6 +31,7 @@ Building interactive MCP apps today requires:
 - **Flexible deployment** - Express server, custom transport, or serverless
 - **Framework agnostic** - React, Vue, Svelte, or vanilla JS for UI
 - **Plugins, Middleware & Events** - Extensible architecture for logging, authentication, analytics
+- **Debug Logging** - Structured logging from UI to server via MCP protocol, bypassing sandbox restrictions
 
 ## Who Is This For?
 
@@ -314,6 +315,7 @@ export default {
 | Persisted State   | ✅ (polyfill) | ✅           |
 | File Upload       | ❌            | ✅           |
 | Tool Cancellation | ✅            | ❌           |
+| Debug Logging     | ✅            | ✅           |
 
 ## Contributing
 
