@@ -109,6 +109,7 @@ export function createServerInstance<T extends ToolDefs>(
   let httpServer: Server | undefined;
 
   // Get configurable server route (default: "/mcp")
+  // Note: Validation is done in createApp's validateConfig function
   const serverRoute = config.config?.serverRoute ?? "/mcp";
 
   // Setup stateless Streamable HTTP endpoint for MCP
@@ -240,11 +241,31 @@ export function createServerInstance<T extends ToolDefs>(
       try {
         const url = new URL(req.url);
 
+        // Health check endpoint
         if (url.pathname === "/health") {
           return new Response(
             JSON.stringify({ status: "ok", name: config.name, version: config.version }),
             {
               status: 200,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        // Validate request matches the configured serverRoute
+        if (url.pathname !== serverRoute) {
+          return new Response(JSON.stringify({ error: "Not found" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        // Only POST is supported for MCP requests
+        if (req.method !== "POST") {
+          return new Response(
+            JSON.stringify({ error: `${req.method} not supported in stateless mode` }),
+            {
+              status: 405,
               headers: { "Content-Type": "application/json" },
             }
           );

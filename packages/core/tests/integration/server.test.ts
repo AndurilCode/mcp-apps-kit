@@ -237,5 +237,135 @@ describe("app.start() integration", () => {
       const mcpGetResponse = await fetch("http://localhost:3008/v1/api/services/mcp");
       expect(mcpGetResponse.status).toBe(405);
     });
+
+    it("should accept POST requests on custom route", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {
+          ping: {
+            description: "Ping",
+            input: z.object({}),
+            output: z.object({ pong: z.boolean() }),
+            handler: async () => ({ pong: true }),
+          },
+        },
+        config: {
+          serverRoute: "/api/mcp",
+        },
+      });
+
+      await app.start({ port: 3009 });
+
+      // POST to custom route should be routed correctly (not 404 or 405)
+      const postResponse = await fetch("http://localhost:3009/api/mcp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", method: "tools/list", id: 1 }),
+      });
+
+      // Should not return 404 (not found) or 405 (method not allowed)
+      // The route should be matched and handled by MCP transport
+      expect(postResponse.status).not.toBe(404);
+      expect(postResponse.status).not.toBe(405);
+    });
+
+    it("should throw error if serverRoute does not start with /", () => {
+      expect(() =>
+        createApp({
+          name: "test-app",
+          version: "1.0.0",
+          tools: {},
+          config: {
+            serverRoute: "api/mcp", // Missing leading slash
+          },
+        })
+      ).toThrow('serverRoute must start with "/"');
+    });
+
+    it("should throw error if serverRoute conflicts with /health", () => {
+      expect(() =>
+        createApp({
+          name: "test-app",
+          version: "1.0.0",
+          tools: {},
+          config: {
+            serverRoute: "/health", // Reserved path
+          },
+        })
+      ).toThrow('serverRoute cannot be "/health"');
+    });
+  });
+
+  describe("serverRoute with handleRequest (serverless)", () => {
+    it("should return 404 for wrong route in handleRequest", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {},
+        config: {
+          serverRoute: "/api/mcp",
+        },
+      });
+
+      // Request to wrong route should return 404
+      const invalidRequest = new Request("http://localhost/mcp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", method: "tools/list", id: 1 }),
+      });
+      const invalidResponse = await app.handleRequest(invalidRequest);
+      expect(invalidResponse.status).toBe(404);
+
+      const body = await invalidResponse.json();
+      expect(body).toEqual({ error: "Not found" });
+    });
+
+    it("should return 405 for non-POST methods in handleRequest", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {},
+        config: {
+          serverRoute: "/api/mcp",
+        },
+      });
+
+      // GET request should return 405
+      const getRequest = new Request("http://localhost/api/mcp", {
+        method: "GET",
+      });
+      const getResponse = await app.handleRequest(getRequest);
+      expect(getResponse.status).toBe(405);
+
+      // DELETE request should return 405
+      const deleteRequest = new Request("http://localhost/api/mcp", {
+        method: "DELETE",
+      });
+      const deleteResponse = await app.handleRequest(deleteRequest);
+      expect(deleteResponse.status).toBe(405);
+    });
+
+    it("should handle /health in handleRequest", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {},
+        config: {
+          serverRoute: "/api/mcp",
+        },
+      });
+
+      const healthRequest = new Request("http://localhost/health");
+      const healthResponse = await app.handleRequest(healthRequest);
+      expect(healthResponse.status).toBe(200);
+
+      const body = await healthResponse.json();
+      expect(body).toEqual({
+        status: "ok",
+        name: "test-app",
+        version: "1.0.0",
+      });
+    });
   });
 });
