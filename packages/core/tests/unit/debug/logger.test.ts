@@ -125,7 +125,7 @@ describe("Debug Logger", () => {
       const mockHandler = (entry: LogEntry) => {
         outputEntries.push(entry);
       };
-      logger = new DebugLogger({ enabled: true, level: "debug" }, mockHandler, "test");
+      logger = new DebugLogger({ level: "debug" }, mockHandler, "test");
     });
 
     it("should create log entries with correct properties", () => {
@@ -298,10 +298,10 @@ describe("Debug Logger", () => {
     it("should configure the global debug logger", () => {
       const originalLevel = debugLogger["minLevel"];
 
-      configureDebugLogger({ enabled: true, level: "debug" });
+      configureDebugLogger({ level: "debug" });
       expect(debugLogger["minLevel"]).toBe("debug");
 
-      configureDebugLogger({ enabled: true, level: "error" });
+      configureDebugLogger({ level: "error" });
       expect(debugLogger["minLevel"]).toBe("error");
 
       // Restore

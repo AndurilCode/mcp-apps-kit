@@ -71,10 +71,10 @@ function validateConfig<T extends ToolDefs>(config: unknown): asserts config is 
     if (typeof debug !== "object" || debug === null) {
       throw new AppError(ErrorCode.INVALID_CONFIG, "Config.config.debug must be an object");
     }
-    if (debug.enabled !== undefined && typeof debug.enabled !== "boolean") {
+    if (debug.logTool !== undefined && typeof debug.logTool !== "boolean") {
       throw new AppError(
         ErrorCode.INVALID_CONFIG,
-        "Config.config.debug.enabled must be a boolean if provided"
+        "Config.config.debug.logTool must be a boolean if provided"
       );
     }
     if (debug.level !== undefined) {
@@ -135,8 +135,8 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
   // Validate config at runtime
   validateConfig<T>(config);
 
-  // Configure debug logger if enabled
-  if (config.config?.debug?.enabled) {
+  // Configure debug logger if debug config is provided
+  if (config.config?.debug) {
     configureDebugLogger(config.config.debug);
   }
 

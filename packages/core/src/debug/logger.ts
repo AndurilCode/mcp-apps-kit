@@ -198,7 +198,6 @@ export class DebugLogger {
   private minLevel: DebugLogLevel;
   private outputHandler: LogOutputHandler;
   private source: string;
-  private enabled: boolean;
 
   /**
    * Create a debug logger
@@ -208,21 +207,13 @@ export class DebugLogger {
    * @param source - Optional source identifier for log entries
    */
   constructor(
-    config: Pick<DebugConfig, "enabled" | "level"> = { enabled: true },
+    config: Pick<DebugConfig, "level"> = {},
     outputHandler: LogOutputHandler = consoleOutputHandler,
     source?: string
   ) {
-    this.enabled = config.enabled ?? true;
     this.minLevel = config.level ?? "info";
     this.outputHandler = outputHandler;
     this.source = source ?? "mcp-apps";
-  }
-
-  /**
-   * Enable or disable the logger
-   */
-  setEnabled(enabled: boolean): void {
-    this.enabled = enabled;
   }
 
   /**
@@ -256,7 +247,7 @@ export class DebugLogger {
    * Log a message if it meets the minimum level
    */
   private log(level: DebugLogLevel, message: string, data?: unknown): void {
-    if (!this.enabled || !shouldLog(level, this.minLevel)) {
+    if (!shouldLog(level, this.minLevel)) {
       return;
     }
     const entry = this.createEntry(level, message, data);
@@ -322,12 +313,11 @@ export class DebugLogger {
  * This is initialized with default settings and can be configured
  * when createApp is called with debug configuration.
  */
-export const debugLogger = new DebugLogger({ enabled: false, level: "info" });
+export const debugLogger = new DebugLogger({ level: "info" });
 
 /**
  * Configure the global debug logger
  */
 export function configureDebugLogger(config: DebugConfig): void {
-  debugLogger.setEnabled(config.enabled ?? false);
   debugLogger.setLevel(config.level ?? "info");
 }

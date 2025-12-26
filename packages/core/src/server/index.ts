@@ -360,8 +360,8 @@ function registerDebugLogTool(
   mcpServer: McpServer,
   debugConfig: DebugConfig | undefined
 ): void {
-  // Only register if debug logging is enabled
-  if (!debugConfig?.enabled) {
+  // Only register if log tool is enabled
+  if (!debugConfig?.logTool) {
     return;
   }
 

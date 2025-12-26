@@ -106,14 +106,17 @@ export type DebugLogLevel = "debug" | "info" | "warn" | "error";
  */
 export interface DebugConfig {
   /**
-   * Enable debug logging.
+   * Enable the log_debug tool for client-to-server log transport.
    *
-   * When enabled, logs are transported through the MCP protocol's
-   * `log_debug` tool instead of console methods.
+   * When true, registers the `log_debug` MCP tool so client UIs
+   * can send debug logs to the server via the MCP protocol.
+   *
+   * Note: Server-side logging is enabled whenever a debug config
+   * is provided, regardless of this setting.
    *
    * @default false
    */
-  enabled: boolean;
+  logTool?: boolean;
 
   /**
    * Minimum log level to output.
