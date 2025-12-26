@@ -384,6 +384,7 @@ function registerDebugLogTool(
 
   // Register the log_debug tool
   // This is an internal tool for transporting debug logs from client UIs
+  // Hidden from the model (visibility: "private") but accessible to widgets
   mcpServer.registerTool(
     "log_debug",
     {
@@ -394,8 +395,11 @@ function registerDebugLogTool(
       _meta: {
         // Metadata to indicate this is an internal tool
         internal: true,
-        // Visibility hint for hosts that support it
+        // MCP visibility hint
         visibility: "app",
+        // OpenAI/ChatGPT visibility: "private" hides from model, widgetAccessible: true allows widget access
+        "openai/visibility": "private",
+        "openai/widgetAccessible": true,
       },
     },
     async (args: Record<string, unknown>) => {

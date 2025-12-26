@@ -626,6 +626,11 @@ const app = createApp({
     },
     // Use MCP protocol for Claude Desktop / MCP Apps
     protocol: "mcp",
+    // Enable debug logging to receive logs from client UIs via MCP transport
+    debug: {
+      enabled: true,
+      level: "debug", // Show all logs including debug level
+    },
   },
 });
 
