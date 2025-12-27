@@ -15,6 +15,9 @@ import { createPlugin } from "@mcp-apps-kit/core";
 import type { Middleware } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
+// Required for Vercel to detect Express serverless function
+import "express";
+
 // =============================================================================
 // DATA TYPES
 // =============================================================================
