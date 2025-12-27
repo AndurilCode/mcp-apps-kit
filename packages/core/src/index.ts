@@ -50,7 +50,15 @@ export type {
 export type { CSPConfig, UIDef, UIDefs } from "./types/ui";
 
 // Config types
-export type { Protocol, AuthConfig, CORSConfig, GlobalConfig, AppConfig } from "./types/config";
+export type {
+  Protocol,
+  AuthConfig,
+  CORSConfig,
+  GlobalConfig,
+  AppConfig,
+  DebugConfig,
+  DebugLogLevel,
+} from "./types/config";
 
 // Plugin types
 export type {
@@ -100,6 +108,18 @@ export {
   createBatchedHandler,
 } from "./events/types";
 export { TypedEventEmitter } from "./events/EventEmitter";
+
+// Debug logging types
+export type { LogEntry, LogDebugInput, LogDebugOutput, LogOutputHandler } from "./debug/logger";
+export {
+  DebugLogger,
+  debugLogger,
+  configureDebugLogger,
+  consoleOutputHandler,
+  shouldLog,
+  safeStringify,
+  safeSerialize,
+} from "./debug/logger";
 
 // =============================================================================
 // UTILITY EXPORTS

@@ -11,11 +11,23 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { z } from "zod";
 import { createApp } from "../../src/index";
+import express from "express";
+import type { AddressInfo } from "node:net";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js";
 
-// Track servers for cleanup
+// Track servers and transports for cleanup
 const servers: Array<{ close: () => void }> = [];
+const transports: StreamableHTTPClientTransport[] = [];
 
 afterEach(async () => {
+  // Close all transports first
+  for (const transport of transports) {
+    await transport.close().catch(() => {});
+  }
+  transports.length = 0;
+
   // Close all servers after each test
   for (const server of servers) {
     await new Promise<void>((resolve) => {
@@ -366,6 +378,167 @@ describe("app.start() integration", () => {
         name: "test-app",
         version: "1.0.0",
       });
+    });
+  });
+
+  describe("debug logTool registration", () => {
+    it("should register log_debug tool when logTool is true", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {
+          ping: {
+            description: "Simple ping tool",
+            input: z.object({}),
+            output: z.object({ pong: z.boolean() }),
+            handler: async () => ({ pong: true }),
+          },
+        },
+        config: {
+          debug: {
+            logTool: true,
+            level: "debug",
+          },
+        },
+      });
+
+      // Set up HTTP server and connect MCP client
+      const host = express();
+      host.use(app.handler());
+      const server = host.listen(0);
+      servers.push(server);
+      const port = (server.address() as AddressInfo).port;
+
+      const client = new Client({ name: "test-client", version: "1.0.0" });
+      const transport = new StreamableHTTPClientTransport(new URL(`http://localhost:${port}/mcp`));
+      transports.push(transport);
+      await client.connect(transport);
+
+      // List tools through MCP protocol
+      const result = await client.request(
+        { method: "tools/list", params: {} },
+        ListToolsResultSchema
+      );
+
+      const toolNames = result.tools.map((t) => t.name);
+      expect(toolNames).toContain("log_debug");
+      expect(toolNames).toContain("ping");
+    });
+
+    it("should NOT register log_debug tool when logTool is false", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {
+          ping: {
+            description: "Simple ping tool",
+            input: z.object({}),
+            output: z.object({ pong: z.boolean() }),
+            handler: async () => ({ pong: true }),
+          },
+        },
+        config: {
+          debug: {
+            logTool: false,
+            level: "debug",
+          },
+        },
+      });
+
+      const host = express();
+      host.use(app.handler());
+      const server = host.listen(0);
+      servers.push(server);
+      const port = (server.address() as AddressInfo).port;
+
+      const client = new Client({ name: "test-client", version: "1.0.0" });
+      const transport = new StreamableHTTPClientTransport(new URL(`http://localhost:${port}/mcp`));
+      transports.push(transport);
+      await client.connect(transport);
+
+      const result = await client.request(
+        { method: "tools/list", params: {} },
+        ListToolsResultSchema
+      );
+
+      const toolNames = result.tools.map((t) => t.name);
+      expect(toolNames).not.toContain("log_debug");
+      expect(toolNames).toContain("ping");
+    });
+
+    it("should NOT register log_debug tool when debug config is missing", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {
+          ping: {
+            description: "Simple ping tool",
+            input: z.object({}),
+            output: z.object({ pong: z.boolean() }),
+            handler: async () => ({ pong: true }),
+          },
+        },
+      });
+
+      const host = express();
+      host.use(app.handler());
+      const server = host.listen(0);
+      servers.push(server);
+      const port = (server.address() as AddressInfo).port;
+
+      const client = new Client({ name: "test-client", version: "1.0.0" });
+      const transport = new StreamableHTTPClientTransport(new URL(`http://localhost:${port}/mcp`));
+      transports.push(transport);
+      await client.connect(transport);
+
+      const result = await client.request(
+        { method: "tools/list", params: {} },
+        ListToolsResultSchema
+      );
+
+      const toolNames = result.tools.map((t) => t.name);
+      expect(toolNames).not.toContain("log_debug");
+      expect(toolNames).toContain("ping");
+    });
+
+    it("should NOT register log_debug tool when logTool is omitted", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {
+          ping: {
+            description: "Simple ping tool",
+            input: z.object({}),
+            output: z.object({ pong: z.boolean() }),
+            handler: async () => ({ pong: true }),
+          },
+        },
+        config: {
+          debug: {
+            level: "info",
+          },
+        },
+      });
+
+      const host = express();
+      host.use(app.handler());
+      const server = host.listen(0);
+      servers.push(server);
+      const port = (server.address() as AddressInfo).port;
+
+      const client = new Client({ name: "test-client", version: "1.0.0" });
+      const transport = new StreamableHTTPClientTransport(new URL(`http://localhost:${port}/mcp`));
+      transports.push(transport);
+      await client.connect(transport);
+
+      const result = await client.request(
+        { method: "tools/list", params: {} },
+        ListToolsResultSchema
+      );
+
+      const toolNames = result.tools.map((t) => t.name);
+      expect(toolNames).not.toContain("log_debug");
+      expect(toolNames).toContain("ping");
     });
   });
 });

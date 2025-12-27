@@ -305,10 +305,8 @@ describe("Plugin Lifecycle Integration", () => {
 
       // Error from bad plugin should have been logged
       expect(consoleErrorSpy).toHaveBeenCalled();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining("bad-start-plugin"),
-        expect.anything()
-      );
+      // The debugLogger outputs a single formatted string
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining("bad-start-plugin"));
 
       consoleErrorSpy.mockRestore();
     });

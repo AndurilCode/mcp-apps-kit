@@ -50,7 +50,15 @@ import {
   useToolInput,
   type ModalOptions,
 } from "@mcp-apps-kit/ui-react";
+import { clientDebugLogger } from "@mcp-apps-kit/ui";
 import type { KanbanClientTools } from "../index";
+
+// Configure the debug logger to enable MCP transport
+clientDebugLogger.configure({
+  enabled: true,
+  level: "debug",
+  source: "kanban-ui",
+});
 
 // =============================================================================
 // Types
@@ -539,7 +547,7 @@ export function App() {
 
   // Subscribe to teardown events
   useOnTeardown((reason) => {
-    console.log("[Kanban App] Teardown:", reason);
+    clientDebugLogger.info("Teardown event received", { reason });
     // Cleanup resources if needed
   });
 
@@ -570,11 +578,13 @@ export function App() {
   // Refresh board by calling listTasks
   const refreshBoard = useCallback(async () => {
     if (isCancelled) return;
-    console.log("[Kanban App] refreshBoard called");
+    clientDebugLogger.debug("Refreshing board...");
     setIsLoading(true);
     try {
       const result = (await client.callTool("listTasks", {})) as Record<string, unknown>;
-      console.log("[Kanban App] refreshBoard result:", result);
+      clientDebugLogger.debug("Refresh board result received", {
+        taskCount: (result as { tasks?: Task[] }).tasks?.length,
+      });
 
       let data: Record<string, unknown> | null = null;
 
@@ -587,18 +597,18 @@ export function App() {
           try {
             data = JSON.parse(result.result) as Record<string, unknown>;
           } catch {
-            console.error("[Kanban App] Failed to parse result string");
+            clientDebugLogger.error("Failed to parse result string", { result: result.result });
           }
         }
       }
 
       if (data && "tasks" in data) {
         const newBoardData = tasksToBoard(data.tasks as Task[]);
-        console.log("[Kanban App] Setting board data:", newBoardData);
+        clientDebugLogger.info("Board data updated", { totalTasks: newBoardData.totalTasks });
         setBoardData(newBoardData);
       }
     } catch (err) {
-      console.error("[Kanban App] refreshBoard error:", err);
+      clientDebugLogger.error("Failed to refresh board", { error: (err as Error).message });
       showMessage(`Failed to refresh: ${(err as Error).message}`, true);
     } finally {
       setIsLoading(false);
@@ -608,7 +618,7 @@ export function App() {
   // Load initial data
   useEffect(() => {
     const output = client.toolOutput as Record<string, unknown> | undefined;
-    console.log("[Kanban App] Tool output:", output);
+    clientDebugLogger.debug("Initial tool output", { hasOutput: !!output });
 
     if (output) {
       if ("columns" in output && Array.isArray(output.columns)) {
@@ -626,6 +636,11 @@ export function App() {
   // Create task
   const handleCreateTask = useCallback(
     async (title: string, description?: string, attachmentId?: string) => {
+      clientDebugLogger.info("Creating task", {
+        title,
+        hasDescription: !!description,
+        hasAttachment: !!attachmentId,
+      });
       setIsLoading(true);
       try {
         const result = (await client.callTool("createTask", {
@@ -636,8 +651,10 @@ export function App() {
         if (result && typeof result === "object" && "message" in result) {
           showMessage(result.message as string);
         }
+        clientDebugLogger.debug("Task created successfully");
         await refreshBoard();
       } catch (err) {
+        clientDebugLogger.error("Failed to create task", { error: (err as Error).message });
         showMessage(`Failed to create task: ${(err as Error).message}`, true);
       } finally {
         setIsLoading(false);
@@ -666,6 +683,7 @@ export function App() {
         if (!confirm("Delete this task?")) return;
       }
 
+      clientDebugLogger.info("Deleting task", { taskId });
       setIsLoading(true);
       try {
         const result = (await client.callTool("deleteTask", { taskId })) as Record<string, unknown>;
@@ -685,6 +703,7 @@ export function App() {
   // Move task
   const handleMoveTask = useCallback(
     async (taskId: string, newStatus: Task["status"]) => {
+      clientDebugLogger.info("Moving task", { taskId, newStatus });
       setIsLoading(true);
       try {
         const result = (await client.callTool("moveTask", { taskId, newStatus })) as Record<

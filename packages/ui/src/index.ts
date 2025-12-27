@@ -48,6 +48,16 @@ export type {
 // Adapter types
 export type { ProtocolAdapter, AdapterFactory, AdapterType } from "./adapters/types";
 
+// Debug logging types and utilities
+export type { DebugLogLevel, LogEntry, ClientDebugConfig } from "./debug/logger";
+export {
+  ClientDebugLogger,
+  clientDebugLogger,
+  shouldLog,
+  safeSerialize,
+  safeStringify,
+} from "./debug/logger";
+
 // =============================================================================
 // ADAPTER EXPORTS
 // =============================================================================
@@ -79,6 +89,7 @@ import { MockAdapter } from "./adapters/mock";
 import { McpAdapter } from "./adapters/mcp";
 import { OpenAIAdapter } from "./adapters/openai";
 import { createAppsClient } from "./client";
+import { clientDebugLogger } from "./debug/logger";
 
 /**
  * Create an adapter based on detected or forced protocol
@@ -132,6 +143,10 @@ export async function createClient<T extends ToolDefs = ToolDefs>(
   // Create and connect the adapter
   const adapter = createAdapter(protocol);
   await adapter.connect();
+
+  // Configure the global debug logger with the connected adapter
+  // This enables MCP transport for debug logging
+  clientDebugLogger.setAdapter(adapter);
 
   // Create and return the client
   return createAppsClient<T>(adapter);

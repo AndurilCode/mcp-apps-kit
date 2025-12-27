@@ -21,6 +21,7 @@ import type {
   EventEmitterStats,
 } from "./types";
 import { MaxListenersExceededError } from "./types";
+import { debugLogger } from "../debug/logger";
 
 /**
  * Internal listener wrapper
@@ -148,9 +149,8 @@ export class TypedEventEmitter<TEventMap extends Record<string, unknown>> {
     if (this.options.logErrors) {
       for (const result of results) {
         if (result.status === "rejected") {
-          // eslint-disable-next-line no-console
-          console.error(
-            `Event handler error for '${String(event)}':`,
+          debugLogger.error(
+            `Event handler error for '${String(event)}'`,
             result.reason instanceof Error ? result.reason.message : String(result.reason)
           );
         }

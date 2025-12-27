@@ -252,6 +252,59 @@ app.on("tool:error", ({ toolName, error }) => {
 
 **See the [kanban example](../../examples/kanban/src/index.ts) for a complete demonstration.**
 
+## Debug Logging
+
+Enable debug logging to receive structured logs from client UIs through the MCP protocol. This is especially useful in sandboxed environments (like mobile ChatGPT) where `console` access is restricted.
+
+### Server Configuration
+
+```ts
+const app = createApp({
+  name: "my-app",
+  version: "1.0.0",
+  tools: {
+    /* ... */
+  },
+  config: {
+    debug: {
+      enabled: true, // Enable debug logging
+      level: "debug", // "debug" | "info" | "warn" | "error"
+    },
+  },
+});
+```
+
+When enabled, the server:
+
+- Registers an internal `log_debug` tool (hidden from the model)
+- Receives batched log entries from connected client UIs
+- Outputs logs to the server console with timestamps and source info
+
+### Log Levels
+
+| Level   | Description                   |
+| ------- | ----------------------------- |
+| `debug` | All logs including debug info |
+| `info`  | Info, warning, and error logs |
+| `warn`  | Warning and error logs only   |
+| `error` | Error logs only               |
+
+### Using the Debug Logger (Server-side)
+
+You can also use the debug logger directly in your server code:
+
+```ts
+import { debugLogger } from "@mcp-apps-kit/core";
+
+// Log messages at different levels
+debugLogger.debug("Processing request", { requestId: "123" });
+debugLogger.info("User logged in", { userId: "456" });
+debugLogger.warn("Rate limit approaching", { remaining: 10 });
+debugLogger.error("Database connection failed", { error: err.message });
+```
+
+**See also:** [@mcp-apps-kit/ui README](../ui/README.md) for client-side logging.
+
 ## What you get
 
 - A single place to define **tools** + **UI resources**

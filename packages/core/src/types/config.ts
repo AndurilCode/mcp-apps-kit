@@ -67,6 +67,88 @@ export interface CORSConfig {
 }
 
 // =============================================================================
+// DEBUG LOGGING
+// =============================================================================
+
+/**
+ * Log level for debug logging
+ *
+ * - `"debug"`: All logs including debug messages
+ * - `"info"`: Info, warning, and error logs (default)
+ * - `"warn"`: Warning and error logs only
+ * - `"error"`: Error logs only
+ */
+export type DebugLogLevel = "debug" | "info" | "warn" | "error";
+
+/**
+ * Debug logging configuration
+ *
+ * Enables debug logging that transports logs through the MCP protocol,
+ * bypassing sandbox restrictions in iframe environments where console
+ * access is unavailable (e.g., mobile ChatGPT).
+ *
+ * @example
+ * ```typescript
+ * const app = createApp({
+ *   name: "my-app",
+ *   version: "1.0.0",
+ *   tools: { ... },
+ *   config: {
+ *     debug: {
+ *       enabled: true,
+ *       level: "debug",
+ *       batchSize: 10,
+ *       flushIntervalMs: 5000,
+ *     },
+ *   },
+ * });
+ * ```
+ */
+export interface DebugConfig {
+  /**
+   * Enable the log_debug tool for client-to-server log transport.
+   *
+   * When true, registers the `log_debug` MCP tool so client UIs
+   * can send debug logs to the server via the MCP protocol.
+   *
+   * Note: Server-side logging is enabled whenever a debug config
+   * is provided, regardless of this setting.
+   *
+   * @default false
+   */
+  logTool?: boolean;
+
+  /**
+   * Minimum log level to output.
+   *
+   * Logs below this level will be filtered out.
+   *
+   * @default "info"
+   */
+  level?: DebugLogLevel;
+
+  /**
+   * Number of logs to batch before flushing.
+   *
+   * Batching reduces the number of MCP tool calls.
+   * Set to 1 for immediate flushing of each log.
+   *
+   * @default 10
+   */
+  batchSize?: number;
+
+  /**
+   * Maximum time in milliseconds between flushes.
+   *
+   * Logs will be flushed after this interval even if
+   * the batch size has not been reached.
+   *
+   * @default 5000
+   */
+  flushIntervalMs?: number;
+}
+
+// =============================================================================
 // APP CONFIGURATION
 // =============================================================================
 
@@ -109,6 +191,24 @@ export interface GlobalConfig {
    * ```
    */
   serverRoute?: string;
+
+  /**
+   * Debug logging configuration.
+   *
+   * Enables debug logging that transports logs through the MCP protocol,
+   * bypassing sandbox restrictions in iframe environments.
+   *
+   * @example
+   * ```typescript
+   * config: {
+   *   debug: {
+   *     enabled: true,
+   *     level: "debug",
+   *   }
+   * }
+   * ```
+   */
+  debug?: DebugConfig;
 }
 
 /**
