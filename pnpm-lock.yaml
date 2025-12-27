@@ -66,13 +66,13 @@ importers:
   examples/kanban:
     dependencies:
       '@mcp-apps-kit/core':
-        specifier: workspace:*
+        specifier: ^0.2.0
         version: link:../../packages/core
       '@mcp-apps-kit/ui':
-        specifier: workspace:*
+        specifier: ^0.2.0
         version: link:../../packages/ui
       '@mcp-apps-kit/ui-react':
-        specifier: workspace:*
+        specifier: ^0.2.0
         version: link:../../packages/ui-react
       react:
         specifier: ^19.2.3
@@ -81,8 +81,8 @@ importers:
         specifier: ^19.2.3
         version: 19.2.3(react@19.2.3)
       zod:
-        specifier: ^4.0.0
-        version: 4.2.1
+        specifier: ^3.24.0
+        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: ^25.0.3
@@ -99,6 +99,9 @@ importers:
       concurrently:
         specifier: ^9.2.1
         version: 9.2.1
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(postcss@8.5.6)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.2)
       tsx:
         specifier: ^4.0.0
         version: 4.21.0
@@ -3339,6 +3342,9 @@ packages:
     resolution: {integrity: sha512-HvWtU2UG41LALjajJrML6uQejQhNJx+JBO9IflpSja4R03iNWfKXrj6W2h7ljuLyc1nKS+9yDyL/9tD1U/yBnQ==}
     peerDependencies:
       zod: ^3.25 || ^4
+
+  zod@3.25.76:
+    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
   zod@4.2.1:
     resolution: {integrity: sha512-0wZ1IRqGGhMP76gLqz8EyfBXKk0J2qo2+H3fi4mcUP/KtTocoX08nmIAHl1Z2kJIZbZee8KOpBCSNPRgauucjw==}
@@ -6585,5 +6591,7 @@ snapshots:
   zod-to-json-schema@3.25.0(zod@4.2.1):
     dependencies:
       zod: 4.2.1
+
+  zod@3.25.76: {}
 
   zod@4.2.1: {}
