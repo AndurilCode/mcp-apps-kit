@@ -21,6 +21,7 @@ export interface CLIOptions {
   directory?: string;
   skipInstall: boolean;
   skipGit: boolean;
+  vercel: boolean;
   interactive: boolean;
 }
 
@@ -73,6 +74,7 @@ export function parseArgs(args: string[]): CLIOptions {
     template: "react",
     skipInstall: false,
     skipGit: false,
+    vercel: false,
     interactive: false,
   };
 
@@ -97,6 +99,7 @@ export function parseArgs(args: string[]): CLIOptions {
     .option("-d, --directory <path>", "Directory to create project in")
     .option("--skip-install", "Skip installing dependencies", false)
     .option("--skip-git", "Skip initializing git repository", false)
+    .option("--vercel", "Add Vercel deployment configuration", false)
     .allowUnknownOption(false)
     .parse(["node", "create-mcp-apps-kit", ...args]);
 
@@ -105,6 +108,7 @@ export function parseArgs(args: string[]): CLIOptions {
     directory?: string;
     skipInstall: boolean;
     skipGit: boolean;
+    vercel: boolean;
   }>();
   const [name] = program.args;
 
@@ -114,6 +118,7 @@ export function parseArgs(args: string[]): CLIOptions {
     directory: options.directory,
     skipInstall: options.skipInstall,
     skipGit: options.skipGit,
+    vercel: options.vercel,
     interactive: !name,
   };
 
@@ -129,7 +134,7 @@ async function runInteractive(): Promise<CreateAppOptions> {
   console.log(chalk.bold("🚀 Create a new MCP application"));
   console.log();
 
-  const response = await prompts<"name" | "template" | "skipInstall" | "skipGit">([
+  const response = await prompts<"name" | "template" | "vercel" | "skipInstall" | "skipGit">([
     {
       type: "text",
       name: "name",
@@ -153,6 +158,12 @@ async function runInteractive(): Promise<CreateAppOptions> {
     },
     {
       type: "confirm",
+      name: "vercel",
+      message: "Add Vercel deployment setup?",
+      initial: true,
+    },
+    {
+      type: "confirm",
       name: "skipInstall",
       message: "Skip installing dependencies?",
       initial: false,
@@ -173,6 +184,7 @@ async function runInteractive(): Promise<CreateAppOptions> {
   return {
     name: response.name as string,
     template: response.template as "react" | "vanilla",
+    vercel: response.vercel as boolean,
     skipInstall: response.skipInstall as boolean,
     skipGit: response.skipGit as boolean,
   };
@@ -207,14 +219,20 @@ async function main(): Promise<void> {
         directory: cliOptions.directory,
         skipInstall: cliOptions.skipInstall,
         skipGit: cliOptions.skipGit,
+        vercel: cliOptions.vercel,
       };
     }
 
     console.log();
     console.log(chalk.blue(`Creating ${options.name} with ${options.template} template...`));
+    if (options.vercel) {
+      console.log(chalk.blue("Setting up for Vercel deployment..."));
+    }
     console.log();
 
     await scaffoldProject(options);
+
+    const packageManager = options.vercel ? "npm" : "pnpm";
 
     console.log();
     console.log(chalk.green("✓ Project created successfully!"));
@@ -222,10 +240,15 @@ async function main(): Promise<void> {
     console.log("Next steps:");
     console.log(chalk.cyan(`  cd ${options.directory ?? options.name}`));
     if (!options.skipInstall) {
-      console.log(chalk.cyan("  pnpm dev"));
+      console.log(chalk.cyan(`  ${packageManager} run dev`));
     } else {
-      console.log(chalk.cyan("  pnpm install"));
-      console.log(chalk.cyan("  pnpm dev"));
+      console.log(chalk.cyan(`  ${packageManager} install`));
+      console.log(chalk.cyan(`  ${packageManager} run dev`));
+    }
+    if (options.vercel) {
+      console.log();
+      console.log("To deploy to Vercel:");
+      console.log(chalk.cyan("  vercel deploy"));
     }
     console.log();
   } catch (error) {
