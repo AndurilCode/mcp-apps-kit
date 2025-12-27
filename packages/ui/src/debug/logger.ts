@@ -166,13 +166,10 @@ export function safeStringify(data: unknown): string {
     return `${data.name}: ${data.message}`;
   }
   try {
-    return JSON.stringify(data);
+    // Always use circular replacer to avoid double-stringify on circular refs
+    return JSON.stringify(data, getCircularReplacer());
   } catch {
-    try {
-      return JSON.stringify(data, getCircularReplacer());
-    } catch {
-      return "[Unstringifiable]";
-    }
+    return "[Unstringifiable]";
   }
 }
 
