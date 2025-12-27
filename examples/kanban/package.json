@@ -16,9 +16,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mcp-apps-kit/core": "^0.2.1",
-    "@mcp-apps-kit/ui": "^0.2.1",
-    "@mcp-apps-kit/ui-react": "^0.2.1",
+    "@mcp-apps-kit/core": "^0.2.2",
+    "@mcp-apps-kit/ui": "^0.2.2",
+    "@mcp-apps-kit/ui-react": "^0.2.2",
     "express": "^4.21.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",

@@ -3,6 +3,11 @@
   "installCommand": "npm install",
   "buildCommand": "npm run build:ui",
   "outputDirectory": ".",
+  "functions": {
+    "src/index.ts": {
+      "includeFiles": "public/**"
+    }
+  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/src/index.ts" }
   ]

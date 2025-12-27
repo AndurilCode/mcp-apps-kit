@@ -612,7 +612,7 @@ const app = createApp({
       // Widget description helps the model understand what the widget does
       widgetDescription:
         "A drag-and-drop Kanban board for task management. Users can create, move, update, and delete tasks across three columns: To Do, In Progress, and Done. Supports file attachments on tasks and provides real-time updates. The board displays task counts per column and allows exporting data.",
-      html: "./src/ui/dist/index.html",
+      html: "./public/index.html",
       prefersBorder: true,
       csp: {
         connectDomains: [],
@@ -646,8 +646,7 @@ export type KanbanClientTools = ClientToolsFromCore<typeof app.tools>;
 
 // Default export for Vercel serverless deployment
 // Vercel detects this and runs the Express app as a serverless function
-// Note: Using type assertion until @mcp-apps-kit/core 0.2.2 exposes expressApp
-export default (app as unknown as { expressApp: unknown }).expressApp;
+export default app.expressApp;
 
 // =============================================================================
 // REGISTER MIDDLEWARE: Applied in order to all tool calls
