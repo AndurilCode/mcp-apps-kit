@@ -637,6 +637,14 @@ const app = createApp({
 export type KanbanClientTools = ClientToolsFromCore<typeof app.tools>;
 
 // =============================================================================
+// EXPORT FOR VERCEL
+// =============================================================================
+
+// Default export for Vercel serverless deployment
+// Vercel detects this and runs the Express app as a serverless function
+export default app.expressApp;
+
+// =============================================================================
 // REGISTER MIDDLEWARE: Applied in order to all tool calls
 // =============================================================================
 
@@ -717,3 +725,4 @@ app.start({ port }).then(() => {
 ╚═══════════════════════════════════════════════════════════════════════╝
   `);
 });
+
