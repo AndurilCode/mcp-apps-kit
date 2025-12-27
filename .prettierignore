@@ -22,4 +22,4 @@ specs/
 docs/
 
 # Generated/bundled UI files
-examples/kanban/public/index.html
+# (kanban example moved to separate repo)

@@ -250,7 +250,7 @@ app.on("tool:error", ({ toolName, error }) => {
 });
 ```
 
-**See the [kanban example](../../examples/kanban/src/index.ts) for a complete demonstration.**
+**See the [kanban-mcp-example](https://github.com/AndurilCode/kanban-mcp-example) for a complete demonstration.**
 
 ## Debug Logging
 
@@ -315,7 +315,7 @@ debugLogger.error("Database connection failed", { error: err.message });
 
 - Project overview: ../../README.md
 - Examples:
-  - ../../examples/kanban
+  - [kanban-mcp-example](https://github.com/AndurilCode/kanban-mcp-example) (comprehensive demo)
   - ../../examples/minimal
   - ../../examples/restaurant-finder
 

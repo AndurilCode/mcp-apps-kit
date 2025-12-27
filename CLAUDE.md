@@ -15,8 +15,9 @@ packages/
 
 examples/
 ├── minimal/        # Simple hello-world example
-├── kanban/         # Full-featured example (8 tools, React UI)
 └── restaurant-finder/
+
+# Full-featured kanban example: https://github.com/AndurilCode/kanban-mcp-example
 ```
 
 Each package has its own README with detailed API documentation.
@@ -29,7 +30,7 @@ pnpm install && pnpm build && pnpm test && pnpm lint && pnpm typecheck
 
 # Package-specific
 pnpm -C packages/core test        # Test single package
-pnpm -C examples/kanban dev       # Run example with hot reload
+pnpm -C examples/minimal dev      # Run minimal example with hot reload
 
 # Release
 pnpm release:version:patch|minor|major

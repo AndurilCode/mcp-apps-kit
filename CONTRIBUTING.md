@@ -26,11 +26,13 @@ pnpm typecheck
 
 ## Examples
 
-Run the Kanban example (server + UI watcher):
+Run the minimal example (server + UI watcher):
 
 ```bash
-pnpm -C examples/kanban dev
+pnpm -C examples/minimal dev
 ```
+
+For a comprehensive demo, see the separate [kanban-mcp-example](https://github.com/AndurilCode/kanban-mcp-example) repository.
 
 ## Code style
 

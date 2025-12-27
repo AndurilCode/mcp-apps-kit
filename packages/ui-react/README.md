@@ -75,7 +75,7 @@ export function App() {
 ## Documentation & examples
 
 - Project overview: ../../README.md
-- Example React widget: ../../examples/kanban
+- Example React widget: [kanban-mcp-example](https://github.com/AndurilCode/kanban-mcp-example)
 
 ## License
 

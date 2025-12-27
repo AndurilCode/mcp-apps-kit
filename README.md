@@ -56,11 +56,15 @@ This project may be a poor fit if you:
 
 ### 5-minute Demo (Kanban Example)
 
-Run the included Kanban board example, which demonstrates tool calling + a React widget:
+A comprehensive Kanban board example demonstrating all SDK features (tool calling, React widgets, plugins, middleware, events) is available in a separate repository:
+
+👉 **[kanban-mcp-example](https://github.com/AndurilCode/kanban-mcp-example)**
 
 ```bash
+git clone https://github.com/AndurilCode/kanban-mcp-example.git
+cd kanban-mcp-example
 pnpm install
-pnpm -C examples/kanban dev
+pnpm dev
 ```
 
 Then open:

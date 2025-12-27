@@ -119,7 +119,7 @@ const app = createApp({
 
 - Project overview: ../../README.md
 - Examples that include UI code:
-  - ../../examples/kanban
+  - [kanban-mcp-example](https://github.com/AndurilCode/kanban-mcp-example)
   - ../../examples/minimal
 
 ## License
