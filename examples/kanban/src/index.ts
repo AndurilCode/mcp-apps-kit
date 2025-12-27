@@ -10,6 +10,10 @@
  * - Event system for observability and analytics
  */
 
+// Note: express import required for Vercel serverless detection
+// The actual Express app comes from @mcp-apps-kit/core
+import "express";
+
 import { createApp, defineTool, type ClientToolsFromCore } from "@mcp-apps-kit/core";
 import { createPlugin } from "@mcp-apps-kit/core";
 import type { Middleware } from "@mcp-apps-kit/core";
@@ -642,7 +646,8 @@ export type KanbanClientTools = ClientToolsFromCore<typeof app.tools>;
 
 // Default export for Vercel serverless deployment
 // Vercel detects this and runs the Express app as a serverless function
-export default app.expressApp;
+// Note: Using type assertion until @mcp-apps-kit/core 0.2.2 exposes expressApp
+export default (app as unknown as { expressApp: unknown }).expressApp;
 
 // =============================================================================
 // REGISTER MIDDLEWARE: Applied in order to all tool calls
@@ -688,13 +693,16 @@ app.on("tool:error", ({ toolName, error, duration }) => {
 });
 
 // =============================================================================
-// START SERVER
+// START SERVER (skip on Vercel - they handle this via the default export)
 // =============================================================================
 
 const port = parseInt(process.env.PORT || "3001");
 
-app.start({ port }).then(() => {
-  console.log(`
+// Only start the server when not running on Vercel
+// Vercel uses the default export (app.expressApp) instead
+if (!process.env.VERCEL) {
+  app.start({ port }).then(() => {
+    console.log(`
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                         KANBAN BOARD SERVER                           ║
 ║            Comprehensive SDK Feature Demonstration                    ║
@@ -723,6 +731,7 @@ app.start({ port }).then(() => {
 ║  • Middleware: Request logging and rate limiting                      ║
 ║  • Events: Lifecycle and tool execution monitoring                    ║
 ╚═══════════════════════════════════════════════════════════════════════╝
-  `);
-});
+    `);
+  });
+}
 

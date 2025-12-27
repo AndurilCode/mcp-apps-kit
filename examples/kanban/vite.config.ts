@@ -13,7 +13,7 @@ export default defineConfig({
   ],
   root: resolve(__dirname, "src/ui"),
   build: {
-    outDir: "dist",
+    outDir: resolve(__dirname, "public"),
     emptyOutDir: true,
     cssCodeSplit: false,
     assetsInlineLimit: 100000000,
