@@ -75,7 +75,7 @@ function getReactTemplate(name: string, vercel = false): Record<string, string> 
   const uiOutputDir = vercel ? "public" : "dist";
   const packageManager = vercel ? "npm" : "pnpm";
   const versions = getPackageVersions();
-  
+
   const files: Record<string, string> = {
     "package.json": JSON.stringify(
       {
@@ -429,7 +429,9 @@ Add to your Claude Desktop config:
   }
 }
 \`\`\`
-${vercel ? `
+${
+  vercel
+    ? `
 ## Deploy to Vercel
 
 This project is configured for Vercel deployment:
@@ -439,7 +441,9 @@ vercel deploy
 \`\`\`
 
 Then use the deployed URL as your MCP server endpoint.
-` : ""}
+`
+    : ""
+}
 `,
   };
 
@@ -810,7 +814,9 @@ Add to your Claude Desktop config:
   }
 }
 \`\`\`
-${vercel ? `
+${
+  vercel
+    ? `
 ## Deploy to Vercel
 
 This project is configured for Vercel deployment:
@@ -820,7 +826,9 @@ vercel deploy
 \`\`\`
 
 Then use the deployed URL as your MCP server endpoint.
-` : ""}
+`
+    : ""
+}
 `,
   };
 
@@ -859,7 +867,14 @@ Then use the deployed URL as your MCP server endpoint.
  * Scaffold a new MCP application project
  */
 export async function scaffoldProject(options: CreateAppOptions): Promise<void> {
-  const { name, template, directory, vercel = false, skipInstall = false, skipGit = false } = options;
+  const {
+    name,
+    template,
+    directory,
+    vercel = false,
+    skipInstall = false,
+    skipGit = false,
+  } = options;
 
   // Determine project directory
   const projectDir = directory ?? path.resolve(process.cwd(), name);
@@ -875,7 +890,8 @@ export async function scaffoldProject(options: CreateAppOptions): Promise<void> 
   }
 
   // Get template files
-  const templateFiles = template === "react" ? getReactTemplate(name, vercel) : getVanillaTemplate(name, vercel);
+  const templateFiles =
+    template === "react" ? getReactTemplate(name, vercel) : getVanillaTemplate(name, vercel);
 
   // Write all files
   for (const [filePath, content] of Object.entries(templateFiles)) {
