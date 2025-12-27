@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm --filter @mcp-apps-kit/example-kanban build",
+  "buildCommand": "pnpm build && pnpm --filter @mcp-apps-kit/example-kanban build",
   "outputDirectory": "examples/kanban",
   "rewrites": [
     { "source": "/(.*)", "destination": "/api/index.ts" }
