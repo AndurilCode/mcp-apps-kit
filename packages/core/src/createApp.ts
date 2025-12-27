@@ -173,6 +173,14 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
     ui: config.ui as U,
 
     /**
+     * Get the underlying Express app for serverless deployments (e.g., Vercel).
+     */
+    get expressApp() {
+      const server = getServerInstance();
+      return server.expressApp;
+    },
+
+    /**
      * Start the built-in Express server
      */
     start: async (options?: StartOptions): Promise<void> => {

@@ -1,6 +1,6 @@
 {
   "name": "@mcp-apps-kit/core",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Server-side framework for building MCP applications",
   "type": "module",
   "main": "./dist/index.cjs",

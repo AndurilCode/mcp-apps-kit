@@ -15,6 +15,9 @@ import { createPlugin } from "@mcp-apps-kit/core";
 import type { Middleware } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
+// Required for Vercel to detect Express serverless function
+import "express";
+
 // =============================================================================
 // DATA TYPES
 // =============================================================================
@@ -608,7 +611,7 @@ const app = createApp({
       // Widget description helps the model understand what the widget does
       widgetDescription:
         "A drag-and-drop Kanban board for task management. Users can create, move, update, and delete tasks across three columns: To Do, In Progress, and Done. Supports file attachments on tasks and provides real-time updates. The board displays task counts per column and allows exporting data.",
-      html: "./src/ui/dist/index.html",
+      html: "./public/index.html",
       prefersBorder: true,
       csp: {
         connectDomains: [],
@@ -635,6 +638,14 @@ const app = createApp({
 });
 
 export type KanbanClientTools = ClientToolsFromCore<typeof app.tools>;
+
+// =============================================================================
+// EXPORT FOR VERCEL
+// =============================================================================
+
+// Default export for Vercel serverless deployment
+// Vercel detects this and runs the Express app as a serverless function
+export default app.expressApp;
 
 // =============================================================================
 // REGISTER MIDDLEWARE: Applied in order to all tool calls
@@ -680,13 +691,16 @@ app.on("tool:error", ({ toolName, error, duration }) => {
 });
 
 // =============================================================================
-// START SERVER
+// START SERVER (skip on Vercel - they handle this via the default export)
 // =============================================================================
 
 const port = parseInt(process.env.PORT || "3001");
 
-app.start({ port }).then(() => {
-  console.log(`
+// Only start the server when not running on Vercel
+// Vercel uses the default export (app.expressApp) instead
+if (!process.env.VERCEL) {
+  app.start({ port }).then(() => {
+    console.log(`
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║                         KANBAN BOARD SERVER                           ║
 ║            Comprehensive SDK Feature Demonstration                    ║
@@ -715,5 +729,6 @@ app.start({ port }).then(() => {
 ║  • Middleware: Request logging and rate limiting                      ║
 ║  • Events: Lifecycle and tool execution monitoring                    ║
 ╚═══════════════════════════════════════════════════════════════════════╝
-  `);
-});
+    `);
+  });
+}

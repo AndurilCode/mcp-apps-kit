@@ -20,3 +20,6 @@ coverage/
 # Specs and docs (not code)
 specs/
 docs/
+
+# Generated/bundled UI files
+examples/kanban/public/index.html

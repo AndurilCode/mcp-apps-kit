@@ -16,36 +16,88 @@ export interface CreateAppOptions {
   name: string;
   template: "react" | "vanilla";
   directory?: string;
+  vercel?: boolean;
   skipInstall?: boolean;
   skipGit?: boolean;
+}
+
+// =============================================================================
+// Version Detection
+// =============================================================================
+
+interface PackageVersions {
+  core: string;
+  ui: string;
+  uiReact: string;
+}
+
+// Cache for fetched versions
+let cachedVersions: PackageVersions | null = null;
+
+/**
+ * Fetch the latest version of a package from npm registry
+ */
+function fetchLatestVersion(packageName: string): string {
+  try {
+    const result = execSync(`npm view ${packageName} version`, {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    return `^${result}`;
+  } catch {
+    // Fallback to a reasonable default if we can't fetch
+    return "^0.2.0";
+  }
+}
+
+/**
+ * Get the versions of @mcp-apps-kit packages from npm registry
+ */
+function getPackageVersions(): PackageVersions {
+  if (cachedVersions) {
+    return cachedVersions;
+  }
+
+  cachedVersions = {
+    core: fetchLatestVersion("@mcp-apps-kit/core"),
+    ui: fetchLatestVersion("@mcp-apps-kit/ui"),
+    uiReact: fetchLatestVersion("@mcp-apps-kit/ui-react"),
+  };
+
+  return cachedVersions;
 }
 
 // =============================================================================
 // Template Content
 // =============================================================================
 
-function getReactTemplate(name: string): Record<string, string> {
-  return {
+function getReactTemplate(name: string, vercel = false): Record<string, string> {
+  const uiOutputDir = vercel ? "public" : "dist";
+  const packageManager = vercel ? "npm" : "pnpm";
+  const versions = getPackageVersions();
+
+  const files: Record<string, string> = {
     "package.json": JSON.stringify(
       {
         name,
         version: "0.1.0",
         type: "module",
         scripts: {
-          dev: 'concurrently "pnpm dev:server" "pnpm dev:ui"',
+          dev: `concurrently "${packageManager} run dev:server" "${packageManager} run dev:ui"`,
           "dev:server": "tsx watch server/index.ts",
           "dev:ui": "vite --config ui/vite.config.ts",
-          build: "pnpm build:ui && tsc",
+          build: `${packageManager} run build:ui && tsc`,
           "build:ui": "vite build --config ui/vite.config.ts",
           start: "node dist/server/index.js",
         },
         dependencies: {
-          "@mcp-apps-kit/core": "^0.1.0",
-          "@mcp-apps-kit/ui": "^0.1.0",
-          "@mcp-apps-kit/ui-react": "^0.1.0",
+          "@mcp-apps-kit/core": versions.core,
+          "@mcp-apps-kit/ui": versions.ui,
+          "@mcp-apps-kit/ui-react": versions.uiReact,
           react: "^18.2.0",
           "react-dom": "^18.2.0",
           zod: "^3.22.0",
+          ...(vercel ? { express: "^4.21.0" } : {}),
         },
         devDependencies: {
           "@types/react": "^18.2.0",
@@ -80,7 +132,60 @@ function getReactTemplate(name: string): Record<string, string> {
       null,
       2
     ),
-    "server/index.ts": `/**
+    "server/index.ts": vercel
+      ? `/**
+ * ${name} - MCP Server
+ */
+
+// Required for Vercel to detect Express
+import "express";
+
+import { createApp } from "@mcp-apps-kit/core";
+import { z } from "zod";
+
+const app = createApp({
+  name: "${name}",
+  version: "0.1.0",
+
+  tools: {
+    hello: {
+      description: "Say hello to someone",
+      input: z.object({
+        name: z.string().describe("Name to greet"),
+      }),
+      output: z.object({
+        message: z.string(),
+        timestamp: z.string(),
+      }),
+      handler: async ({ name }) => {
+        return {
+          message: \`Hello, \${name}!\`,
+          timestamp: new Date().toISOString(),
+        };
+      },
+      ui: "greeting",
+    },
+  },
+
+  ui: {
+    greeting: {
+      html: "./${uiOutputDir}/index.html",
+      description: "Greeting widget",
+      prefersBorder: true,
+    },
+  },
+});
+
+// Only start locally - Vercel uses the exported Express app
+if (!process.env.VERCEL) {
+  await app.start({ port: 3000 });
+  console.log("MCP server running on http://localhost:3000");
+}
+
+// Export Express app for Vercel
+export default app.expressApp;
+`
+      : `/**
  * ${name} - MCP Server
  */
 
@@ -281,13 +386,14 @@ export default defineConfig({
   plugins: [react(), viteSingleFile()],
   root: "./ui",
   build: {
-    outDir: "dist",
+    outDir: "${uiOutputDir}",
     emptyOutDir: true,
   },
 });
 `,
     ".gitignore": `node_modules/
 dist/
+public/
 *.log
 .env
 .env.local
@@ -299,14 +405,14 @@ An MCP application built with @mcp-apps-kit.
 ## Development
 
 \`\`\`bash
-pnpm install
-pnpm dev
+${packageManager} install
+${packageManager} run dev
 \`\`\`
 
 ## Build
 
 \`\`\`bash
-pnpm build
+${packageManager} run build
 \`\`\`
 
 ## Connecting to Claude Desktop
@@ -323,29 +429,75 @@ Add to your Claude Desktop config:
   }
 }
 \`\`\`
+${
+  vercel
+    ? `
+## Deploy to Vercel
+
+This project is configured for Vercel deployment:
+
+\`\`\`bash
+vercel deploy
+\`\`\`
+
+Then use the deployed URL as your MCP server endpoint.
+`
+    : ""
+}
 `,
   };
+
+  // Add vercel.json if Vercel setup is enabled
+  if (vercel) {
+    files["vercel.json"] = JSON.stringify(
+      {
+        installCommand: "npm install",
+        buildCommand: "npm run build:ui",
+        outputDirectory: ".",
+        functions: {
+          "server/index.ts": {
+            includeFiles: `${uiOutputDir}/**`,
+          },
+        },
+        rewrites: [
+          {
+            source: "/(.*)",
+            destination: "/server/index.ts",
+          },
+        ],
+      },
+      null,
+      2
+    );
+  }
+
+  return files;
 }
 
-function getVanillaTemplate(name: string): Record<string, string> {
-  return {
+function getVanillaTemplate(name: string, vercel = false): Record<string, string> {
+  const uiOutputDir = vercel ? "public" : "dist";
+  const packageManager = vercel ? "npm" : "pnpm";
+  const versions = getPackageVersions();
+
+  const files: Record<string, string> = {
     "package.json": JSON.stringify(
       {
         name,
         version: "0.1.0",
         type: "module",
         scripts: {
-          dev: 'concurrently "pnpm dev:server" "pnpm dev:ui"',
+          dev: `concurrently "${packageManager} run dev:server" "${packageManager} run dev:ui"`,
           "dev:server": "tsx watch server/index.ts",
           "dev:ui": "vite --config ui/vite.config.ts",
-          build: "pnpm build:ui && tsc",
+          build: `${packageManager} run build:ui && tsc`,
           "build:ui": "vite build --config ui/vite.config.ts",
           start: "node dist/server/index.js",
         },
         dependencies: {
-          "@mcp-apps-kit/core": "^0.1.0",
-          "@mcp-apps-kit/ui": "^0.1.0",
+          "@mcp-apps-kit/core": versions.core,
+          "@mcp-apps-kit/ui": versions.ui,
           zod: "^3.22.0",
+          ...(vercel ? { express: "^4.21.0" } : {}),
         },
         devDependencies: {
           concurrently: "^8.2.0",
@@ -376,7 +528,60 @@ function getVanillaTemplate(name: string): Record<string, string> {
       null,
       2
     ),
-    "server/index.ts": `/**
+    "server/index.ts": vercel
+      ? `/**
+ * ${name} - MCP Server
+ */
+
+// Required for Vercel to detect Express
+import "express";
+
+import { createApp } from "@mcp-apps-kit/core";
+import { z } from "zod";
+
+const app = createApp({
+  name: "${name}",
+  version: "0.1.0",
+
+  tools: {
+    hello: {
+      description: "Say hello to someone",
+      input: z.object({
+        name: z.string().describe("Name to greet"),
+      }),
+      output: z.object({
+        message: z.string(),
+        timestamp: z.string(),
+      }),
+      handler: async ({ name }) => {
+        return {
+          message: \`Hello, \${name}!\`,
+          timestamp: new Date().toISOString(),
+        };
+      },
+      ui: "greeting",
+    },
+  },
+
+  ui: {
+    greeting: {
+      html: "./${uiOutputDir}/index.html",
+      description: "Greeting widget",
+      prefersBorder: true,
+    },
+  },
+});
+
+// Only start locally - Vercel uses the exported Express app
+if (!process.env.VERCEL) {
+  await app.start({ port: 3000 });
+  console.log("MCP server running on http://localhost:3000");
+}
+
+// Export Express app for Vercel
+export default app.expressApp;
+`
+      : `/**
  * ${name} - MCP Server
  */
 
@@ -566,13 +771,14 @@ export default defineConfig({
   plugins: [viteSingleFile()],
   root: "./ui",
   build: {
-    outDir: "dist",
+    outDir: "${uiOutputDir}",
     emptyOutDir: true,
   },
 });
 `,
     ".gitignore": `node_modules/
 dist/
+public/
 *.log
 .env
 .env.local
@@ -584,14 +790,14 @@ An MCP application built with @mcp-apps-kit.
 ## Development
 
 \`\`\`bash
-pnpm install
-pnpm dev
+${packageManager} install
+${packageManager} run dev
 \`\`\`
 
 ## Build
 
 \`\`\`bash
-pnpm build
+${packageManager} run build
 \`\`\`
 
 ## Connecting to Claude Desktop
@@ -608,8 +814,49 @@ Add to your Claude Desktop config:
   }
 }
 \`\`\`
+${
+  vercel
+    ? `
+## Deploy to Vercel
+
+This project is configured for Vercel deployment:
+
+\`\`\`bash
+vercel deploy
+\`\`\`
+
+Then use the deployed URL as your MCP server endpoint.
+`
+    : ""
+}
 `,
   };
+
+  // Add vercel.json if Vercel setup is enabled
+  if (vercel) {
+    files["vercel.json"] = JSON.stringify(
+      {
+        installCommand: "npm install",
+        buildCommand: "npm run build:ui",
+        outputDirectory: ".",
+        functions: {
+          "server/index.ts": {
+            includeFiles: `${uiOutputDir}/**`,
+          },
+        },
+        rewrites: [
+          {
+            source: "/(.*)",
+            destination: "/server/index.ts",
+          },
+        ],
+      },
+      null,
+      2
+    );
+  }
+
+  return files;
 }
 
 // =============================================================================
@@ -620,7 +867,14 @@ Add to your Claude Desktop config:
  * Scaffold a new MCP application project
  */
 export async function scaffoldProject(options: CreateAppOptions): Promise<void> {
-  const { name, template, directory, skipInstall = false, skipGit = false } = options;
+  const {
+    name,
+    template,
+    directory,
+    vercel = false,
+    skipInstall = false,
+    skipGit = false,
+  } = options;
 
   // Determine project directory
   const projectDir = directory ?? path.resolve(process.cwd(), name);
@@ -636,7 +890,8 @@ export async function scaffoldProject(options: CreateAppOptions): Promise<void> 
   }
 
   // Get template files
-  const templateFiles = template === "react" ? getReactTemplate(name) : getVanillaTemplate(name);
+  const templateFiles =
+    template === "react" ? getReactTemplate(name, vercel) : getVanillaTemplate(name, vercel);
 
   // Write all files
   for (const [filePath, content] of Object.entries(templateFiles)) {
@@ -664,11 +919,16 @@ export async function scaffoldProject(options: CreateAppOptions): Promise<void> 
   // Install dependencies
   if (!skipInstall) {
     try {
-      // Try pnpm first, fall back to npm
-      try {
-        execSync("pnpm install", { cwd: projectDir, stdio: "inherit" });
-      } catch {
+      if (vercel) {
+        // Use npm for Vercel projects (better compatibility)
         execSync("npm install", { cwd: projectDir, stdio: "inherit" });
+      } else {
+        // Try pnpm first, fall back to npm
+        try {
+          execSync("pnpm install", { cwd: projectDir, stdio: "inherit" });
+        } catch {
+          execSync("npm install", { cwd: projectDir, stdio: "inherit" });
+        }
       }
     } catch {
       // eslint-disable-next-line no-console

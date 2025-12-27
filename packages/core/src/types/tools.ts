@@ -343,6 +343,18 @@ export interface App<
   /** Get Express middleware for custom server setup */
   handler(): ExpressMiddleware;
 
+  /**
+   * Get the underlying Express app for serverless deployments (e.g., Vercel).
+   * Use this for default exports in serverless environments.
+   *
+   * @example
+   * ```typescript
+   * // For Vercel deployment, export the Express app:
+   * export default app.expressApp;
+   * ```
+   */
+  readonly expressApp: unknown;
+
   /** Handle a single request (for serverless) */
   handleRequest(req: Request, env?: unknown): Promise<Response>;
 
