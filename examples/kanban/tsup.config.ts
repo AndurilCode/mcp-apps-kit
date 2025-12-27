@@ -5,10 +5,10 @@ export default defineConfig({
   format: ["esm"],
   target: "node20",
   outDir: "dist",
-  clean: false, // Don't clean since vite builds UI to same dir
+  clean: false, // Preserve static assets; Vite builds UI to public/, tsup outputs to dist/
   dts: false,
   sourcemap: true,
-  // Don't bundle - let Vercel install dependencies
+  // Bundle application code; listed packages are kept external so Vercel will install them
   bundle: true,
   // External packages that Vercel will install
   external: [

@@ -10,10 +10,6 @@
  * - Event system for observability and analytics
  */
 
-// Note: express import required for Vercel serverless detection
-// The actual Express app comes from @mcp-apps-kit/core
-import "express";
-
 import { createApp, defineTool, type ClientToolsFromCore } from "@mcp-apps-kit/core";
 import { createPlugin } from "@mcp-apps-kit/core";
 import type { Middleware } from "@mcp-apps-kit/core";
