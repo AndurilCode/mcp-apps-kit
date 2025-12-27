@@ -32,6 +32,8 @@ export {
   useView,
   // Modals (ChatGPT only)
   useModal,
+  // Debug logging
+  useDebugLogger,
 } from "./hooks";
 
 // File operation types
@@ -39,3 +41,6 @@ export type { FileUploadResult, UseFileUploadState } from "./hooks";
 
 // Re-export modal types from @mcp-apps-kit/ui
 export type { ModalButton, ModalInput, ModalOptions, ModalResult } from "@mcp-apps-kit/ui";
+
+// Re-export debug logger types from @mcp-apps-kit/ui
+export type { ClientDebugConfig, ClientDebugLogger } from "@mcp-apps-kit/ui";

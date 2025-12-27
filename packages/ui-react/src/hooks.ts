@@ -8,9 +8,11 @@ import type {
   HostContext,
   ToolDefs,
   ToolResult,
+  ClientDebugConfig,
   ModalOptions,
   ModalResult,
 } from "@mcp-apps-kit/ui";
+import { clientDebugLogger, type ClientDebugLogger } from "@mcp-apps-kit/ui";
 import { useAppsContext } from "./context";
 
 // =============================================================================
@@ -849,4 +851,44 @@ export function useModal(): {
   );
 
   return { isSupported, isOpen, showModal };
+}
+
+// =============================================================================
+// DEBUG LOGGING HOOKS
+// =============================================================================
+
+/**
+ * Access the debug logger with automatic adapter injection
+ *
+ * The adapter is automatically configured when AppsProvider connects.
+ * Use this hook to access the logger and optionally configure it.
+ *
+ * @param config - Optional configuration to apply
+ * @returns The configured client debug logger
+ *
+ * @example
+ * ```tsx
+ * function MyComponent() {
+ *   const logger = useDebugLogger({ enabled: true, level: "debug" });
+ *
+ *   const handleClick = () => {
+ *     logger.info("Button clicked", { timestamp: Date.now() });
+ *   };
+ *
+ *   return <button onClick={handleClick}>Click me</button>;
+ * }
+ * ```
+ */
+export function useDebugLogger(config?: Partial<ClientDebugConfig>): ClientDebugLogger {
+  // Verify we're inside AppsProvider (adapter is set by createClient)
+  useAppsContext();
+
+  // Apply configuration when it changes
+  useEffect(() => {
+    if (config) {
+      clientDebugLogger.configure(config);
+    }
+  }, [config]);
+
+  return clientDebugLogger;
 }
