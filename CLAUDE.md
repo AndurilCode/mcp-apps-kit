@@ -19,6 +19,8 @@ examples/
 └── restaurant-finder/
 ```
 
+Each package has its own README with detailed API documentation.
+
 ## Commands
 
 ```bash
@@ -177,3 +179,9 @@ tools: { my_tool: { ui: "widget", visibility: "both" } }
 - Use `export type` for type-only exports
 - Maintain 80% minimum test coverage
 - Never commit secrets - use environment variables
+
+## External Documentation
+
+- [MCP Specification](https://modelcontextprotocol.io/specification/2025-11-25)
+- [MCP Apps Extension](https://blog.modelcontextprotocol.io/posts/2025-11-21-mcp-apps/)
+- [OpenAI Apps SDK](https://developers.openai.com/apps-sdk)
