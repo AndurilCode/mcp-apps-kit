@@ -72,6 +72,10 @@ const app = createApp({
       origin: true,
     },
     protocol: "mcp",
+    debug: {
+      logTool: true,
+      level: "info",
+    },
 
     // OAuth 2.1 Configuration (Uncomment and configure with your values)
     //   oauth: {
