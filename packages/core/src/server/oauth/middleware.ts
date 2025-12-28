@@ -80,15 +80,38 @@ function validateScopes(tokenScopes: string[], requiredScopes?: string[]): void 
  *
  * @param validatedToken - Validated token from JWT verification
  * @returns Auth context for request metadata
+ * @throws {OAuthError} If required claims are missing or have incorrect types
  */
 function createAuthContext(validatedToken: ValidatedToken): AuthContext {
+  const subject = validatedToken.extra?.subject;
+  const issuer = validatedToken.extra?.issuer;
+  const audience = validatedToken.extra?.audience;
+
+  // Validate required subject claim
+  if (typeof subject !== "string") {
+    throw new OAuthError(ErrorCode.INVALID_TOKEN, "Token missing required 'subject' claim");
+  }
+
+  // Validate issuer is a string if present
+  if (issuer !== undefined && typeof issuer !== "string") {
+    throw new OAuthError(ErrorCode.INVALID_TOKEN, "Token 'issuer' claim must be a string");
+  }
+
+  // Validate audience is string or array if present
+  if (audience !== undefined && typeof audience !== "string" && !Array.isArray(audience)) {
+    throw new OAuthError(
+      ErrorCode.INVALID_TOKEN,
+      "Token 'audience' claim must be a string or array"
+    );
+  }
+
   return {
-    subject: validatedToken.extra?.subject as string,
+    subject,
     scopes: validatedToken.scopes,
     expiresAt: validatedToken.expiresAt,
     clientId: validatedToken.clientId,
-    issuer: validatedToken.extra?.issuer as string,
-    audience: validatedToken.extra?.audience as string | string[],
+    issuer: issuer ?? "",
+    audience: audience ?? "",
     token: validatedToken.token,
     extra: validatedToken.extra,
   };

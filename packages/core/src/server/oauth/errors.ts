@@ -81,20 +81,31 @@ export class OAuthError extends Error {
    * ```
    */
   toWWWAuthenticateHeader(realm: string): string {
-    const params: string[] = [`realm="${realm}"`];
+    const params: string[] = [`realm="${this.escapeQuotedString(realm)}"`];
 
     if (this.code !== "invalid_request") {
       params.push(`error="${this.code}"`);
-      params.push(`error_description="${this.description}"`);
+      params.push(`error_description="${this.escapeQuotedString(this.description)}"`);
     }
 
     if (this.wwwAuthenticateParams) {
       for (const [key, value] of Object.entries(this.wwwAuthenticateParams)) {
-        params.push(`${key}="${value}"`);
+        params.push(`${key}="${this.escapeQuotedString(value)}"`);
       }
     }
 
     return `Bearer ${params.join(", ")}`;
+  }
+
+  /**
+   * Escape a string for use in a quoted-string per RFC 7230.
+   * Escapes backslashes and double quotes to prevent header injection.
+   *
+   * @param value - String to escape
+   * @returns Escaped string safe for use in quoted header values
+   */
+  private escapeQuotedString(value: string): string {
+    return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   }
 
   /**

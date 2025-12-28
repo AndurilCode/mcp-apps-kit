@@ -152,10 +152,10 @@ importers:
         specifier: ^5.1.0
         version: 5.2.1
       jsonwebtoken:
-        specifier: ^9.0.2
+        specifier: ^9.0.3
         version: 9.0.3
       jwks-rsa:
-        specifier: ^3.1.0
+        specifier: ^3.2.0
         version: 3.2.0
       zod:
         specifier: ^4.0.0

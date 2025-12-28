@@ -174,7 +174,7 @@ describe("OAuth Discovery", () => {
       );
 
       await expect(discoverAuthServerMetadata("https://auth.example.com")).rejects.toThrow(
-        /JWKS URI must use HTTPS in production/
+        /JWKS URI must use HTTPS per RFC 8414/
       );
     });
 

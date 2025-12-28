@@ -140,9 +140,18 @@ export async function discoverAuthServerMetadata(
       );
     }
 
-    // Validate JWKS URI uses HTTPS in production
-    if (process.env.NODE_ENV === "production" && !metadata.jwks_uri.startsWith("https://")) {
-      throw new OAuthError(ErrorCode.INVALID_REQUEST, "JWKS URI must use HTTPS in production", 500);
+    // Validate JWKS URI uses HTTPS per RFC 8414 (allow localhost for development)
+    const jwksUrl = new URL(metadata.jwks_uri);
+    if (
+      jwksUrl.protocol !== "https:" &&
+      jwksUrl.hostname !== "localhost" &&
+      jwksUrl.hostname !== "127.0.0.1"
+    ) {
+      throw new OAuthError(
+        ErrorCode.INVALID_REQUEST,
+        "JWKS URI must use HTTPS per RFC 8414 (localhost exempted for development)",
+        500
+      );
     }
 
     return metadata;

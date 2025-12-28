@@ -49,7 +49,7 @@ This project may be a poor fit if you:
 
 ## Compatibility Policy
 
-- **Node.js**: `>= 18` (see `@mcp-apps-kit/core` engines)
+- **Node.js**: `>= 20` (see root `package.json` engines requirement)
 - **MCP SDK**: `@mcp-apps-kit/core` depends on `@modelcontextprotocol/sdk` and is the only place that should need to change when the MCP SDK changes.
 - **Versioning**: breaking changes in supported protocol behavior or public APIs ship as a new major of `@mcp-apps-kit/*`.
 

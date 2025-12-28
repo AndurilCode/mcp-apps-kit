@@ -474,8 +474,6 @@ const app = createApp({
 });
 ```
 
-**See [docs/OAUTH.md](./docs/OAUTH.md) for complete OAuth documentation.**
-
 ## What you get
 
 - A single place to define **tools** + **UI resources**
