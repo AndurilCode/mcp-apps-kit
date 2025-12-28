@@ -147,7 +147,7 @@ export function createServerInstance<T extends ToolDefs>(
     // Provide minimal provider for metadata-only router (no auth server functionality)
     const minimalProvider = {
       clientsStore: {
-        getClient: () => undefined,
+        getClient: (clientId: string) => undefined,
         // No registerClient method needed for metadata-only
       },
     };

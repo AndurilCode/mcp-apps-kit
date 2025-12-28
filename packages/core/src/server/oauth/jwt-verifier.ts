@@ -165,7 +165,14 @@ export async function verifyJWT(
  *
  * @param validatedToken - Validated token from JWT verification
  * @returns User identifier (sub claim)
+ * @throws {Error} If subject is missing or invalid
  */
 export function extractSubject(validatedToken: ValidatedToken): string {
-  return validatedToken.extra?.subject as string;
+  const subject = validatedToken.extra?.subject;
+  
+  if (typeof subject !== 'string' || subject.length === 0) {
+    throw new Error('Missing or invalid subject in validated token');
+  }
+  
+  return subject;
 }

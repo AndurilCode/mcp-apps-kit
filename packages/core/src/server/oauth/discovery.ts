@@ -76,8 +76,11 @@ export async function discoverAuthServerMetadata(
   authorizationServer: string,
   timeoutMs = 5000
 ): Promise<AuthorizationServerMetadata> {
+  // Normalize authorization server URL to avoid double slashes
+  const normalizedServer = authorizationServer.replace(/\/$/, '');
+  
   // Construct discovery endpoint URL per RFC 8414
-  const discoveryUrl = `${authorizationServer}/.well-known/oauth-authorization-server`;
+  const discoveryUrl = `${normalizedServer}/.well-known/oauth-authorization-server`;
 
   try {
     // Fetch metadata with timeout
