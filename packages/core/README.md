@@ -155,7 +155,7 @@ const app = createApp({
     },
   },
 });
-````
+```
 
 ## Plugins, Middleware & Events
 

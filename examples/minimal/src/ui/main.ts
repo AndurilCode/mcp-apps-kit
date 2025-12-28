@@ -4,22 +4,27 @@
  * Demonstrates basic @mcp-apps-kit/ui client usage:
  * - Receiving tool output
  * - Responding to theme changes
+ * - Type-safe client with inferred tool types
  */
 
 import { createClient } from "@mcp-apps-kit/ui";
+import type { AppClientTools, GreetOutput } from "../index";
 
-interface GreetingOutput {
-  message: string;
-  timestamp: string;
-}
+// Type derived from server-side Zod schemas via ClientToolsFromCore
+type GreetingOutput = GreetOutput;
 
 async function main() {
-  const client = await createClient();
+  const client = await createClient<AppClientTools>();
   const container = document.getElementById("app");
   if (!container) return;
 
   // Initial render
   render(container, client.toolOutput as GreetingOutput | undefined, client.hostContext.theme);
+
+  // Re-render when tool output changes
+  client.onToolResult((result) => {
+    render(container, result.greet as GreetingOutput | undefined, client.hostContext.theme);
+  });
 
   // Re-render when context changes (theme, etc.)
   client.onHostContextChange((context) => {

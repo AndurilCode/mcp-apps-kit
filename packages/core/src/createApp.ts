@@ -194,7 +194,10 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
 
     // Start initialization (only runs once)
     oauthInitPromise = (async () => {
-      const oauthConfig = config.config!.oauth!;
+      const oauthConfig = config.config?.oauth;
+      if (!oauthConfig) {
+        throw new Error("OAuth configuration is missing");
+      }
 
       // Skip JWKS discovery if custom token verifier is provided
       if (!oauthConfig.tokenVerifier) {
