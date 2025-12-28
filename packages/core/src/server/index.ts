@@ -125,7 +125,16 @@ export function createServerInstance<T extends ToolDefs>(
 
   // Apply OAuth middleware if configured
   if (config.config?.oauth && jwksClient !== null) {
-    const oauthMiddleware = createOAuthMiddleware(config.config.oauth, jwksClient);
+    // Construct full protected resource URL for audience validation
+    const protectedResourceUrl = new URL(serverRoute, config.config.oauth.protectedResource);
+    
+    // Create OAuth config with correct audience expectation
+    const oauthConfigWithAudience = {
+      ...config.config.oauth,
+      audience: config.config.oauth.audience ?? protectedResourceUrl.href,
+    };
+    
+    const oauthMiddleware = createOAuthMiddleware(oauthConfigWithAudience, jwksClient);
     expressApp.post(serverRoute, oauthMiddleware);
   }
 
@@ -135,17 +144,29 @@ export function createServerInstance<T extends ToolDefs>(
     const oauthConfig = config.config.oauth;
 
     // Create OAuth metadata for the authorization server
+    // Provide minimal provider for metadata-only router (no auth server functionality)
+    const minimalProvider = {
+      clientsStore: {
+        getClient: () => undefined,
+        // No registerClient method needed for metadata-only
+      },
+    };
+
     const oauthMetadata = createOAuthMetadata({
-      provider: {} as never, // Not needed for metadata-only router
+      provider: minimalProvider as never,
       issuerUrl: new URL(oauthConfig.authorizationServer),
       scopesSupported: oauthConfig.scopes,
     });
+
+    // Construct full protected resource URL including server route
+    // This is needed for the SDK to generate the correct metadata endpoint URL
+    const protectedResourceUrl = new URL(serverRoute, oauthConfig.protectedResource);
 
     // Mount metadata router
     expressApp.use(
       mcpAuthMetadataRouter({
         oauthMetadata,
-        resourceServerUrl: new URL(oauthConfig.protectedResource),
+        resourceServerUrl: protectedResourceUrl,
         scopesSupported: oauthConfig.scopes,
         resourceName: config.name,
       })

@@ -27,12 +27,14 @@ export function extractBearerToken(req: Request): string {
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
-    throw new OAuthError(ErrorCode.INVALID_REQUEST, "Missing Authorization header");
+    // Per RFC 6750: Missing credentials should return 401 with invalid_token
+    throw new OAuthError(ErrorCode.INVALID_TOKEN, "Missing Authorization header");
   }
 
   if (!authHeader.startsWith("Bearer ")) {
+    // Per RFC 6750: Invalid auth scheme should return 401 with invalid_token
     throw new OAuthError(
-      ErrorCode.INVALID_REQUEST,
+      ErrorCode.INVALID_TOKEN,
       "Invalid Authorization header format. Expected: Bearer <token>"
     );
   }
@@ -40,7 +42,8 @@ export function extractBearerToken(req: Request): string {
   const token = authHeader.substring(7); // Remove "Bearer " prefix
 
   if (!token || token.trim().length === 0) {
-    throw new OAuthError(ErrorCode.INVALID_REQUEST, "Empty bearer token");
+    // Per RFC 6750: Empty/missing token should return 401 with invalid_token
+    throw new OAuthError(ErrorCode.INVALID_TOKEN, "Empty bearer token");
   }
 
   return token;
@@ -102,17 +105,26 @@ function createAuthContext(validatedToken: ValidatedToken): AuthContext {
  * @param authContext - Authenticated context
  */
 function injectAuthContext(req: Request, authContext: AuthContext): void {
-  // Get or create _meta object
-  const body = req.body as { _meta?: Record<string, unknown> };
-  if (!body._meta) {
-    body._meta = {};
+  // Per MCP spec: _meta should be inside params, not at root level of JSON-RPC message
+  const body = req.body as {
+    params?: { _meta?: Record<string, unknown> };
+  };
+
+  // Ensure params object exists
+  if (!body.params) {
+    body.params = {};
+  }
+
+  // Get or create _meta object inside params
+  if (!body.params._meta) {
+    body.params._meta = {};
   }
 
   // Inject subject for cross-platform compatibility (always override client value)
-  body._meta["openai/subject"] = authContext.subject;
+  body.params._meta["openai/subject"] = authContext.subject;
 
   // Inject full auth context for framework-specific access
-  body._meta["mcp-apps-kit/auth"] = authContext;
+  body.params._meta["mcp-apps-kit/auth"] = authContext;
 }
 
 /**

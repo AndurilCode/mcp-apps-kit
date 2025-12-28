@@ -120,8 +120,10 @@ export async function discoverAuthServerMetadata(
       );
     }
 
-    // Validate issuer matches authorization server
-    if (metadata.issuer !== authorizationServer) {
+    // Validate issuer matches authorization server (normalize trailing slashes)
+    const normalizedIssuer = metadata.issuer.replace(/\/$/, "");
+    const normalizedAuthServer = authorizationServer.replace(/\/$/, "");
+    if (normalizedIssuer !== normalizedAuthServer) {
       throw new OAuthError(
         ErrorCode.INVALID_REQUEST,
         `Issuer mismatch: expected '${authorizationServer}', got '${metadata.issuer}'`,

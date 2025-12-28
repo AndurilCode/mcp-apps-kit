@@ -74,10 +74,14 @@ export async function verifyJWT(
     // Determine expected audience (default: protectedResource)
     const audience = config.audience ?? config.protectedResource;
 
+    // Normalize issuer to handle trailing slash differences
+    // Auth0 and other providers may return issuer with trailing slash
+    const normalizedIssuer = config.authorizationServer.replace(/\/$/, "");
+
     // Build verification options
     const verifyOptions: jwt.VerifyOptions = {
       algorithms: algorithms as jwt.Algorithm[],
-      issuer: config.authorizationServer,
+      issuer: [normalizedIssuer, `${normalizedIssuer}/`], // Accept both with and without trailing slash
       clockTolerance: 5, // 5 second clock skew tolerance
     };
 
