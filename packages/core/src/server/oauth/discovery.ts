@@ -97,10 +97,16 @@ export async function discoverAuthServerMetadata(
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      // Use the external server's status if it's a valid HTTP error code (4xx/5xx),
+      // otherwise use 502 Bad Gateway to indicate a proxy error
+      const statusCode = response.status >= 400 && response.status < 600 
+        ? response.status 
+        : 502;
+      
       throw new OAuthError(
         ErrorCode.INVALID_REQUEST,
         `Authorization server metadata discovery failed: HTTP ${response.status} ${response.statusText}`,
-        500
+        statusCode
       );
     }
 

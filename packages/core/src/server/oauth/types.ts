@@ -189,10 +189,8 @@ export interface OAuthConfig {
  */
 export const OAuthConfigSchema = z.object({
   protectedResource: z
-    .string()
     .url("Protected resource must be a valid URL"),
   authorizationServer: z
-    .string()
     .url("Authorization server must be a valid URL"),
   jwksUri: z.string().url("JWKS URI must be a valid URL").optional(),
   algorithms: z

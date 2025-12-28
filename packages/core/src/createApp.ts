@@ -14,7 +14,7 @@ import { createServerInstance, type ServerInstance } from "./server/index";
 import { PluginManager } from "./plugins/PluginManager";
 import { MiddlewareChain } from "./middleware/MiddlewareChain";
 import { TypedEventEmitter } from "./events/EventEmitter";
-import { configureDebugLogger } from "./debug/logger";
+import { configureDebugLogger, debugLogger } from "./debug/logger";
 import { OAuthConfigSchema } from "./server/oauth/types.js";
 import { getJwksUri } from "./server/oauth/discovery.js";
 import { createJwksClient } from "./server/oauth/jwks-client.js";
@@ -236,7 +236,7 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
               timeout: 5000,
             });
 
-            console.log(`✅ OAuth enabled - JWKS URI: ${jwksUri}`);
+            debugLogger.info(`OAuth enabled - JWKS URI: ${jwksUri}`);
           } catch (error) {
             // Fail app startup if JWKS discovery fails
             const errorMessage =
@@ -247,7 +247,7 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
             );
           }
         } else {
-          console.log("✅ OAuth enabled - Using custom token verifier");
+          debugLogger.info("OAuth enabled - Using custom token verifier");
         }
       }
 
