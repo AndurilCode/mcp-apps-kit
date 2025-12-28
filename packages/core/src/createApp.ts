@@ -14,7 +14,11 @@ import { createServerInstance, type ServerInstance } from "./server/index";
 import { PluginManager } from "./plugins/PluginManager";
 import { MiddlewareChain } from "./middleware/MiddlewareChain";
 import { TypedEventEmitter } from "./events/EventEmitter";
-import { configureDebugLogger } from "./debug/logger";
+import { configureDebugLogger, debugLogger } from "./debug/logger";
+import { OAuthConfigSchema } from "./server/oauth/types.js";
+import { getJwksUri } from "./server/oauth/discovery.js";
+import { createJwksClient } from "./server/oauth/jwks-client.js";
+import type { JwksClient } from "jwks-rsa";
 
 /**
  * Validate app configuration
@@ -103,6 +107,21 @@ function validateConfig<T extends ToolDefs>(config: unknown): asserts config is 
       }
     }
   }
+
+  // Validate OAuth config if provided
+  if (globalConfig?.oauth !== undefined) {
+    try {
+      OAuthConfigSchema.parse(globalConfig.oauth);
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new AppError(
+          ErrorCode.INVALID_CONFIG,
+          `Invalid OAuth configuration: ${error.message}`
+        );
+      }
+      throw new AppError(ErrorCode.INVALID_CONFIG, "Invalid OAuth configuration");
+    }
+  }
 }
 
 /**
@@ -153,9 +172,76 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
   // Create server instance (lazy initialization)
   let serverInstance: ServerInstance | null = null;
 
+  // OAuth JWKS client (initialized lazily on first use)
+  let jwksClient: JwksClient | null = null;
+  let oauthInitPromise: Promise<void> | null = null;
+
+  /**
+   * Ensure OAuth is initialized (idempotent, runs only once)
+   * Called from both app.start() and app.handleRequest() for serverless support
+   */
+  async function ensureOAuthInitialized(): Promise<void> {
+    // Skip if OAuth not configured or already initialized
+    if (!config.config?.oauth || jwksClient !== null) {
+      return;
+    }
+
+    // If initialization is in progress, wait for it
+    if (oauthInitPromise) {
+      await oauthInitPromise;
+      return;
+    }
+
+    // Start initialization (only runs once)
+    oauthInitPromise = (async () => {
+      try {
+        const oauthConfig = config.config?.oauth;
+        if (!oauthConfig) {
+          throw new AppError(ErrorCode.INVALID_CONFIG, "OAuth configuration is missing");
+        }
+
+        // Initialize JWKS client (even with custom verifier, for hybrid scenarios)
+        try {
+          // Discover or use explicit JWKS URI
+          const jwksUri = await getJwksUri(oauthConfig.authorizationServer, oauthConfig.jwksUri);
+
+          // Initialize JWKS client with discovered/explicit URI
+          jwksClient = createJwksClient({
+            jwksUri,
+            cacheMaxAge: 600000, // 10 minutes
+            jwksRequestsPerMinute: 10,
+            timeout: 5000,
+          });
+
+          if (oauthConfig.tokenVerifier) {
+            debugLogger.info(
+              `OAuth enabled - Using custom token verifier with JWKS URI: ${jwksUri}`
+            );
+          } else {
+            debugLogger.info(`OAuth enabled - JWKS URI: ${jwksUri}`);
+          }
+        } catch (error) {
+          // Fail initialization if JWKS discovery fails
+          const errorMessage =
+            error instanceof Error ? error.message : "Unknown error during JWKS discovery";
+          throw new AppError(
+            ErrorCode.INVALID_CONFIG,
+            `OAuth initialization failed: ${errorMessage}. Please verify your authorization server URL and network connectivity.`
+          );
+        }
+      } catch (error) {
+        // Reset promise on failure to allow retry
+        oauthInitPromise = null;
+        throw error;
+      }
+    })();
+
+    await oauthInitPromise;
+  }
+
   function getServerInstance(): ServerInstance {
     if (!serverInstance) {
-      serverInstance = createServerInstance(config, pluginManager);
+      serverInstance = createServerInstance(config, pluginManager, jwksClient);
       // Attach middleware chain to server instance for tool execution
       serverInstance.setMiddlewareChain(middlewareChain);
       // Attach event emitter to server instance for event emission
@@ -193,6 +279,9 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
         pluginInitialized = true;
       }
 
+      // Initialize OAuth if configured (idempotent)
+      await ensureOAuthInitialized();
+
       const server = getServerInstance();
       await server.start(options);
 
@@ -229,6 +318,9 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
      * Handle a single request (for serverless)
      */
     handleRequest: async (req: Request, env?: unknown): Promise<Response> => {
+      // Initialize OAuth lazily for serverless (idempotent)
+      await ensureOAuthInitialized();
+
       const server = getServerInstance();
       return server.handleRequest(req, env);
     },

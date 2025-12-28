@@ -5,6 +5,7 @@
 import type { ToolDefs } from "./tools";
 import type { UIDefs } from "./ui";
 import type { Plugin } from "../plugins/types";
+import type { OAuthConfig } from "../server/oauth/types.js";
 
 // =============================================================================
 // PROTOCOL CONFIGURATION
@@ -21,25 +22,8 @@ export type Protocol = "mcp" | "openai";
 // =============================================================================
 // AUTHENTICATION
 // =============================================================================
-
-/**
- * OAuth 2.1 authentication configuration
- *
- * Used for securing tool access with OAuth-based authentication.
- */
-export interface AuthConfig {
-  /** Authentication type - currently only OAuth 2.1 is supported */
-  type: "oauth2";
-
-  /** OAuth scopes required for access */
-  scopes: string[];
-
-  /** Protected resource URL */
-  protectedResource: string;
-
-  /** Authorization server URL */
-  authorizationServer: string;
-}
+// OAuth 2.1 configuration is imported from server/oauth/types.ts
+// and used in GlobalConfig below
 
 // =============================================================================
 // CORS
@@ -156,8 +140,8 @@ export interface DebugConfig {
  * Global configuration options for the app
  */
 export interface GlobalConfig {
-  /** OAuth authentication configuration */
-  auth?: AuthConfig;
+  /** OAuth 2.1 authentication configuration */
+  oauth?: OAuthConfig;
 
   /** CORS configuration for HTTP server */
   cors?: CORSConfig;

@@ -52,13 +52,22 @@ export type { CSPConfig, UIDef, UIDefs } from "./types/ui";
 // Config types
 export type {
   Protocol,
-  AuthConfig,
   CORSConfig,
   GlobalConfig,
   AppConfig,
   DebugConfig,
   DebugLogLevel,
 } from "./types/config";
+
+// OAuth types
+export type {
+  OAuthConfig,
+  ValidatedToken,
+  AuthContext,
+  TokenVerifier,
+} from "./server/oauth/types.js";
+export { OAuthConfigSchema } from "./server/oauth/types.js";
+export { OAuthError, ErrorCode as OAuthErrorCode } from "./server/oauth/errors.js";
 
 // Plugin types
 export type {

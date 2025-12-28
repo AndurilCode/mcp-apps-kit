@@ -7,9 +7,15 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import {
+  mcpAuthMetadataRouter,
+  createOAuthMetadata,
+} from "@modelcontextprotocol/sdk/server/auth/router.js";
 import express, { type Express, type Request, type Response } from "express";
 import type { Server } from "http";
 import { z } from "zod";
+import type { JwksClient } from "jwks-rsa";
+import { createOAuthMiddleware } from "./oauth/middleware.js";
 
 import type {
   ToolDefs,
@@ -62,7 +68,8 @@ export interface ServerInstance {
  */
 export function createServerInstance<T extends ToolDefs>(
   config: AppConfig<T>,
-  pluginManager: PluginManager
+  pluginManager: PluginManager,
+  jwksClient: JwksClient | null = null
 ): ServerInstance {
   // Create protocol adapter
   const adapter = createAdapter(config.config?.protocol ?? "mcp");
@@ -115,6 +122,63 @@ export function createServerInstance<T extends ToolDefs>(
   // Get configurable server route (default: "/mcp")
   // Note: Validation is done in createApp's validateConfig function
   const serverRoute = config.config?.serverRoute ?? "/mcp";
+
+  // Apply OAuth middleware if configured
+  if (config.config?.oauth) {
+    // Construct full protected resource URL for audience validation
+    const protectedResourceUrl = new URL(serverRoute, config.config.oauth.protectedResource);
+
+    // Create OAuth config with correct audience expectation
+    const oauthConfigWithAudience = {
+      ...config.config.oauth,
+      audience: config.config.oauth.audience ?? protectedResourceUrl.href,
+    };
+
+    // Pass jwksClient even for custom verifiers (enables hybrid verification scenarios)
+    const oauthMiddleware = createOAuthMiddleware(oauthConfigWithAudience, jwksClient);
+    expressApp.post(serverRoute, oauthMiddleware);
+  }
+
+  // Mount OAuth metadata router if OAuth is configured
+  // Important: This server is a PROTECTED RESOURCE (validates OAuth tokens), NOT an authorization server.
+  // These endpoints expose metadata about:
+  // 1. /.well-known/oauth-authorization-server: Metadata about the EXTERNAL auth server that issues tokens
+  // 2. /.well-known/oauth-protected-resource: Metadata about THIS protected resource (scopes, auth servers)
+  // These endpoints help clients discover OAuth configuration but do NOT provide token issuance.
+  if (config.config?.oauth) {
+    const oauthConfig = config.config.oauth;
+
+    // Create OAuth metadata for the authorization server
+    // Provide minimal provider for metadata-only router (no auth server functionality)
+    // Note: This is a workaround for the MCP SDK which expects a provider object
+    // but we only need metadata endpoints, not actual OAuth server functionality
+    const minimalProvider = {
+      clientsStore: {
+        getClient: (_clientId: string) => undefined,
+        // No registerClient method needed for metadata-only
+      },
+    };
+
+    const oauthMetadata = createOAuthMetadata({
+      provider: minimalProvider as never,
+      issuerUrl: new URL(oauthConfig.authorizationServer),
+      scopesSupported: oauthConfig.scopes,
+    });
+
+    // Construct full protected resource URL including server route
+    // This is needed for the SDK to generate the correct metadata endpoint URL
+    const protectedResourceUrl = new URL(serverRoute, oauthConfig.protectedResource);
+
+    // Mount metadata router
+    expressApp.use(
+      mcpAuthMetadataRouter({
+        oauthMetadata,
+        resourceServerUrl: protectedResourceUrl,
+        scopesSupported: oauthConfig.scopes,
+        resourceName: config.name,
+      })
+    );
+  }
 
   // Setup stateless Streamable HTTP endpoint for MCP
   // Each request creates a fresh transport (no session management)
