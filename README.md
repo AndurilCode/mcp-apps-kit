@@ -28,6 +28,7 @@ Building interactive MCP apps today requires:
 - **Single `createApp()` entry point** - Define tools and UI once
 - **Type-safe tool bindings** - Full TypeScript inference for inputs, outputs, and UI access
 - **Protocol abstraction** - UI code works identically on both platforms
+- **OAuth 2.1 Security** - Built-in JWT validation with automatic JWKS discovery (RFC 6750, RFC 8414)
 - **Flexible deployment** - Express server, custom transport, or serverless
 - **Framework agnostic** - React, Vue, Svelte, or vanilla JS for UI
 - **Plugins, Middleware & Events** - Extensible architecture for logging, authentication, analytics
@@ -48,7 +49,7 @@ This project may be a poor fit if you:
 
 ## Compatibility Policy
 
-- **Node.js**: `>= 20` (see `@mcp-apps-kit/core` engines)
+- **Node.js**: `>= 18` (see `@mcp-apps-kit/core` engines)
 - **MCP SDK**: `@mcp-apps-kit/core` depends on `@modelcontextprotocol/sdk` and is the only place that should need to change when the MCP SDK changes.
 - **Versioning**: breaking changes in supported protocol behavior or public APIs ship as a new major of `@mcp-apps-kit/*`.
 
@@ -314,6 +315,7 @@ export default {
 | ----------------- | ------------- | ------------ |
 | Tool Calling      | ✅            | ✅           |
 | Structured Data   | ✅            | ✅           |
+| OAuth 2.1 Auth    | ✅            | ✅           |
 | Theme Support     | ✅            | ✅           |
 | Display Modes     | ✅            | ✅           |
 | Persisted State   | ✅ (polyfill) | ✅           |

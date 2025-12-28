@@ -79,10 +79,6 @@ With Zod v4, TypeScript cannot infer concrete schema types across module boundar
 
 If you prefer not to use `defineTool`, you can use the object syntax directly, but you'll need type assertions:
 
-### Alternative: Object Syntax with Type Assertions
-
-If you prefer not to use `defineTool`, you can use the object syntax directly, but you'll need type assertions:
-
 ```ts
 // Define schema separately
 const searchInput = z.object({
@@ -108,12 +104,19 @@ const app = createApp({
 
 Use `.describe()` to add descriptions that appear in tool parameter documentation:
 
-````ts
-handler: async (input, context) => {
-  const typedInput = input as z.infer<typeof myInputSchema>;
-  // Now typedInput has full type safety
-  const value = typedInput.someProperty;
-}
+```ts
+const myTool = defineTool({
+  description: "Search for items",
+  input: z.object({
+    query: z.string().describe("Search query text"),
+    maxResults: z.number().optional().describe("Maximum number of results to return"),
+  }),
+  handler: async (input) => {
+    // input is fully typed
+    return { results: [] };
+  },
+});
+```
 
 ## Attach UI to tool outputs
 
@@ -267,7 +270,7 @@ const app = createApp({
   },
   config: {
     debug: {
-      enabled: true, // Enable debug logging
+      logTool: true, // Enable debug logging
       level: "debug", // "debug" | "info" | "warn" | "error"
     },
   },
@@ -304,6 +307,174 @@ debugLogger.error("Database connection failed", { error: err.message });
 ```
 
 **See also:** [@mcp-apps-kit/ui README](../ui/README.md) for client-side logging.
+
+## OAuth 2.1 Authentication
+
+Secure your MCP server with OAuth 2.1 bearer token validation. The framework includes built-in JWT verification with automatic JWKS discovery, complying with RFC 6750 (Bearer Token Usage) and RFC 8414 (Authorization Server Metadata).
+
+### Quick Start
+
+```ts
+import { createApp } from "@mcp-apps-kit/core";
+
+const app = createApp({
+  name: "my-app",
+  version: "1.0.0",
+  tools: {
+    /* ... */
+  },
+  oauth: {
+    protectedResource: "http://localhost:3000",
+    authorizationServer: "https://auth.example.com",
+    scopes: ["mcp:read", "mcp:write"], // Optional: required scopes
+  },
+});
+```
+
+### Configuration
+
+| Option                | Type                 | Required | Description                                                     |
+| --------------------- | -------------------- | -------- | --------------------------------------------------------------- |
+| `protectedResource`   | `string`             | ✅       | Public URL of this MCP server (used as default audience)        |
+| `authorizationServer` | `string`             | ✅       | Issuer URL of OAuth 2.1 authorization server                    |
+| `jwksUri`             | `string`             | ❌       | Explicit JWKS URI (auto-discovered if not provided)             |
+| `algorithms`          | `string[]`           | ❌       | Allowed JWT algorithms (default: `["RS256"]`)                   |
+| `audience`            | `string \| string[]` | ❌       | Expected audience claim (default: `protectedResource`)          |
+| `scopes`              | `string[]`           | ❌       | Required OAuth scopes for all requests                          |
+| `tokenVerifier`       | `TokenVerifier`      | ❌       | Custom token verification (for non-JWT tokens or introspection) |
+
+### How It Works
+
+1. **Automatic Discovery**: Framework discovers JWKS endpoint via `/.well-known/oauth-authorization-server`
+2. **Request Validation**: Bearer tokens are validated before tool execution
+3. **Auth Context Injection**: Authenticated user info is injected into tool handlers
+
+```ts
+tools: {
+  get_user_data: defineTool({
+    description: "Get authenticated user data",
+    input: z.object({}),
+    handler: async (input, context) => {
+      // Access authenticated user information
+      const auth = context.auth;
+
+      console.log("User ID:", auth.subject);
+      console.log("Scopes:", auth.scopes);
+      console.log("Expires at:", new Date(auth.expiresAt * 1000));
+
+      return { userId: auth.subject };
+    },
+  }),
+}
+```
+
+### Auth Context Properties
+
+When OAuth is enabled, tool handlers receive authenticated context via `context.auth`:
+
+```ts
+interface AuthContext {
+  subject: string; // User identifier (JWT 'sub' claim)
+  scopes: string[]; // OAuth scopes granted to token
+  expiresAt: number; // Token expiration (Unix timestamp)
+  clientId: string; // OAuth client ID
+  issuer: string; // Token issuer (authorization server)
+  audience: string | string[]; // Token audience
+  token?: string; // Original bearer token
+  extra?: Record<string, unknown>; // Additional JWT claims
+}
+```
+
+### Error Responses
+
+The framework returns RFC 6750-compliant error responses:
+
+```http
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer realm="http://localhost:3000",
+                  error="invalid_token",
+                  error_description="Token expired"
+```
+
+| Error Code           | Status | Description                          |
+| -------------------- | ------ | ------------------------------------ |
+| `invalid_request`    | 400    | Malformed request                    |
+| `invalid_token`      | 401    | Token expired, revoked, or malformed |
+| `insufficient_scope` | 403    | Token missing required scopes        |
+
+### Custom Token Verification
+
+For non-JWT tokens or token introspection:
+
+```ts
+import type { TokenVerifier } from "@mcp-apps-kit/core";
+
+const customVerifier: TokenVerifier = {
+  async verifyAccessToken(token: string) {
+    // Call your token introspection endpoint
+    const response = await fetch("https://auth.example.com/introspect", {
+      method: "POST",
+      body: new URLSearchParams({ token }),
+    });
+
+    const data = await response.json();
+
+    if (!data.active) {
+      throw new Error("Token inactive");
+    }
+
+    return {
+      token,
+      clientId: data.client_id,
+      scopes: data.scope.split(" "),
+      expiresAt: data.exp,
+      extra: { subject: data.sub },
+    };
+  },
+};
+
+const app = createApp({
+  oauth: {
+    protectedResource: "http://localhost:3000",
+    authorizationServer: "https://auth.example.com",
+    tokenVerifier: customVerifier, // Use custom verifier
+  },
+});
+```
+
+### Security Features
+
+- ✅ **JWT Signature Verification**: RSA/ECDSA signature validation via JWKS
+- ✅ **Claim Validation**: Automatic validation of `iss`, `aud`, `exp`, `sub`, `client_id`
+- ✅ **Scope Enforcement**: Optional scope validation for all requests
+- ✅ **Issuer Normalization**: Handles trailing slash differences
+- ✅ **Clock Skew Tolerance**: 5-second tolerance for timestamp validation
+- ✅ **HTTPS Enforcement**: JWKS URIs must use HTTPS in production
+- ✅ **Subject Override**: Framework overrides client-provided subject for security
+
+### Production Considerations
+
+1. **HTTPS Required**: JWKS URIs must use HTTPS in production environments
+2. **Key Caching**: JWKS keys are cached with automatic refresh (10-minute TTL)
+3. **Rate Limiting**: Built-in rate limiting for JWKS requests (10 requests/minute)
+4. **Error Handling**: All validation errors return proper WWW-Authenticate headers
+
+### Testing Without OAuth
+
+Disable OAuth for development/testing:
+
+```ts
+const app = createApp({
+  name: "my-app",
+  version: "1.0.0",
+  tools: {
+    /* ... */
+  },
+  // No oauth config = OAuth disabled
+});
+```
+
+**See [docs/OAUTH.md](./docs/OAUTH.md) for complete OAuth documentation.**
 
 ## What you get
 
