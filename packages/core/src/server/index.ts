@@ -10,6 +10,8 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import express, { type Express, type Request, type Response } from "express";
 import type { Server } from "http";
 import { z } from "zod";
+import type { JwksClient } from "jwks-rsa";
+import { createOAuthMiddleware } from "./oauth/middleware.js";
 
 import type {
   ToolDefs,
@@ -62,7 +64,8 @@ export interface ServerInstance {
  */
 export function createServerInstance<T extends ToolDefs>(
   config: AppConfig<T>,
-  pluginManager: PluginManager
+  pluginManager: PluginManager,
+  jwksClient: JwksClient | null = null
 ): ServerInstance {
   // Create protocol adapter
   const adapter = createAdapter(config.config?.protocol ?? "mcp");
@@ -115,6 +118,12 @@ export function createServerInstance<T extends ToolDefs>(
   // Get configurable server route (default: "/mcp")
   // Note: Validation is done in createApp's validateConfig function
   const serverRoute = config.config?.serverRoute ?? "/mcp";
+
+  // Apply OAuth middleware if configured
+  if (config.config?.oauth && jwksClient !== null) {
+    const oauthMiddleware = createOAuthMiddleware(config.config.oauth, jwksClient);
+    expressApp.post(serverRoute, oauthMiddleware);
+  }
 
   // Setup stateless Streamable HTTP endpoint for MCP
   // Each request creates a fresh transport (no session management)

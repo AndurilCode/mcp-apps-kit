@@ -177,7 +177,7 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
 
   function getServerInstance(): ServerInstance {
     if (!serverInstance) {
-      serverInstance = createServerInstance(config, pluginManager);
+      serverInstance = createServerInstance(config, pluginManager, jwksClient);
       // Attach middleware chain to server instance for tool execution
       serverInstance.setMiddlewareChain(middlewareChain);
       // Attach event emitter to server instance for event emission
