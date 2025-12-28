@@ -194,13 +194,13 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
 
     // Start initialization (only runs once)
     oauthInitPromise = (async () => {
-      const oauthConfig = config.config?.oauth;
-      if (!oauthConfig) {
-        throw new AppError(ErrorCode.INVALID_CONFIG, "OAuth configuration is missing");
-      }
+      try {
+        const oauthConfig = config.config?.oauth;
+        if (!oauthConfig) {
+          throw new AppError(ErrorCode.INVALID_CONFIG, "OAuth configuration is missing");
+        }
 
-      // Skip JWKS discovery if custom token verifier is provided
-      if (!oauthConfig.tokenVerifier) {
+        // Initialize JWKS client (even with custom verifier, for hybrid scenarios)
         try {
           // Discover or use explicit JWKS URI
           const jwksUri = await getJwksUri(oauthConfig.authorizationServer, oauthConfig.jwksUri);
@@ -213,7 +213,13 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
             timeout: 5000,
           });
 
-          debugLogger.info(`OAuth enabled - JWKS URI: ${jwksUri}`);
+          if (oauthConfig.tokenVerifier) {
+            debugLogger.info(
+              `OAuth enabled - Using custom token verifier with JWKS URI: ${jwksUri}`
+            );
+          } else {
+            debugLogger.info(`OAuth enabled - JWKS URI: ${jwksUri}`);
+          }
         } catch (error) {
           // Fail initialization if JWKS discovery fails
           const errorMessage =
@@ -223,8 +229,10 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
             `OAuth initialization failed: ${errorMessage}. Please verify your authorization server URL and network connectivity.`
           );
         }
-      } else {
-        debugLogger.info("OAuth enabled - Using custom token verifier");
+      } catch (error) {
+        // Reset promise on failure to allow retry
+        oauthInitPromise = null;
+        throw error;
       }
     })();
 

@@ -349,6 +349,17 @@ const app = createApp({
 2. **Request Validation**: Bearer tokens are validated before tool execution
 3. **Auth Context Injection**: Authenticated user info is injected into tool handlers
 
+> **Important**: This server is a **protected resource** (API/service that requires OAuth tokens), NOT an authorization server. The OAuth endpoints exposed by this framework provide metadata about the external authorization server that issues tokens, not authentication functionality itself.
+
+#### OAuth Metadata Endpoints
+
+When OAuth is enabled, the framework exposes two metadata endpoints:
+
+- **`/.well-known/oauth-authorization-server`**: Returns metadata about your external authorization server (e.g., Auth0, Keycloak)
+- **`/.well-known/oauth-protected-resource`**: Returns metadata about this protected resource (scopes, authorization servers)
+
+These endpoints help clients discover OAuth configuration, but do not provide token issuance or user authentication.
+
 ```ts
 tools: {
   get_user_data: defineTool({

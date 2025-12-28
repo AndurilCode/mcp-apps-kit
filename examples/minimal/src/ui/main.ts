@@ -15,6 +15,8 @@ clientDebugLogger.configure({
   enabled: true,
   level: "info",
   source: "minimal-ui",
+  batchSize: 1, // Send immediately (don't batch)
+  flushIntervalMs: 1000, // Flush every second
 });
 
 // Type derived from server-side Zod schemas via ClientToolsFromCore
