@@ -79,9 +79,29 @@ export interface ToolContext {
   userLocation?: UserLocation;
 
   /**
-   * Anonymized user identifier.
-   * Use for rate limiting or session correlation.
-   * Never use for authentication or PII.
+   * User identifier from the request context.
+   *
+   * - **With OAuth enabled**: Contains the authenticated user's subject (sub claim) from the verified JWT token.
+   *   This is a verified identity that can be used for authorization and user-specific logic.
+   * - **Without OAuth**: May contain an anonymized identifier for rate limiting or session correlation.
+   *   Do not use for authentication or PII in this case.
+   *
+   * When OAuth is configured, this value is server-validated and overrides any client-provided value.
+   * Access full auth details via `context.raw?.["mcp-apps-kit/auth"]`.
+   *
+   * @example
+   * ```typescript
+   * handler: async (input, context) => {
+   *   // With OAuth: verified user identifier
+   *   const userId = context.subject;
+   *
+   *   // Access full auth context (scopes, clientId, token, etc.)
+   *   const auth = context.raw?.["mcp-apps-kit/auth"];
+   *   const scopes = auth?.scopes ?? [];
+   *
+   *   return { message: `Hello, ${userId}!` };
+   * }
+   * ```
    */
   subject?: string;
 
