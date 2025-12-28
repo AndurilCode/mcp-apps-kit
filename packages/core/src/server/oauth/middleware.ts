@@ -111,14 +111,10 @@ function injectAuthContext(req: Request, authContext: AuthContext): void {
   };
 
   // Ensure params object exists
-  if (!body.params) {
-    body.params = {};
-  }
+  body.params ??= {};
 
   // Get or create _meta object inside params
-  if (!body.params._meta) {
-    body.params._meta = {};
-  }
+  body.params._meta ??= {};
 
   // Inject subject for cross-platform compatibility (always override client value)
   body.params._meta["openai/subject"] = authContext.subject;

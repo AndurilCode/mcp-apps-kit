@@ -601,7 +601,7 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
       expect(subject).toBe("user123");
     });
 
-    it("should handle missing extra object", () => {
+    it("should throw error when extra object is missing", () => {
       const validatedToken = {
         token: "test.jwt.token",
         clientId: "client123",
@@ -609,12 +609,10 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
         expiresAt: Math.floor(Date.now() / 1000) + 3600,
       };
 
-      const subject = extractSubject(validatedToken);
-
-      expect(subject).toBeUndefined();
+      expect(() => extractSubject(validatedToken)).toThrow(/Missing or invalid subject/);
     });
 
-    it("should handle missing subject in extra", () => {
+    it("should throw error when subject is missing in extra", () => {
       const validatedToken = {
         token: "test.jwt.token",
         clientId: "client123",
@@ -625,9 +623,7 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
         },
       };
 
-      const subject = extractSubject(validatedToken);
-
-      expect(subject).toBeUndefined();
+      expect(() => extractSubject(validatedToken)).toThrow(/Missing or invalid subject/);
     });
   });
 });

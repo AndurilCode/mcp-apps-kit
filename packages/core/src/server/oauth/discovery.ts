@@ -85,7 +85,9 @@ export async function discoverAuthServerMetadata(
   try {
     // Fetch metadata with timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, timeoutMs);
 
     const response = await fetch(discoveryUrl, {
       signal: controller.signal,

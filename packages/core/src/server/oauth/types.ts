@@ -188,9 +188,9 @@ export interface OAuthConfig {
  * Used at app startup to validate OAuth configuration.
  */
 export const OAuthConfigSchema = z.object({
-  protectedResource: z.url("Protected resource must be a valid URL"),
-  authorizationServer: z.url("Authorization server must be a valid URL"),
-  jwksUri: z.string().url("JWKS URI must be a valid URL").optional(),
+  protectedResource: z.url({ message: "Protected resource must be a valid URL" }),
+  authorizationServer: z.url({ message: "Authorization server must be a valid URL" }),
+  jwksUri: z.url({ message: "JWKS URI must be a valid URL" }).optional(),
   algorithms: z.array(z.string()).min(1, "At least one algorithm required").optional(),
   audience: z.union([z.string(), z.array(z.string())]).optional(),
   scopes: z.array(z.string()).optional(),

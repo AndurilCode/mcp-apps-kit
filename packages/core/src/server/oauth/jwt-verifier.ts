@@ -97,7 +97,7 @@ export async function verifyJWT(
     const payload = jwt.verify(token, publicKey, verifyOptions) as jwt.JwtPayload;
 
     // Extract validated token details
-    const clientId = payload.client_id || payload.azp;
+    const clientId = (payload.client_id ?? payload.azp) as string | undefined;
     if (!clientId) {
       throw new OAuthError(ErrorCode.INVALID_TOKEN, "JWT missing required claim: client_id or azp");
     }
@@ -113,7 +113,7 @@ export async function verifyJWT(
     }
 
     // Extract scopes (space-separated string per RFC 8693)
-    const scopeString = payload.scope || "";
+    const scopeString = (payload.scope ?? "") as string;
     const scopes = typeof scopeString === "string" ? scopeString.split(" ").filter(Boolean) : [];
 
     // Return validated token
