@@ -89,9 +89,6 @@ export function createJwksClient(config: JwksClientConfig): JwksClient {
  * const publicKey = key.getPublicKey(); // PEM format
  * ```
  */
-export async function getSigningKey(
-  client: JwksClient,
-  kid: string
-): Promise<SigningKey> {
+export async function getSigningKey(client: JwksClient, kid: string): Promise<SigningKey> {
   return client.getSigningKey(kid);
 }

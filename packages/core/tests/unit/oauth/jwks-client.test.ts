@@ -1,8 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import {
-  createJwksClient,
-  getSigningKey,
-} from "../../../src/server/oauth/jwks-client.js";
+import { createJwksClient, getSigningKey } from "../../../src/server/oauth/jwks-client.js";
 
 describe("JWKS Client", () => {
   describe("createJwksClient", () => {
@@ -87,21 +84,17 @@ describe("JWKS Client", () => {
 
     it("should propagate errors from client", async () => {
       const mockClient = {
-        getSigningKey: vi
-          .fn()
-          .mockRejectedValue(new Error("Key not found")),
+        getSigningKey: vi.fn().mockRejectedValue(new Error("Key not found")),
       };
 
-      await expect(
-        getSigningKey(mockClient as any, "unknown-key-id")
-      ).rejects.toThrow("Key not found");
+      await expect(getSigningKey(mockClient as any, "unknown-key-id")).rejects.toThrow(
+        "Key not found"
+      );
     });
 
     it("should handle missing key ID", async () => {
       const mockClient = {
-        getSigningKey: vi
-          .fn()
-          .mockRejectedValue(new Error("No key id provided")),
+        getSigningKey: vi.fn().mockRejectedValue(new Error("No key id provided")),
       };
 
       await expect(getSigningKey(mockClient as any, "")).rejects.toThrow();

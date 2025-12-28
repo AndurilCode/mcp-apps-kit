@@ -77,8 +77,8 @@ export async function discoverAuthServerMetadata(
   timeoutMs = 5000
 ): Promise<AuthorizationServerMetadata> {
   // Normalize authorization server URL to avoid double slashes
-  const normalizedServer = authorizationServer.replace(/\/$/, '');
-  
+  const normalizedServer = authorizationServer.replace(/\/$/, "");
+
   // Construct discovery endpoint URL per RFC 8414
   const discoveryUrl = `${normalizedServer}/.well-known/oauth-authorization-server`;
 
@@ -99,10 +99,8 @@ export async function discoverAuthServerMetadata(
     if (!response.ok) {
       // Use the external server's status if it's a valid HTTP error code (4xx/5xx),
       // otherwise use 502 Bad Gateway to indicate a proxy error
-      const statusCode = response.status >= 400 && response.status < 600 
-        ? response.status 
-        : 502;
-      
+      const statusCode = response.status >= 400 && response.status < 600 ? response.status : 502;
+
       throw new OAuthError(
         ErrorCode.INVALID_REQUEST,
         `Authorization server metadata discovery failed: HTTP ${response.status} ${response.statusText}`,
@@ -141,15 +139,8 @@ export async function discoverAuthServerMetadata(
     }
 
     // Validate JWKS URI uses HTTPS in production
-    if (
-      process.env.NODE_ENV === "production" &&
-      !metadata.jwks_uri.startsWith("https://")
-    ) {
-      throw new OAuthError(
-        ErrorCode.INVALID_REQUEST,
-        "JWKS URI must use HTTPS in production",
-        500
-      );
+    if (process.env.NODE_ENV === "production" && !metadata.jwks_uri.startsWith("https://")) {
+      throw new OAuthError(ErrorCode.INVALID_REQUEST, "JWKS URI must use HTTPS in production", 500);
     }
 
     return metadata;

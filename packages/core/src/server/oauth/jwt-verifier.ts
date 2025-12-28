@@ -99,10 +99,7 @@ export async function verifyJWT(
     // Extract validated token details
     const clientId = payload.client_id || payload.azp;
     if (!clientId) {
-      throw new OAuthError(
-        ErrorCode.INVALID_TOKEN,
-        "JWT missing required claim: client_id or azp"
-      );
+      throw new OAuthError(ErrorCode.INVALID_TOKEN, "JWT missing required claim: client_id or azp");
     }
 
     const sub = payload.sub;
@@ -143,10 +140,7 @@ export async function verifyJWT(
     }
 
     if (error instanceof jwt.JsonWebTokenError) {
-      throw new OAuthError(
-        ErrorCode.INVALID_TOKEN,
-        `Token verification failed: ${error.message}`
-      );
+      throw new OAuthError(ErrorCode.INVALID_TOKEN, `Token verification failed: ${error.message}`);
     }
 
     if (error instanceof jwt.NotBeforeError) {
@@ -169,10 +163,10 @@ export async function verifyJWT(
  */
 export function extractSubject(validatedToken: ValidatedToken): string {
   const subject = validatedToken.extra?.subject;
-  
-  if (typeof subject !== 'string' || subject.length === 0) {
-    throw new Error('Missing or invalid subject in validated token');
+
+  if (typeof subject !== "string" || subject.length === 0) {
+    throw new Error("Missing or invalid subject in validated token");
   }
-  
+
   return subject;
 }

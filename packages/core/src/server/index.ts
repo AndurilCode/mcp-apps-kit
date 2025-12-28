@@ -127,13 +127,13 @@ export function createServerInstance<T extends ToolDefs>(
   if (config.config?.oauth && jwksClient !== null) {
     // Construct full protected resource URL for audience validation
     const protectedResourceUrl = new URL(serverRoute, config.config.oauth.protectedResource);
-    
+
     // Create OAuth config with correct audience expectation
     const oauthConfigWithAudience = {
       ...config.config.oauth,
       audience: config.config.oauth.audience ?? protectedResourceUrl.href,
     };
-    
+
     const oauthMiddleware = createOAuthMiddleware(oauthConfigWithAudience, jwksClient);
     expressApp.post(serverRoute, oauthMiddleware);
   }

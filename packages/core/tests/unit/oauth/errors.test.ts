@@ -4,10 +4,7 @@ import { OAuthError, ErrorCode } from "../../../src/server/oauth/errors.js";
 describe("OAuthError", () => {
   describe("constructor", () => {
     it("should create an error with required properties", () => {
-      const error = new OAuthError(
-        ErrorCode.INVALID_TOKEN,
-        "Token expired"
-      );
+      const error = new OAuthError(ErrorCode.INVALID_TOKEN, "Token expired");
 
       expect(error).toBeInstanceOf(Error);
       expect(error.name).toBe("OAuthError");
@@ -17,28 +14,19 @@ describe("OAuthError", () => {
     });
 
     it("should default statusCode to 400 for invalid_request", () => {
-      const error = new OAuthError(
-        ErrorCode.INVALID_REQUEST,
-        "Bad request"
-      );
+      const error = new OAuthError(ErrorCode.INVALID_REQUEST, "Bad request");
 
       expect(error.statusCode).toBe(400);
     });
 
     it("should default statusCode to 401 for invalid_token", () => {
-      const error = new OAuthError(
-        ErrorCode.INVALID_TOKEN,
-        "Token invalid"
-      );
+      const error = new OAuthError(ErrorCode.INVALID_TOKEN, "Token invalid");
 
       expect(error.statusCode).toBe(401);
     });
 
     it("should default statusCode to 403 for insufficient_scope", () => {
-      const error = new OAuthError(
-        ErrorCode.INSUFFICIENT_SCOPE,
-        "Insufficient permissions"
-      );
+      const error = new OAuthError(ErrorCode.INSUFFICIENT_SCOPE, "Insufficient permissions");
 
       expect(error.statusCode).toBe(403);
     });
@@ -50,20 +38,13 @@ describe("OAuthError", () => {
     });
 
     it("should use provided statusCode when specified", () => {
-      const error = new OAuthError(
-        ErrorCode.INVALID_TOKEN,
-        "Server error",
-        500
-      );
+      const error = new OAuthError(ErrorCode.INVALID_TOKEN, "Server error", 500);
 
       expect(error.statusCode).toBe(500);
     });
 
     it("should maintain proper prototype chain", () => {
-      const error = new OAuthError(
-        ErrorCode.INVALID_TOKEN,
-        "Test error"
-      );
+      const error = new OAuthError(ErrorCode.INVALID_TOKEN, "Test error");
 
       expect(error instanceof OAuthError).toBe(true);
       expect(error instanceof Error).toBe(true);
@@ -72,10 +53,7 @@ describe("OAuthError", () => {
 
   describe("toWWWAuthenticateHeader", () => {
     it("should generate proper header for invalid_token", () => {
-      const error = new OAuthError(
-        ErrorCode.INVALID_TOKEN,
-        "Token expired"
-      );
+      const error = new OAuthError(ErrorCode.INVALID_TOKEN, "Token expired");
 
       const header = error.toWWWAuthenticateHeader("http://localhost:3000");
 
@@ -85,10 +63,7 @@ describe("OAuthError", () => {
     });
 
     it("should generate proper header for insufficient_scope", () => {
-      const error = new OAuthError(
-        ErrorCode.INSUFFICIENT_SCOPE,
-        "Missing required scopes"
-      );
+      const error = new OAuthError(ErrorCode.INSUFFICIENT_SCOPE, "Missing required scopes");
 
       const header = error.toWWWAuthenticateHeader("https://api.example.com");
 
@@ -98,10 +73,7 @@ describe("OAuthError", () => {
     });
 
     it("should omit error details for invalid_request", () => {
-      const error = new OAuthError(
-        ErrorCode.INVALID_REQUEST,
-        "Bad request"
-      );
+      const error = new OAuthError(ErrorCode.INVALID_REQUEST, "Bad request");
 
       const header = error.toWWWAuthenticateHeader("http://localhost:3000");
 
@@ -109,10 +81,7 @@ describe("OAuthError", () => {
     });
 
     it("should include additional WWW-Authenticate parameters", () => {
-      const error = new OAuthError(
-        ErrorCode.INSUFFICIENT_SCOPE,
-        "Missing scopes"
-      );
+      const error = new OAuthError(ErrorCode.INSUFFICIENT_SCOPE, "Missing scopes");
       error.wwwAuthenticateParams = {
         scope: "mcp:read mcp:write",
       };
@@ -125,10 +94,7 @@ describe("OAuthError", () => {
     });
 
     it("should include multiple additional parameters", () => {
-      const error = new OAuthError(
-        ErrorCode.INVALID_TOKEN,
-        "Token invalid"
-      );
+      const error = new OAuthError(ErrorCode.INVALID_TOKEN, "Token invalid");
       error.wwwAuthenticateParams = {
         scope: "mcp:read",
         custom: "value",
@@ -143,10 +109,7 @@ describe("OAuthError", () => {
 
   describe("toJSON", () => {
     it("should serialize error to JSON without additional params", () => {
-      const error = new OAuthError(
-        ErrorCode.INVALID_TOKEN,
-        "Token expired"
-      );
+      const error = new OAuthError(ErrorCode.INVALID_TOKEN, "Token expired");
 
       const json = error.toJSON();
 
@@ -159,10 +122,7 @@ describe("OAuthError", () => {
     });
 
     it("should include wwwAuthenticateParams in details", () => {
-      const error = new OAuthError(
-        ErrorCode.INSUFFICIENT_SCOPE,
-        "Missing scopes"
-      );
+      const error = new OAuthError(ErrorCode.INSUFFICIENT_SCOPE, "Missing scopes");
       error.wwwAuthenticateParams = {
         scope: "mcp:read mcp:write",
       };

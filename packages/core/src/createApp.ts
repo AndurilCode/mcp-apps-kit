@@ -223,10 +223,7 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
         if (!oauthConfig.tokenVerifier) {
           try {
             // Discover or use explicit JWKS URI
-            const jwksUri = await getJwksUri(
-              oauthConfig.authorizationServer,
-              oauthConfig.jwksUri
-            );
+            const jwksUri = await getJwksUri(oauthConfig.authorizationServer, oauthConfig.jwksUri);
 
             // Initialize JWKS client with discovered/explicit URI
             jwksClient = createJwksClient({

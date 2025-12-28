@@ -7,12 +7,7 @@
  * @packageDocumentation
  */
 
-export type {
-  OAuthConfig,
-  ValidatedToken,
-  AuthContext,
-  TokenVerifier,
-} from "./types.js";
+export type { OAuthConfig, ValidatedToken, AuthContext, TokenVerifier } from "./types.js";
 
 export { OAuthConfigSchema } from "./types.js";
 

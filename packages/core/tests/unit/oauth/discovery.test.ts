@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  discoverAuthServerMetadata,
-  getJwksUri,
-} from "../../../src/server/oauth/discovery.js";
+import { discoverAuthServerMetadata, getJwksUri } from "../../../src/server/oauth/discovery.js";
 import { OAuthError, ErrorCode } from "../../../src/server/oauth/errors.js";
 
 describe("OAuth Discovery", () => {
@@ -36,9 +33,7 @@ describe("OAuth Discovery", () => {
         json: async () => mockMetadata,
       });
 
-      const result = await discoverAuthServerMetadata(
-        "https://auth.example.com"
-      );
+      const result = await discoverAuthServerMetadata("https://auth.example.com");
 
       expect(global.fetch).toHaveBeenCalledWith(
         "https://auth.example.com/.well-known/oauth-authorization-server",
@@ -61,9 +56,7 @@ describe("OAuth Discovery", () => {
         json: async () => mockMetadata,
       });
 
-      const result = await discoverAuthServerMetadata(
-        "https://auth.example.com"
-      );
+      const result = await discoverAuthServerMetadata("https://auth.example.com");
 
       expect(result).toEqual(mockMetadata);
     });
@@ -80,9 +73,7 @@ describe("OAuth Discovery", () => {
         json: async () => mockMetadata,
       });
 
-      const result = await discoverAuthServerMetadata(
-        "https://auth.example.com/"
-      );
+      const result = await discoverAuthServerMetadata("https://auth.example.com/");
 
       expect(result).toEqual(mockMetadata);
     });
@@ -94,13 +85,13 @@ describe("OAuth Discovery", () => {
         statusText: "Not Found",
       });
 
-      await expect(
-        discoverAuthServerMetadata("https://auth.example.com")
-      ).rejects.toThrow(OAuthError);
+      await expect(discoverAuthServerMetadata("https://auth.example.com")).rejects.toThrow(
+        OAuthError
+      );
 
-      await expect(
-        discoverAuthServerMetadata("https://auth.example.com")
-      ).rejects.toThrow(/HTTP 404 Not Found/);
+      await expect(discoverAuthServerMetadata("https://auth.example.com")).rejects.toThrow(
+        /HTTP 404 Not Found/
+      );
     });
 
     it("should throw OAuthError when issuer is missing", async () => {
@@ -114,13 +105,13 @@ describe("OAuth Discovery", () => {
         json: async () => mockMetadata,
       });
 
-      await expect(
-        discoverAuthServerMetadata("https://auth.example.com")
-      ).rejects.toThrow(OAuthError);
+      await expect(discoverAuthServerMetadata("https://auth.example.com")).rejects.toThrow(
+        OAuthError
+      );
 
-      await expect(
-        discoverAuthServerMetadata("https://auth.example.com")
-      ).rejects.toThrow(/missing required 'issuer' field/);
+      await expect(discoverAuthServerMetadata("https://auth.example.com")).rejects.toThrow(
+        /missing required 'issuer' field/
+      );
     });
 
     it("should throw OAuthError when jwks_uri is missing", async () => {
@@ -134,13 +125,13 @@ describe("OAuth Discovery", () => {
         json: async () => mockMetadata,
       });
 
-      await expect(
-        discoverAuthServerMetadata("https://auth.example.com")
-      ).rejects.toThrow(OAuthError);
+      await expect(discoverAuthServerMetadata("https://auth.example.com")).rejects.toThrow(
+        OAuthError
+      );
 
-      await expect(
-        discoverAuthServerMetadata("https://auth.example.com")
-      ).rejects.toThrow(/missing required 'jwks_uri' field/);
+      await expect(discoverAuthServerMetadata("https://auth.example.com")).rejects.toThrow(
+        /missing required 'jwks_uri' field/
+      );
     });
 
     it("should throw OAuthError when issuer does not match authorization server", async () => {
@@ -155,13 +146,13 @@ describe("OAuth Discovery", () => {
         json: async () => mockMetadata,
       });
 
-      await expect(
-        discoverAuthServerMetadata("https://auth.example.com")
-      ).rejects.toThrow(OAuthError);
+      await expect(discoverAuthServerMetadata("https://auth.example.com")).rejects.toThrow(
+        OAuthError
+      );
 
-      await expect(
-        discoverAuthServerMetadata("https://auth.example.com")
-      ).rejects.toThrow(/Issuer mismatch/);
+      await expect(discoverAuthServerMetadata("https://auth.example.com")).rejects.toThrow(
+        /Issuer mismatch/
+      );
     });
 
     it("should throw OAuthError when JWKS URI is not HTTPS in production", async () => {
@@ -178,13 +169,13 @@ describe("OAuth Discovery", () => {
         json: async () => mockMetadata,
       });
 
-      await expect(
-        discoverAuthServerMetadata("https://auth.example.com")
-      ).rejects.toThrow(OAuthError);
+      await expect(discoverAuthServerMetadata("https://auth.example.com")).rejects.toThrow(
+        OAuthError
+      );
 
-      await expect(
-        discoverAuthServerMetadata("https://auth.example.com")
-      ).rejects.toThrow(/JWKS URI must use HTTPS in production/);
+      await expect(discoverAuthServerMetadata("https://auth.example.com")).rejects.toThrow(
+        /JWKS URI must use HTTPS in production/
+      );
     });
 
     it("should allow HTTP JWKS URI in non-production", async () => {
@@ -215,35 +206,33 @@ describe("OAuth Discovery", () => {
         });
       });
 
-      await expect(
-        discoverAuthServerMetadata("https://auth.example.com", 100)
-      ).rejects.toThrow(/timed out/);
+      await expect(discoverAuthServerMetadata("https://auth.example.com", 100)).rejects.toThrow(
+        /timed out/
+      );
     });
 
     it("should handle network errors", async () => {
-      global.fetch = vi
-        .fn()
-        .mockRejectedValue(new Error("Network error"));
+      global.fetch = vi.fn().mockRejectedValue(new Error("Network error"));
 
-      await expect(
-        discoverAuthServerMetadata("https://auth.example.com")
-      ).rejects.toThrow(OAuthError);
+      await expect(discoverAuthServerMetadata("https://auth.example.com")).rejects.toThrow(
+        OAuthError
+      );
 
-      await expect(
-        discoverAuthServerMetadata("https://auth.example.com")
-      ).rejects.toThrow(/Network error/);
+      await expect(discoverAuthServerMetadata("https://auth.example.com")).rejects.toThrow(
+        /Network error/
+      );
     });
 
     it("should handle unknown errors", async () => {
       global.fetch = vi.fn().mockRejectedValue("Unknown error");
 
-      await expect(
-        discoverAuthServerMetadata("https://auth.example.com")
-      ).rejects.toThrow(OAuthError);
+      await expect(discoverAuthServerMetadata("https://auth.example.com")).rejects.toThrow(
+        OAuthError
+      );
 
-      await expect(
-        discoverAuthServerMetadata("https://auth.example.com")
-      ).rejects.toThrow(/unknown error/);
+      await expect(discoverAuthServerMetadata("https://auth.example.com")).rejects.toThrow(
+        /unknown error/
+      );
     });
 
     it("should use custom timeout value", async () => {
@@ -293,10 +282,7 @@ describe("OAuth Discovery", () => {
       // Mock fetch to ensure it's not called
       global.fetch = vi.fn();
 
-      const result = await getJwksUri(
-        "https://auth.example.com",
-        explicitUri
-      );
+      const result = await getJwksUri("https://auth.example.com", explicitUri);
 
       expect(result).toBe(explicitUri);
       expect(global.fetch).not.toHaveBeenCalled();
@@ -327,9 +313,7 @@ describe("OAuth Discovery", () => {
         statusText: "Not Found",
       });
 
-      await expect(
-        getJwksUri("https://auth.example.com")
-      ).rejects.toThrow(OAuthError);
+      await expect(getJwksUri("https://auth.example.com")).rejects.toThrow(OAuthError);
     });
 
     it("should prefer explicit URI over discovery", async () => {
@@ -338,10 +322,7 @@ describe("OAuth Discovery", () => {
       // Mock fetch to ensure it's not called
       global.fetch = vi.fn();
 
-      const result = await getJwksUri(
-        "https://auth.example.com",
-        explicitUri
-      );
+      const result = await getJwksUri("https://auth.example.com", explicitUri);
 
       expect(result).toBe(explicitUri);
       expect(global.fetch).not.toHaveBeenCalled();

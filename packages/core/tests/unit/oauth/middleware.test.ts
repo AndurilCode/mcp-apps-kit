@@ -1,14 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Request, Response, NextFunction } from "express";
-import {
-  extractBearerToken,
-  createOAuthMiddleware,
-} from "../../../src/server/oauth/middleware.js";
+import { extractBearerToken, createOAuthMiddleware } from "../../../src/server/oauth/middleware.js";
 import { OAuthError, ErrorCode } from "../../../src/server/oauth/errors.js";
-import type {
-  OAuthConfig,
-  ValidatedToken,
-} from "../../../src/server/oauth/types.js";
+import type { OAuthConfig, ValidatedToken } from "../../../src/server/oauth/types.js";
 
 describe("OAuth Middleware", () => {
   describe("extractBearerToken", () => {
@@ -30,9 +24,7 @@ describe("OAuth Middleware", () => {
       } as Request;
 
       expect(() => extractBearerToken(req)).toThrow(OAuthError);
-      expect(() => extractBearerToken(req)).toThrow(
-        /Missing Authorization header/
-      );
+      expect(() => extractBearerToken(req)).toThrow(/Missing Authorization header/);
     });
 
     it("should throw OAuthError when Authorization header format is invalid", () => {
@@ -43,9 +35,7 @@ describe("OAuth Middleware", () => {
       } as Request;
 
       expect(() => extractBearerToken(req)).toThrow(OAuthError);
-      expect(() => extractBearerToken(req)).toThrow(
-        /Invalid Authorization header format/
-      );
+      expect(() => extractBearerToken(req)).toThrow(/Invalid Authorization header format/);
     });
 
     it("should throw OAuthError when bearer token is empty", () => {
@@ -150,18 +140,10 @@ describe("OAuth Middleware", () => {
       const middleware = createOAuthMiddleware(mockConfig, mockJwksClient as any);
 
       // Mock verifyJWT to return valid token
-      const verifyJWTModule = await import(
-        "../../../src/server/oauth/jwt-verifier.js"
-      );
-      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(
-        mockValidatedToken
-      );
+      const verifyJWTModule = await import("../../../src/server/oauth/jwt-verifier.js");
+      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(mockValidatedToken);
 
-      await middleware(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
       expect(mockResponse.status).not.toHaveBeenCalled();
@@ -170,23 +152,13 @@ describe("OAuth Middleware", () => {
     it("should inject auth context into request metadata", async () => {
       const middleware = createOAuthMiddleware(mockConfig, mockJwksClient as any);
 
-      const verifyJWTModule = await import(
-        "../../../src/server/oauth/jwt-verifier.js"
-      );
-      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(
-        mockValidatedToken
-      );
+      const verifyJWTModule = await import("../../../src/server/oauth/jwt-verifier.js");
+      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(mockValidatedToken);
 
-      await middleware(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockRequest.body?.params?._meta).toBeDefined();
-      expect(mockRequest.body?.params?._meta?.["openai/subject"]).toBe(
-        "user123"
-      );
+      expect(mockRequest.body?.params?._meta?.["openai/subject"]).toBe("user123");
       expect(mockRequest.body?.params?._meta?.["mcp-apps-kit/auth"]).toBeDefined();
     });
 
@@ -198,18 +170,10 @@ describe("OAuth Middleware", () => {
 
       const middleware = createOAuthMiddleware(mockConfig, mockJwksClient as any);
 
-      const verifyJWTModule = await import(
-        "../../../src/server/oauth/jwt-verifier.js"
-      );
-      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(
-        mockValidatedToken
-      );
+      const verifyJWTModule = await import("../../../src/server/oauth/jwt-verifier.js");
+      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(mockValidatedToken);
 
-      await middleware(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockRequest.body?.params).toBeDefined();
       expect(mockRequest.body?.params?._meta).toBeDefined();
@@ -223,18 +187,10 @@ describe("OAuth Middleware", () => {
 
       const middleware = createOAuthMiddleware(mockConfig, mockJwksClient as any);
 
-      const verifyJWTModule = await import(
-        "../../../src/server/oauth/jwt-verifier.js"
-      );
-      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(
-        mockValidatedToken
-      );
+      const verifyJWTModule = await import("../../../src/server/oauth/jwt-verifier.js");
+      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(mockValidatedToken);
 
-      await middleware(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockRequest.body?.params?._meta).toBeDefined();
     });
@@ -251,26 +207,16 @@ describe("OAuth Middleware", () => {
 
       const middleware = createOAuthMiddleware(configWithVerifier, null);
 
-      await middleware(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockTokenVerifier.verifyAccessToken).toHaveBeenCalledWith(
-        "valid.jwt.token"
-      );
+      expect(mockTokenVerifier.verifyAccessToken).toHaveBeenCalledWith("valid.jwt.token");
       expect(mockNext).toHaveBeenCalled();
     });
 
     it("should throw error when JWKS client is null without custom verifier", async () => {
       const middleware = createOAuthMiddleware(mockConfig, null);
 
-      await middleware(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockResponse.status).toHaveBeenCalledWith(400);
       expect(mockResponse.json).toHaveBeenCalledWith(
@@ -288,23 +234,12 @@ describe("OAuth Middleware", () => {
         scopes: ["mcp:admin"], // Token doesn't have this scope
       };
 
-      const middleware = createOAuthMiddleware(
-        configWithScopes,
-        mockJwksClient as any
-      );
+      const middleware = createOAuthMiddleware(configWithScopes, mockJwksClient as any);
 
-      const verifyJWTModule = await import(
-        "../../../src/server/oauth/jwt-verifier.js"
-      );
-      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(
-        mockValidatedToken
-      );
+      const verifyJWTModule = await import("../../../src/server/oauth/jwt-verifier.js");
+      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(mockValidatedToken);
 
-      await middleware(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockResponse.status).toHaveBeenCalledWith(403);
       expect(mockResponse.setHeader).toHaveBeenCalledWith(
@@ -319,23 +254,12 @@ describe("OAuth Middleware", () => {
         scopes: ["mcp:read"], // Token has this scope
       };
 
-      const middleware = createOAuthMiddleware(
-        configWithScopes,
-        mockJwksClient as any
-      );
+      const middleware = createOAuthMiddleware(configWithScopes, mockJwksClient as any);
 
-      const verifyJWTModule = await import(
-        "../../../src/server/oauth/jwt-verifier.js"
-      );
-      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(
-        mockValidatedToken
-      );
+      const verifyJWTModule = await import("../../../src/server/oauth/jwt-verifier.js");
+      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(mockValidatedToken);
 
-      await middleware(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
       expect(mockResponse.status).not.toHaveBeenCalled();
@@ -346,11 +270,7 @@ describe("OAuth Middleware", () => {
 
       const middleware = createOAuthMiddleware(mockConfig, mockJwksClient as any);
 
-      await middleware(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockResponse.status).toHaveBeenCalledWith(401);
       expect(mockResponse.setHeader).toHaveBeenCalledWith(
@@ -363,18 +283,12 @@ describe("OAuth Middleware", () => {
     it("should handle token verification errors", async () => {
       const middleware = createOAuthMiddleware(mockConfig, mockJwksClient as any);
 
-      const verifyJWTModule = await import(
-        "../../../src/server/oauth/jwt-verifier.js"
-      );
+      const verifyJWTModule = await import("../../../src/server/oauth/jwt-verifier.js");
       vi.spyOn(verifyJWTModule, "verifyJWT").mockRejectedValue(
         new OAuthError(ErrorCode.INVALID_TOKEN, "Token expired")
       );
 
-      await middleware(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockResponse.status).toHaveBeenCalledWith(401);
       expect(mockResponse.setHeader).toHaveBeenCalledWith(
@@ -387,18 +301,10 @@ describe("OAuth Middleware", () => {
     it("should handle unexpected errors", async () => {
       const middleware = createOAuthMiddleware(mockConfig, mockJwksClient as any);
 
-      const verifyJWTModule = await import(
-        "../../../src/server/oauth/jwt-verifier.js"
-      );
-      vi.spyOn(verifyJWTModule, "verifyJWT").mockRejectedValue(
-        new Error("Unexpected error")
-      );
+      const verifyJWTModule = await import("../../../src/server/oauth/jwt-verifier.js");
+      vi.spyOn(verifyJWTModule, "verifyJWT").mockRejectedValue(new Error("Unexpected error"));
 
-      await middleware(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockResponse.status).toHaveBeenCalledWith(401);
       expect(mockResponse.json).toHaveBeenCalledWith(
@@ -415,11 +321,7 @@ describe("OAuth Middleware", () => {
 
       const middleware = createOAuthMiddleware(mockConfig, mockJwksClient as any);
 
-      await middleware(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockResponse.setHeader).toHaveBeenCalledWith(
         "WWW-Authenticate",
@@ -433,23 +335,12 @@ describe("OAuth Middleware", () => {
         scopes: ["mcp:admin", "mcp:write"],
       };
 
-      const middleware = createOAuthMiddleware(
-        configWithScopes,
-        mockJwksClient as any
-      );
+      const middleware = createOAuthMiddleware(configWithScopes, mockJwksClient as any);
 
-      const verifyJWTModule = await import(
-        "../../../src/server/oauth/jwt-verifier.js"
-      );
-      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(
-        mockValidatedToken
-      );
+      const verifyJWTModule = await import("../../../src/server/oauth/jwt-verifier.js");
+      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(mockValidatedToken);
 
-      await middleware(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockResponse.setHeader).toHaveBeenCalledWith(
         "WWW-Authenticate",
@@ -460,18 +351,10 @@ describe("OAuth Middleware", () => {
     it("should inject full auth context with all fields", async () => {
       const middleware = createOAuthMiddleware(mockConfig, mockJwksClient as any);
 
-      const verifyJWTModule = await import(
-        "../../../src/server/oauth/jwt-verifier.js"
-      );
-      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(
-        mockValidatedToken
-      );
+      const verifyJWTModule = await import("../../../src/server/oauth/jwt-verifier.js");
+      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(mockValidatedToken);
 
-      await middleware(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
       const authContext = mockRequest.body?.params?._meta?.["mcp-apps-kit/auth"];
       expect(authContext).toMatchObject({
@@ -495,24 +378,13 @@ describe("OAuth Middleware", () => {
 
       const middleware = createOAuthMiddleware(mockConfig, mockJwksClient as any);
 
-      const verifyJWTModule = await import(
-        "../../../src/server/oauth/jwt-verifier.js"
-      );
-      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(
-        tokenWithArrayAudience
-      );
+      const verifyJWTModule = await import("../../../src/server/oauth/jwt-verifier.js");
+      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(tokenWithArrayAudience);
 
-      await middleware(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
       const authContext = mockRequest.body?.params?._meta?.["mcp-apps-kit/auth"];
-      expect(authContext.audience).toEqual([
-        "http://localhost:3000",
-        "https://api.example.com",
-      ]);
+      expect(authContext.audience).toEqual(["http://localhost:3000", "https://api.example.com"]);
     });
 
     it("should not call next() when error occurs", async () => {
@@ -520,11 +392,7 @@ describe("OAuth Middleware", () => {
 
       const middleware = createOAuthMiddleware(mockConfig, mockJwksClient as any);
 
-      await middleware(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockNext).not.toHaveBeenCalled();
     });
@@ -541,22 +409,12 @@ describe("OAuth Middleware", () => {
 
       const middleware = createOAuthMiddleware(mockConfig, mockJwksClient as any);
 
-      const verifyJWTModule = await import(
-        "../../../src/server/oauth/jwt-verifier.js"
-      );
-      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(
-        mockValidatedToken
-      );
+      const verifyJWTModule = await import("../../../src/server/oauth/jwt-verifier.js");
+      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(mockValidatedToken);
 
-      await middleware(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
-      expect(mockRequest.body?.params?._meta?.["openai/subject"]).toBe(
-        "user123"
-      );
+      expect(mockRequest.body?.params?._meta?.["openai/subject"]).toBe("user123");
     });
 
     it("should skip scope validation when no scopes required", async () => {
@@ -565,23 +423,12 @@ describe("OAuth Middleware", () => {
         scopes: undefined,
       };
 
-      const middleware = createOAuthMiddleware(
-        configWithoutScopes,
-        mockJwksClient as any
-      );
+      const middleware = createOAuthMiddleware(configWithoutScopes, mockJwksClient as any);
 
-      const verifyJWTModule = await import(
-        "../../../src/server/oauth/jwt-verifier.js"
-      );
-      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(
-        mockValidatedToken
-      );
+      const verifyJWTModule = await import("../../../src/server/oauth/jwt-verifier.js");
+      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(mockValidatedToken);
 
-      await middleware(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
     });
@@ -592,23 +439,12 @@ describe("OAuth Middleware", () => {
         scopes: [],
       };
 
-      const middleware = createOAuthMiddleware(
-        configWithEmptyScopes,
-        mockJwksClient as any
-      );
+      const middleware = createOAuthMiddleware(configWithEmptyScopes, mockJwksClient as any);
 
-      const verifyJWTModule = await import(
-        "../../../src/server/oauth/jwt-verifier.js"
-      );
-      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(
-        mockValidatedToken
-      );
+      const verifyJWTModule = await import("../../../src/server/oauth/jwt-verifier.js");
+      vi.spyOn(verifyJWTModule, "verifyJWT").mockResolvedValue(mockValidatedToken);
 
-      await middleware(
-        mockRequest as Request,
-        mockResponse as Response,
-        mockNext
-      );
+      await middleware(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
     });

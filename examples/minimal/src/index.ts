@@ -63,6 +63,48 @@ const app = createApp({
       origin: true,
     },
     protocol: "mcp",
+
+    // OAuth 2.1 Configuration (Uncomment and configure with your values)
+    oauth: {
+      // Public URL of this MCP server (the Protected Resource)
+      protectedResource: "http://localhost:3000",
+
+      // Issuer URL of your OAuth 2.1 Authorization Server
+      // Examples: "https://auth.example.com", "https://accounts.google.com"
+      authorizationServer: "https://dev-up6dgm4hz8o24flb.us.auth0.com",
+
+      // Optional: Required OAuth scopes for all requests
+      // Tokens must contain ALL listed scopes
+      scopes: ["mcp:read"],
+
+      // Optional: Explicit JWKS URI (auto-discovered if not provided)
+      // jwksUri: "https://auth.example.com/.well-known/jwks.json",
+
+      // Optional: Allowed JWT signing algorithms (defaults to ["RS256"])
+      // algorithms: ["RS256", "RS384", "ES256"],
+
+      // Optional: Expected audience (defaults to protectedResource)
+      // audience: "https://api.example.com",
+
+      // Optional: Custom token verification (for token introspection, non-JWT tokens)
+      // tokenVerifier: {
+      //   async verifyAccessToken(token: string) {
+      //     const res = await fetch("https://auth.example.com/introspect", {
+      //       method: "POST",
+      //       body: new URLSearchParams({ token }),
+      //     });
+      //     const data = await res.json();
+      //     if (!data.active) throw new Error("Token inactive");
+      //     return {
+      //       token,
+      //       clientId: data.client_id,
+      //       scopes: data.scope.split(" "),
+      //       expiresAt: data.exp,
+      //       extra: { subject: data.sub },
+      //     };
+      //   },
+      // },
+    },
   },
 });
 

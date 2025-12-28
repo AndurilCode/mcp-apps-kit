@@ -1,9 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import jwt from "jsonwebtoken";
-import {
-  verifyJWT,
-  extractSubject,
-} from "../../../src/server/oauth/jwt-verifier.js";
+import { verifyJWT, extractSubject } from "../../../src/server/oauth/jwt-verifier.js";
 import { OAuthError, ErrorCode } from "../../../src/server/oauth/errors.js";
 import type { OAuthConfig } from "../../../src/server/oauth/types.js";
 
@@ -52,11 +49,7 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
       // Mock jwt.verify
       vi.spyOn(jwt, "verify").mockReturnValue(mockPayload as any);
 
-      const result = await verifyJWT(
-        mockToken,
-        mockConfig,
-        mockJwksClient as any
-      );
+      const result = await verifyJWT(mockToken, mockConfig, mockJwksClient as any);
 
       expect(result).toEqual({
         token: mockToken,
@@ -95,11 +88,7 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
 
       vi.spyOn(jwt, "verify").mockReturnValue(mockPayload as any);
 
-      const result = await verifyJWT(
-        mockToken,
-        mockConfig,
-        mockJwksClient as any
-      );
+      const result = await verifyJWT(mockToken, mockConfig, mockJwksClient as any);
 
       expect(result.extra?.issuer).toBe("https://auth.example.com/");
     });
@@ -127,11 +116,7 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
 
       vi.spyOn(jwt, "verify").mockReturnValue(mockPayload as any);
 
-      const result = await verifyJWT(
-        mockToken,
-        mockConfig,
-        mockJwksClient as any
-      );
+      const result = await verifyJWT(mockToken, mockConfig, mockJwksClient as any);
 
       expect(result.clientId).toBe("azp-client123");
     });
@@ -164,16 +149,9 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
 
       vi.spyOn(jwt, "verify").mockReturnValue(mockPayload as any);
 
-      const result = await verifyJWT(
-        mockToken,
-        configWithArrayAudience,
-        mockJwksClient as any
-      );
+      const result = await verifyJWT(mockToken, configWithArrayAudience, mockJwksClient as any);
 
-      expect(result.extra?.audience).toEqual([
-        "http://localhost:3000",
-        "https://api.example.com",
-      ]);
+      expect(result.extra?.audience).toEqual(["http://localhost:3000", "https://api.example.com"]);
     });
 
     it("should handle empty scopes", async () => {
@@ -199,11 +177,7 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
 
       vi.spyOn(jwt, "verify").mockReturnValue(mockPayload as any);
 
-      const result = await verifyJWT(
-        mockToken,
-        mockConfig,
-        mockJwksClient as any
-      );
+      const result = await verifyJWT(mockToken, mockConfig, mockJwksClient as any);
 
       expect(result.scopes).toEqual([]);
     });
@@ -231,11 +205,7 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
 
       vi.spyOn(jwt, "verify").mockReturnValue(mockPayload as any);
 
-      const result = await verifyJWT(
-        mockToken,
-        mockConfig,
-        mockJwksClient as any
-      );
+      const result = await verifyJWT(mockToken, mockConfig, mockJwksClient as any);
 
       expect(result.scopes).toEqual([]);
     });
@@ -266,9 +236,7 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
         getPublicKey: () => mockPublicKey,
       });
 
-      const verifySpy = vi
-        .spyOn(jwt, "verify")
-        .mockReturnValue(mockPayload as any);
+      const verifySpy = vi.spyOn(jwt, "verify").mockReturnValue(mockPayload as any);
 
       await verifyJWT(mockToken, configWithAlgorithms, mockJwksClient as any);
 
@@ -307,9 +275,7 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
         getPublicKey: () => mockPublicKey,
       });
 
-      const verifySpy = vi
-        .spyOn(jwt, "verify")
-        .mockReturnValue(mockPayload as any);
+      const verifySpy = vi.spyOn(jwt, "verify").mockReturnValue(mockPayload as any);
 
       await verifyJWT(mockToken, configWithAudience, mockJwksClient as any);
 
@@ -327,13 +293,13 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
 
       vi.spyOn(jwt, "decode").mockReturnValue(null);
 
-      await expect(
-        verifyJWT(mockToken, mockConfig, mockJwksClient as any)
-      ).rejects.toThrow(OAuthError);
+      await expect(verifyJWT(mockToken, mockConfig, mockJwksClient as any)).rejects.toThrow(
+        OAuthError
+      );
 
-      await expect(
-        verifyJWT(mockToken, mockConfig, mockJwksClient as any)
-      ).rejects.toThrow(/Malformed JWT token/);
+      await expect(verifyJWT(mockToken, mockConfig, mockJwksClient as any)).rejects.toThrow(
+        /Malformed JWT token/
+      );
     });
 
     it("should throw OAuthError when kid is missing", async () => {
@@ -345,13 +311,13 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
         signature: "signature",
       });
 
-      await expect(
-        verifyJWT(mockToken, mockConfig, mockJwksClient as any)
-      ).rejects.toThrow(OAuthError);
+      await expect(verifyJWT(mockToken, mockConfig, mockJwksClient as any)).rejects.toThrow(
+        OAuthError
+      );
 
-      await expect(
-        verifyJWT(mockToken, mockConfig, mockJwksClient as any)
-      ).rejects.toThrow(/missing key ID/);
+      await expect(verifyJWT(mockToken, mockConfig, mockJwksClient as any)).rejects.toThrow(
+        /missing key ID/
+      );
     });
 
     it("should throw OAuthError when getSigningKey fails", async () => {
@@ -363,17 +329,15 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
         signature: "signature",
       });
 
-      mockJwksClient.getSigningKey.mockRejectedValue(
-        new Error("Key not found")
+      mockJwksClient.getSigningKey.mockRejectedValue(new Error("Key not found"));
+
+      await expect(verifyJWT(mockToken, mockConfig, mockJwksClient as any)).rejects.toThrow(
+        OAuthError
       );
 
-      await expect(
-        verifyJWT(mockToken, mockConfig, mockJwksClient as any)
-      ).rejects.toThrow(OAuthError);
-
-      await expect(
-        verifyJWT(mockToken, mockConfig, mockJwksClient as any)
-      ).rejects.toThrow(/Failed to get signing key/);
+      await expect(verifyJWT(mockToken, mockConfig, mockJwksClient as any)).rejects.toThrow(
+        /Failed to get signing key/
+      );
     });
 
     it("should throw OAuthError when client_id and azp are missing", async () => {
@@ -399,13 +363,13 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
 
       vi.spyOn(jwt, "verify").mockReturnValue(mockPayload as any);
 
-      await expect(
-        verifyJWT(mockToken, mockConfig, mockJwksClient as any)
-      ).rejects.toThrow(OAuthError);
+      await expect(verifyJWT(mockToken, mockConfig, mockJwksClient as any)).rejects.toThrow(
+        OAuthError
+      );
 
-      await expect(
-        verifyJWT(mockToken, mockConfig, mockJwksClient as any)
-      ).rejects.toThrow(/missing required claim: client_id or azp/);
+      await expect(verifyJWT(mockToken, mockConfig, mockJwksClient as any)).rejects.toThrow(
+        /missing required claim: client_id or azp/
+      );
     });
 
     it("should throw OAuthError when sub is missing", async () => {
@@ -431,13 +395,13 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
 
       vi.spyOn(jwt, "verify").mockReturnValue(mockPayload as any);
 
-      await expect(
-        verifyJWT(mockToken, mockConfig, mockJwksClient as any)
-      ).rejects.toThrow(OAuthError);
+      await expect(verifyJWT(mockToken, mockConfig, mockJwksClient as any)).rejects.toThrow(
+        OAuthError
+      );
 
-      await expect(
-        verifyJWT(mockToken, mockConfig, mockJwksClient as any)
-      ).rejects.toThrow(/missing required claim: sub/);
+      await expect(verifyJWT(mockToken, mockConfig, mockJwksClient as any)).rejects.toThrow(
+        /missing required claim: sub/
+      );
     });
 
     it("should throw OAuthError when exp is missing", async () => {
@@ -463,13 +427,13 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
 
       vi.spyOn(jwt, "verify").mockReturnValue(mockPayload as any);
 
-      await expect(
-        verifyJWT(mockToken, mockConfig, mockJwksClient as any)
-      ).rejects.toThrow(OAuthError);
+      await expect(verifyJWT(mockToken, mockConfig, mockJwksClient as any)).rejects.toThrow(
+        OAuthError
+      );
 
-      await expect(
-        verifyJWT(mockToken, mockConfig, mockJwksClient as any)
-      ).rejects.toThrow(/missing required claim: exp/);
+      await expect(verifyJWT(mockToken, mockConfig, mockJwksClient as any)).rejects.toThrow(
+        /missing required claim: exp/
+      );
     });
 
     it("should handle TokenExpiredError", async () => {
@@ -489,13 +453,13 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
         throw new jwt.TokenExpiredError("jwt expired", new Date());
       });
 
-      await expect(
-        verifyJWT(mockToken, mockConfig, mockJwksClient as any)
-      ).rejects.toThrow(OAuthError);
+      await expect(verifyJWT(mockToken, mockConfig, mockJwksClient as any)).rejects.toThrow(
+        OAuthError
+      );
 
-      await expect(
-        verifyJWT(mockToken, mockConfig, mockJwksClient as any)
-      ).rejects.toThrow(/Token expired/);
+      await expect(verifyJWT(mockToken, mockConfig, mockJwksClient as any)).rejects.toThrow(
+        /Token expired/
+      );
     });
 
     it("should handle JsonWebTokenError", async () => {
@@ -515,13 +479,13 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
         throw new jwt.JsonWebTokenError("invalid signature");
       });
 
-      await expect(
-        verifyJWT(mockToken, mockConfig, mockJwksClient as any)
-      ).rejects.toThrow(OAuthError);
+      await expect(verifyJWT(mockToken, mockConfig, mockJwksClient as any)).rejects.toThrow(
+        OAuthError
+      );
 
-      await expect(
-        verifyJWT(mockToken, mockConfig, mockJwksClient as any)
-      ).rejects.toThrow(/invalid signature/);
+      await expect(verifyJWT(mockToken, mockConfig, mockJwksClient as any)).rejects.toThrow(
+        /invalid signature/
+      );
     });
 
     it("should handle NotBeforeError", async () => {
@@ -541,9 +505,9 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
         throw new jwt.NotBeforeError("jwt not active", new Date());
       });
 
-      await expect(
-        verifyJWT(mockToken, mockConfig, mockJwksClient as any)
-      ).rejects.toThrow(OAuthError);
+      await expect(verifyJWT(mockToken, mockConfig, mockJwksClient as any)).rejects.toThrow(
+        OAuthError
+      );
 
       // Verify the error is an OAuthError with appropriate message
       // Note: The NotBeforeError may be caught as a generic error in some test environments
@@ -575,13 +539,13 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
         throw new Error("Generic verification error");
       });
 
-      await expect(
-        verifyJWT(mockToken, mockConfig, mockJwksClient as any)
-      ).rejects.toThrow(OAuthError);
+      await expect(verifyJWT(mockToken, mockConfig, mockJwksClient as any)).rejects.toThrow(
+        OAuthError
+      );
 
-      await expect(
-        verifyJWT(mockToken, mockConfig, mockJwksClient as any)
-      ).rejects.toThrow(/Generic verification error/);
+      await expect(verifyJWT(mockToken, mockConfig, mockJwksClient as any)).rejects.toThrow(
+        /Generic verification error/
+      );
     });
 
     it("should include clock tolerance in verification options", async () => {
@@ -605,9 +569,7 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1234567890
         getPublicKey: () => mockPublicKey,
       });
 
-      const verifySpy = vi
-        .spyOn(jwt, "verify")
-        .mockReturnValue(mockPayload as any);
+      const verifySpy = vi.spyOn(jwt, "verify").mockReturnValue(mockPayload as any);
 
       await verifyJWT(mockToken, mockConfig, mockJwksClient as any);
 
