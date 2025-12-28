@@ -7,6 +7,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import {
+  mcpAuthMetadataRouter,
+  createOAuthMetadata,
+} from "@modelcontextprotocol/sdk/server/auth/router.js";
 import express, { type Express, type Request, type Response } from "express";
 import type { Server } from "http";
 import { z } from "zod";
@@ -123,6 +127,29 @@ export function createServerInstance<T extends ToolDefs>(
   if (config.config?.oauth && jwksClient !== null) {
     const oauthMiddleware = createOAuthMiddleware(config.config.oauth, jwksClient);
     expressApp.post(serverRoute, oauthMiddleware);
+  }
+
+  // Mount OAuth metadata router if OAuth is configured
+  // This exposes /.well-known/oauth-protected-resource and /.well-known/oauth-authorization-server
+  if (config.config?.oauth) {
+    const oauthConfig = config.config.oauth;
+
+    // Create OAuth metadata for the authorization server
+    const oauthMetadata = createOAuthMetadata({
+      provider: {} as never, // Not needed for metadata-only router
+      issuerUrl: new URL(oauthConfig.authorizationServer),
+      scopesSupported: oauthConfig.scopes,
+    });
+
+    // Mount metadata router
+    expressApp.use(
+      mcpAuthMetadataRouter({
+        oauthMetadata,
+        resourceServerUrl: new URL(oauthConfig.protectedResource),
+        scopesSupported: oauthConfig.scopes,
+        resourceName: config.name,
+      })
+    );
   }
 
   // Setup stateless Streamable HTTP endpoint for MCP
