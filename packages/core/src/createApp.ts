@@ -15,6 +15,10 @@ import { PluginManager } from "./plugins/PluginManager";
 import { MiddlewareChain } from "./middleware/MiddlewareChain";
 import { TypedEventEmitter } from "./events/EventEmitter";
 import { configureDebugLogger } from "./debug/logger";
+import { OAuthConfigSchema } from "./server/oauth/types.js";
+import { getJwksUri } from "./server/oauth/discovery.js";
+import { createJwksClient } from "./server/oauth/jwks-client.js";
+import type { JwksClient } from "jwks-rsa";
 
 /**
  * Validate app configuration
@@ -103,6 +107,21 @@ function validateConfig<T extends ToolDefs>(config: unknown): asserts config is 
       }
     }
   }
+
+  // Validate OAuth config if provided
+  if (globalConfig?.oauth !== undefined) {
+    try {
+      OAuthConfigSchema.parse(globalConfig.oauth);
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new AppError(
+          ErrorCode.INVALID_CONFIG,
+          `Invalid OAuth configuration: ${error.message}`
+        );
+      }
+      throw new AppError(ErrorCode.INVALID_CONFIG, "Invalid OAuth configuration");
+    }
+  }
 }
 
 /**
@@ -153,6 +172,9 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
   // Create server instance (lazy initialization)
   let serverInstance: ServerInstance | null = null;
 
+  // OAuth JWKS client (initialized on app start if OAuth is configured)
+  let jwksClient: JwksClient | null = null;
+
   function getServerInstance(): ServerInstance {
     if (!serverInstance) {
       serverInstance = createServerInstance(config, pluginManager);
@@ -191,6 +213,42 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
           tools: config.tools,
         });
         pluginInitialized = true;
+      }
+
+      // Initialize OAuth if configured
+      if (config.config?.oauth && !jwksClient) {
+        const oauthConfig = config.config.oauth;
+
+        // Skip JWKS discovery if custom token verifier is provided
+        if (!oauthConfig.tokenVerifier) {
+          try {
+            // Discover or use explicit JWKS URI
+            const jwksUri = await getJwksUri(
+              oauthConfig.authorizationServer,
+              oauthConfig.jwksUri
+            );
+
+            // Initialize JWKS client with discovered/explicit URI
+            jwksClient = createJwksClient({
+              jwksUri,
+              cacheMaxAge: 600000, // 10 minutes
+              jwksRequestsPerMinute: 10,
+              timeout: 5000,
+            });
+
+            console.log(`✅ OAuth enabled - JWKS URI: ${jwksUri}`);
+          } catch (error) {
+            // Fail app startup if JWKS discovery fails
+            const errorMessage =
+              error instanceof Error ? error.message : "Unknown error during JWKS discovery";
+            throw new AppError(
+              ErrorCode.INVALID_CONFIG,
+              `OAuth initialization failed: ${errorMessage}. Please verify your authorization server URL and network connectivity.`
+            );
+          }
+        } else {
+          console.log("✅ OAuth enabled - Using custom token verifier");
+        }
       }
 
       const server = getServerInstance();
