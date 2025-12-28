@@ -172,8 +172,61 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
   // Create server instance (lazy initialization)
   let serverInstance: ServerInstance | null = null;
 
-  // OAuth JWKS client (initialized on app start if OAuth is configured)
+  // OAuth JWKS client (initialized lazily on first use)
   let jwksClient: JwksClient | null = null;
+  let oauthInitPromise: Promise<void> | null = null;
+
+  /**
+   * Ensure OAuth is initialized (idempotent, runs only once)
+   * Called from both app.start() and app.handleRequest() for serverless support
+   */
+  async function ensureOAuthInitialized(): Promise<void> {
+    // Skip if OAuth not configured or already initialized
+    if (!config.config?.oauth || jwksClient !== null) {
+      return;
+    }
+
+    // If initialization is in progress, wait for it
+    if (oauthInitPromise) {
+      await oauthInitPromise;
+      return;
+    }
+
+    // Start initialization (only runs once)
+    oauthInitPromise = (async () => {
+      const oauthConfig = config.config!.oauth!;
+
+      // Skip JWKS discovery if custom token verifier is provided
+      if (!oauthConfig.tokenVerifier) {
+        try {
+          // Discover or use explicit JWKS URI
+          const jwksUri = await getJwksUri(oauthConfig.authorizationServer, oauthConfig.jwksUri);
+
+          // Initialize JWKS client with discovered/explicit URI
+          jwksClient = createJwksClient({
+            jwksUri,
+            cacheMaxAge: 600000, // 10 minutes
+            jwksRequestsPerMinute: 10,
+            timeout: 5000,
+          });
+
+          debugLogger.info(`OAuth enabled - JWKS URI: ${jwksUri}`);
+        } catch (error) {
+          // Fail initialization if JWKS discovery fails
+          const errorMessage =
+            error instanceof Error ? error.message : "Unknown error during JWKS discovery";
+          throw new AppError(
+            ErrorCode.INVALID_CONFIG,
+            `OAuth initialization failed: ${errorMessage}. Please verify your authorization server URL and network connectivity.`
+          );
+        }
+      } else {
+        debugLogger.info("OAuth enabled - Using custom token verifier");
+      }
+    })();
+
+    await oauthInitPromise;
+  }
 
   function getServerInstance(): ServerInstance {
     if (!serverInstance) {
@@ -215,38 +268,8 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
         pluginInitialized = true;
       }
 
-      // Initialize OAuth if configured
-      if (config.config?.oauth && !jwksClient) {
-        const oauthConfig = config.config.oauth;
-
-        // Skip JWKS discovery if custom token verifier is provided
-        if (!oauthConfig.tokenVerifier) {
-          try {
-            // Discover or use explicit JWKS URI
-            const jwksUri = await getJwksUri(oauthConfig.authorizationServer, oauthConfig.jwksUri);
-
-            // Initialize JWKS client with discovered/explicit URI
-            jwksClient = createJwksClient({
-              jwksUri,
-              cacheMaxAge: 600000, // 10 minutes
-              jwksRequestsPerMinute: 10,
-              timeout: 5000,
-            });
-
-            debugLogger.info(`OAuth enabled - JWKS URI: ${jwksUri}`);
-          } catch (error) {
-            // Fail app startup if JWKS discovery fails
-            const errorMessage =
-              error instanceof Error ? error.message : "Unknown error during JWKS discovery";
-            throw new AppError(
-              ErrorCode.INVALID_CONFIG,
-              `OAuth initialization failed: ${errorMessage}. Please verify your authorization server URL and network connectivity.`
-            );
-          }
-        } else {
-          debugLogger.info("OAuth enabled - Using custom token verifier");
-        }
-      }
+      // Initialize OAuth if configured (idempotent)
+      await ensureOAuthInitialized();
 
       const server = getServerInstance();
       await server.start(options);
@@ -284,6 +307,9 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
      * Handle a single request (for serverless)
      */
     handleRequest: async (req: Request, env?: unknown): Promise<Response> => {
+      // Initialize OAuth lazily for serverless (idempotent)
+      await ensureOAuthInitialized();
+
       const server = getServerInstance();
       return server.handleRequest(req, env);
     },
