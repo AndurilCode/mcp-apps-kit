@@ -141,11 +141,22 @@ export class McpAdapter implements ProtocolAdapter {
         name: string;
         arguments?: Record<string, unknown>;
       };
-      if (this.callToolHandler) {
-        const result = await this.callToolHandler(name, args ?? {});
-        return { content: [{ type: "text", text: JSON.stringify(result) }] };
+      try {
+        if (this.callToolHandler) {
+          const result = await this.callToolHandler(name, args ?? {});
+          return { content: [{ type: "text", text: JSON.stringify(result) }] };
+        }
+        return {
+          content: [{ type: "text", text: `No handler registered for tool: ${name}` }],
+          isError: true,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          content: [{ type: "text", text: message }],
+          isError: true,
+        };
       }
-      throw new UIError(UIErrorCode.TOOL_NOT_FOUND, `No handler registered for tool: ${name}`);
     };
 
     // Handle list tools requests from host (bidirectional support)
