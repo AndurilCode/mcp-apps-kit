@@ -55,18 +55,26 @@ pnpm release:version:patch|minor|major
 
 ## Tool Definition Pattern
 
-Always use `defineTool` for type inference:
+Always use `defineTool` and `defineUI` for type inference:
 
 ```typescript
-import { defineTool } from "@mcp-apps-kit/core";
+import { defineTool, defineUI } from "@mcp-apps-kit/core";
 import { z } from "zod";
+
+// Define UI for the tool (colocated pattern)
+const myWidget = defineUI({
+  name: "My Widget",
+  description: "Widget description",
+  html: "./ui/dist/index.html",
+  prefersBorder: true,
+});
 
 const tool = defineTool({
   title: "My Tool",
   description: "Tool description",
   input: z.object({ name: z.string() }),
   output: z.object({ message: z.string() }),
-  ui: "widget-id", // Optional: links to UI resource
+  ui: myWidget, // Optional: links to UI resource
   visibility: "both", // "model", "app", or "both"
   handler: async (input) => ({ message: `Hello, ${input.name}!` }),
 });
@@ -153,8 +161,9 @@ export default {
 The framework auto-generates platform-specific metadata:
 
 ```typescript
-// Your definition
-tools: { my_tool: { ui: "widget", visibility: "both" } }
+// Your definition (using colocated UI)
+const myWidget = defineUI({ name: "Widget", html: "./ui/dist/index.html" });
+tools: { my_tool: defineTool({ ui: myWidget, visibility: "both", ... }) }
 
 // MCP Apps: _meta.ui.resourceUri + visibility
 // ChatGPT: _meta["openai/outputTemplate"] + ["openai/visibility"]

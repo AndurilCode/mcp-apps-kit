@@ -139,3 +139,55 @@ export interface UIDef {
  * ```
  */
 export type UIDefs = Record<string, UIDef>;
+
+// =============================================================================
+// UI DEFINITION HELPER
+// =============================================================================
+
+/**
+ * Helper function to define a UI resource with proper type inference.
+ *
+ * Use this helper to define UI resources that can be:
+ * - Colocated inline within a tool definition
+ * - Extracted and shared across multiple tools
+ *
+ * @example Inline with tool (simple case)
+ * ```typescript
+ * const myTool = defineTool({
+ *   description: "My tool",
+ *   input: z.object({ name: z.string() }),
+ *   output: z.object({ result: z.string() }),
+ *   ui: defineUI({
+ *     html: "./widget.html",
+ *     prefersBorder: true,
+ *   }),
+ *   handler: async (input) => ({ result: `Hello ${input.name}` }),
+ * });
+ * ```
+ *
+ * @example Extracted for reuse (shared UI)
+ * ```typescript
+ * // Shared UI definition
+ * const listUI = defineUI({
+ *   html: "./list-widget.html",
+ *   name: "List Widget",
+ *   csp: { connectDomains: ["https://api.example.com"] },
+ * });
+ *
+ * // Multiple tools using the same UI
+ * const searchTool = defineTool({
+ *   description: "Search items",
+ *   ui: listUI,
+ *   // ...
+ * });
+ *
+ * const filterTool = defineTool({
+ *   description: "Filter items",
+ *   ui: listUI,
+ *   // ...
+ * });
+ * ```
+ */
+export function defineUI(definition: UIDef): UIDef {
+  return definition;
+}

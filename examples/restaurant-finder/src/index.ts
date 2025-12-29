@@ -9,12 +9,7 @@
  * - Type-safe handlers using defineTool (no type assertions!)
  */
 
-import {
-  createApp,
-  defineTool,
-  type ClientToolsFromCore,
-  type ToolContext,
-} from "@mcp-apps-kit/core";
+import { createApp, defineTool, defineUI, type ClientToolsFromCore } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 // =============================================================================
@@ -124,6 +119,19 @@ const GetRecommendationsInput = z.object({
 });
 
 // =============================================================================
+// SHARED UI DEFINITION
+// =============================================================================
+
+const restaurantListUI = defineUI({
+  name: "Restaurant List Widget",
+  description: "Displays restaurant search results",
+  widgetDescription:
+    "An interactive list showing restaurants with name, cuisine, rating, price level, and distance. Users can view details and get directions.",
+  html: "./src/ui/dist/index.html",
+  prefersBorder: true,
+});
+
+// =============================================================================
 // APP DEFINITION
 // =============================================================================
 
@@ -144,7 +152,7 @@ const app = createApp({
         count: z.number(),
         searchArea: z.string().optional(),
       }),
-      ui: "restaurant-list",
+      ui: restaurantListUI,
       visibility: "both",
       widgetAccessible: true,
       annotations: {
@@ -236,7 +244,7 @@ const app = createApp({
         recommendations: z.array(RestaurantSchema),
         reason: z.string(),
       }),
-      ui: "restaurant-list",
+      ui: restaurantListUI,
       visibility: "both",
       annotations: {
         readOnlyHint: true,
@@ -277,20 +285,6 @@ const app = createApp({
         };
       },
     }),
-  },
-
-  // ===========================================================================
-  // UI RESOURCES
-  // ===========================================================================
-  ui: {
-    "restaurant-list": {
-      name: "Restaurant List Widget",
-      description: "Displays restaurant search results",
-      widgetDescription:
-        "An interactive list showing restaurants with name, cuisine, rating, price level, and distance. Users can view details and get directions.",
-      html: "./src/ui/dist/index.html",
-      prefersBorder: true,
-    },
   },
 
   // ===========================================================================

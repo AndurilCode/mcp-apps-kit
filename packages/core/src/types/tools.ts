@@ -235,8 +235,33 @@ export interface ToolDef<
     }
   >;
 
-  /** UI resource to render results (references ui config key) */
-  ui?: string;
+  /**
+   * UI resource to render results.
+   *
+   * Can be:
+   * - A string key referencing a UI defined in createApp's `ui` config (legacy)
+   * - A UIDef object for colocated UI definition (recommended)
+   *
+   * @example Colocated UI (recommended)
+   * ```typescript
+   * const myTool = defineTool({
+   *   ui: defineUI({
+   *     html: "./widget.html",
+   *     prefersBorder: true,
+   *   }),
+   *   // ...
+   * });
+   * ```
+   *
+   * @example String reference (legacy)
+   * ```typescript
+   * const myTool = defineTool({
+   *   ui: "my-widget", // References ui config in createApp
+   *   // ...
+   * });
+   * ```
+   */
+  ui?: string | UIDef;
 
   /** Who can call this tool */
   visibility?: Visibility;
@@ -345,15 +370,12 @@ export type ExpressMiddleware = (
   next: () => void
 ) => void | Promise<void>;
 
-import type { UIDefs } from "./ui";
+import type { UIDef } from "./ui";
 
 /**
  * App instance returned by createApp()
  */
-export interface App<
-  T extends ToolDefs = ToolDefs,
-  U extends UIDefs | undefined = UIDefs | undefined,
-> {
+export interface App<T extends ToolDefs = ToolDefs> {
   /** Start the built-in Express server */
   start(options?: StartOptions): Promise<void>;
 
@@ -380,9 +402,6 @@ export interface App<
 
   /** Typed tool definitions (for type inference) */
   readonly tools: T;
-
-  /** UI resource definitions (for type inference) */
-  readonly ui: U;
 
   // ---------------------------------------------------------------------------
   // MIDDLEWARE

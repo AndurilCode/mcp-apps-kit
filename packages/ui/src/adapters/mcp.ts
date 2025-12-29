@@ -99,7 +99,8 @@ export class McpAdapter implements ProtocolAdapter {
     }
 
     // Instantiate App and register handlers BEFORE connecting.
-    this.app = new App({ name: "@mcp-apps-kit/ui", version: "0.0.0" }, {});
+    // Declare tools capability to enable calling server tools and registering bidirectional tool handlers.
+    this.app = new App({ name: "@mcp-apps-kit/ui", version: "0.0.0" }, { tools: {} });
 
     this.app.onerror = (err) => {
       this.log("error", err);

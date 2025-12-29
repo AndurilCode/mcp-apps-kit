@@ -3,12 +3,12 @@
  *
  * A simple "hello world" example demonstrating basic @mcp-apps-kit/core usage:
  * - Simple tool definition with Zod schema
- * - UI resource binding
+ * - Colocated UI resource binding (UI defined alongside tool)
  * - Server startup
  * - Type-safe handlers using defineTool helper (no type assertions needed!)
  */
 
-import { createApp, defineTool, type ClientToolsFromCore, type ToolDef } from "@mcp-apps-kit/core";
+import { createApp, defineTool, defineUI, type ClientToolsFromCore } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 // Define schemas separately for clarity
@@ -21,14 +21,23 @@ const greetOutput = z.object({
   timestamp: z.string(),
 });
 
-// Use defineTool for full type safety - no type assertions needed!
+// Use defineTool + defineUI for full type safety with colocated UI definition
+// No external UI config needed - the UI is defined right where it's used!
 const greetTool = defineTool({
   title: "Greet",
   description: "Greet someone by name",
   input: greetInput,
   output: greetOutput,
-  ui: "greeting-widget",
   visibility: "both",
+
+  // Colocated UI definition - no separate ui config needed!
+  ui: defineUI({
+    name: "Greeting Widget",
+    description: "Displays greeting messages",
+    html: "./src/ui/dist/index.html",
+    prefersBorder: true,
+  }),
+
   handler: async (input, context) => {
     // input is automatically typed as { name: string }
     // No type assertion needed! ✅
@@ -48,7 +57,7 @@ const greetTool = defineTool({
       _text: message,
     };
   },
-}) satisfies ToolDef<typeof greetInput, typeof greetOutput>;
+});
 
 const app = createApp({
   name: "minimal-app",
@@ -58,14 +67,7 @@ const app = createApp({
     greet: greetTool,
   },
 
-  ui: {
-    "greeting-widget": {
-      name: "Greeting Widget",
-      description: "Displays greeting messages",
-      html: "./src/ui/dist/index.html",
-      prefersBorder: true,
-    },
-  },
+  // No ui config needed - UI is colocated with the tool definition above!
 
   config: {
     cors: {

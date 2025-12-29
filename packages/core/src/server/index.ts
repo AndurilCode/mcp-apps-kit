@@ -64,10 +64,18 @@ export interface ServerInstance {
 }
 
 /**
+ * Internal config type that includes extracted UI definitions.
+ * This is used internally by createApp after extracting colocated UIs.
+ */
+type InternalAppConfig<T extends ToolDefs> = AppConfig<T> & {
+  ui?: UIDefs;
+};
+
+/**
  * Create an MCP server instance with tools registered
  */
 export function createServerInstance<T extends ToolDefs>(
-  config: AppConfig<T>,
+  config: InternalAppConfig<T>,
   pluginManager: PluginManager,
   jwksClient: JwksClient | null = null
 ): ServerInstance {
@@ -539,7 +547,9 @@ function registerTools(
     const zodShape = extractZodShape(toolDef.input);
 
     // Look up the full UI URI with hash if tool has a UI binding
-    const uiUri = toolDef.ui ? uiUriMap[toolDef.ui]?.uri : undefined;
+    // Note: By the time tools reach here, inline UIDefs have been normalized to string keys by createApp
+    const uiKey = typeof toolDef.ui === "string" ? toolDef.ui : undefined;
+    const uiUri = uiKey ? uiUriMap[uiKey]?.uri : undefined;
 
     // Build annotations and _meta using the protocol adapter
     const { annotations, _meta } = adapter.buildToolMeta(toolDef, serverName, uiUri);

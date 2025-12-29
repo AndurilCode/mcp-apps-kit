@@ -10,7 +10,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createApp } from "../../src/createApp";
+import { z } from "zod";
+import { createApp, defineTool, defineUI } from "../../src/createApp";
 import { createPlugin } from "../../src/plugins/types";
 
 describe("Plugin Deferred Hooks Integration", () => {
@@ -106,12 +107,17 @@ describe("Plugin Deferred Hooks Integration", () => {
         name: "test-app",
         version: "1.0.0",
         plugins: [plugin],
-        tools: {},
-        ui: {
-          testUI: {
-            name: "Test UI",
-            html: "<html><body>Test</body></html>",
-          },
+        tools: {
+          testTool: defineTool({
+            description: "Test tool with UI",
+            input: z.object({}),
+            output: z.object({}),
+            handler: async () => ({}),
+            ui: defineUI({
+              name: "Test UI",
+              html: "<html><body>Test</body></html>",
+            }),
+          }),
         },
       });
 
