@@ -44,6 +44,6 @@ coverage/
 tmp/
 temp/
 specs/
-.specify
+.specify/
 .claude
-.vercel
+.vercel/
