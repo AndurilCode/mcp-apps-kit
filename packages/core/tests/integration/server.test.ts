@@ -556,6 +556,8 @@ describe("app.start() integration", () => {
       });
 
       await app.start({ port: 3010 });
+      const httpServer = app.getServer().httpServer;
+      if (httpServer) servers.push(httpServer);
 
       const response = await fetch("http://localhost:3010/.well-known/openai-apps-challenge");
       expect(response.status).toBe(200);
@@ -573,6 +575,8 @@ describe("app.start() integration", () => {
       });
 
       await app.start({ port: 3011 });
+      const httpServer = app.getServer().httpServer;
+      if (httpServer) servers.push(httpServer);
 
       const response = await fetch("http://localhost:3011/.well-known/openai-apps-challenge");
       expect(response.status).toBe(404);

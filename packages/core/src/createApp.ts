@@ -122,6 +122,35 @@ function validateConfig<T extends ToolDefs>(config: unknown): asserts config is 
       throw new AppError(ErrorCode.INVALID_CONFIG, "Invalid OAuth configuration");
     }
   }
+
+  // Validate OpenAI config if provided
+  if (globalConfig?.openai !== undefined) {
+    const openaiConfig = globalConfig.openai as Record<string, unknown>;
+    if (typeof openaiConfig !== "object" || openaiConfig === null) {
+      throw new AppError(ErrorCode.INVALID_CONFIG, "Config.config.openai must be an object");
+    }
+    if (openaiConfig.domain_challenge !== undefined) {
+      const token = openaiConfig.domain_challenge;
+      if (typeof token !== "string") {
+        throw new AppError(
+          ErrorCode.INVALID_CONFIG,
+          "Config.config.openai.domain_challenge must be a string"
+        );
+      }
+      if (token.length === 0) {
+        throw new AppError(
+          ErrorCode.INVALID_CONFIG,
+          "Config.config.openai.domain_challenge cannot be an empty string"
+        );
+      }
+      if (token.length > 1000) {
+        throw new AppError(
+          ErrorCode.INVALID_CONFIG,
+          "Config.config.openai.domain_challenge cannot exceed 1000 characters"
+        );
+      }
+    }
+  }
 }
 
 /**
