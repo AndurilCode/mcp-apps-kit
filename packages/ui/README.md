@@ -2,15 +2,41 @@
 
 [![npm](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fui)](https://www.npmjs.com/package/@mcp-apps-kit/ui) [![node](https://img.shields.io/node/v/%40mcp-apps-kit%2Fui)](https://www.npmjs.com/package/@mcp-apps-kit/ui) [![license](https://img.shields.io/npm/l/%40mcp-apps-kit%2Fui)](https://www.npmjs.com/package/@mcp-apps-kit/ui)
 
-Client-side (UI/widget) SDK for MCP apps.
+Client-side SDK for MCP applications (vanilla JavaScript).
 
-Use this package inside the HTML/JS UI that your tool returns (a widget). It gives you a single `createClient()` API that **auto-detects the host** and lets you:
+Use this inside the HTML/JS UI returned by your tools. The SDK auto-detects the host (MCP Apps or ChatGPT Apps) and exposes a unified client for tool calls and host context.
 
-- call tools
-- read tool results and tool inputs
-- react to host context (theme, display mode, safe areas, etc.)
+## Table of Contents
 
-This package is framework-agnostic (vanilla TS/JS). If you’re using React, prefer `@mcp-apps-kit/ui-react`.
+- [Background](#background)
+- [Features](#features)
+- [Compatibility](#compatibility)
+- [Install](#install)
+- [Usage](#usage)
+- [Debug Logging](#debug-logging)
+- [Examples](#examples)
+- [API](#api)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Background
+
+Widget UIs run inside host environments with different APIs and capabilities. This package normalizes those differences so your UI code can call tools, read results, and respond to host context changes from a single API. For React apps, use `@mcp-apps-kit/ui-react`.
+
+## Features
+
+- `createClient()` with host auto-detection
+- Tool calls with optional TypeScript typing
+- Host context access (theme, display mode, safe areas)
+- Tool inputs and results access
+- Optional debug logger that transports logs via MCP
+- Test adapter for local development
+
+## Compatibility
+
+- Hosts: MCP Apps and ChatGPT (OpenAI Apps SDK)
+- Node.js: `>= 18` for tooling/builds (browser runtime)
+- MCP SDK: uses `@modelcontextprotocol/ext-apps`
 
 ## Install
 
@@ -18,25 +44,23 @@ This package is framework-agnostic (vanilla TS/JS). If you’re using React, pre
 npm install @mcp-apps-kit/ui
 ```
 
-## Quick start
+## Usage
+
+### Quick start
 
 ```ts
 import { createClient } from "@mcp-apps-kit/ui";
 
 const client = await createClient();
 
-// Call a tool by name
 await client.callTool("greet", { name: "Alice" });
 
-// React to host context changes (theme, etc.)
 client.onHostContextChange((ctx) => {
   document.documentElement.dataset.theme = ctx.theme;
 });
 ```
 
-## Typed tool calls (recommended)
-
-If your server exports tool types, you can parameterize the client to get fully typed `callTool()` inputs/outputs.
+### Typed tool calls
 
 ```ts
 import { createClient } from "@mcp-apps-kit/ui";
@@ -47,9 +71,7 @@ const client = await createClient<AppClientTools>();
 await client.callTool("search_restaurants", { location: "Paris" });
 ```
 
-## Testing locally
-
-You can force a specific adapter (useful in local dev / unit tests):
+### Local testing
 
 ```ts
 import { createClient } from "@mcp-apps-kit/ui";
@@ -59,68 +81,50 @@ const client = await createClient({ forceAdapter: "mock" });
 
 ## Debug Logging
 
-The client debug logger allows you to send structured logs from your UI to the server through the MCP protocol. This bypasses sandbox restrictions in iframe environments where `console` access may be unavailable (e.g., mobile ChatGPT).
-
-### Basic Usage
+Send structured logs from the UI to the server via MCP:
 
 ```ts
 import { clientDebugLogger } from "@mcp-apps-kit/ui";
 
-// Configure the logger (call once at app startup)
 clientDebugLogger.configure({
-  enabled: true, // Enable MCP transport
-  level: "debug", // Minimum level to log
-  source: "my-widget", // Identifier for log entries
+  enabled: true,
+  level: "debug",
+  source: "my-widget",
 });
 
-// Log messages at different levels
-clientDebugLogger.debug("Component mounted", { props });
-clientDebugLogger.info("User action", { action: "click", target: "button" });
-clientDebugLogger.warn("Validation warning", { field: "email" });
-clientDebugLogger.error("API request failed", { error: err.message });
+clientDebugLogger.info("Component mounted", { props: "..." });
 ```
 
-### Features
-
-- **Intelligent batching**: Logs are batched to reduce MCP calls (default: 10 entries or 5 seconds)
-- **Immediate flush on errors**: Error-level logs are flushed immediately
-- **Automatic fallback**: Falls back to `console` when MCP transport is unavailable
-- **Circular reference handling**: Safely serializes objects with circular references
-- **Graceful degradation**: Works silently in restricted environments
-
-### Configuration Options
+Server-side configuration:
 
 ```ts
-clientDebugLogger.configure({
-  enabled: true, // Enable/disable MCP transport
-  level: "info", // "debug" | "info" | "warn" | "error"
-  batchSize: 10, // Flush after N log entries
-  flushIntervalMs: 5000, // Max time between flushes (ms)
-  source: "my-app", // Source identifier for logs
-});
-```
-
-### Server-Side Setup
-
-For the logs to be received, the server must have debug logging enabled:
-
-```ts
-// server/index.ts
 const app = createApp({
   config: {
-    debug: { enabled: true, level: "debug" },
+    debug: {
+      logTool: true,
+      level: "debug",
+    },
   },
 });
 ```
 
-**See also:** [@mcp-apps-kit/core README](../core/README.md) for server-side configuration.
+## Examples
 
-## Documentation & examples
+- `../../examples/minimal`
+- [kanban-mcp-example](https://github.com/AndurilCode/kanban-mcp-example)
 
-- Project overview: ../../README.md
-- Examples that include UI code:
-  - [kanban-mcp-example](https://github.com/AndurilCode/kanban-mcp-example)
-  - ../../examples/minimal
+## API
+
+Key exports include:
+
+- `createClient`, `detectProtocol`
+- `clientDebugLogger`, `ClientDebugLogger`
+- `McpAdapter`, `OpenAIAdapter`, `MockAdapter`
+- `HostContext`, `AppsClient`, `ToolResult`
+
+## Contributing
+
+See `../../CONTRIBUTING.md` for development setup and guidelines. Issues and pull requests are welcome.
 
 ## License
 
