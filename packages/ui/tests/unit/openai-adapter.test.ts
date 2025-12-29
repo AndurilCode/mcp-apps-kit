@@ -130,14 +130,26 @@ describe("OpenAIAdapter", () => {
   // =============================================================================
 
   describe("host capabilities", () => {
-    it("should return minimal capabilities", async () => {
+    it("should return ChatGPT capabilities", async () => {
       await adapter.connect();
       const capabilities = adapter.getHostCapabilities();
 
       expect(capabilities).toBeDefined();
+      // Common capabilities
       expect(capabilities).toMatchObject({
         openLinks: expect.any(Object),
+        logging: expect.any(Object),
+        theming: expect.objectContaining({
+          themes: expect.arrayContaining(["light", "dark"]),
+        }),
+        displayModes: expect.objectContaining({
+          modes: expect.arrayContaining(["inline", "fullscreen", "pip"]),
+        }),
       });
+      // ChatGPT-specific capabilities
+      expect(capabilities?.fileUpload).toBeDefined();
+      expect(capabilities?.safeAreaInsets).toBeDefined();
+      expect(capabilities?.views).toBeDefined();
     });
   });
 

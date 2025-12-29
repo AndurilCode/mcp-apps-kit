@@ -171,14 +171,21 @@ describe("createClient contract", () => {
     });
 
     describe("host capabilities", () => {
-      it("should return host capabilities", async () => {
+      it("should return comprehensive host capabilities", async () => {
         const client = await createClient({ forceAdapter: "mock" });
         const capabilities: HostCapabilities | undefined = client.getHostCapabilities();
 
         expect(capabilities).toBeDefined();
+        // Common capabilities (both platforms)
         expect(capabilities).toMatchObject({
           logging: expect.any(Object),
           openLinks: expect.any(Object),
+          theming: expect.objectContaining({
+            themes: expect.any(Array),
+          }),
+          displayModes: expect.objectContaining({
+            modes: expect.any(Array),
+          }),
         });
       });
     });

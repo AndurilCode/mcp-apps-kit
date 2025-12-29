@@ -8,11 +8,12 @@
 
 /**
  * Host capabilities advertised during handshake.
- * Indicates what features the host platform supports.
+ * Protocol-agnostic interface covering features from both MCP Apps and ChatGPT.
  */
 export interface HostCapabilities {
-  /** Experimental features (structure TBD) */
-  experimental?: Record<string, unknown>;
+  // ===========================================================================
+  // Common capabilities (supported by both platforms)
+  // ===========================================================================
 
   /** Host accepts log messages via sendLog() */
   logging?: Record<string, never>;
@@ -20,17 +21,81 @@ export interface HostCapabilities {
   /** Host supports opening external URLs via openLink() */
   openLinks?: Record<string, never>;
 
-  /** Host can proxy resource reads to MCP server */
+  /** Host supports theme switching (light/dark/os) */
+  theming?: {
+    /** Supported themes */
+    themes?: ("light" | "dark" | "os")[];
+  };
+
+  /** Host supports display mode changes */
+  displayModes?: {
+    /** Available display modes */
+    modes?: ("inline" | "fullscreen" | "pip" | "panel")[];
+  };
+
+  /** Host supports state persistence */
+  statePersistence?: {
+    /** State is persisted across sessions */
+    persistent?: boolean;
+    /** Maximum state size in bytes */
+    maxSize?: number;
+  };
+
+  // ===========================================================================
+  // MCP Apps specific capabilities (Claude Desktop)
+  // ===========================================================================
+
+  /** Host can proxy resource reads to MCP server (MCP Apps only) */
   serverResources?: {
     /** Host supports resources/list_changed notifications */
     listChanged?: boolean;
   };
 
-  /** Host can proxy tool calls to MCP server */
+  /** Host can proxy tool calls to MCP server (MCP Apps only) */
   serverTools?: {
     /** Host supports tools/list_changed notifications */
     listChanged?: boolean;
   };
+
+  /** Host supports size change notifications (MCP Apps only) */
+  sizeNotifications?: Record<string, never>;
+
+  /** Host supports partial/streaming tool input (MCP Apps only) */
+  partialToolInput?: Record<string, never>;
+
+  /** Host supports bidirectional tools - app can expose tools to host (MCP Apps only) */
+  appTools?: {
+    /** Host supports tools/list_changed notifications from app */
+    listChanged?: boolean;
+  };
+
+  // ===========================================================================
+  // ChatGPT/OpenAI specific capabilities
+  // ===========================================================================
+
+  /** Host supports file uploads (ChatGPT only) */
+  fileUpload?: {
+    /** Maximum file size in bytes */
+    maxSize?: number;
+    /** Allowed MIME types */
+    allowedTypes?: string[];
+  };
+
+  /** Host provides safe area insets (ChatGPT mobile) */
+  safeAreaInsets?: Record<string, never>;
+
+  /** Host supports view identification (ChatGPT only) */
+  views?: {
+    /** Supported view types */
+    types?: string[];
+  };
+
+  // ===========================================================================
+  // Experimental/extension capabilities
+  // ===========================================================================
+
+  /** Experimental features (structure TBD) */
+  experimental?: Record<string, unknown>;
 }
 
 /**

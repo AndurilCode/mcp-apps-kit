@@ -179,17 +179,33 @@ describe("MockAdapter", () => {
   // =============================================================================
 
   describe("host capabilities", () => {
-    it("should return default host capabilities", async () => {
+    it("should return comprehensive host capabilities", async () => {
       await adapter.connect();
       const capabilities = adapter.getHostCapabilities();
 
       expect(capabilities).toBeDefined();
+      // Common capabilities
       expect(capabilities).toMatchObject({
         logging: expect.any(Object),
         openLinks: expect.any(Object),
-        serverTools: expect.objectContaining({ listChanged: expect.any(Boolean) }),
-        serverResources: expect.objectContaining({ listChanged: expect.any(Boolean) }),
+        theming: expect.objectContaining({
+          themes: expect.arrayContaining(["light", "dark"]),
+        }),
+        displayModes: expect.objectContaining({
+          modes: expect.arrayContaining(["inline", "fullscreen"]),
+        }),
+        statePersistence: expect.objectContaining({
+          persistent: expect.any(Boolean),
+        }),
       });
+      // MCP-specific capabilities
+      expect(capabilities?.serverTools).toBeDefined();
+      expect(capabilities?.serverResources).toBeDefined();
+      expect(capabilities?.sizeNotifications).toBeDefined();
+      expect(capabilities?.partialToolInput).toBeDefined();
+      expect(capabilities?.appTools).toBeDefined();
+      // ChatGPT-specific capabilities (for cross-platform testing)
+      expect(capabilities?.fileUpload).toBeDefined();
     });
 
     it("should allow setting mock host capabilities", async () => {

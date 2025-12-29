@@ -34,10 +34,30 @@ export class MockAdapter implements ProtocolAdapter {
   private currentToolOutput?: Record<string, unknown>;
   private currentToolMeta?: Record<string, unknown>;
   private mockHostCapabilities: HostCapabilities = {
+    // Common capabilities
     logging: {},
     openLinks: {},
+    theming: {
+      themes: ["light", "dark", "os"],
+    },
+    displayModes: {
+      modes: ["inline", "fullscreen", "pip", "panel"],
+    },
+    statePersistence: {
+      persistent: true,
+    },
+
+    // MCP-specific capabilities
     serverTools: { listChanged: false },
     serverResources: { listChanged: false },
+    sizeNotifications: {},
+    partialToolInput: {},
+    appTools: { listChanged: false },
+
+    // ChatGPT-specific capabilities (for testing cross-platform code)
+    fileUpload: {},
+    safeAreaInsets: {},
+    views: {},
   };
   private mockHostVersion: HostVersion = {
     name: "MockHost",

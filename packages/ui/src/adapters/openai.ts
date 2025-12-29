@@ -496,10 +496,25 @@ export class OpenAIAdapter implements ProtocolAdapter {
   // === Host Information ===
 
   getHostCapabilities(): HostCapabilities | undefined {
-    // ChatGPT doesn't expose host capabilities in the same way as MCP Apps
-    // Return a minimal set of capabilities
+    // Return capabilities that ChatGPT supports
     return {
+      // Common capabilities
       openLinks: {},
+      logging: {},
+      theming: {
+        themes: ["light", "dark"],
+      },
+      displayModes: {
+        modes: ["inline", "fullscreen", "pip"],
+      },
+      statePersistence: {
+        persistent: false, // Session-scoped only
+      },
+
+      // ChatGPT-specific capabilities
+      fileUpload: {}, // Supported via uploadFile()
+      safeAreaInsets: {}, // Available on mobile
+      views: {}, // View identification supported
     };
   }
 

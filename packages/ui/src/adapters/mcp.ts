@@ -485,9 +485,38 @@ export class McpAdapter implements ProtocolAdapter {
 
   getHostCapabilities(): HostCapabilities | undefined {
     if (!this.app) return undefined;
-    const caps = this.app.getHostCapabilities();
-    if (!caps) return undefined;
-    return caps as HostCapabilities;
+    const mcpCaps = this.app.getHostCapabilities();
+    if (!mcpCaps) return undefined;
+
+    // Map MCP Apps SDK capabilities to our unified interface.
+    // MCP SDK already provides: logging, openLinks, serverResources, serverTools
+    // We augment with common abstraction fields for protocol-agnostic usage.
+    const sdkCaps = mcpCaps as HostCapabilities;
+
+    return {
+      // MCP SDK native capabilities (priority)
+      logging: sdkCaps.logging,
+      openLinks: sdkCaps.openLinks,
+      serverResources: sdkCaps.serverResources,
+      serverTools: sdkCaps.serverTools,
+      experimental: sdkCaps.experimental,
+
+      // Common capabilities (protocol-agnostic abstraction)
+      theming: {
+        themes: ["light", "dark"],
+      },
+      displayModes: {
+        modes: ["inline", "fullscreen", "pip"],
+      },
+      statePersistence: {
+        persistent: false, // MCP Apps doesn't have persistent state
+      },
+
+      // MCP Apps-specific capabilities (always available when connected)
+      sizeNotifications: {},
+      partialToolInput: {},
+      appTools: { listChanged: false },
+    };
   }
 
   getHostVersion(): HostVersion | undefined {
