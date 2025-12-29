@@ -233,6 +233,14 @@ export function createServerInstance<T extends ToolDefs>(
     res.json({ status: "ok", name: config.name, version: config.version });
   });
 
+  // OpenAI domain verification challenge endpoint
+  if (config.config?.openai?.domain_challenge) {
+    const challengeToken = config.config.openai.domain_challenge;
+    expressApp.get("/.well-known/openai-apps-challenge", (_req: Request, res: Response) => {
+      res.type("text/plain").send(challengeToken);
+    });
+  }
+
   // Catch-all 404 handler for unregistered routes
   expressApp.use((_req: Request, res: Response) => {
     res.status(404).json({ error: "Not found" });
@@ -323,6 +331,17 @@ export function createServerInstance<T extends ToolDefs>(
               headers: { "Content-Type": "application/json" },
             }
           );
+        }
+
+        // OpenAI domain verification challenge endpoint
+        if (
+          url.pathname === "/.well-known/openai-apps-challenge" &&
+          config.config?.openai?.domain_challenge
+        ) {
+          return new globalThis.Response(config.config.openai.domain_challenge, {
+            status: 200,
+            headers: { "Content-Type": "text/plain" },
+          });
         }
 
         // Validate request matches the configured serverRoute

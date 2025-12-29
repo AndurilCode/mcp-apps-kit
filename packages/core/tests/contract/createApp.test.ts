@@ -103,5 +103,49 @@ describe("createApp contract", () => {
         createApp({ name: "test", version: "1.0.0" })
       ).toThrow();
     });
+
+    it("should reject empty string for openai.domain_challenge", () => {
+      expect(() =>
+        createApp({
+          name: "test",
+          version: "1.0.0",
+          tools: {},
+          config: {
+            openai: {
+              domain_challenge: "",
+            },
+          },
+        })
+      ).toThrow("cannot be an empty string");
+    });
+
+    it("should reject domain_challenge exceeding 1000 characters", () => {
+      expect(() =>
+        createApp({
+          name: "test",
+          version: "1.0.0",
+          tools: {},
+          config: {
+            openai: {
+              domain_challenge: "x".repeat(1001),
+            },
+          },
+        })
+      ).toThrow("cannot exceed 1000 characters");
+    });
+
+    it("should accept valid domain_challenge", () => {
+      const app = createApp({
+        name: "test",
+        version: "1.0.0",
+        tools: {},
+        config: {
+          openai: {
+            domain_challenge: "valid-token-123",
+          },
+        },
+      });
+      expect(app).toBeDefined();
+    });
   });
 });
