@@ -11,6 +11,8 @@ import type {
   ClientDebugConfig,
   ModalOptions,
   ModalResult,
+  HostCapabilities,
+  HostVersion,
 } from "@mcp-apps-kit/ui";
 import { clientDebugLogger, type ClientDebugLogger } from "@mcp-apps-kit/ui";
 import { useAppsContext } from "./context";
@@ -418,6 +420,172 @@ export function useOnTeardown(handler: (reason?: string) => void): void {
     const unsubscribe = client.onTeardown(handler);
     return unsubscribe;
   }, [client, handler]);
+}
+
+/**
+ * Subscribe to partial/streaming tool input
+ *
+ * Called when the host sends partial tool arguments during streaming.
+ * Useful for showing real-time input as the user types or as the model generates.
+ *
+ * @param handler - Callback for partial input
+ *
+ * @example
+ * ```tsx
+ * function StreamingInput() {
+ *   const [partialInput, setPartialInput] = useState<Record<string, unknown>>({});
+ *
+ *   useOnToolInputPartial((input) => {
+ *     setPartialInput(input);
+ *   });
+ *
+ *   return <pre>{JSON.stringify(partialInput, null, 2)}</pre>;
+ * }
+ * ```
+ */
+export function useOnToolInputPartial(handler: (input: Record<string, unknown>) => void): void {
+  const { client } = useAppsContext();
+
+  useEffect(() => {
+    if (!client) return;
+
+    const unsubscribe = client.onToolInputPartial(handler);
+    return unsubscribe;
+  }, [client, handler]);
+}
+
+// =============================================================================
+// HOST INFORMATION HOOKS
+// =============================================================================
+
+/**
+ * Access host capabilities
+ *
+ * Returns the capabilities advertised by the host during handshake.
+ * Use this to check if features like logging or server tools are supported.
+ *
+ * @returns Host capabilities or undefined if not yet connected
+ *
+ * @example
+ * ```tsx
+ * function CapabilitiesDisplay() {
+ *   const capabilities = useHostCapabilities();
+ *
+ *   return (
+ *     <div>
+ *       <p>Logging: {capabilities?.logging ? "Supported" : "Not supported"}</p>
+ *       <p>Open Links: {capabilities?.openLinks ? "Supported" : "Not supported"}</p>
+ *     </div>
+ *   );
+ * }
+ * ```
+ */
+export function useHostCapabilities(): HostCapabilities | undefined {
+  const { client } = useAppsContext();
+  const [capabilities, setCapabilities] = useState<HostCapabilities | undefined>(
+    client?.getHostCapabilities()
+  );
+
+  useEffect(() => {
+    if (!client) return;
+    setCapabilities(client.getHostCapabilities());
+  }, [client]);
+
+  return capabilities;
+}
+
+/**
+ * Access host version information
+ *
+ * Returns the name and version of the host application.
+ *
+ * @returns Host version info or undefined if not yet connected
+ *
+ * @example
+ * ```tsx
+ * function HostInfo() {
+ *   const hostVersion = useHostVersion();
+ *
+ *   if (!hostVersion) return <div>Loading...</div>;
+ *
+ *   return (
+ *     <div>
+ *       Running on {hostVersion.name} v{hostVersion.version}
+ *     </div>
+ *   );
+ * }
+ * ```
+ */
+export function useHostVersion(): HostVersion | undefined {
+  const { client } = useAppsContext();
+  const [version, setVersion] = useState<HostVersion | undefined>(client?.getHostVersion());
+
+  useEffect(() => {
+    if (!client) return;
+    setVersion(client.getHostVersion());
+  }, [client]);
+
+  return version;
+}
+
+// =============================================================================
+// SIZE NOTIFICATION HOOKS
+// =============================================================================
+
+/**
+ * Hook to set up automatic size change notifications
+ *
+ * Creates a ResizeObserver that automatically sends size changed
+ * notifications to the host when the observed element resizes.
+ *
+ * @returns Ref to attach to the element to observe
+ *
+ * @example
+ * ```tsx
+ * function AutoSizeWidget() {
+ *   const containerRef = useSizeChangedNotifications();
+ *
+ *   return (
+ *     <div ref={containerRef}>
+ *       <p>Content that may change size...</p>
+ *     </div>
+ *   );
+ * }
+ * ```
+ */
+export function useSizeChangedNotifications(): React.RefObject<HTMLElement | null> {
+  const { client } = useAppsContext();
+  const containerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!client || typeof ResizeObserver === "undefined") return;
+
+    const element = containerRef.current;
+    if (!element) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        void client.sendSizeChanged({
+          width: Math.round(width),
+          height: Math.round(height),
+        });
+      }
+    });
+
+    observer.observe(element);
+
+    // Report initial size
+    const rect = element.getBoundingClientRect();
+    void client.sendSizeChanged({
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+    });
+
+    return () => observer.disconnect();
+  }, [client]);
+
+  return containerRef;
 }
 
 // =============================================================================

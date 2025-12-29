@@ -3,6 +3,110 @@
  */
 
 // =============================================================================
+// HOST CAPABILITIES
+// =============================================================================
+
+/**
+ * Host capabilities advertised during handshake.
+ * Indicates what features the host platform supports.
+ */
+export interface HostCapabilities {
+  /** Experimental features (structure TBD) */
+  experimental?: Record<string, unknown>;
+
+  /** Host accepts log messages via sendLog() */
+  logging?: Record<string, never>;
+
+  /** Host supports opening external URLs via openLink() */
+  openLinks?: Record<string, never>;
+
+  /** Host can proxy resource reads to MCP server */
+  serverResources?: {
+    /** Host supports resources/list_changed notifications */
+    listChanged?: boolean;
+  };
+
+  /** Host can proxy tool calls to MCP server */
+  serverTools?: {
+    /** Host supports tools/list_changed notifications */
+    listChanged?: boolean;
+  };
+}
+
+/**
+ * Host version information returned after connection.
+ */
+export interface HostVersion {
+  /** Host application name (e.g., "Claude Desktop") */
+  name: string;
+  /** Host application version */
+  version: string;
+}
+
+/**
+ * App capabilities declared during initialization.
+ * Tells the host what this app supports.
+ */
+export interface AppCapabilities {
+  /** Experimental features (structure TBD) */
+  experimental?: Record<string, unknown>;
+
+  /** App exposes MCP-style tools that the host can call */
+  tools?: {
+    /** App supports tools/list_changed notifications */
+    listChanged?: boolean;
+  };
+}
+
+// =============================================================================
+// SIZE CHANGED PARAMS
+// =============================================================================
+
+/**
+ * Parameters for size changed notifications.
+ */
+export interface SizeChangedParams {
+  /** Widget width in pixels */
+  width: number;
+  /** Widget height in pixels */
+  height: number;
+}
+
+// =============================================================================
+// TOOL HANDLER TYPES (Bidirectional)
+// =============================================================================
+
+/**
+ * Tool definition for app-exposed tools (bidirectional support).
+ * Used when the app exposes tools that the host can call.
+ */
+export interface AppToolDefinition {
+  /** Tool name */
+  name: string;
+  /** Tool description */
+  description?: string;
+  /** JSON Schema for input parameters */
+  inputSchema?: Record<string, unknown>;
+}
+
+/**
+ * Handler for tool calls from the host.
+ * @param toolName - Name of the tool being called
+ * @param args - Tool arguments
+ * @returns Tool result
+ */
+export type CallToolHandler = (
+  toolName: string,
+  args: Record<string, unknown>
+) => Promise<unknown>;
+
+/**
+ * Handler that returns the list of tools exposed by the app.
+ * @returns Array of tool definitions
+ */
+export type ListToolsHandler = () => Promise<AppToolDefinition[]>;
+
+// =============================================================================
 // HOST CONTEXT
 // =============================================================================
 
@@ -315,6 +419,99 @@ export interface AppsClient<T extends ToolDefs = ToolDefs> {
    * @returns Unsubscribe function
    */
   onTeardown(handler: (reason?: string) => void): () => void;
+
+  /**
+   * Subscribe to partial/streaming tool input
+   *
+   * Called when the host sends partial tool arguments during streaming.
+   * Useful for showing real-time input as the user types or as the model generates.
+   *
+   * @param handler - Callback for partial input
+   * @returns Unsubscribe function
+   */
+  onToolInputPartial(handler: (input: Record<string, unknown>) => void): () => void;
+
+  // === Host Information ===
+
+  /**
+   * Get host capabilities
+   *
+   * Returns the capabilities advertised by the host during handshake.
+   * Use this to check if features like logging or server tools are supported.
+   *
+   * @returns Host capabilities or undefined if not yet connected
+   */
+  getHostCapabilities(): HostCapabilities | undefined;
+
+  /**
+   * Get host version information
+   *
+   * Returns the name and version of the host application.
+   *
+   * @returns Host version info or undefined if not yet connected
+   */
+  getHostVersion(): HostVersion | undefined;
+
+  // === Protocol-Level Logging ===
+
+  /**
+   * Send a log message to the host
+   *
+   * Unlike the `log()` method which logs to the local console,
+   * this sends logs through the MCP protocol to the host for
+   * debugging and telemetry purposes.
+   *
+   * @param level - Log level
+   * @param data - Data to log
+   */
+  sendLog(
+    level: "debug" | "info" | "notice" | "warning" | "error" | "critical" | "alert" | "emergency",
+    data: unknown
+  ): Promise<void>;
+
+  // === Size Notifications ===
+
+  /**
+   * Send size changed notification to host
+   *
+   * Notifies the host when the widget's size changes.
+   * Use this for manual size reporting.
+   *
+   * @param params - Size parameters
+   */
+  sendSizeChanged(params: SizeChangedParams): Promise<void>;
+
+  /**
+   * Set up automatic size change notifications
+   *
+   * Creates a ResizeObserver that automatically sends size changed
+   * notifications to the host when the document body resizes.
+   *
+   * @returns Cleanup function to stop observing
+   */
+  setupSizeChangedNotifications(): () => void;
+
+  // === Bidirectional Tool Support ===
+
+  /**
+   * Set handler for tool calls from the host
+   *
+   * When the host calls a tool exposed by this app, this handler
+   * will be invoked with the tool name and arguments.
+   *
+   * @param handler - Handler function for tool calls
+   */
+  setCallToolHandler(handler: CallToolHandler): void;
+
+  /**
+   * Set handler for listing app-exposed tools
+   *
+   * When the host requests the list of tools this app exposes,
+   * this handler will be invoked.
+   *
+   * @param handler - Handler function that returns tool definitions
+   */
+  setListToolsHandler(handler: ListToolsHandler): void;
 
   // === Current State (Read-Only) ===
 

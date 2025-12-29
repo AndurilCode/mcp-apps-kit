@@ -5,7 +5,15 @@
  */
 
 import type { ProtocolAdapter } from "./types";
-import type { HostContext, ResourceContent } from "../types";
+import type {
+  HostContext,
+  ResourceContent,
+  HostCapabilities,
+  HostVersion,
+  SizeChangedParams,
+  CallToolHandler,
+  ListToolsHandler,
+} from "../types";
 
 /**
  * Mock adapter for development and testing
@@ -18,12 +26,25 @@ export class MockAdapter implements ProtocolAdapter {
   private context: HostContext;
   private toolResultHandlers: Set<(result: unknown) => void> = new Set();
   private toolInputHandlers: Set<(input: unknown) => void> = new Set();
+  private toolInputPartialHandlers: Set<(input: unknown) => void> = new Set();
   private toolCancelledHandlers: Set<(reason?: string) => void> = new Set();
   private hostContextHandlers: Set<(context: HostContext) => void> = new Set();
   private teardownHandlers: Set<(reason?: string) => void> = new Set();
   private currentToolInput?: Record<string, unknown>;
   private currentToolOutput?: Record<string, unknown>;
   private currentToolMeta?: Record<string, unknown>;
+  private mockHostCapabilities: HostCapabilities = {
+    logging: {},
+    openLinks: {},
+    serverTools: { listChanged: false },
+    serverResources: { listChanged: false },
+  };
+  private mockHostVersion: HostVersion = {
+    name: "MockHost",
+    version: "1.0.0",
+  };
+  private callToolHandler?: CallToolHandler;
+  private listToolsHandler?: ListToolsHandler;
 
   constructor() {
     // Create default context
@@ -131,11 +152,19 @@ export class MockAdapter implements ProtocolAdapter {
   // === Logging ===
 
   log(level: string, data: unknown): void {
-    // eslint-disable-next-line no-console -- Mock adapter uses console for logging
-    const logFn =
-      { debug: console.debug, info: console.info, warning: console.warn, error: console.error }[
-        level
-      ] ?? console.log;
+    // Mock adapter uses console for logging
+    const logMapping: Record<string, typeof console.log> = {
+      // eslint-disable-next-line no-console
+      debug: console.debug,
+      // eslint-disable-next-line no-console
+      info: console.info,
+      // eslint-disable-next-line no-console
+      warning: console.warn,
+      // eslint-disable-next-line no-console
+      error: console.error,
+    };
+    // eslint-disable-next-line no-console
+    const logFn = logMapping[level] ?? console.log;
     logFn("[MockAdapter]", data);
   }
 
@@ -251,5 +280,101 @@ export class MockAdapter implements ProtocolAdapter {
     for (const handler of this.hostContextHandlers) {
       handler(this.context);
     }
+  }
+
+  // === Host Information ===
+
+  getHostCapabilities(): HostCapabilities | undefined {
+    return this.mockHostCapabilities;
+  }
+
+  getHostVersion(): HostVersion | undefined {
+    return this.mockHostVersion;
+  }
+
+  // === Protocol-Level Logging ===
+
+  async sendLog(
+    level: "debug" | "info" | "notice" | "warning" | "error" | "critical" | "alert" | "emergency",
+    data: unknown
+  ): Promise<void> {
+    // eslint-disable-next-line no-console
+    console.log(`[MockAdapter] sendLog(${level}):`, data);
+  }
+
+  // === Size Notifications ===
+
+  async sendSizeChanged(params: SizeChangedParams): Promise<void> {
+    // eslint-disable-next-line no-console
+    console.log("[MockAdapter] sendSizeChanged:", params);
+  }
+
+  // === Partial Tool Input ===
+
+  onToolInputPartial(handler: (input: unknown) => void): () => void {
+    this.toolInputPartialHandlers.add(handler);
+    return () => this.toolInputPartialHandlers.delete(handler);
+  }
+
+  // === Bidirectional Tool Support ===
+
+  setCallToolHandler(handler: CallToolHandler): void {
+    this.callToolHandler = handler;
+    // eslint-disable-next-line no-console
+    console.log("[MockAdapter] setCallToolHandler: handler registered");
+  }
+
+  setListToolsHandler(handler: ListToolsHandler): void {
+    this.listToolsHandler = handler;
+    // eslint-disable-next-line no-console
+    console.log("[MockAdapter] setListToolsHandler: handler registered");
+  }
+
+  // === Additional Mock-specific Methods ===
+
+  /**
+   * Emit partial tool input (for testing streaming input)
+   */
+  emitToolInputPartial(input: Record<string, unknown>): void {
+    for (const handler of this.toolInputPartialHandlers) {
+      handler(input);
+    }
+  }
+
+  /**
+   * Set mock host capabilities (for testing)
+   */
+  setMockHostCapabilities(capabilities: Partial<HostCapabilities>): void {
+    this.mockHostCapabilities = { ...this.mockHostCapabilities, ...capabilities };
+  }
+
+  /**
+   * Set mock host version (for testing)
+   */
+  setMockHostVersion(version: HostVersion): void {
+    this.mockHostVersion = version;
+  }
+
+  /**
+   * Simulate a tool call from host (for testing bidirectional tools)
+   */
+  async simulateHostToolCall(
+    toolName: string,
+    args: Record<string, unknown>
+  ): Promise<unknown> {
+    if (!this.callToolHandler) {
+      throw new Error("No call tool handler registered");
+    }
+    return this.callToolHandler(toolName, args);
+  }
+
+  /**
+   * Simulate a list tools request from host (for testing bidirectional tools)
+   */
+  async simulateHostListTools(): Promise<unknown> {
+    if (!this.listToolsHandler) {
+      return { tools: [] };
+    }
+    return this.listToolsHandler();
   }
 }

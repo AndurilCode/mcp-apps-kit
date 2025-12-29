@@ -43,7 +43,33 @@ export type {
   ModalInput,
   ModalOptions,
   ModalResult,
+  // New MCP Apps API types
+  HostCapabilities,
+  HostVersion,
+  AppCapabilities,
+  SizeChangedParams,
+  AppToolDefinition,
+  CallToolHandler,
+  ListToolsHandler,
 } from "./types";
+
+// Constants
+export {
+  LATEST_PROTOCOL_VERSION,
+  RESOURCE_MIME_TYPE,
+  RESOURCE_URI_META_KEY,
+} from "./constants";
+
+// Utility functions
+export {
+  applyDocumentTheme,
+  getDocumentTheme,
+  applyHostStyleVariables,
+  applyHostFonts,
+  removeHostFonts,
+  clearHostStyleVariables,
+} from "./utils";
+export type { Theme } from "./utils";
 
 // Adapter types
 export type { ProtocolAdapter, AdapterFactory, AdapterType } from "./adapters/types";
