@@ -1,6 +1,6 @@
 {
   "name": "@mcp-apps-kit/ui",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Client-side SDK for MCP applications (vanilla JavaScript)",
   "type": "module",
   "main": "./dist/index.cjs",

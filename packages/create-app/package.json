@@ -1,6 +1,6 @@
 {
   "name": "@mcp-apps-kit/create-app",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "CLI tool for scaffolding MCP applications",
   "type": "module",
   "main": "./dist/index.cjs",
