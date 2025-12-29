@@ -289,10 +289,10 @@ describe("MockAdapter", () => {
 
       await adapter.sendSizeChanged({ width: 800, height: 600 });
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "[MockAdapter] sendSizeChanged:",
-        { width: 800, height: 600 }
-      );
+      expect(consoleSpy).toHaveBeenCalledWith("[MockAdapter] sendSizeChanged:", {
+        width: 800,
+        height: 600,
+      });
       consoleSpy.mockRestore();
     });
   });
@@ -360,9 +360,9 @@ describe("MockAdapter", () => {
       it("should throw if no handler is registered", async () => {
         await adapter.connect();
 
-        await expect(
-          adapter.simulateHostToolCall("greet", { name: "World" })
-        ).rejects.toThrow("No call tool handler registered");
+        await expect(adapter.simulateHostToolCall("greet", { name: "World" })).rejects.toThrow(
+          "No call tool handler registered"
+        );
       });
     });
 

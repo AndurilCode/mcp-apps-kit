@@ -4,6 +4,8 @@
  * Provides a working implementation without requiring a host platform.
  */
 
+import { UIError, UIErrorCode } from "../errors";
+
 import type { ProtocolAdapter } from "./types";
 import type {
   HostContext,
@@ -378,12 +380,9 @@ export class MockAdapter implements ProtocolAdapter {
   /**
    * Simulate a tool call from host (for testing bidirectional tools)
    */
-  async simulateHostToolCall(
-    toolName: string,
-    args: Record<string, unknown>
-  ): Promise<unknown> {
+  async simulateHostToolCall(toolName: string, args: Record<string, unknown>): Promise<unknown> {
     if (!this.callToolHandler) {
-      throw new Error("No call tool handler registered");
+      throw new UIError(UIErrorCode.TOOL_NOT_FOUND, "No call tool handler registered");
     }
     return this.callToolHandler(toolName, args);
   }

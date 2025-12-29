@@ -54,11 +54,7 @@ export type {
 } from "./types";
 
 // Constants
-export {
-  LATEST_PROTOCOL_VERSION,
-  RESOURCE_MIME_TYPE,
-  RESOURCE_URI_META_KEY,
-} from "./constants";
+export { LATEST_PROTOCOL_VERSION, RESOURCE_MIME_TYPE, RESOURCE_URI_META_KEY } from "./constants";
 
 // Utility functions
 export {
@@ -70,6 +66,10 @@ export {
   clearHostStyleVariables,
 } from "./utils";
 export type { Theme } from "./utils";
+
+// Error types
+export { UIError, UIErrorCode } from "./errors";
+export type { UIErrorCodeType } from "./errors";
 
 // Adapter types
 export type { ProtocolAdapter, AdapterFactory, AdapterType } from "./adapters/types";

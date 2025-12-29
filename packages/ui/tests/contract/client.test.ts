@@ -233,9 +233,7 @@ describe("createClient contract", () => {
       it("should send size changed without error", async () => {
         const client = await createClient({ forceAdapter: "mock" });
 
-        await expect(
-          client.sendSizeChanged({ width: 800, height: 600 })
-        ).resolves.toBeUndefined();
+        await expect(client.sendSizeChanged({ width: 800, height: 600 })).resolves.toBeUndefined();
       });
 
       it("should setup size changed notifications and return cleanup function", async () => {

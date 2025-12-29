@@ -5,6 +5,8 @@
  * These can be used without React or the full client SDK.
  */
 
+const STYLE_ID = "mcp-apps-host-fonts";
+
 /**
  * Apply host-provided CSS variables to the document
  *
@@ -62,8 +64,6 @@ export function applyHostFonts(css: string): void {
     return;
   }
 
-  const STYLE_ID = "mcp-apps-host-fonts";
-
   let styleEl = document.getElementById(STYLE_ID) as HTMLStyleElement | null;
 
   if (!styleEl) {
@@ -85,7 +85,6 @@ export function removeHostFonts(): void {
     return;
   }
 
-  const STYLE_ID = "mcp-apps-host-fonts";
   const styleEl = document.getElementById(STYLE_ID);
 
   if (styleEl) {

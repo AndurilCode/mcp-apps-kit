@@ -6,6 +6,7 @@
  */
 
 import { App } from "@modelcontextprotocol/ext-apps";
+import { UIError, UIErrorCode } from "../errors";
 
 type ResourceReadResult = {
   contents: Array<{
@@ -136,12 +137,15 @@ export class McpAdapter implements ProtocolAdapter {
 
     // Handle tool calls from host (bidirectional support)
     this.app.oncalltool = async (params) => {
-      const { name, arguments: args } = params as { name: string; arguments?: Record<string, unknown> };
+      const { name, arguments: args } = params as {
+        name: string;
+        arguments?: Record<string, unknown>;
+      };
       if (this.callToolHandler) {
         const result = await this.callToolHandler(name, args ?? {});
         return { content: [{ type: "text", text: JSON.stringify(result) }] };
       }
-      throw new Error(`No handler registered for tool: ${name}`);
+      throw new UIError(UIErrorCode.TOOL_NOT_FOUND, `No handler registered for tool: ${name}`);
     };
 
     // Handle list tools requests from host (bidirectional support)
@@ -536,7 +540,7 @@ export class McpAdapter implements ProtocolAdapter {
     data: unknown
   ): Promise<void> {
     if (!this.app) {
-      throw new Error("MCP Apps adapter not connected");
+      throw new UIError(UIErrorCode.NOT_CONNECTED, "MCP Apps adapter not connected");
     }
     await this.app.sendLog({
       level,
@@ -549,7 +553,7 @@ export class McpAdapter implements ProtocolAdapter {
 
   async sendSizeChanged(params: SizeChangedParams): Promise<void> {
     if (!this.app) {
-      throw new Error("MCP Apps adapter not connected");
+      throw new UIError(UIErrorCode.NOT_CONNECTED, "MCP Apps adapter not connected");
     }
     await this.app.sendSizeChanged({
       width: params.width,

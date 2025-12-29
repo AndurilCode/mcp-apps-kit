@@ -160,10 +160,7 @@ export interface AppToolDefinition {
  * @param args - Tool arguments
  * @returns Tool result
  */
-export type CallToolHandler = (
-  toolName: string,
-  args: Record<string, unknown>
-) => Promise<unknown>;
+export type CallToolHandler = (toolName: string, args: Record<string, unknown>) => Promise<unknown>;
 
 /**
  * Handler that returns the list of tools exposed by the app.
