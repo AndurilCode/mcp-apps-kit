@@ -3,7 +3,6 @@
  */
 
 import type { ToolDefs } from "./tools";
-import type { UIDefs } from "./ui";
 import type { Plugin } from "../plugins/types";
 import type { OAuthConfig } from "../server/oauth/types.js";
 
@@ -236,16 +235,13 @@ export interface GlobalConfig {
  *   name: "my-app",
  *   version: "1.0.0",
  *   tools: {
- *     greet: {
+ *     greet: defineTool({
  *       description: "Greet a user",
  *       input: z.object({ name: z.string() }),
+ *       output: z.object({ message: z.string() }),
  *       handler: async ({ name }) => ({ message: `Hello, ${name}!` }),
- *     },
- *   },
- *   ui: {
- *     "greeting-widget": {
- *       html: "./widget.html",
- *     },
+ *       ui: defineUI({ html: "./widget.html" }),
+ *     }),
  *   },
  * };
  * ```
@@ -273,12 +269,6 @@ export interface AppConfig<T extends ToolDefs = ToolDefs> {
    * Each key is the tool name, value is the tool definition.
    */
   tools: T;
-
-  /**
-   * UI resource definitions.
-   * Keys are referenced from tool definitions via `ui` property.
-   */
-  ui?: UIDefs;
 
   /**
    * Global configuration options.

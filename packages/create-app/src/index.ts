@@ -140,15 +140,24 @@ function getReactTemplate(name: string, vercel = false): Record<string, string> 
 // Required for Vercel to detect Express
 import "express";
 
-import { createApp } from "@mcp-apps-kit/core";
+import { createApp, defineTool, defineUI } from "@mcp-apps-kit/core";
 import { z } from "zod";
+
+// Define the UI for displaying greetings
+const greetingUI = defineUI({
+  name: "Greeting Widget",
+  description: "Displays greeting messages",
+  html: "./${uiOutputDir}/index.html",
+  prefersBorder: true,
+});
 
 const app = createApp({
   name: "${name}",
   version: "0.1.0",
 
   tools: {
-    hello: {
+    hello: defineTool({
+      title: "Hello",
       description: "Say hello to someone",
       input: z.object({
         name: z.string().describe("Name to greet"),
@@ -163,16 +172,8 @@ const app = createApp({
           timestamp: new Date().toISOString(),
         };
       },
-      ui: "greeting",
-    },
-  },
-
-  ui: {
-    greeting: {
-      html: "./${uiOutputDir}/index.html",
-      description: "Greeting widget",
-      prefersBorder: true,
-    },
+      ui: greetingUI,
+    }),
   },
 });
 
@@ -189,15 +190,24 @@ export default app.expressApp;
  * ${name} - MCP Server
  */
 
-import { createApp } from "@mcp-apps-kit/core";
+import { createApp, defineTool, defineUI } from "@mcp-apps-kit/core";
 import { z } from "zod";
+
+// Define the UI for displaying greetings
+const greetingUI = defineUI({
+  name: "Greeting Widget",
+  description: "Displays greeting messages",
+  html: "./ui/dist/index.html",
+  prefersBorder: true,
+});
 
 const app = createApp({
   name: "${name}",
   version: "0.1.0",
 
   tools: {
-    hello: {
+    hello: defineTool({
+      title: "Hello",
       description: "Say hello to someone",
       input: z.object({
         name: z.string().describe("Name to greet"),
@@ -212,16 +222,8 @@ const app = createApp({
           timestamp: new Date().toISOString(),
         };
       },
-      ui: "greeting",
-    },
-  },
-
-  ui: {
-    greeting: {
-      html: "./ui/dist/index.html",
-      description: "Greeting widget",
-      prefersBorder: true,
-    },
+      ui: greetingUI,
+    }),
   },
 });
 
@@ -536,15 +538,24 @@ function getVanillaTemplate(name: string, vercel = false): Record<string, string
 // Required for Vercel to detect Express
 import "express";
 
-import { createApp } from "@mcp-apps-kit/core";
+import { createApp, defineTool, defineUI } from "@mcp-apps-kit/core";
 import { z } from "zod";
+
+// Define the UI for displaying greetings
+const greetingUI = defineUI({
+  name: "Greeting Widget",
+  description: "Displays greeting messages",
+  html: "./${uiOutputDir}/index.html",
+  prefersBorder: true,
+});
 
 const app = createApp({
   name: "${name}",
   version: "0.1.0",
 
   tools: {
-    hello: {
+    hello: defineTool({
+      title: "Hello",
       description: "Say hello to someone",
       input: z.object({
         name: z.string().describe("Name to greet"),
@@ -559,16 +570,8 @@ const app = createApp({
           timestamp: new Date().toISOString(),
         };
       },
-      ui: "greeting",
-    },
-  },
-
-  ui: {
-    greeting: {
-      html: "./${uiOutputDir}/index.html",
-      description: "Greeting widget",
-      prefersBorder: true,
-    },
+      ui: greetingUI,
+    }),
   },
 });
 
@@ -585,15 +588,24 @@ export default app.expressApp;
  * ${name} - MCP Server
  */
 
-import { createApp } from "@mcp-apps-kit/core";
+import { createApp, defineTool, defineUI } from "@mcp-apps-kit/core";
 import { z } from "zod";
+
+// Define the UI for displaying greetings
+const greetingUI = defineUI({
+  name: "Greeting Widget",
+  description: "Displays greeting messages",
+  html: "./ui/dist/index.html",
+  prefersBorder: true,
+});
 
 const app = createApp({
   name: "${name}",
   version: "0.1.0",
 
   tools: {
-    hello: {
+    hello: defineTool({
+      title: "Hello",
       description: "Say hello to someone",
       input: z.object({
         name: z.string().describe("Name to greet"),
@@ -608,16 +620,8 @@ const app = createApp({
           timestamp: new Date().toISOString(),
         };
       },
-      ui: "greeting",
-    },
-  },
-
-  ui: {
-    greeting: {
-      html: "./ui/dist/index.html",
-      description: "Greeting widget",
-      prefersBorder: true,
-    },
+      ui: greetingUI,
+    }),
   },
 });
 

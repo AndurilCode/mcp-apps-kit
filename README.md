@@ -119,8 +119,18 @@ npx @mcp-apps-kit/create-app@latest
 
 ```typescript
 // server/index.ts
-import { createApp, defineTool, type ClientToolsFromCore } from "@mcp-apps-kit/core";
+import { createApp, defineTool, defineUI, type ClientToolsFromCore } from "@mcp-apps-kit/core";
 import { z } from "zod";
+
+// Define UI widget for displaying restaurant results
+const restaurantListUI = defineUI({
+  name: "Restaurant List",
+  description: "Displays restaurant search results",
+  html: "./dist/widget.html",
+  csp: {
+    connectDomains: ["https://api.yelp.com"],
+  },
+});
 
 const app = createApp({
   name: "restaurant-finder",
@@ -151,17 +161,8 @@ const app = createApp({
           _meta: { fullDetails: results },
         };
       },
-      ui: "restaurant-list",
+      ui: restaurantListUI,
     }),
-  },
-
-  ui: {
-    "restaurant-list": {
-      html: "./dist/widget.html",
-      csp: {
-        connectDomains: ["https://api.yelp.com"],
-      },
-    },
   },
 });
 
@@ -257,25 +258,28 @@ tools: {
 The framework generates protocol-specific metadata for each platform:
 
 ```typescript
-// Your unified definition
+// Your unified definition (using colocated UI)
+const myWidget = defineUI({ name: "Widget", html: "./dist/widget.html" });
+
 tools: {
-  my_tool: {
-    ui: "widget",
+  my_tool: defineTool({
+    ui: myWidget,
     visibility: "both",
-  },
+    // ...
+  }),
 }
 
 // Generated for MCP Apps
 _meta: {
   ui: {
-    resourceUri: "ui://my-app/widget",
+    resourceUri: "ui://my-app/__ui_my_tool",
     visibility: ["model", "app"],
   },
 }
 
 // Generated for ChatGPT Apps
 _meta: {
-  "openai/outputTemplate": "ui://my-app/widget",
+  "openai/outputTemplate": "ui://my-app/__ui_my_tool",
   "openai/widgetAccessible": true,
   "openai/visibility": "public",
 }

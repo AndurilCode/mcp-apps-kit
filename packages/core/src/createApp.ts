@@ -6,7 +6,7 @@
 
 import type { ToolDefs, App, StartOptions, McpServer, ExpressMiddleware } from "./types/tools";
 import type { AppConfig, DebugConfig } from "./types/config";
-import type { UIDefs } from "./types/ui";
+import type { UIDef, UIDefs } from "./types/ui";
 import type { Middleware } from "./middleware/types";
 import type { EventMap } from "./events/types";
 import { AppError, ErrorCode } from "./utils/errors";
@@ -19,6 +19,45 @@ import { OAuthConfigSchema } from "./server/oauth/types.js";
 import { getJwksUri } from "./server/oauth/discovery.js";
 import { createJwksClient } from "./server/oauth/jwks-client.js";
 import type { JwksClient } from "jwks-rsa";
+
+/**
+ * Check if a value is a UIDef object (has required 'html' property)
+ */
+function isUIDef(value: unknown): value is UIDef {
+  return typeof value === "object" && value !== null && "html" in value;
+}
+
+/**
+ * Extract colocated UIs from tool definitions.
+ *
+ * For tools with inline UIDef objects, generates a unique key based on the tool name
+ * and collects them into a UI definitions map. Also normalizes the tool's `ui` field
+ * to be a string key for internal server processing.
+ *
+ * @returns Extracted UIDefs and normalized tools with string UI references
+ */
+function extractColocatedUIs<T extends ToolDefs>(tools: T): { uiDefs: UIDefs; normalizedTools: T } {
+  const uiDefs: UIDefs = {};
+  const normalizedTools = { ...tools } as Record<string, unknown>;
+
+  for (const [toolName, toolDef] of Object.entries(tools)) {
+    if (toolDef.ui && isUIDef(toolDef.ui)) {
+      // Generate a unique key for this colocated UI based on tool name
+      const uiKey = `__ui_${toolName}`;
+
+      // Collect UI definition
+      uiDefs[uiKey] = toolDef.ui;
+
+      // Normalize the tool to use the string key internally
+      normalizedTools[toolName] = {
+        ...toolDef,
+        ui: uiKey,
+      };
+    }
+  }
+
+  return { uiDefs, normalizedTools: normalizedTools as T };
+}
 
 /**
  * Validate app configuration
@@ -177,19 +216,27 @@ function validateConfig<T extends ToolDefs>(config: unknown): asserts config is 
  * await app.start({ port: 3000 });
  * ```
  */
-export function createApp<T extends ToolDefs, U extends UIDefs | undefined = undefined>(
-  config: AppConfig<T> & { ui?: U }
-): App<T, U> {
+export function createApp<T extends ToolDefs>(config: AppConfig<T>): App<T> {
   // Validate config at runtime
   validateConfig<T>(config);
 
+  // Extract colocated UIs from tool definitions for internal server processing
+  const { uiDefs, normalizedTools } = extractColocatedUIs(config.tools);
+
+  // Create normalized config with extracted UIs for server
+  const normalizedConfig: AppConfig<T> & { ui?: UIDefs } = {
+    ...config,
+    tools: normalizedTools,
+    ui: Object.keys(uiDefs).length > 0 ? uiDefs : undefined,
+  };
+
   // Configure debug logger if debug config is provided
-  if (config.config?.debug) {
-    configureDebugLogger(config.config.debug);
+  if (normalizedConfig.config?.debug) {
+    configureDebugLogger(normalizedConfig.config.debug);
   }
 
   // Initialize plugin manager (but defer init() call to app.start())
-  const pluginManager = new PluginManager(config.plugins ?? []);
+  const pluginManager = new PluginManager(normalizedConfig.plugins ?? []);
   let pluginInitialized = false;
 
   // Initialize middleware chain
@@ -211,7 +258,7 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
    */
   async function ensureOAuthInitialized(): Promise<void> {
     // Skip if OAuth not configured or already initialized
-    if (!config.config?.oauth || jwksClient !== null) {
+    if (!normalizedConfig.config?.oauth || jwksClient !== null) {
       return;
     }
 
@@ -224,7 +271,7 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
     // Start initialization (only runs once)
     oauthInitPromise = (async () => {
       try {
-        const oauthConfig = config.config?.oauth;
+        const oauthConfig = normalizedConfig.config?.oauth;
         if (!oauthConfig) {
           throw new AppError(ErrorCode.INVALID_CONFIG, "OAuth configuration is missing");
         }
@@ -270,7 +317,7 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
 
   function getServerInstance(): ServerInstance {
     if (!serverInstance) {
-      serverInstance = createServerInstance(config, pluginManager, jwksClient);
+      serverInstance = createServerInstance(normalizedConfig, pluginManager, jwksClient);
       // Attach middleware chain to server instance for tool execution
       serverInstance.setMiddlewareChain(middlewareChain);
       // Attach event emitter to server instance for event emission
@@ -280,12 +327,9 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
   }
 
   // Create the app instance
-  const app: App<T, U> = {
-    // Typed tool definitions
+  const app: App<T> = {
+    // Typed tool definitions (original, not normalized - preserves inline UIDefs for type inference)
     tools: config.tools,
-
-    // UI resource definitions
-    ui: config.ui as U,
 
     /**
      * Get the underlying Express app for serverless deployments (e.g., Vercel).
@@ -302,8 +346,8 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
       // Initialize plugins if not already done
       if (!pluginInitialized) {
         await pluginManager.init({
-          config,
-          tools: config.tools,
+          config: normalizedConfig,
+          tools: normalizedConfig.tools,
         });
         pluginInitialized = true;
       }
@@ -389,28 +433,13 @@ export function createApp<T extends ToolDefs, U extends UIDefs | undefined = und
 
   // Emit app:init event after app is created
   // Note: This happens synchronously during createApp
-  void eventEmitter.emit("app:init", { config });
+  void eventEmitter.emit("app:init", { config: normalizedConfig });
 
   return app;
 }
 
-/**
- * Define a UI resource with type inference (optional helper)
- *
- * @param def - UI resource definition
- * @returns The same UI definition (for type inference)
- *
- * @example
- * ```typescript
- * const widget = defineUI({
- *   html: "./widget.html",
- *   csp: { connectDomains: ["https://api.example.com"] },
- * });
- * ```
- */
-export function defineUI<T>(def: T): T {
-  return def;
-}
-
 // Re-export defineTool from types/tools for convenience
 export { defineTool } from "./types/tools";
+
+// Re-export defineUI from types/ui for convenience
+export { defineUI } from "./types/ui";

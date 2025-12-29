@@ -79,14 +79,25 @@ await app.start({ port: 3000 });
 
 ### Attach UI to tool outputs
 
-Tools can reference a UI resource by ID. Return UI-only payloads in `_meta`.
+Tools can include a UI definition for displaying results. Use `defineUI` for type-safe UI definitions, then reference it from your tool. Return UI-only payloads in `_meta`.
 
 ```ts
+import { createApp, defineTool, defineUI } from "@mcp-apps-kit/core";
+import { z } from "zod";
+
+// Define UI widget for displaying restaurant list
+const restaurantListUI = defineUI({
+  name: "Restaurant List",
+  description: "Displays restaurant search results",
+  html: "./dist/widget.html",
+  prefersBorder: true,
+});
+
 const app = createApp({
   name: "restaurant-finder",
   version: "1.0.0",
   tools: {
-    search_restaurants: {
+    search_restaurants: defineTool({
       description: "Search for restaurants by location",
       input: z.object({ location: z.string() }),
       output: z.object({ count: z.number() }),
@@ -97,13 +108,8 @@ const app = createApp({
           _meta: { restaurants },
         };
       },
-      ui: "restaurant-list",
-    },
-  },
-  ui: {
-    "restaurant-list": {
-      html: "./dist/widget.html",
-    },
+      ui: restaurantListUI,
+    }),
   },
 });
 ```

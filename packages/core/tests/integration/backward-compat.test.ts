@@ -9,7 +9,7 @@
 
 import { describe, it } from "vitest";
 import { z } from "zod";
-import { createApp, defineTool } from "../../src/createApp";
+import { createApp, defineTool, defineUI } from "../../src/createApp";
 
 describe("Backward Compatibility", () => {
   describe("Apps without new features", () => {
@@ -161,16 +161,21 @@ describe("Backward Compatibility", () => {
       await app.start({ transport: "stdio" });
     });
 
-    it("should support apps with UI resources (no plugins/middleware/events)", async () => {
+    it("should support apps with colocated UI resources (no plugins/middleware/events)", async () => {
       const app = createApp({
         name: "ui-app",
         version: "1.0.0",
-        tools: {},
-        ui: {
-          testUI: {
-            name: "Test UI",
-            html: "<html><body>Test</body></html>",
-          },
+        tools: {
+          testTool: defineTool({
+            description: "A tool with UI",
+            input: z.object({}),
+            output: z.object({}),
+            handler: async () => ({}),
+            ui: defineUI({
+              name: "Test UI",
+              html: "<html><body>Test</body></html>",
+            }),
+          }),
         },
       });
 
