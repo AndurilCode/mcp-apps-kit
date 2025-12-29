@@ -1,0 +1,54 @@
+/* Greeting Widget Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  padding: 16px;
+  background: #fff;
+  color: #333;
+}
+
+.container {
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.greeting {
+  text-align: center;
+  padding: 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.greeting h1 {
+  font-size: 1.5rem;
+  margin-bottom: 8px;
+}
+
+.greeting .timestamp {
+  font-size: 0.875rem;
+  opacity: 0.8;
+}
+
+.waiting {
+  text-align: center;
+  padding: 24px;
+  color: #666;
+  font-style: italic;
+}
+
+/* Dark mode support */
+.dark body {
+  background: #1a1a1a;
+  color: #fff;
+}
+
+.dark .waiting {
+  color: #aaa;
+}
