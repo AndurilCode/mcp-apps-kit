@@ -133,6 +133,33 @@ export interface DebugConfig {
 }
 
 // =============================================================================
+// OPENAI CONFIGURATION
+// =============================================================================
+
+/**
+ * OpenAI Apps SDK specific configuration
+ */
+export interface OpenAIConfig {
+  /**
+   * Domain verification challenge token for OpenAI Apps SDK.
+   *
+   * When provided, exposes a route at `/.well-known/openai-apps-challenge`
+   * that returns this token as plain text. This is used by OpenAI to verify
+   * domain ownership when registering your app.
+   *
+   * @example
+   * ```typescript
+   * config: {
+   *   openai: {
+   *     domain_challenge: "your-verification-token"
+   *   }
+   * }
+   * ```
+   */
+  domain_challenge?: string;
+}
+
+// =============================================================================
 // APP CONFIGURATION
 // =============================================================================
 
@@ -145,6 +172,9 @@ export interface GlobalConfig {
 
   /** CORS configuration for HTTP server */
   cors?: CORSConfig;
+
+  /** OpenAI Apps SDK specific configuration */
+  openai?: OpenAIConfig;
 
   /**
    * Target protocol for metadata generation.

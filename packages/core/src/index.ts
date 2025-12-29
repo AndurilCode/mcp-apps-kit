@@ -53,6 +53,7 @@ export type { CSPConfig, UIDef, UIDefs } from "./types/ui";
 export type {
   Protocol,
   CORSConfig,
+  OpenAIConfig,
   GlobalConfig,
   AppConfig,
   DebugConfig,

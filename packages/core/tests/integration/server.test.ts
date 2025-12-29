@@ -541,4 +541,76 @@ describe("app.start() integration", () => {
       expect(toolNames).toContain("ping");
     });
   });
+
+  describe("OpenAI domain_challenge configuration", () => {
+    it("should expose challenge endpoint when domain_challenge is configured", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {},
+        config: {
+          openai: {
+            domain_challenge: "my-verification-token-123",
+          },
+        },
+      });
+
+      await app.start({ port: 3010 });
+
+      const response = await fetch("http://localhost:3010/.well-known/openai-apps-challenge");
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toContain("text/plain");
+
+      const text = await response.text();
+      expect(text).toBe("my-verification-token-123");
+    });
+
+    it("should return 404 for challenge endpoint when domain_challenge is not configured", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {},
+      });
+
+      await app.start({ port: 3011 });
+
+      const response = await fetch("http://localhost:3011/.well-known/openai-apps-challenge");
+      expect(response.status).toBe(404);
+    });
+
+    it("should handle domain_challenge in serverless handleRequest", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {},
+        config: {
+          openai: {
+            domain_challenge: "serverless-token-456",
+          },
+        },
+      });
+
+      const request = new Request("http://localhost/.well-known/openai-apps-challenge");
+      const response = await app.handleRequest(request);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toBe("text/plain");
+
+      const text = await response.text();
+      expect(text).toBe("serverless-token-456");
+    });
+
+    it("should return 404 in serverless handleRequest when domain_challenge is not configured", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {},
+      });
+
+      const request = new Request("http://localhost/.well-known/openai-apps-challenge");
+      const response = await app.handleRequest(request);
+
+      expect(response.status).toBe(404);
+    });
+  });
 });
