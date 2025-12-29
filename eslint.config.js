@@ -12,11 +12,19 @@ export default [
   },
   // Server-side packages (Node.js environment)
   {
-    files: ["packages/core/**/*.ts", "packages/create-app/**/*.ts"],
+    files: [
+      "packages/core/**/*.ts",
+      "packages/create-app/**/*.ts",
+      "packages/ui-react-builder/**/*.ts",
+    ],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
-        project: ["./packages/core/tsconfig.json", "./packages/create-app/tsconfig.json"],
+        project: [
+          "./packages/core/tsconfig.json",
+          "./packages/create-app/tsconfig.json",
+          "./packages/ui-react-builder/tsconfig.json",
+        ],
         tsconfigRootDir: import.meta.dirname,
       },
       globals: {
