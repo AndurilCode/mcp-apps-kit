@@ -9,9 +9,9 @@
 [![npm @mcp-apps-kit/ui-react](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fui-react?label=%40mcp-apps-kit%2Fui-react&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/ui-react)
 [![npm @mcp-apps-kit/create-app](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fcreate-app?label=%40mcp-apps-kit%2Fcreate-app&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/create-app)
 
-Unified MCP Apps Builder SDK - Build MCP apps for Claude Desktop and ChatGPT from a single codebase.
+Build interactive AI apps for [MCP Apps](https://blog.modelcontextprotocol.io/posts/2025-11-21-mcp-apps/) and [ChatGPT](https://developers.openai.com/apps-sdk) from a single codebase.
 
-MCP AppsKit is a TypeScript framework for building interactive MCP applications with shared tool and UI definitions across hosts, including MCP Apps and ChatGPT (OpenAI Apps SDK). It includes a server runtime, a vanilla JS UI client, React bindings, and a scaffolding CLI.
+MCP AppsKit is a TypeScript framework for building interactive applications with shared tool and UI definitions. [MCP Apps](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/1865) is an official extension to the Model Context Protocol that enables servers to deliver interactive UIs to hosts. [OpenAI Apps SDK](https://openai.com/index/introducing-apps-in-chatgpt/) is the developer toolkit for building apps that run inside ChatGPT. This framework abstracts both protocols, providing a server runtime, vanilla JS UI client, React bindings, and a scaffolding CLI.
 
 ## Table of Contents
 
@@ -382,23 +382,22 @@ npm run dev
 
 Local examples:
 
-- `examples/minimal` for a minimal server and UI widget
-- `examples/restaurant-finder` for an end-to-end app
-- `examples/plugin-middleware-demo` for plugins, middleware, and events
+- [examples/minimal](examples/minimal/) - minimal server and UI widget
+- [examples/restaurant-finder](examples/restaurant-finder/) - end-to-end app with search functionality
 
 ## API
 
 Detailed package documentation:
 
-- `packages/core/README.md`
-- `packages/ui/README.md`
-- `packages/ui-react/README.md`
-- `packages/create-app/README.md`
+- [packages/core/README.md](packages/core/README.md)
+- [packages/ui/README.md](packages/ui/README.md)
+- [packages/ui-react/README.md](packages/ui-react/README.md)
+- [packages/create-app/README.md](packages/create-app/README.md)
 
 ## Contributing
 
-See `CONTRIBUTING.md` for development setup and guidelines. Issues and pull requests are welcome.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines. Issues and pull requests are welcome.
 
 ## License
 
-MIT
+[MIT](LICENSE)
