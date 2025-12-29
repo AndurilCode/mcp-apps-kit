@@ -135,7 +135,7 @@ describe("OpenAIAdapter", () => {
       const capabilities = adapter.getHostCapabilities();
 
       expect(capabilities).toBeDefined();
-      // Common capabilities
+      // Common capabilities - always available
       expect(capabilities).toMatchObject({
         openLinks: expect.any(Object),
         logging: expect.any(Object),
@@ -145,11 +145,34 @@ describe("OpenAIAdapter", () => {
         displayModes: expect.objectContaining({
           modes: expect.arrayContaining(["inline", "fullscreen", "pip"]),
         }),
+        statePersistence: expect.objectContaining({
+          persistent: false,
+        }),
       });
-      // ChatGPT-specific capabilities
+      // ChatGPT-specific capabilities are dynamically detected from runtime
+      // In test environment without real SDK, these may be undefined
+      // We just verify the method returns without error
+    });
+
+    it("should detect fileUpload capability when SDK provides uploadFile", async () => {
+      // Mock window.openai with uploadFile
+      const mockOpenAI = {
+        uploadFile: vi.fn(),
+      };
+      Object.defineProperty(window, "openai", {
+        value: mockOpenAI,
+        writable: true,
+        configurable: true,
+      });
+
+      await adapter.connect();
+      const capabilities = adapter.getHostCapabilities();
+
       expect(capabilities?.fileUpload).toBeDefined();
-      expect(capabilities?.safeAreaInsets).toBeDefined();
-      expect(capabilities?.views).toBeDefined();
+
+      // Cleanup
+      // @ts-expect-error - cleaning up mock
+      delete window.openai;
     });
   });
 

@@ -497,6 +497,10 @@ export class McpAdapter implements ProtocolAdapter {
     // We augment with common abstraction fields for protocol-agnostic usage.
     const sdkCaps = mcpCaps as HostCapabilities;
 
+    // Extract available display modes from host context if provided
+    const hostContext = this.app.getHostContext();
+    const availableModes = hostContext?.availableDisplayModes as string[] | undefined;
+
     return {
       // MCP SDK native capabilities (priority)
       logging: sdkCaps.logging,
@@ -505,13 +509,14 @@ export class McpAdapter implements ProtocolAdapter {
       serverTools: sdkCaps.serverTools,
       experimental: sdkCaps.experimental,
 
-      // Common capabilities (protocol-agnostic abstraction)
+      // Common capabilities derived from host context when available
       theming: {
+        // MCP Apps supports light and dark themes (os resolves to one of these)
         themes: ["light", "dark"],
       },
-      displayModes: {
-        modes: ["inline", "fullscreen", "pip"],
-      },
+      displayModes: availableModes
+        ? { modes: availableModes as ("inline" | "fullscreen" | "pip" | "panel")[] }
+        : undefined,
       statePersistence: {
         persistent: false, // MCP Apps doesn't have persistent state
       },

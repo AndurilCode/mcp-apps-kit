@@ -496,25 +496,35 @@ export class OpenAIAdapter implements ProtocolAdapter {
   // === Host Information ===
 
   getHostCapabilities(): HostCapabilities | undefined {
-    // Return capabilities that ChatGPT supports
+    // Derive capabilities from what the SDK actually exposes at runtime
+    const openai = this.getOpenAI();
+
+    // Detect available features from the SDK object
+    const hasFileUpload = openai && typeof openai.uploadFile === "function";
+    const hasSafeArea = this.context.safeAreaInsets !== undefined;
+    const hasViews = this.context.view !== undefined;
+
     return {
-      // Common capabilities
+      // Common capabilities - always available in ChatGPT
       openLinks: {},
       logging: {},
       theming: {
+        // ChatGPT supports light and dark themes
         themes: ["light", "dark"],
       },
       displayModes: {
+        // ChatGPT supports these display modes via requestDisplayMode()
+        // Note: SDK doesn't expose availableDisplayModes, these are known supported modes
         modes: ["inline", "fullscreen", "pip"],
       },
       statePersistence: {
-        persistent: false, // Session-scoped only
+        persistent: false, // Session-scoped only (widgetState)
       },
 
-      // ChatGPT-specific capabilities
-      fileUpload: {}, // Supported via uploadFile()
-      safeAreaInsets: {}, // Available on mobile
-      views: {}, // View identification supported
+      // ChatGPT-specific capabilities - detected from runtime
+      fileUpload: hasFileUpload ? {} : undefined,
+      safeAreaInsets: hasSafeArea ? {} : undefined,
+      views: hasViews ? {} : undefined,
     };
   }
 
