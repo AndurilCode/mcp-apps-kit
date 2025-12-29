@@ -274,6 +274,31 @@ await client.sendFollowUpMessage("Tell me more");
 await client.requestDisplayMode("fullscreen");
 ```
 
+## OpenAI Domain Verification
+
+When submitting your app to the [ChatGPT App Store](https://developers.openai.com/apps-sdk/deploy/submission/), OpenAI requires domain verification to confirm you own the server hosting your MCP app. This works similarly to Google Search Console verification.
+
+Configure the verification token provided by OpenAI:
+
+```typescript
+const app = createApp({
+  name: "my-app",
+  version: "1.0.0",
+  tools: {
+    /* ... */
+  },
+  config: {
+    openai: {
+      domain_challenge: "your-verification-token-from-openai",
+    },
+  },
+});
+```
+
+This exposes a `GET /.well-known/openai-apps-challenge` endpoint that returns the token as plain text. OpenAI pings this endpoint when you submit your app to verify domain ownership.
+
+> **Note:** Deploy your app with this configuration before clicking submit in the OpenAI platform—the verification check happens immediately.
+
 ## Deployment Options
 
 ### Express Server (default)
