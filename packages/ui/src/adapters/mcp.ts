@@ -6,6 +6,7 @@
  */
 
 import { App } from "@modelcontextprotocol/ext-apps";
+import { UIError, UIErrorCode } from "../errors";
 
 type ResourceReadResult = {
   contents: Array<{
@@ -33,7 +34,15 @@ type ExtAppsLogLevel =
   | "emergency";
 
 import type { ProtocolAdapter } from "./types";
-import type { HostContext, ResourceContent } from "../types";
+import type {
+  HostContext,
+  ResourceContent,
+  HostCapabilities,
+  HostVersion,
+  SizeChangedParams,
+  CallToolHandler,
+  ListToolsHandler,
+} from "../types";
 
 /**
  * Adapter for MCP Apps (Claude Desktop)
@@ -46,6 +55,7 @@ export class McpAdapter implements ProtocolAdapter {
   private context: HostContext;
   private toolResultHandlers: Set<(result: unknown) => void> = new Set();
   private toolInputHandlers: Set<(input: unknown) => void> = new Set();
+  private toolInputPartialHandlers: Set<(input: unknown) => void> = new Set();
   private toolCancelledHandlers: Set<(reason?: string) => void> = new Set();
   private hostContextHandlers: Set<(context: HostContext) => void> = new Set();
   private teardownHandlers: Set<(reason?: string) => void> = new Set();
@@ -53,6 +63,8 @@ export class McpAdapter implements ProtocolAdapter {
   private currentToolOutput?: Record<string, unknown>;
   private currentToolMeta?: Record<string, unknown>;
   private app?: App;
+  private callToolHandler?: CallToolHandler;
+  private listToolsHandler?: ListToolsHandler;
 
   constructor() {
     this.context = this.createDefaultContext();
@@ -113,7 +125,52 @@ export class McpAdapter implements ProtocolAdapter {
       }
     };
 
-    // We currently ignore partial tool input streaming in this adapter.
+    // Handle partial/streaming tool input
+    this.app.ontoolinputpartial = (params) => {
+      const args = (params as { arguments?: Record<string, unknown> }).arguments;
+      if (args) {
+        for (const handler of this.toolInputPartialHandlers) {
+          handler(args);
+        }
+      }
+    };
+
+    // Handle tool calls from host (bidirectional support)
+    this.app.oncalltool = async (params) => {
+      const { name, arguments: args } = params as {
+        name: string;
+        arguments?: Record<string, unknown>;
+      };
+      try {
+        if (this.callToolHandler) {
+          const result = await this.callToolHandler(name, args ?? {});
+          return { content: [{ type: "text", text: JSON.stringify(result) }] };
+        }
+        return {
+          content: [{ type: "text", text: `No handler registered for tool: ${name}` }],
+          isError: true,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          content: [{ type: "text", text: message }],
+          isError: true,
+        };
+      }
+    };
+
+    // Handle list tools requests from host (bidirectional support)
+    // The ext-apps SDK expects tools as an array of tool names (strings)
+    // Full tool definitions are provided through the MCP server, not the app
+    this.app.onlisttools = async () => {
+      if (this.listToolsHandler) {
+        const tools = await this.listToolsHandler();
+        return {
+          tools: tools.map((t) => t.name),
+        };
+      }
+      return { tools: [] };
+    };
 
     this.app.ontoolresult = (result) => {
       const output = this.extractToolOutput(result);
@@ -378,11 +435,19 @@ export class McpAdapter implements ProtocolAdapter {
       }
     }
 
-    // eslint-disable-next-line no-console -- Fallback logging when MCP logging unavailable
-    const logFn =
-      { debug: console.debug, info: console.info, warning: console.warn, error: console.error }[
-        level
-      ] ?? console.log;
+    // Fallback logging when MCP logging unavailable
+    const logMapping: Record<typeof level, typeof console.log> = {
+      // eslint-disable-next-line no-console
+      debug: console.debug,
+      // eslint-disable-next-line no-console
+      info: console.info,
+      // eslint-disable-next-line no-console
+      warning: console.warn,
+      // eslint-disable-next-line no-console
+      error: console.error,
+    };
+    // eslint-disable-next-line no-console
+    const logFn = logMapping[level] ?? console.log;
     logFn("[MCP Apps]", data);
   }
 
@@ -429,5 +494,103 @@ export class McpAdapter implements ProtocolAdapter {
 
   getToolMeta(): Record<string, unknown> | undefined {
     return this.currentToolMeta;
+  }
+
+  // === Host Information ===
+
+  getHostCapabilities(): HostCapabilities | undefined {
+    if (!this.app) return undefined;
+    const mcpCaps = this.app.getHostCapabilities();
+    if (!mcpCaps) return undefined;
+
+    // Map MCP Apps SDK capabilities to our unified interface.
+    // MCP SDK already provides: logging, openLinks, serverResources, serverTools
+    // We augment with common abstraction fields for protocol-agnostic usage.
+    const sdkCaps = mcpCaps as HostCapabilities;
+
+    // Extract available display modes from host context if provided
+    const hostContext = this.app.getHostContext();
+    const availableModes = hostContext?.availableDisplayModes as string[] | undefined;
+
+    return {
+      // MCP SDK native capabilities (priority)
+      logging: sdkCaps.logging,
+      openLinks: sdkCaps.openLinks,
+      serverResources: sdkCaps.serverResources,
+      serverTools: sdkCaps.serverTools,
+      experimental: sdkCaps.experimental,
+
+      // Common capabilities derived from host context when available
+      theming: {
+        // MCP Apps supports light and dark themes (os resolves to one of these)
+        themes: ["light", "dark"],
+      },
+      displayModes: availableModes
+        ? { modes: availableModes as ("inline" | "fullscreen" | "pip" | "panel")[] }
+        : undefined,
+      statePersistence: {
+        persistent: false, // MCP Apps doesn't have persistent state
+      },
+
+      // MCP Apps-specific capabilities (always available when connected)
+      sizeNotifications: {},
+      partialToolInput: {},
+      appTools: { listChanged: false },
+    };
+  }
+
+  getHostVersion(): HostVersion | undefined {
+    if (!this.app) return undefined;
+    const version = this.app.getHostVersion();
+    if (!version) return undefined;
+    return {
+      name: version.name,
+      version: version.version,
+    };
+  }
+
+  // === Protocol-Level Logging ===
+
+  async sendLog(
+    level: "debug" | "info" | "notice" | "warning" | "error" | "critical" | "alert" | "emergency",
+    data: unknown
+  ): Promise<void> {
+    if (!this.app) {
+      throw new UIError(UIErrorCode.NOT_CONNECTED, "MCP Apps adapter not connected");
+    }
+    await this.app.sendLog({
+      level,
+      data,
+      logger: "@mcp-apps-kit/ui",
+    });
+  }
+
+  // === Size Notifications ===
+
+  async sendSizeChanged(params: SizeChangedParams): Promise<void> {
+    if (!this.app) {
+      throw new UIError(UIErrorCode.NOT_CONNECTED, "MCP Apps adapter not connected");
+    }
+    await this.app.sendSizeChanged({
+      width: params.width,
+      height: params.height,
+    });
+  }
+
+  // === Partial Tool Input ===
+
+  onToolInputPartial(handler: (input: unknown) => void): () => void {
+    this.toolInputPartialHandlers.add(handler);
+    return () => this.toolInputPartialHandlers.delete(handler);
+  }
+
+  // === Bidirectional Tool Support ===
+
+  setCallToolHandler(handler: CallToolHandler): void {
+    this.callToolHandler = handler;
+  }
+
+  setListToolsHandler(handler: ListToolsHandler): void {
+    this.listToolsHandler = handler;
   }
 }

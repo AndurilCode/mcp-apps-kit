@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { createClient, detectProtocol } from "../../src/index";
-import type { AppsClient, ToolDefs } from "../../src/types";
+import type { AppsClient, ToolDefs, HostCapabilities, HostVersion } from "../../src/types";
 
 describe("createClient contract", () => {
   describe("detectProtocol", () => {
@@ -140,6 +140,139 @@ describe("createClient contract", () => {
   describe("error handling", () => {
     it("should throw for unknown forced adapter", async () => {
       await expect(createClient({ forceAdapter: "invalid" as "mock" })).rejects.toThrow();
+    });
+  });
+
+  // =============================================================================
+  // NEW MCP APPS API CONTRACT TESTS
+  // =============================================================================
+
+  describe("new MCP Apps API methods", () => {
+    it("should have all new methods on the client", async () => {
+      const client = await createClient({ forceAdapter: "mock" });
+
+      // Host information
+      expect(typeof client.getHostCapabilities).toBe("function");
+      expect(typeof client.getHostVersion).toBe("function");
+
+      // Protocol-level logging
+      expect(typeof client.sendLog).toBe("function");
+
+      // Size notifications
+      expect(typeof client.sendSizeChanged).toBe("function");
+      expect(typeof client.setupSizeChangedNotifications).toBe("function");
+
+      // Partial tool input
+      expect(typeof client.onToolInputPartial).toBe("function");
+
+      // Bidirectional tool support
+      expect(typeof client.setCallToolHandler).toBe("function");
+      expect(typeof client.setListToolsHandler).toBe("function");
+    });
+
+    describe("host capabilities", () => {
+      it("should return comprehensive host capabilities", async () => {
+        const client = await createClient({ forceAdapter: "mock" });
+        const capabilities: HostCapabilities | undefined = client.getHostCapabilities();
+
+        expect(capabilities).toBeDefined();
+        // Common capabilities (both platforms)
+        expect(capabilities).toMatchObject({
+          logging: expect.any(Object),
+          openLinks: expect.any(Object),
+          theming: expect.objectContaining({
+            themes: expect.any(Array),
+          }),
+          displayModes: expect.objectContaining({
+            modes: expect.any(Array),
+          }),
+        });
+      });
+    });
+
+    describe("host version", () => {
+      it("should return host version", async () => {
+        const client = await createClient({ forceAdapter: "mock" });
+        const version: HostVersion | undefined = client.getHostVersion();
+
+        expect(version).toBeDefined();
+        expect(version).toMatchObject({
+          name: expect.any(String),
+          version: expect.any(String),
+        });
+      });
+    });
+
+    describe("protocol-level logging", () => {
+      it("should send log without error", async () => {
+        const client = await createClient({ forceAdapter: "mock" });
+
+        await expect(client.sendLog("info", { message: "test" })).resolves.toBeUndefined();
+      });
+
+      it("should accept all log levels", async () => {
+        const client = await createClient({ forceAdapter: "mock" });
+        const levels = [
+          "debug",
+          "info",
+          "notice",
+          "warning",
+          "error",
+          "critical",
+          "alert",
+          "emergency",
+        ] as const;
+
+        for (const level of levels) {
+          await expect(client.sendLog(level, { level })).resolves.toBeUndefined();
+        }
+      });
+    });
+
+    describe("size notifications", () => {
+      it("should send size changed without error", async () => {
+        const client = await createClient({ forceAdapter: "mock" });
+
+        await expect(client.sendSizeChanged({ width: 800, height: 600 })).resolves.toBeUndefined();
+      });
+
+      it("should setup size changed notifications and return cleanup function", async () => {
+        const client = await createClient({ forceAdapter: "mock" });
+
+        const cleanup = client.setupSizeChangedNotifications();
+        expect(typeof cleanup).toBe("function");
+
+        // Should not throw
+        cleanup();
+      });
+    });
+
+    describe("partial tool input", () => {
+      it("should return unsubscribe function for onToolInputPartial", async () => {
+        const client = await createClient({ forceAdapter: "mock" });
+
+        const handler = vi.fn();
+        const unsubscribe = client.onToolInputPartial(handler);
+
+        expect(typeof unsubscribe).toBe("function");
+        unsubscribe();
+      });
+    });
+
+    describe("bidirectional tool support", () => {
+      it("should register call tool handler without error", async () => {
+        const client = await createClient({ forceAdapter: "mock" });
+
+        const handler = vi.fn().mockResolvedValue({ result: "success" });
+        expect(() => client.setCallToolHandler(handler)).not.toThrow();
+      });
+
+      it("should register list tools handler without error", async () => {
+        const client = await createClient({ forceAdapter: "mock" });
+
+        const handler = vi.fn().mockResolvedValue([{ name: "tool1" }]);
+        expect(() => client.setListToolsHandler(handler)).not.toThrow();
+      });
     });
   });
 });

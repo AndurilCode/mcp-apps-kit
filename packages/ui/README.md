@@ -31,6 +31,9 @@ Widget UIs run inside host environments with different APIs and capabilities. Th
 - Tool inputs and results access
 - Optional debug logger that transports logs via MCP
 - Test adapter for local development
+- **Host capabilities** - Query what the host supports (theming, display modes, file upload, etc.)
+- **Bidirectional tools** - Register handlers for host-initiated tool calls
+- **Theme & style utilities** - Apply host themes and CSS variables
 
 ## Compatibility
 
@@ -115,12 +118,112 @@ const app = createApp({
 
 ## API
 
-Key exports include:
+### Client Factory
 
-- `createClient`, `detectProtocol`
-- `clientDebugLogger`, `ClientDebugLogger`
-- `McpAdapter`, `OpenAIAdapter`, `MockAdapter`
-- `HostContext`, `AppsClient`, `ToolResult`
+- `createClient(options?)` - Create a connected client with auto-detection
+- `detectProtocol()` - Detect the host platform ("mcp" | "openai" | "mock")
+
+### Host Capabilities
+
+```ts
+const capabilities = client.getHostCapabilities();
+
+// Common capabilities (both platforms)
+capabilities?.theming?.themes; // ["light", "dark"]
+capabilities?.displayModes?.modes; // ["inline", "fullscreen", "pip"]
+capabilities?.statePersistence?.persistent; // boolean
+capabilities?.openLinks; // {} if supported
+capabilities?.logging; // {} if supported
+
+// MCP Apps specific
+capabilities?.serverTools?.listChanged; // boolean
+capabilities?.serverResources?.listChanged; // boolean
+capabilities?.sizeNotifications; // {} if supported
+capabilities?.partialToolInput; // {} if supported
+
+// ChatGPT specific
+capabilities?.fileUpload; // {} if supported
+capabilities?.safeAreaInsets; // {} if supported
+capabilities?.views; // {} if supported
+```
+
+### Host Version
+
+```ts
+const version = client.getHostVersion();
+// { name: "Claude Desktop", version: "1.0.0" } (MCP Apps only)
+```
+
+### Theme & Style Utilities
+
+```ts
+import {
+  applyDocumentTheme,
+  getDocumentTheme,
+  applyHostStyleVariables,
+  applyHostFonts,
+  removeHostFonts,
+  clearHostStyleVariables,
+} from "@mcp-apps-kit/ui";
+
+// Apply theme to document
+applyDocumentTheme("dark"); // or "light" or "os"
+
+// Apply host-provided CSS variables
+applyHostStyleVariables({
+  "primary-color": "#007bff",
+  "--font-size": "16px",
+});
+
+// Apply host-provided font CSS
+applyHostFonts("@font-face { ... }");
+```
+
+### Bidirectional Tools (MCP Apps)
+
+```ts
+// Register a handler for host-initiated tool calls
+client.setCallToolHandler(async (toolName, args) => {
+  if (toolName === "get_selection") {
+    return { selection: document.getSelection()?.toString() };
+  }
+  throw new Error(`Unknown tool: ${toolName}`);
+});
+
+// Register a handler for listing available tools
+client.setListToolsHandler(async () => [
+  { name: "get_selection", description: "Get current text selection" },
+]);
+```
+
+### Protocol Logging
+
+```ts
+// Send logs via the MCP protocol (appears in host logs)
+await client.sendLog("info", { event: "user_action", details: "..." });
+```
+
+### Error Handling
+
+```ts
+import { UIError, UIErrorCode } from "@mcp-apps-kit/ui";
+
+try {
+  await client.callTool("unknown");
+} catch (error) {
+  if (error instanceof UIError) {
+    console.error(error.code, error.message);
+  }
+}
+```
+
+### Key Types
+
+- `HostContext` - Theme, viewport, locale, display mode, etc.
+- `HostCapabilities` - Protocol-agnostic capability interface
+- `HostVersion` - Host application name and version
+- `AppsClient` - Main client interface
+- `UIError`, `UIErrorCode` - Client-side error types
 
 ## Contributing
 

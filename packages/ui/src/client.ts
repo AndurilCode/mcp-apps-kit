@@ -12,6 +12,11 @@ import type {
   ToolResult,
   InferToolInputs,
   InferToolOutputs,
+  HostCapabilities,
+  HostVersion,
+  SizeChangedParams,
+  CallToolHandler,
+  ListToolsHandler,
 } from "./types";
 import type { ProtocolAdapter } from "./adapters/types";
 
@@ -117,6 +122,66 @@ export function createAppsClient<T extends ToolDefs = ToolDefs>(
 
     onTeardown(handler: (reason?: string) => void): () => void {
       return adapter.onTeardown(handler);
+    },
+
+    onToolInputPartial(handler: (input: Record<string, unknown>) => void): () => void {
+      return adapter.onToolInputPartial(handler as (input: unknown) => void);
+    },
+
+    // === Host Information ===
+
+    getHostCapabilities(): HostCapabilities | undefined {
+      return adapter.getHostCapabilities();
+    },
+
+    getHostVersion(): HostVersion | undefined {
+      return adapter.getHostVersion();
+    },
+
+    // === Protocol-Level Logging ===
+
+    async sendLog(
+      level: "debug" | "info" | "notice" | "warning" | "error" | "critical" | "alert" | "emergency",
+      data: unknown
+    ): Promise<void> {
+      return adapter.sendLog(level, data);
+    },
+
+    // === Size Notifications ===
+
+    async sendSizeChanged(params: SizeChangedParams): Promise<void> {
+      return adapter.sendSizeChanged(params);
+    },
+
+    setupSizeChangedNotifications(): () => void {
+      // Only run in browser environments
+      if (typeof window === "undefined" || typeof ResizeObserver === "undefined") {
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        return () => {};
+      }
+
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const { width, height } = entry.contentRect;
+          void adapter.sendSizeChanged({ width: Math.round(width), height: Math.round(height) });
+        }
+      });
+
+      observer.observe(document.body);
+
+      return () => {
+        observer.disconnect();
+      };
+    },
+
+    // === Bidirectional Tool Support ===
+
+    setCallToolHandler(handler: CallToolHandler): void {
+      adapter.setCallToolHandler(handler);
+    },
+
+    setListToolsHandler(handler: ListToolsHandler): void {
+      adapter.setListToolsHandler(handler);
     },
 
     // === Accessors ===

@@ -7,7 +7,15 @@
  */
 
 import type { ProtocolAdapter } from "./types";
-import type { HostContext, ResourceContent } from "../types";
+import type {
+  HostContext,
+  ResourceContent,
+  HostCapabilities,
+  HostVersion,
+  SizeChangedParams,
+  CallToolHandler,
+  ListToolsHandler,
+} from "../types";
 
 /**
  * Adapter for ChatGPT Apps (OpenAI)
@@ -483,5 +491,100 @@ export class OpenAIAdapter implements ProtocolAdapter {
 
   getToolMeta(): Record<string, unknown> | undefined {
     return this.currentToolMeta;
+  }
+
+  // === Host Information ===
+
+  getHostCapabilities(): HostCapabilities | undefined {
+    // Derive capabilities from what the SDK actually exposes at runtime
+    const openai = this.getOpenAI();
+
+    // Detect available features from the SDK object
+    const hasFileUpload = openai && typeof openai.uploadFile === "function";
+    const hasSafeArea = this.context.safeAreaInsets !== undefined;
+    const hasViews = this.context.view !== undefined;
+
+    return {
+      // Common capabilities - always available in ChatGPT
+      openLinks: {},
+      logging: {},
+      theming: {
+        // ChatGPT supports light and dark themes
+        themes: ["light", "dark"],
+      },
+      displayModes: {
+        // ChatGPT supports these display modes via requestDisplayMode()
+        // Note: SDK doesn't expose availableDisplayModes, these are known supported modes
+        modes: ["inline", "fullscreen", "pip"],
+      },
+      statePersistence: {
+        persistent: false, // Session-scoped only (widgetState)
+      },
+
+      // ChatGPT-specific capabilities - detected from runtime
+      fileUpload: hasFileUpload ? {} : undefined,
+      safeAreaInsets: hasSafeArea ? {} : undefined,
+      views: hasViews ? {} : undefined,
+    };
+  }
+
+  getHostVersion(): HostVersion | undefined {
+    // ChatGPT doesn't expose version info to widgets
+    return undefined;
+  }
+
+  // === Protocol-Level Logging ===
+
+  async sendLog(
+    level: "debug" | "info" | "notice" | "warning" | "error" | "critical" | "alert" | "emergency",
+    data: unknown
+  ): Promise<void> {
+    // ChatGPT doesn't have protocol-level logging
+    // Map to the adapter's log method levels
+    const levelMapping: Record<typeof level, "debug" | "info" | "warning" | "error"> = {
+      debug: "debug",
+      info: "info",
+      notice: "info",
+      warning: "warning",
+      error: "error",
+      critical: "error",
+      alert: "error",
+      emergency: "error",
+    };
+    this.log(levelMapping[level], data);
+  }
+
+  // === Size Notifications ===
+
+  async sendSizeChanged(params: SizeChangedParams): Promise<void> {
+    // ChatGPT uses notifyIntrinsicHeight for height changes
+    // We abstract this by using the height from params
+    const openai = this.getOpenAI();
+    if (openai && typeof openai.notifyIntrinsicHeight === "function") {
+      (openai.notifyIntrinsicHeight as (height: number) => void)(params.height);
+    }
+    // Width changes are not directly supported in ChatGPT
+  }
+
+  // === Partial Tool Input ===
+
+  onToolInputPartial(_handler: (input: unknown) => void): () => void {
+    // ChatGPT doesn't support partial/streaming tool input
+    // Return a no-op unsubscribe function
+    this.log("debug", "onToolInputPartial is not supported on ChatGPT");
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    return () => {};
+  }
+
+  // === Bidirectional Tool Support ===
+
+  setCallToolHandler(_handler: CallToolHandler): void {
+    // ChatGPT doesn't support bidirectional tool calls (host calling app tools)
+    this.log("debug", "setCallToolHandler is not supported on ChatGPT");
+  }
+
+  setListToolsHandler(_handler: ListToolsHandler): void {
+    // ChatGPT doesn't support bidirectional tool listing
+    this.log("debug", "setListToolsHandler is not supported on ChatGPT");
   }
 }

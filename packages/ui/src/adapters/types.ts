@@ -5,7 +5,15 @@
  * the unified AppsClient API to platform-specific implementations.
  */
 
-import type { HostContext, ResourceContent } from "../types";
+import type {
+  HostContext,
+  ResourceContent,
+  HostCapabilities,
+  HostVersion,
+  SizeChangedParams,
+  CallToolHandler,
+  ListToolsHandler,
+} from "../types";
 
 // =============================================================================
 // PROTOCOL ADAPTER INTERFACE
@@ -201,6 +209,68 @@ export interface ProtocolAdapter {
    * Get current tool metadata
    */
   getToolMeta(): Record<string, unknown> | undefined;
+
+  // === Host Information ===
+
+  /**
+   * Get host capabilities
+   * Returns capabilities advertised during handshake
+   */
+  getHostCapabilities(): HostCapabilities | undefined;
+
+  /**
+   * Get host version information
+   * Returns host name and version
+   */
+  getHostVersion(): HostVersion | undefined;
+
+  // === Protocol-Level Logging ===
+
+  /**
+   * Send a log message to the host via the protocol
+   *
+   * @param level - Log level
+   * @param data - Data to log
+   */
+  sendLog(
+    level: "debug" | "info" | "notice" | "warning" | "error" | "critical" | "alert" | "emergency",
+    data: unknown
+  ): Promise<void>;
+
+  // === Size Notifications ===
+
+  /**
+   * Send size changed notification to host
+   *
+   * @param params - Size parameters (width, height)
+   */
+  sendSizeChanged(params: SizeChangedParams): Promise<void>;
+
+  // === Partial Tool Input ===
+
+  /**
+   * Subscribe to partial/streaming tool input
+   *
+   * @param handler - Callback for partial input
+   * @returns Unsubscribe function
+   */
+  onToolInputPartial(handler: (input: unknown) => void): () => void;
+
+  // === Bidirectional Tool Support ===
+
+  /**
+   * Set handler for tool calls from the host
+   *
+   * @param handler - Handler for incoming tool calls
+   */
+  setCallToolHandler(handler: CallToolHandler): void;
+
+  /**
+   * Set handler for listing app-exposed tools
+   *
+   * @param handler - Handler that returns tool definitions
+   */
+  setListToolsHandler(handler: ListToolsHandler): void;
 }
 
 // =============================================================================

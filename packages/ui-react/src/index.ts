@@ -5,7 +5,19 @@
  */
 
 // Re-export types from @mcp-apps-kit/ui
-export type { HostContext, ToolResult, AppsClient } from "@mcp-apps-kit/ui";
+export type {
+  HostContext,
+  ToolResult,
+  AppsClient,
+  // New MCP Apps API types
+  HostCapabilities,
+  HostVersion,
+  AppCapabilities,
+  SizeChangedParams,
+  AppToolDefinition,
+  CallToolHandler,
+  ListToolsHandler,
+} from "@mcp-apps-kit/ui";
 
 // Context (placeholder - will be implemented in Phase 6)
 export { AppsProvider } from "./context";
@@ -34,6 +46,11 @@ export {
   useModal,
   // Debug logging
   useDebugLogger,
+  // New MCP Apps API hooks
+  useOnToolInputPartial,
+  useHostCapabilities,
+  useHostVersion,
+  useSizeChangedNotifications,
 } from "./hooks";
 
 // File operation types
