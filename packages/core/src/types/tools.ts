@@ -514,6 +514,8 @@ export type InferToolOutputs<T extends ToolDefs> = {
 export type ClientToolsFromCore<T extends ToolDefs> = {
   [K in keyof T]: {
     input: z.input<T[K]["input"]>;
-    output: T[K]["output"] extends z.ZodType ? z.infer<T[K]["output"]> : unknown;
+    output: NonNullable<T[K]["output"]> extends z.ZodType
+      ? z.infer<NonNullable<T[K]["output"]>>
+      : unknown;
   };
 };

@@ -7,25 +7,10 @@
 
 import { useEffect } from "react";
 import { useToolResult, useHostContext } from "@mcp-apps-kit/ui-react";
-
-// Define the expected greet output shape directly to avoid circular import
-interface GreetOutput {
-  message: string;
-  timestamp: string;
-}
-
-// Simple tool definitions for this widget
-// Using index signature to satisfy ToolDefs constraint
-type GreetToolDef = {
-  greet: {
-    input: { name: string };
-    output: GreetOutput;
-  };
-  [key: string]: { input: unknown; output?: unknown };
-};
+import type { AppClientTools } from "../index";
 
 export function GreetingWidget() {
-  const result = useToolResult<GreetToolDef>();
+  const result = useToolResult<AppClientTools>();
   const { theme } = useHostContext();
 
   // Extract the greet output - result contains the tool outputs keyed by tool name

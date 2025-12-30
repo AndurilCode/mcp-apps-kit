@@ -189,6 +189,7 @@ import { useAppsClient, useToolResult, useHostContext } from "@mcp-apps-kit/ui-r
 import type { AppClientTools } from "../../server";
 
 function RestaurantList() {
+  // Type-safe hooks - tool names, inputs, and outputs are all inferred
   const client = useAppsClient<AppClientTools>();
   const result = useToolResult<AppClientTools>();
   const context = useHostContext();
