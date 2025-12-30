@@ -16,6 +16,8 @@ import type { AppConfig } from "../types/config";
  *
  * Maps event names to their payload types. All events emitted by the framework
  * must be defined here to maintain type safety.
+ *
+ * @internal
  */
 export interface EventMap {
   /**
@@ -114,6 +116,8 @@ export interface EventMap {
  *
  * Async function that processes event payloads.
  * Errors in handlers are caught and logged but don't propagate.
+ *
+ * @internal
  */
 export type EventHandler<T> = (payload: T) => void | Promise<void>;
 
@@ -121,6 +125,8 @@ export type EventHandler<T> = (payload: T) => void | Promise<void>;
  * Wildcard event handler
  *
  * Receives all events with event name and payload.
+ *
+ * @internal
  */
 export type AnyEventHandler = (event: string, payload: unknown) => void | Promise<void>;
 
@@ -129,6 +135,8 @@ export type AnyEventHandler = (event: string, payload: unknown) => void | Promis
  *
  * Call to remove event listener.
  * Safe to call multiple times (idempotent).
+ *
+ * @internal
  */
 export type UnsubscribeFn = () => void;
 
@@ -140,6 +148,8 @@ export type UnsubscribeFn = () => void;
  * Error thrown when max listeners exceeded
  *
  * Prevents memory leaks from unbounded listener growth.
+ *
+ * @internal
  */
 export class MaxListenersExceededError extends Error {
   constructor(event: string, maxListeners: number) {
@@ -159,6 +169,8 @@ export class MaxListenersExceededError extends Error {
  * Options for creating event emitter
  *
  * Allows customization of event emitter behavior.
+ *
+ * @internal
  */
 export interface EventEmitterOptions {
   /**
@@ -199,6 +211,8 @@ export interface EventEmitterOptions {
  * Event listener info
  *
  * Internal type for tracking active listeners.
+ *
+ * @internal
  */
 export interface EventListenerInfo {
   /** Event name */
@@ -213,6 +227,8 @@ export interface EventListenerInfo {
  * Event emitter stats
  *
  * Debug info about event emitter state.
+ *
+ * @internal
  */
 export interface EventEmitterStats {
   /** Total number of listeners across all events */
@@ -231,11 +247,15 @@ export interface EventEmitterStats {
 
 /**
  * Extract event names from event map
+ *
+ * @internal
  */
 export type EventNames<TEventMap extends Record<string, unknown>> = keyof TEventMap & string;
 
 /**
  * Extract payload type for specific event
+ *
+ * @internal
  */
 export type EventPayload<
   TEventMap extends Record<string, unknown>,
@@ -250,6 +270,8 @@ export type EventPayload<
  * Create typed event handler with validation
  *
  * Wraps handler with runtime payload validation using Zod schema.
+ *
+ * @internal
  */
 export function createValidatedHandler<T>(
   schema: { parse: (data: unknown) => T },
@@ -265,6 +287,8 @@ export function createValidatedHandler<T>(
  * Create debounced event handler
  *
  * Delays handler execution until event hasn't fired for specified duration.
+ *
+ * @internal
  */
 export function createDebouncedHandler<T>(
   handler: EventHandler<T>,
@@ -304,6 +328,8 @@ export function createDebouncedHandler<T>(
  * Create batched event handler
  *
  * Collects events and processes them in batches.
+ *
+ * @internal
  */
 export function createBatchedHandler<T>(
   handler: (payloads: T[]) => void | Promise<void>,

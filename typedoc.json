@@ -1,0 +1,32 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "packages/core/src/index.ts",
+    "packages/ui/src/index.ts",
+    "packages/ui-react/src/index.ts",
+    "packages/ui-react-builder/src/index.ts"
+  ],
+  "entryPointStrategy": "expand",
+  "out": "docs/api",
+  "name": "MCP Apps Kit",
+  "readme": "none",
+  "projectDocuments": ["docs/quickstart.md"],
+  "includeVersion": true,
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeInternal": true,
+  "excludeExternals": true,
+  "skipErrorChecking": true,
+  "treatWarningsAsErrors": false,
+  "validation": {
+    "notExported": false,
+    "invalidLink": true,
+    "notDocumented": false
+  },
+  "navigationLinks": {
+    "GitHub": "https://github.com/AndurilCode/mcp-apps-kit",
+    "npm": "https://www.npmjs.com/org/mcp-apps-kit"
+  },
+  "githubPages": true,
+  "cleanOutputDir": true
+}

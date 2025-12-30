@@ -165,6 +165,8 @@ export class AppError extends Error {
  *   throw formatZodError(result.error);
  * }
  * ```
+ *
+ * @internal
  */
 export function formatZodError(error: ZodError): AppError {
   // Use Zod's built-in prettifyError for human-readable formatting
@@ -196,6 +198,8 @@ export function formatZodError(error: ZodError): AppError {
  *   throw wrapError(error, ErrorCode.TOOL_EXECUTION_ERROR);
  * }
  * ```
+ *
+ * @internal
  */
 export function wrapError(
   error: unknown,

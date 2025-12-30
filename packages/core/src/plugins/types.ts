@@ -16,6 +16,8 @@ import type { AppConfig } from "../types/config";
  * Base context provided to all plugin hooks
  *
  * Contains app metadata and plugin reference.
+ *
+ * @internal
  */
 export interface PluginContext {
   /** App metadata */
@@ -40,6 +42,8 @@ export interface PluginContext {
 
 /**
  * Context provided to plugin onInit hook
+ *
+ * @internal
  */
 export interface PluginInitContext {
   /** App configuration */
@@ -50,6 +54,8 @@ export interface PluginInitContext {
 
 /**
  * Context provided to plugin onStart hook
+ *
+ * @internal
  */
 export interface PluginStartContext {
   /** Server port (if HTTP transport) */
@@ -60,6 +66,8 @@ export interface PluginStartContext {
 
 /**
  * Context provided to plugin onShutdown hook
+ *
+ * @internal
  */
 export interface PluginShutdownContext {
   /** Whether shutdown is graceful */
@@ -70,6 +78,8 @@ export interface PluginShutdownContext {
 
 /**
  * Context provided to plugin beforeToolCall/afterToolCall/onToolError hooks
+ *
+ * @internal
  */
 export interface ToolCallContext {
   /** Name of the tool being called */
@@ -82,6 +92,8 @@ export interface ToolCallContext {
 
 /**
  * Context provided to plugin onRequest hook
+ *
+ * @internal
  */
 export interface RequestContext {
   /** HTTP method */
@@ -96,6 +108,8 @@ export interface RequestContext {
 
 /**
  * Context provided to plugin onResponse hook
+ *
+ * @internal
  */
 export interface ResponseContext extends RequestContext {
   /** HTTP status code */
@@ -106,6 +120,8 @@ export interface ResponseContext extends RequestContext {
 
 /**
  * Context provided to plugin onUILoad hook
+ *
+ * @internal
  */
 export interface UILoadContext {
   /** UI resource key */
@@ -264,6 +280,8 @@ export interface Plugin<TConfig = unknown> {
 
 /**
  * Helper type to infer config type from configSchema
+ *
+ * @internal
  */
 export type InferPluginConfig<T extends z.ZodType> = z.infer<T>;
 
@@ -272,6 +290,8 @@ export type InferPluginConfig<T extends z.ZodType> = z.infer<T>;
  *
  * Provides better TypeScript inference than manually typing Plugin interface.
  * Validates config against configSchema at creation time.
+ *
+ * @internal
  */
 export function createPlugin<TConfig extends z.ZodType>(
   definition: Omit<Plugin<z.infer<TConfig>>, "configSchema"> & {

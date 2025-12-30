@@ -3,6 +3,7 @@
  *
  * Executes middleware in registration order with proper control flow.
  *
+ * @internal
  * @module middleware/MiddlewareChain
  */
 
@@ -16,6 +17,8 @@ import { MultipleNextCallsError } from "./types";
  * - Sequential execution in registration order
  * - next() call tracking to prevent multiple calls
  * - Error propagation through chain
+ *
+ * @internal
  */
 export class MiddlewareChain {
   private middleware: Middleware[] = [];

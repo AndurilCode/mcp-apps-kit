@@ -9,6 +9,7 @@
  * - Max listeners enforcement to prevent memory leaks
  * - Error logging with configurable behavior
  *
+ * @internal
  * @module events/EventEmitter
  */
 
@@ -57,6 +58,8 @@ interface ListenerWrapper<T> {
  *
  * await emitter.emit("user:login", { userId: "123" });
  * ```
+ *
+ * @internal
  */
 export class TypedEventEmitter<TEventMap extends Record<string, unknown>> {
   private listeners = new Map<keyof TEventMap, ListenerWrapper<unknown>[]>();

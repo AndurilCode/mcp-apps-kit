@@ -15,6 +15,8 @@ import type { DebugConfig, DebugLogLevel } from "../types/config";
 
 /**
  * A single log entry
+ *
+ * @internal
  */
 export interface LogEntry {
   /** Log level */
@@ -31,6 +33,8 @@ export interface LogEntry {
 
 /**
  * Input schema for the log_debug tool
+ *
+ * @internal
  */
 export interface LogDebugInput {
   /** Array of log entries to process */
@@ -39,6 +43,8 @@ export interface LogDebugInput {
 
 /**
  * Output schema for the log_debug tool
+ *
+ * @internal
  */
 export interface LogDebugOutput {
   /** Number of entries processed */
@@ -47,6 +53,8 @@ export interface LogDebugOutput {
 
 /**
  * Logger output handler function type
+ *
+ * @internal
  */
 export type LogOutputHandler = (entry: LogEntry) => void;
 
@@ -66,6 +74,8 @@ const LogLevelValue: Record<DebugLogLevel, number> = {
 
 /**
  * Check if a log level should be output given the minimum level
+ *
+ * @internal
  */
 export function shouldLog(level: DebugLogLevel, minLevel: DebugLogLevel): boolean {
   return LogLevelValue[level] >= LogLevelValue[minLevel];
@@ -93,6 +103,8 @@ function getCircularReplacer(): (key: string, value: unknown) => unknown {
 
 /**
  * Safely stringify data, handling circular references
+ *
+ * @internal
  */
 export function safeStringify(data: unknown): string {
   if (data === undefined) {
@@ -128,6 +140,8 @@ export function safeStringify(data: unknown): string {
 
 /**
  * Safely serialize data for transport, handling circular references
+ *
+ * @internal
  */
 export function safeSerialize(data: unknown): unknown {
   if (data === undefined || data === null) {
@@ -164,6 +178,8 @@ export function safeSerialize(data: unknown): unknown {
 
 /**
  * Default console output handler for server-side logging
+ *
+ * @internal
  */
 export const consoleOutputHandler: LogOutputHandler = (entry: LogEntry): void => {
   const prefix = `[${entry.timestamp}] [${entry.level.toUpperCase()}]${entry.source ? ` [${entry.source}]` : ""}`;
@@ -194,6 +210,8 @@ export const consoleOutputHandler: LogOutputHandler = (entry: LogEntry): void =>
  *
  * Provides structured logging with configurable output handlers.
  * Use this on the server to output logs received from clients via the log_debug tool.
+ *
+ * @internal
  */
 export class DebugLogger {
   private minLevel: DebugLogLevel;
@@ -318,6 +336,8 @@ export const debugLogger = new DebugLogger({ level: "info" });
 
 /**
  * Configure the global debug logger
+ *
+ * @internal
  */
 export function configureDebugLogger(config: DebugConfig): void {
   debugLogger.setLevel(config.level ?? "info");

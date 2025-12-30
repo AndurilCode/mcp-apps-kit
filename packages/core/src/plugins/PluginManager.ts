@@ -12,6 +12,7 @@
  * - Error isolation for all hooks except onInit
  * - Shutdown timeout enforcement
  *
+ * @internal
  * @module plugins/PluginManager
  */
 
@@ -22,6 +23,8 @@ import { debugLogger } from "../debug/logger";
  * PluginManager class
  *
  * Manages plugin lifecycle and hook execution with error isolation.
+ *
+ * @internal
  */
 export class PluginManager {
   private plugins: Plugin[];

@@ -4,6 +4,8 @@ import { z } from "zod";
  * Token verifier interface for custom token verification.
  * Allows developers to implement custom validation logic for non-JWT tokens
  * or use token introspection endpoints.
+ *
+ * @internal
  */
 export interface TokenVerifier {
   /**
@@ -37,6 +39,8 @@ export interface TokenVerifier {
 
 /**
  * Result of successful token validation.
+ *
+ * @internal
  */
 export interface ValidatedToken {
   /**
@@ -72,6 +76,8 @@ export interface ValidatedToken {
 
 /**
  * Authenticated request context injected into tool handlers.
+ *
+ * @internal
  */
 export interface AuthContext {
   /**
@@ -120,6 +126,8 @@ export interface AuthContext {
 
 /**
  * OAuth 2.1 configuration object.
+ *
+ * @internal
  */
 export interface OAuthConfig {
   /**
@@ -186,6 +194,8 @@ export interface OAuthConfig {
 /**
  * Zod schema for OAuthConfig validation.
  * Used at app startup to validate OAuth configuration.
+ *
+ * @internal
  */
 export const OAuthConfigSchema = z.object({
   protectedResource: z.url({ message: "Protected resource must be a valid URL" }),

@@ -114,6 +114,8 @@ export function transformToCoreDefs(
  * const html = await buildReactUI("my-widget", reactDef);
  * const coreDef = transformSingleToCoreDef(reactDef, html);
  * ```
+ *
+ * @internal
  */
 export function transformSingleToCoreDef(def: ReactUIDef, html: string): UIDef {
   return {
@@ -149,6 +151,8 @@ export function transformSingleToCoreDef(def: ReactUIDef, html: string): UIDef {
  *   ...transformToCoreDefs(reactUIs, buildResult),
  * };
  * ```
+ *
+ * @internal
  */
 export function extractReactUIs(defs: Record<string, ReactUIDef | UIDef>): {
   reactUIs: Record<string, ReactUIDef>;

@@ -1,6 +1,7 @@
 /**
  * Utility functions for MCP Apps
  *
+ * @internal
  * @packageDocumentation
  */
 

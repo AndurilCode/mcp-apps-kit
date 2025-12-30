@@ -3,6 +3,8 @@
  *
  * Implements the ProtocolAdapter interface for MCP Apps running in Claude Desktop.
  * Uses @modelcontextprotocol/ext-apps (JSON-RPC over postMessage + ui/initialize).
+ *
+ * @internal
  */
 
 import { App } from "@modelcontextprotocol/ext-apps";
@@ -46,6 +48,8 @@ import type {
 
 /**
  * Adapter for MCP Apps (Claude Desktop)
+ *
+ * @internal
  *
  * Communicates with the host via postMessage through iframe boundary.
  * State management is a graceful no-op (not supported in MCP Apps).

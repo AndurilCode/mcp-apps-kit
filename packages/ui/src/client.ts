@@ -2,6 +2,8 @@
  * Unified AppsClient implementation
  *
  * Wraps protocol adapters to provide the unified AppsClient interface.
+ *
+ * @internal
  */
 
 import type {
@@ -22,6 +24,8 @@ import type { ProtocolAdapter } from "./adapters/types";
 
 /**
  * Create an AppsClient that wraps a protocol adapter
+ *
+ * @internal
  */
 export function createAppsClient<T extends ToolDefs = ToolDefs>(
   adapter: ProtocolAdapter

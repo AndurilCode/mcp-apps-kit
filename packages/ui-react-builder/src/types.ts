@@ -155,6 +155,8 @@ export interface BuildOptions {
 
 /**
  * Options passed to the HTML template function.
+ *
+ * @internal
  */
 export interface TemplateOptions {
   /**
@@ -242,6 +244,8 @@ export interface BuildError {
 /**
  * Options for the development server.
  * Reserved for future implementation.
+ *
+ * @internal
  */
 export interface DevServerOptions {
   /**

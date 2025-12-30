@@ -69,6 +69,8 @@ export type Middleware = (context: MiddlewareContext, next: () => Promise<void>)
  * Error thrown when middleware calls next() multiple times
  *
  * Prevents undefined behavior from multiple invocations.
+ *
+ * @internal
  */
 export class MultipleNextCallsError extends Error {
   constructor(middlewareIndex: number) {
@@ -81,6 +83,8 @@ export class MultipleNextCallsError extends Error {
  * Error thrown when middleware times out
  *
  * Prevents slow middleware from blocking requests indefinitely.
+ *
+ * @internal
  */
 export class MiddlewareTimeoutError extends Error {
   constructor(timeoutMs: number, middlewareIndex?: number) {
@@ -102,6 +106,8 @@ export class MiddlewareTimeoutError extends Error {
  *
  * Provides better TypeScript inference for middleware that reads/writes
  * specific state keys.
+ *
+ * @internal
  */
 export function createTypedMiddleware<TState extends Record<string, unknown>>(
   middleware: (
@@ -118,6 +124,8 @@ export function createTypedMiddleware<TState extends Record<string, unknown>>(
  * Helper to compose multiple middleware into one
  *
  * Useful for grouping related middleware.
+ *
+ * @internal
  */
 export function composeMiddleware(middleware: Middleware[]): Middleware {
   return async (context, next) => {
@@ -146,6 +154,8 @@ export function composeMiddleware(middleware: Middleware[]): Middleware {
  * Create error handling middleware
  *
  * Catches errors from downstream middleware/handler and transforms them.
+ *
+ * @internal
  */
 export function createErrorHandler(
   handler: (error: Error, context: MiddlewareContext) => Promise<void> | void
@@ -164,6 +174,8 @@ export function createErrorHandler(
  * Create conditional middleware
  *
  * Only executes middleware if condition is met.
+ *
+ * @internal
  */
 export function createConditionalMiddleware(
   condition: (context: MiddlewareContext) => boolean,
@@ -182,6 +194,8 @@ export function createConditionalMiddleware(
  * Create timeout middleware
  *
  * Enforces timeout on middleware chain execution.
+ *
+ * @internal
  */
 export function createTimeoutMiddleware(timeoutMs: number): Middleware {
   return async (_context, next) => {
