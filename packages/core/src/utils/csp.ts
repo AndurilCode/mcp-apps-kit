@@ -3,6 +3,9 @@
  *
  * Provides utilities for mapping CSP configuration to protocol-specific formats
  * for MCP Apps and ChatGPT Apps.
+ *
+ * @internal
+ * @module utils/csp
  */
 
 import type { CSPConfig } from "../types/ui";
@@ -15,6 +18,8 @@ import type { CSPConfig } from "../types/ui";
  * MCP CSP metadata format
  *
  * MCP Apps use camelCase field names.
+ *
+ * @internal
  */
 export interface McpCSPMetadata {
   connectDomains?: string[];
@@ -29,6 +34,8 @@ export interface McpCSPMetadata {
  *
  * @param csp - CSP configuration
  * @returns MCP-specific CSP metadata
+ *
+ * @internal
  */
 export function generateMcpCSPMetadata(csp: CSPConfig): McpCSPMetadata {
   const result: McpCSPMetadata = {};
@@ -52,6 +59,8 @@ export function generateMcpCSPMetadata(csp: CSPConfig): McpCSPMetadata {
  * OpenAI CSP metadata format
  *
  * ChatGPT Apps use snake_case field names.
+ *
+ * @internal
  */
 export interface OpenAICSPMetadata {
   connect_domains?: string[];
@@ -67,6 +76,8 @@ export interface OpenAICSPMetadata {
  *
  * @param csp - CSP configuration
  * @returns OpenAI-specific CSP metadata
+ *
+ * @internal
  */
 export function generateOpenAICSPMetadata(csp: CSPConfig): OpenAICSPMetadata {
   const result: OpenAICSPMetadata = {};
@@ -98,6 +109,8 @@ import type { UIDef } from "../types/ui";
 
 /**
  * MCP UI resource metadata format
+ *
+ * @internal
  */
 export interface McpUIResourceMetadata {
   name?: string;
@@ -109,6 +122,8 @@ export interface McpUIResourceMetadata {
 
 /**
  * OpenAI UI resource metadata format
+ *
+ * @internal
  */
 export interface OpenAIUIResourceMetadata {
   name?: string;
@@ -125,6 +140,8 @@ export interface OpenAIUIResourceMetadata {
  * @param key - Resource identifier
  * @param uiDef - UI resource definition
  * @returns MCP-specific UI resource metadata
+ *
+ * @internal
  */
 export function generateMcpUIMetadata(key: string, uiDef: UIDef): McpUIResourceMetadata {
   const result: McpUIResourceMetadata = {
@@ -156,6 +173,8 @@ export function generateMcpUIMetadata(key: string, uiDef: UIDef): McpUIResourceM
  * @param key - Resource identifier
  * @param uiDef - UI resource definition
  * @returns OpenAI-specific UI resource metadata
+ *
+ * @internal
  */
 export function generateOpenAIUIMetadata(key: string, uiDef: UIDef): OpenAIUIResourceMetadata {
   const result: OpenAIUIResourceMetadata = {

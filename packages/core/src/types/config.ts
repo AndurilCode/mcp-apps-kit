@@ -15,6 +15,8 @@ import type { OAuthConfig } from "../server/oauth/types.js";
  *
  * - `"mcp"`: MCP Apps protocol (Claude Desktop, etc.) - uses camelCase metadata
  * - `"openai"`: OpenAI/ChatGPT Apps protocol - uses snake_case metadata with openai/ prefixes
+ *
+ * @internal
  */
 export type Protocol = "mcp" | "openai";
 
@@ -30,6 +32,8 @@ export type Protocol = "mcp" | "openai";
 
 /**
  * CORS configuration for the HTTP server
+ *
+ * @internal
  */
 export interface CORSConfig {
   /**
@@ -60,6 +64,8 @@ export interface CORSConfig {
  * - `"info"`: Info, warning, and error logs (default)
  * - `"warn"`: Warning and error logs only
  * - `"error"`: Error logs only
+ *
+ * @internal
  */
 export type DebugLogLevel = "debug" | "info" | "warn" | "error";
 
@@ -86,6 +92,8 @@ export type DebugLogLevel = "debug" | "info" | "warn" | "error";
  *   },
  * });
  * ```
+ *
+ * @internal
  */
 export interface DebugConfig {
   /**
@@ -137,6 +145,8 @@ export interface DebugConfig {
 
 /**
  * OpenAI Apps SDK specific configuration
+ *
+ * @internal
  */
 export interface OpenAIConfig {
   /**
@@ -164,6 +174,8 @@ export interface OpenAIConfig {
 
 /**
  * Global configuration options for the app
+ *
+ * @internal
  */
 export interface GlobalConfig {
   /** OAuth 2.1 authentication configuration */

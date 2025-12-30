@@ -3,6 +3,8 @@
  *
  * Defines the internal interface for protocol adapters that map
  * the unified AppsClient API to platform-specific implementations.
+ *
+ * @internal
  */
 
 import type {
@@ -28,6 +30,8 @@ import type {
  * - MockAdapter: For development/testing
  *
  * Each adapter translates the unified API to the platform-specific SDK.
+ *
+ * @internal
  */
 export interface ProtocolAdapter {
   // === Lifecycle ===
@@ -279,10 +283,14 @@ export interface ProtocolAdapter {
 
 /**
  * Factory function type for creating protocol adapters
+ *
+ * @internal
  */
 export type AdapterFactory = () => ProtocolAdapter;
 
 /**
  * Adapter type identifiers
+ *
+ * @internal
  */
 export type AdapterType = "mcp" | "openai" | "mock";

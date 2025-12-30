@@ -63,6 +63,8 @@ const DEFAULT_BASE_CSS = `
  *   css: customStyles,
  * });
  * ```
+ *
+ * @internal
  */
 export function generateHTML(options: TemplateOptions): string {
   const { key, name, script, css } = options;
@@ -88,6 +90,8 @@ export function generateHTML(options: TemplateOptions): string {
 
 /**
  * Options for generating the React entry point.
+ *
+ * @internal
  */
 export interface EntryPointOptions {
   /**
@@ -135,6 +139,8 @@ export interface EntryPointOptions {
  *   componentExport: "MyWidget",
  * });
  * ```
+ *
+ * @internal
  */
 export function generateEntryPoint(
   componentPathOrOptions: string | EntryPointOptions,

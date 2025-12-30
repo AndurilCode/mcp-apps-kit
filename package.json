@@ -1,6 +1,6 @@
 {
   "name": "@mcp-apps-kit/monorepo",
-  "version": "0.0.0",
+  "version": "0.2.6",
   "private": true,
   "type": "module",
   "description": "Unified MCP Apps Builder SDK - Build MCP apps for Claude Desktop and ChatGPT from a single codebase",
@@ -12,11 +12,13 @@
     "format:write": "prettier --write .",
     "typecheck": "nx run-many --target=typecheck",
     "release:version:patch:dry": "nx release version patch -p @mcp-apps-kit/core,@mcp-apps-kit/ui,@mcp-apps-kit/ui-react,@mcp-apps-kit/ui-react-builder,@mcp-apps-kit/create-app --dry-run",
-    "release:version:patch": "nx release version patch -p @mcp-apps-kit/core,@mcp-apps-kit/ui,@mcp-apps-kit/ui-react,@mcp-apps-kit/ui-react-builder,@mcp-apps-kit/create-app",
+    "release:version:patch": "nx release version patch -p @mcp-apps-kit/core,@mcp-apps-kit/ui,@mcp-apps-kit/ui-react,@mcp-apps-kit/ui-react-builder,@mcp-apps-kit/create-app && pnpm version patch --no-git-tag-version && git add package.json",
     "release:version:minor:dry": "nx release version minor -p @mcp-apps-kit/core,@mcp-apps-kit/ui,@mcp-apps-kit/ui-react,@mcp-apps-kit/ui-react-builder,@mcp-apps-kit/create-app --dry-run",
-    "release:version:minor": "nx release version minor -p @mcp-apps-kit/core,@mcp-apps-kit/ui,@mcp-apps-kit/ui-react,@mcp-apps-kit/ui-react-builder,@mcp-apps-kit/create-app",
+    "release:version:minor": "nx release version minor -p @mcp-apps-kit/core,@mcp-apps-kit/ui,@mcp-apps-kit/ui-react,@mcp-apps-kit/ui-react-builder,@mcp-apps-kit/create-app && pnpm version minor --no-git-tag-version && git add package.json",
     "release:version:major:dry": "nx release version major -p @mcp-apps-kit/core,@mcp-apps-kit/ui,@mcp-apps-kit/ui-react,@mcp-apps-kit/ui-react-builder,@mcp-apps-kit/create-app --dry-run",
-    "release:version:major": "nx release version major -p @mcp-apps-kit/core,@mcp-apps-kit/ui,@mcp-apps-kit/ui-react,@mcp-apps-kit/ui-react-builder,@mcp-apps-kit/create-app"
+    "release:version:major": "nx release version major -p @mcp-apps-kit/core,@mcp-apps-kit/ui,@mcp-apps-kit/ui-react,@mcp-apps-kit/ui-react-builder,@mcp-apps-kit/create-app && pnpm version major --no-git-tag-version && git add package.json",
+    "docs": "typedoc",
+    "docs:watch": "typedoc --watch"
   },
   "keywords": [
     "mcp",
@@ -33,6 +35,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "typedoc": "^0.28.15",
+    "typedoc-plugin-markdown": "^4.9.0",
     "@nx/js": "^22.3.3",
     "@nx/workspace": "^22.3.3",
     "@testing-library/jest-dom": "^6.9.1",

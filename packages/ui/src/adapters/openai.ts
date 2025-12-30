@@ -4,6 +4,8 @@
  *
  * Implements the ProtocolAdapter interface for ChatGPT Apps.
  * Would integrate with the OpenAI Apps SDK when available.
+ *
+ * @internal
  */
 
 import type { ProtocolAdapter } from "./types";
@@ -22,6 +24,8 @@ import type {
  *
  * Supports session-scoped state persistence.
  * Integrates with the OpenAI Apps SDK.
+ *
+ * @internal
  */
 export class OpenAIAdapter implements ProtocolAdapter {
   private connected = false;

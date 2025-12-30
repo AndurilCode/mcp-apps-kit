@@ -2,6 +2,8 @@
  * Mock adapter for development and testing
  *
  * Provides a working implementation without requiring a host platform.
+ *
+ * @internal
  */
 
 import { UIError, UIErrorCode } from "../errors";
@@ -21,6 +23,8 @@ import type {
  * Mock adapter for development and testing
  *
  * All operations are simulated locally with console logging.
+ *
+ * @internal
  */
 export class MockAdapter implements ProtocolAdapter {
   private connected = false;

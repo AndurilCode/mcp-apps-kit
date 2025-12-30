@@ -3,6 +3,9 @@
  *
  * Provides utilities for mapping tool definitions to protocol-specific metadata
  * formats for MCP Apps and ChatGPT Apps.
+ *
+ * @internal
+ * @module utils/metadata
  */
 
 import type { ToolDef, Visibility } from "../types/tools";
@@ -15,12 +18,16 @@ import { zodToJsonSchema } from "./schema";
 /**
  * MCP visibility value
  * Array of who can invoke: "model", "app", or both
+ *
+ * @internal
  */
 export type McpVisibilityValue = ("model" | "app")[];
 
 /**
  * MCP UI metadata structure
  * All MCP-specific metadata goes under _meta.ui.*
+ *
+ * @internal
  */
 export interface McpUIMeta {
   resourceUri?: string;
@@ -37,6 +44,8 @@ export interface McpUIMeta {
  *
  * @param visibility - Tool visibility setting
  * @returns MCP visibility array
+ *
+ * @internal
  */
 export function mapVisibilityToMcp(visibility?: Visibility): McpVisibilityValue {
   switch (visibility) {
@@ -60,6 +69,8 @@ export function mapVisibilityToMcp(visibility?: Visibility): McpVisibilityValue 
  * Settings:
  * - openai/visibility: "public" | "private" - Controls model access
  * - openai/widgetAccessible: boolean - Controls UI access
+ *
+ * @internal
  */
 export interface OpenAIVisibilitySettings {
   "openai/visibility": "public" | "private";
@@ -76,6 +87,8 @@ export interface OpenAIVisibilitySettings {
  *
  * @param visibility - Tool visibility setting
  * @returns OpenAI-specific visibility settings with openai/ prefixes
+ *
+ * @internal
  */
 export function mapVisibilityToOpenAI(visibility?: Visibility): OpenAIVisibilitySettings {
   switch (visibility) {
@@ -95,6 +108,8 @@ export function mapVisibilityToOpenAI(visibility?: Visibility): OpenAIVisibility
 
 /**
  * MCP tool metadata format
+ *
+ * @internal
  */
 export interface McpToolMetadata {
   name: string;
@@ -105,6 +120,8 @@ export interface McpToolMetadata {
 
 /**
  * OpenAI tool metadata format
+ *
+ * @internal
  */
 export interface OpenAIToolMetadata {
   type: "function";
@@ -125,6 +142,8 @@ export interface OpenAIToolMetadata {
  * @param toolDef - Tool definition
  * @param protocol - Target protocol ("mcp" | "openai")
  * @returns Protocol-specific metadata object
+ *
+ * @internal
  */
 export function generateToolMetadata(
   name: string,
@@ -220,6 +239,8 @@ function generateOpenAIMetadata(name: string, toolDef: ToolDef): OpenAIToolMetad
  * @param tools - Collection of tool definitions
  * @param protocol - Target protocol
  * @returns Array of protocol-specific metadata objects
+ *
+ * @internal
  */
 export function generateAllToolsMetadata(
   tools: Record<string, ToolDef>,

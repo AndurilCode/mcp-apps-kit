@@ -38,6 +38,9 @@ Thumbs.db
 # Test coverage
 coverage/
 
+# Generated documentation
+docs/api/
+
 # Temporary files
 *.tmp
 *.temp

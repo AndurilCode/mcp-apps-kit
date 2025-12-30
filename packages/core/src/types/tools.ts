@@ -22,6 +22,8 @@ export type Visibility = "model" | "app" | "both";
  *
  * Coarse location hint for analytics, formatting, or localization.
  * Only available when the client provides this information.
+ *
+ * @internal
  */
 export interface UserLocation {
   /** City name */
@@ -138,6 +140,8 @@ export interface ToolContext {
  *
  * These help the model understand the nature of the tool and
  * allow hosts to optimize UX (e.g., skip confirmations for read-only tools).
+ *
+ * @internal
  */
 export interface ToolAnnotations {
   /**
@@ -345,6 +349,8 @@ import type { CORSConfig } from "./config";
 
 /**
  * Server start options
+ *
+ * @internal
  */
 export interface StartOptions {
   port?: number;
@@ -355,6 +361,8 @@ export interface StartOptions {
 /**
  * MCP Server type (from @modelcontextprotocol/sdk)
  * Using unknown to avoid direct dependency coupling
+ *
+ * @internal
  */
 export interface McpServer {
   // Opaque type - actual implementation from MCP SDK
@@ -363,6 +371,8 @@ export interface McpServer {
 
 /**
  * Express middleware type
+ *
+ * @internal
  */
 export type ExpressMiddleware = (
   req: unknown,
@@ -477,6 +487,8 @@ export interface App<T extends ToolDefs = ToolDefs> {
  * type Inputs = InferToolInputs<typeof app.tools>;
  * // { greet: { name: string }, search: { query: string } }
  * ```
+ *
+ * @internal
  */
 export type InferToolInputs<T extends ToolDefs> = {
   [K in keyof T]: z.infer<T[K]["input"]>;
@@ -490,6 +502,8 @@ export type InferToolInputs<T extends ToolDefs> = {
  * type Outputs = InferToolOutputs<typeof app.tools>;
  * // { greet: { message: string }, search: { results: string[] } }
  * ```
+ *
+ * @internal
  */
 export type InferToolOutputs<T extends ToolDefs> = {
   [K in keyof T]: T[K]["output"] extends z.ZodType ? z.infer<T[K]["output"]> : unknown;

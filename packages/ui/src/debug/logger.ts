@@ -15,11 +15,15 @@ import type { ProtocolAdapter } from "../adapters/types";
 
 /**
  * Log level for debug logging
+ *
+ * @internal
  */
 export type DebugLogLevel = "debug" | "info" | "warn" | "error";
 
 /**
  * A single log entry
+ *
+ * @internal
  */
 export interface LogEntry {
   /** Log level */
@@ -36,6 +40,8 @@ export interface LogEntry {
 
 /**
  * Debug configuration for the client logger
+ *
+ * @internal
  */
 export interface ClientDebugConfig {
   /**
@@ -92,6 +98,8 @@ const LogLevelValue: Record<DebugLogLevel, number> = {
 
 /**
  * Check if a log level should be output given the minimum level
+ *
+ * @internal
  */
 export function shouldLog(level: DebugLogLevel, minLevel: DebugLogLevel): boolean {
   return LogLevelValue[level] >= LogLevelValue[minLevel];
@@ -119,6 +127,8 @@ function getCircularReplacer(): (key: string, value: unknown) => unknown {
 
 /**
  * Safely serialize data for transport, handling circular references
+ *
+ * @internal
  */
 export function safeSerialize(data: unknown): unknown {
   if (data === undefined || data === null) {
@@ -151,6 +161,8 @@ export function safeSerialize(data: unknown): unknown {
 
 /**
  * Safely stringify data for console output
+ *
+ * @internal
  */
 export function safeStringify(data: unknown): string {
   if (data === undefined) {
@@ -189,6 +201,8 @@ export function safeStringify(data: unknown): string {
  * - Circular reference handling
  * - Fallback to console when not connected
  * - Graceful degradation in restricted environments
+ *
+ * @internal
  */
 export class ClientDebugLogger {
   private adapter: ProtocolAdapter | null = null;
@@ -492,5 +506,7 @@ export class ClientDebugLogger {
  *
  * Use this for logging in UI components. Configure it after
  * connecting to the MCP server.
+ *
+ * @internal
  */
 export const clientDebugLogger = new ClientDebugLogger();

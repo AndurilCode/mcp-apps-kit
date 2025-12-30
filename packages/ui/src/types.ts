@@ -9,6 +9,8 @@
 /**
  * Host capabilities advertised during handshake.
  * Protocol-agnostic interface covering features from both MCP Apps and ChatGPT.
+ *
+ * @internal
  */
 export interface HostCapabilities {
   // ===========================================================================
@@ -100,6 +102,8 @@ export interface HostCapabilities {
 
 /**
  * Host version information returned after connection.
+ *
+ * @internal
  */
 export interface HostVersion {
   /** Host application name (e.g., "Claude Desktop") */
@@ -111,6 +115,8 @@ export interface HostVersion {
 /**
  * App capabilities declared during initialization.
  * Tells the host what this app supports.
+ *
+ * @internal
  */
 export interface AppCapabilities {
   /** Experimental features (structure TBD) */
@@ -129,6 +135,8 @@ export interface AppCapabilities {
 
 /**
  * Parameters for size changed notifications.
+ *
+ * @internal
  */
 export interface SizeChangedParams {
   /** Widget width in pixels */
@@ -144,6 +152,8 @@ export interface SizeChangedParams {
 /**
  * Tool definition for app-exposed tools (bidirectional support).
  * Used when the app exposes tools that the host can call.
+ *
+ * @internal
  */
 export interface AppToolDefinition {
   /** Tool name */
@@ -159,12 +169,16 @@ export interface AppToolDefinition {
  * @param toolName - Name of the tool being called
  * @param args - Tool arguments
  * @returns Tool result
+ *
+ * @internal
  */
 export type CallToolHandler = (toolName: string, args: Record<string, unknown>) => Promise<unknown>;
 
 /**
  * Handler that returns the list of tools exposed by the app.
  * @returns Array of tool definitions
+ *
+ * @internal
  */
 export type ListToolsHandler = () => Promise<AppToolDefinition[]>;
 
@@ -174,6 +188,8 @@ export type ListToolsHandler = () => Promise<AppToolDefinition[]>;
 
 /**
  * Viewport dimensions
+ *
+ * @internal
  */
 export interface Viewport {
   width: number;
@@ -184,6 +200,8 @@ export interface Viewport {
 
 /**
  * Safe area insets (mobile devices)
+ *
+ * @internal
  */
 export interface SafeAreaInsets {
   top: number;
@@ -194,6 +212,8 @@ export interface SafeAreaInsets {
 
 /**
  * Device capabilities
+ *
+ * @internal
  */
 export interface DeviceCapabilities {
   touch?: boolean;
@@ -202,6 +222,8 @@ export interface DeviceCapabilities {
 
 /**
  * Host-provided styling
+ *
+ * @internal
  */
 export interface HostStyles {
   variables?: Record<string, string>;
@@ -260,6 +282,8 @@ export interface HostContext {
 
 /**
  * Resource content from readResource
+ *
+ * @internal
  */
 export interface ResourceContent {
   uri: string;
@@ -270,11 +294,15 @@ export interface ResourceContent {
 
 /**
  * Generic tool definitions type (for type inference)
+ *
+ * @internal
  */
 export type ToolDefs = Record<string, { input: unknown; output?: unknown }>;
 
 /**
  * Extract output types from tool definitions
+ *
+ * @internal
  */
 export type InferToolOutputs<T extends ToolDefs> = {
   [K in keyof T]: T[K]["output"] extends undefined ? unknown : NonNullable<T[K]["output"]>;
@@ -282,6 +310,8 @@ export type InferToolOutputs<T extends ToolDefs> = {
 
 /**
  * Extract input types from tool definitions
+ *
+ * @internal
  */
 export type InferToolInputs<T extends ToolDefs> = {
   [K in keyof T]: T[K]["input"];
@@ -289,6 +319,8 @@ export type InferToolInputs<T extends ToolDefs> = {
 
 /**
  * Tool result with optional metadata
+ *
+ * @internal
  */
 export type ToolResult<T extends ToolDefs> = {
   [K in keyof T]?: InferToolOutputs<T>[K] & {
@@ -661,5 +693,7 @@ export interface CreateClientOptions {
 
 /**
  * Detected protocol type
+ *
+ * @internal
  */
 export type DetectedProtocol = "mcp" | "openai" | "mock";

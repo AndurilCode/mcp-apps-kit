@@ -1,6 +1,8 @@
 /**
  * OAuth-specific error type with RFC 6750 compliance.
  * Represents authentication and authorization errors in OAuth 2.0 Bearer Token Usage.
+ *
+ * @internal
  */
 export class OAuthError extends Error {
   /**

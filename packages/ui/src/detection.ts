@@ -1,5 +1,7 @@
 /**
  * Protocol detection for auto-selecting the correct adapter
+ *
+ * @internal
  */
 
 import type { DetectedProtocol } from "./types";
@@ -38,6 +40,8 @@ function isChatGPTSandbox(): boolean {
  * 4. Neither → Mock (development mode)
  *
  * @returns Detected protocol type
+ *
+ * @internal
  */
 export function detectProtocol(): DetectedProtocol {
   // Server-side: default to mock

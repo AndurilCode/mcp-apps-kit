@@ -14,6 +14,8 @@ import { z } from "zod";
 /**
  * JSON Schema 7 compatible type
  * Using a more flexible type to accommodate zod-to-json-schema output
+ *
+ * @internal
  */
 export type JSONSchema = Record<string, unknown>;
 
@@ -21,6 +23,8 @@ export type JSONSchema = Record<string, unknown>;
  * Options for zodToJsonSchema conversion
  *
  * Note: Zod v4 uses native JSON Schema 2020-12 conversion.
+ *
+ * @internal
  */
 export interface ZodToJsonSchemaOptions {
   /**
@@ -66,6 +70,8 @@ export interface ZodToJsonSchemaOptions {
  * //   required: ["name"]
  * // }
  * ```
+ *
+ * @internal
  */
 export function zodToJsonSchema(
   schema: z.ZodType,
@@ -92,6 +98,8 @@ export function zodToJsonSchema(
  *
  * @param schema - Zod object schema
  * @returns Map of property names to descriptions
+ *
+ * @internal
  */
 export function extractPropertyDescriptions(
   schema: z.ZodObject<z.ZodRawShape>
@@ -127,6 +135,8 @@ export function extractPropertyDescriptions(
  *
  * @param value - Value to check
  * @returns True if the value is a Zod schema
+ *
+ * @internal
  */
 export function isZodSchema(value: unknown): value is z.ZodType {
   return (
