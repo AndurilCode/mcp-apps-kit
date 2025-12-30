@@ -77,8 +77,17 @@ export function useToolResult<T extends ToolDefs = ToolDefs>(): ToolResult<T> | 
   const [result, setResult] = useState<ToolResult<T> | undefined>(undefined);
 
   useEffect(() => {
-    if (!client) return;
+    if (!client) {
+      return;
+    }
 
+    // Get initial tool output if available (wrapped with tool name)
+    const initialOutput = client.toolOutput;
+    if (initialOutput && Object.keys(initialOutput).length > 0) {
+      setResult(initialOutput as ToolResult<T>);
+    }
+
+    // Subscribe to future tool result updates
     const unsubscribe = client.onToolResult((newResult) => {
       setResult(newResult as ToolResult<T>);
     });

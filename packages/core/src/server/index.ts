@@ -681,13 +681,14 @@ function registerTools(
           const closeWidget = resultObj._closeWidget as boolean | undefined;
           const textNarration = resultObj._text as string | undefined;
 
-          // Build response _meta, merging user _meta with closeWidget
-          let responseMeta: Record<string, unknown> | undefined;
-          if (closeWidget || resultObj._meta) {
-            responseMeta = { ...(resultObj._meta as Record<string, unknown> | undefined) };
-            if (closeWidget) {
-              responseMeta["openai/closeWidget"] = true;
-            }
+          // Build response _meta, merging user _meta with tool name and closeWidget
+          // Tool name is always included for widget access (especially OpenAI which doesn't expose it)
+          let responseMeta: Record<string, unknown> = {
+            toolName: name,
+            ...(resultObj._meta as Record<string, unknown> | undefined),
+          };
+          if (closeWidget) {
+            responseMeta["openai/closeWidget"] = true;
           }
 
           // Clean result for structured content (remove underscore-prefixed fields)
