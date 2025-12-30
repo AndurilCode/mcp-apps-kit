@@ -41,6 +41,46 @@ import * as esbuild from "esbuild";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { generateHTML } from "./html";
+import { parseReactUIDefinitions } from "./ast-parser";
+
+/**
+ * Logger interface for the MCP React UI plugin.
+ */
+export interface PluginLogger {
+  info: (message: string) => void;
+  warn: (message: string) => void;
+  error: (message: string) => void;
+}
+
+/**
+ * Default logger that uses console methods with a prefix.
+ */
+const defaultLogger: PluginLogger = {
+  info: (message: string) => {
+    console.log(message); // eslint-disable-line no-console
+  },
+  warn: (message: string) => {
+    console.warn(message); // eslint-disable-line no-console
+  },
+  error: (message: string) => {
+    console.error(message); // eslint-disable-line no-console
+  },
+};
+
+/**
+ * Silent logger that does nothing.
+ */
+const silentLogger: PluginLogger = {
+  info: () => {
+    // Intentionally empty - silent logger
+  },
+  warn: () => {
+    // Intentionally empty - silent logger
+  },
+  error: () => {
+    // Intentionally empty - silent logger
+  },
+};
 
 /**
  * Options for the MCP React UI Vite plugin.
@@ -71,6 +111,25 @@ export interface McpReactUIOptions {
    * Path to global CSS file to include in all UIs.
    */
   globalCss?: string;
+
+  /**
+   * Custom logger for plugin output.
+   * Set to `false` to disable all logging, or provide a custom logger.
+   * @default console
+   */
+  logger?: PluginLogger | false;
+
+  /**
+   * Standalone mode takes over the Vite build.
+   *
+   * - When `true`, the plugin overrides the build input and removes all Vite outputs,
+   *   producing only the generated UI HTML files.
+   * - When `false` (default), the plugin is additive: it generates UI HTML files
+   *   without modifying the main Vite build inputs/outputs.
+   *
+   * Use `true` when your Vite config exists solely to build MCP UI HTML.
+   */
+  standalone?: boolean;
 }
 
 /**
@@ -88,147 +147,136 @@ interface DiscoveredUI {
 }
 
 /**
- * Scan source file for defineReactUI calls and extract component information.
+ * Convert a filesystem path to an import specifier suitable for esbuild.
+ *
+ * esbuild accepts absolute paths as specifiers (e.g. "/abs/file.tsx", "C:/abs/file.tsx").
+ * For relative-like paths, we prefix with "./".
+ *
+ * @internal
  */
-async function discoverReactUIs(serverEntry: string, root: string): Promise<DiscoveredUI[]> {
-  const entryPath = path.resolve(root, serverEntry);
-  const content = await fs.readFile(entryPath, "utf-8");
-  const discovered: DiscoveredUI[] = [];
+export function toEsbuildImportSpecifier(componentPath: string): string {
+  // Normalize path for ESM imports (Windows backslashes -> forward slashes)
+  const normalized = componentPath.replace(/\\/g, "/");
 
-  // Find all imports to build a map of component names to file paths
-  const importMap = new Map<string, string>();
+  // Absolute path forms we must not prefix with "./":
+  // - POSIX absolute: /...
+  // - Windows drive absolute: C:/...
+  // - UNC absolute: //server/share/...
+  const isWindowsDriveAbsolute = /^[a-zA-Z]:\//.test(normalized);
+  const isUncAbsolute = normalized.startsWith("//");
 
-  // Match: import { Foo } from "./path" or import { Foo as Bar } from "./path"
-  const namedImportRegex = /import\s*\{([^}]+)\}\s*from\s*["']([^"']+)["']/g;
-  let match;
-
-  while ((match = namedImportRegex.exec(content)) !== null) {
-    const imports = match[1];
-    const importPath = match[2];
-    if (!imports || !importPath) continue;
-
-    // Parse individual imports
-    const importParts = imports.split(",").map((s) => s.trim());
-    for (const part of importParts) {
-      // Handle "Foo as Bar" syntax
-      const asMatch = part.match(/(\w+)\s+as\s+(\w+)/);
-      if (asMatch?.[2]) {
-        const localName = asMatch[2];
-        importMap.set(localName, importPath);
-      } else {
-        const name = part.trim();
-        if (name) {
-          importMap.set(name, importPath);
-        }
-      }
-    }
+  if (
+    normalized.startsWith(".") ||
+    normalized.startsWith("/") ||
+    isWindowsDriveAbsolute ||
+    isUncAbsolute
+  ) {
+    return normalized;
   }
 
-  // Match default imports: import Foo from "./path"
-  const defaultImportRegex = /import\s+(\w+)\s+from\s*["']([^"']+)["']/g;
-  while ((match = defaultImportRegex.exec(content)) !== null) {
-    const name = match[1];
-    const importPath = match[2];
-    if (!name || !importPath) continue;
-    if (!importMap.has(name)) {
-      importMap.set(name, importPath);
-    }
+  return `./${normalized}`;
+}
+
+/**
+ * Checks whether `candidatePath` is within `rootPath`.
+ *
+ * Both inputs may be relative; they will be resolved before comparison.
+ *
+ * @internal
+ */
+export function isPathWithinRoot(rootPath: string, candidatePath: string): boolean {
+  const resolvedRoot = path.resolve(rootPath);
+  const resolvedCandidate = path.resolve(candidatePath);
+
+  const relative = path.relative(resolvedRoot, resolvedCandidate);
+  if (relative === "") return true;
+  if (relative === "..") return false;
+
+  return !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+}
+
+/**
+ * Resolve import path to actual file path with extension.
+ */
+async function resolveComponentPath(
+  importPath: string,
+  entryDir: string,
+  rootDir: string,
+  componentName: string,
+  logger: PluginLogger
+): Promise<string | null> {
+  if (!importPath.startsWith(".")) {
+    // Package import - skip
+    return null;
   }
 
-  // Find defineReactUI calls
-  // Match: defineReactUI({ component: ComponentName, name: "...", ... })
-  const defineReactUIRegex =
-    /defineReactUI\s*\(\s*\{[^}]*component\s*:\s*(\w+)[^}]*name\s*:\s*["']([^"']+)["'][^}]*\}/g;
+  const rootRealPath = await fs.realpath(rootDir);
+  const basePath = path.resolve(entryDir, importPath);
 
-  while ((match = defineReactUIRegex.exec(content)) !== null) {
-    const componentName = match[1];
-    const uiName = match[2];
-    if (!componentName || !uiName) continue;
+  const candidatePaths = path.extname(basePath)
+    ? [basePath]
+    : [".tsx", ".ts", ".jsx", ".js"].map((ext) => basePath + ext);
 
-    const importPath = importMap.get(componentName);
-    if (importPath) {
-      // Resolve the import path relative to the entry file
-      const entryDir = path.dirname(entryPath);
-      let componentPath: string;
-
-      if (importPath.startsWith(".")) {
-        // Relative import
-        componentPath = path.resolve(entryDir, importPath);
-        // Add extension if not present
-        if (!path.extname(componentPath)) {
-          // Try common extensions
-          for (const ext of [".tsx", ".ts", ".jsx", ".js"]) {
-            try {
-              await fs.access(componentPath + ext);
-              componentPath = componentPath + ext;
-              break;
-            } catch {
-              // Try next extension
-            }
-          }
-        }
-      } else {
-        // Package import - skip for now
-        continue;
-      }
-
-      // Generate key from component name (kebab-case)
-      const key = componentName.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
-
-      discovered.push({
-        componentName,
-        componentPath,
-        name: uiName,
-        key,
-      });
-    }
-  }
-
-  // Also try alternate pattern where name comes before component
-  const altRegex =
-    /defineReactUI\s*\(\s*\{[^}]*name\s*:\s*["']([^"']+)["'][^}]*component\s*:\s*(\w+)[^}]*\}/g;
-
-  while ((match = altRegex.exec(content)) !== null) {
-    const uiName = match[1];
-    const componentName = match[2];
-    if (!uiName || !componentName) continue;
-
-    // Check if we already found this
-    if (discovered.some((d) => d.componentName === componentName)) {
+  for (const candidatePath of candidatePaths) {
+    try {
+      await fs.access(candidatePath);
+    } catch {
       continue;
     }
 
-    const importPath = importMap.get(componentName);
-    if (importPath) {
-      const entryDir = path.dirname(entryPath);
-      let componentPath: string;
-
-      if (importPath.startsWith(".")) {
-        componentPath = path.resolve(entryDir, importPath);
-        if (!path.extname(componentPath)) {
-          for (const ext of [".tsx", ".ts", ".jsx", ".js"]) {
-            try {
-              await fs.access(componentPath + ext);
-              componentPath = componentPath + ext;
-              break;
-            } catch {
-              // Try next extension
-            }
-          }
-        }
-      } else {
-        continue;
-      }
-
-      const key = componentName.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
-
-      discovered.push({
-        componentName,
-        componentPath,
-        name: uiName,
-        key,
-      });
+    // Resolve symlinks before boundary check.
+    const candidateRealPath = await fs.realpath(candidatePath);
+    if (!isPathWithinRoot(rootRealPath, candidateRealPath)) {
+      logger.warn(
+        `[mcp-react-ui] Refusing to build UI component outside project root. ` +
+          `component="${componentName}", import="${importPath}", resolved="${candidateRealPath}"`
+      );
+      return null;
     }
+
+    return candidateRealPath;
+  }
+
+  logger.warn(
+    `[mcp-react-ui] Could not resolve component file for "${componentName}" from import "${importPath}". ` +
+      `Tried extensions: .tsx, .ts, .jsx, .js. Skipping this component.`
+  );
+  return null;
+}
+
+/**
+ * Scan source file for defineReactUI calls and extract component information.
+ * Uses AST parsing for reliable detection of imports and defineReactUI calls.
+ */
+async function discoverReactUIs(
+  serverEntry: string,
+  root: string,
+  logger: PluginLogger
+): Promise<DiscoveredUI[]> {
+  const entryPath = path.resolve(root, serverEntry);
+  const content = await fs.readFile(entryPath, "utf-8");
+  const entryDir = path.dirname(entryPath);
+
+  const parsed = await parseReactUIDefinitions(content);
+  const discovered: DiscoveredUI[] = [];
+
+  for (const ui of parsed) {
+    const componentPath = await resolveComponentPath(
+      ui.importPath,
+      entryDir,
+      root,
+      ui.componentName,
+      logger
+    );
+    if (!componentPath) continue;
+
+    const key = ui.componentName.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
+    discovered.push({
+      componentName: ui.componentName,
+      componentPath,
+      name: ui.name,
+      key,
+    });
   }
 
   return discovered;
@@ -241,7 +289,8 @@ async function buildDiscoveredUIs(
   discovered: DiscoveredUI[],
   options: McpReactUIOptions,
   root: string,
-  isProduction: boolean
+  isProduction: boolean,
+  logger: PluginLogger
 ): Promise<void> {
   const minify = options.minify ?? isProduction;
   const outDir = options.outDir ?? "./dist/ui";
@@ -253,22 +302,17 @@ async function buildDiscoveredUIs(
     try {
       globalCss = await fs.readFile(globalCssPath, "utf-8");
     } catch (error) {
-      console.warn(
-        `[mcp-react-ui] globalCss file not found or unreadable: ${globalCssPath}`,
-        error instanceof Error ? error.message : error
+      logger.warn(
+        `[mcp-react-ui] globalCss file not found or unreadable: ${globalCssPath} - ${
+          error instanceof Error ? error.message : error
+        }`
       );
     }
   }
 
   // Build each discovered UI
   for (const ui of discovered) {
-    // Normalize path for ESM imports (Windows backslashes -> forward slashes)
-    const normalizedComponentPath = ui.componentPath.replace(/\\/g, "/");
-    // Ensure path is a proper relative or absolute import
-    const importPath =
-      normalizedComponentPath.startsWith(".") || normalizedComponentPath.startsWith("/")
-        ? normalizedComponentPath
-        : `./${normalizedComponentPath}`;
+    const importPath = toEsbuildImportSpecifier(ui.componentPath);
 
     // Generate entry point code
     const entryCode = `
@@ -329,8 +373,7 @@ if (rootElement) {
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
     await fs.writeFile(outputPath, html, "utf-8");
 
-    // eslint-disable-next-line no-console
-    console.log(`[mcp-react-ui] Built: ${ui.key}.html`);
+    logger.info(`[mcp-react-ui] Built: ${ui.key}.html`);
   }
 }
 
@@ -361,6 +404,12 @@ if (rootElement) {
 export function mcpReactUI(options: McpReactUIOptions): Plugin {
   let config: ResolvedConfig;
 
+  const standalone = options.standalone ?? false;
+
+  // Resolve logger: false = silent, undefined = default, custom = use provided
+  const logger: PluginLogger =
+    options.logger === false ? silentLogger : (options.logger ?? defaultLogger);
+
   return {
     name: "mcp-react-ui",
 
@@ -374,33 +423,31 @@ export function mcpReactUI(options: McpReactUIOptions): Plugin {
       const isProduction = config.mode === "production";
 
       // Discover React UIs from server entry
-      const discovered = await discoverReactUIs(options.serverEntry, root);
+      const discovered = await discoverReactUIs(options.serverEntry, root, logger);
 
       if (discovered.length === 0) {
-        // eslint-disable-next-line no-console
-        console.log("[mcp-react-ui] No defineReactUI calls found");
+        logger.info("[mcp-react-ui] No defineReactUI calls found");
         return;
       }
 
-      // eslint-disable-next-line no-console
-      console.log(
+      logger.info(
         `[mcp-react-ui] Found ${discovered.length} React UI(s): ${discovered.map((d) => d.componentName).join(", ")}`
       );
 
       // Build discovered UIs
-      await buildDiscoveredUIs(discovered, options, root, isProduction);
+      await buildDiscoveredUIs(discovered, options, root, isProduction, logger);
     },
 
     // Provide a virtual empty module so Vite doesn't complain about missing entry
     resolveId(id) {
-      if (id === "virtual:mcp-react-ui-entry") {
+      if (standalone && id === "virtual:mcp-react-ui-entry") {
         return id;
       }
       return null;
     },
 
     load(id) {
-      if (id === "virtual:mcp-react-ui-entry") {
+      if (standalone && id === "virtual:mcp-react-ui-entry") {
         return "export default {}";
       }
       return null;
@@ -408,6 +455,10 @@ export function mcpReactUI(options: McpReactUIOptions): Plugin {
 
     // Override the config to use our virtual entry
     config() {
+      if (!standalone) {
+        return undefined;
+      }
+
       return {
         build: {
           rollupOptions: {
@@ -417,8 +468,12 @@ export function mcpReactUI(options: McpReactUIOptions): Plugin {
       };
     },
 
-    // Prevent Vite from generating output files (we already wrote our HTML)
+    // Standalone mode: prevent Vite from generating output files (we already wrote our HTML)
     generateBundle(_, bundle) {
+      if (!standalone) {
+        return;
+      }
+
       // Remove all generated chunks since we don't need them
       const keys = Object.keys(bundle);
       for (const key of keys) {

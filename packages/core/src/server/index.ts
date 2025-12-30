@@ -681,12 +681,13 @@ function registerTools(
           const closeWidget = resultObj._closeWidget as boolean | undefined;
           const textNarration = resultObj._text as string | undefined;
 
-          // Build response _meta, merging user _meta with tool name and closeWidget
-          // Tool name is always included for widget access (especially OpenAI which doesn't expose it)
-          let responseMeta: Record<string, unknown> = {
-            toolName: name,
-            ...(resultObj._meta as Record<string, unknown> | undefined),
-          };
+          // Build response _meta, merging user _meta with optional tool name and closeWidget
+          // Tool name is only included when tool has a UI binding (for widget access, especially
+          // OpenAI which doesn't expose tool name to widgets)
+          const userMeta = resultObj._meta as Record<string, unknown> | undefined;
+          let responseMeta: Record<string, unknown> = uiKey
+            ? { toolName: name, ...userMeta }
+            : { ...userMeta };
           if (closeWidget) {
             responseMeta["openai/closeWidget"] = true;
           }

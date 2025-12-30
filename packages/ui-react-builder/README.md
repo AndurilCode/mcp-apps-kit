@@ -27,9 +27,11 @@ Building interactive UI widgets for MCP applications traditionally requires manu
 
 - `defineReactUI()` helper for type-safe React component definitions
 - Vite plugin for automatic discovery and building of React UIs
+- **AST-based parsing** using `@typescript-eslint/typescript-estree` for reliable detection
 - esbuild-powered bundling to self-contained HTML
 - Auto-generated HTML paths from component names (kebab-case)
 - Global CSS injection support
+- Configurable logging for plugin output
 - Full compatibility with `defineTool()` from `@mcp-apps-kit/core`
 
 ## Compatibility
@@ -119,6 +121,10 @@ export default defineConfig({
       outDir: "./src/ui/dist",
       // Optional: Global CSS to include in all UIs
       globalCss: "./src/ui/styles.css",
+
+      // Optional: Standalone mode takes over the Vite build and outputs only UI HTML.
+      // Use this if this Vite config exists solely to build MCP UI widgets.
+      // standalone: true,
     }),
   ],
 });
@@ -126,10 +132,17 @@ export default defineConfig({
 
 ### How it works
 
-1. The plugin scans your `serverEntry` file for `defineReactUI` calls
+1. The plugin scans your `serverEntry` file for `defineReactUI` calls using AST parsing
 2. It resolves component imports to their source files
 3. Each component is bundled with React, ReactDOM, and `@mcp-apps-kit/ui-react`
 4. Self-contained HTML files are written to `outDir`
+
+The plugin uses `@typescript-eslint/typescript-estree` for reliable AST-based detection of imports and `defineReactUI` calls. This is more robust than regex-based parsing and correctly handles:
+
+- Nested `defineReactUI` calls (e.g., inside `defineTool`)
+- Comments around definitions
+- Various import styles (named, default, aliased)
+- Complex code structures (conditionals, arrays, objects)
 
 ### Supported patterns
 
@@ -184,6 +197,7 @@ If you need patterns not supported by auto-discovery, use `defineUI({ html: "...
 | `ReactUIDef`   | Output type (extends `UIDef` from core) |
 | `BuildOptions` | Options for the build process           |
 | `BuildResult`  | Result of building React UIs            |
+| `PluginLogger` | Logger interface for Vite plugin        |
 
 ### Build Functions
 
@@ -191,6 +205,14 @@ If you need patterns not supported by auto-discovery, use `defineUI({ html: "...
 | --------------- | -------------------------------- |
 | `buildReactUIs` | Build multiple React UIs to HTML |
 | `buildReactUI`  | Build a single React UI to HTML  |
+
+> **Note:** The programmatic build functions (`buildReactUIs`, `buildReactUI`) serialize components using `.toString()`, which has limitations:
+>
+> - No external imports (components cannot import other modules)
+> - No closures (components that capture external variables won't work)
+> - Simple components only (best for self-contained components)
+>
+> For production use, prefer the **Vite plugin** which uses file paths for proper import resolution.
 
 ### Transform Utilities
 
@@ -214,12 +236,34 @@ If you need patterns not supported by auto-discovery, use `defineUI({ html: "...
 import { mcpReactUI } from "@mcp-apps-kit/ui-react-builder/vite";
 ```
 
-| Option        | Type      | Default        | Description                     |
-| ------------- | --------- | -------------- | ------------------------------- |
-| `serverEntry` | `string`  | (required)     | Server entry point to scan      |
-| `outDir`      | `string`  | `"./dist/ui"`  | Output directory for HTML files |
-| `minify`      | `boolean` | `true` in prod | Minify output JavaScript        |
-| `globalCss`   | `string`  | -              | Path to global CSS file         |
+| Option        | Type                    | Default        | Description                                 |
+| ------------- | ----------------------- | -------------- | ------------------------------------------- |
+| `serverEntry` | `string`                | (required)     | Server entry point to scan                  |
+| `outDir`      | `string`                | `"./dist/ui"`  | Output directory for HTML files             |
+| `minify`      | `boolean`               | `true` in prod | Minify output JavaScript                    |
+| `globalCss`   | `string`                | -              | Path to global CSS file                     |
+| `logger`      | `PluginLogger \| false` | console        | Custom logger or `false` to disable logging |
+| `standalone`  | `boolean`               | `false`        | Take over Vite build (emit only UI HTML)    |
+
+#### Custom logging
+
+```ts
+// Disable all logging
+mcpReactUI({
+  serverEntry: "./src/index.ts",
+  logger: false,
+});
+
+// Custom logger
+mcpReactUI({
+  serverEntry: "./src/index.ts",
+  logger: {
+    info: (msg) => myLogger.info(msg),
+    warn: (msg) => myLogger.warn(msg),
+    error: (msg) => myLogger.error(msg),
+  },
+});
+```
 
 ## Examples
 

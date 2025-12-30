@@ -18,26 +18,53 @@ import { generateHTML, generateEntryPoint } from "./html";
  * into a complete HTML file that includes React, ReactDOM, @mcp-apps-kit/ui-react,
  * and the user's component code.
  *
+ * **IMPORTANT: Limitations**
+ *
+ * This programmatic build function serializes components using `.toString()`, which has
+ * significant limitations:
+ *
+ * - **No external imports**: Components cannot import other modules, hooks, or utilities
+ * - **No closures**: Components that capture external variables will not work
+ * - **Simple components only**: Best for self-contained components without dependencies
+ *
+ * For production use, prefer the **Vite plugin** (`mcpReactUI`) which uses file paths
+ * for proper import resolution and supports:
+ * - Full import/export resolution
+ * - CSS imports and CSS modules
+ * - All React hooks and utilities
+ * - External component dependencies
+ *
+ * This function is primarily intended for:
+ * - **Testing**: Unit and integration tests for the build pipeline
+ * - **Simple widgets**: Self-contained components with no external imports
+ * - **Prototyping**: Quick experimentation before setting up Vite
+ *
  * @param uis - Record of UI keys to React UI definitions
  * @param options - Build configuration options
  * @returns Build result with compiled HTML and metadata
  *
  * @example
  * ```typescript
- * import { buildReactUIs, defineReactUI } from "@mcp-apps-kit/ui-react-builder";
- * import { RestaurantList } from "./widgets/RestaurantList";
+ * // For production, use the Vite plugin instead:
+ * // vite.config.ts
+ * import { mcpReactUI } from "@mcp-apps-kit/ui-react-builder/vite";
  *
- * const result = await buildReactUIs({
- *   "restaurant-list": defineReactUI({
- *     component: RestaurantList,
- *     name: "Restaurant List",
- *   }),
- * }, {
- *   outDir: "./dist/ui",
- *   minify: true,
+ * export default defineConfig({
+ *   plugins: [mcpReactUI({ serverEntry: "./src/index.ts" })],
  * });
  *
- * console.log(`Built ${result.outputs.size} UIs in ${result.duration}ms`);
+ * // This programmatic API is for simple/test cases:
+ * import { buildReactUIs, defineReactUI } from "@mcp-apps-kit/ui-react-builder";
+ *
+ * // Only works with simple, self-contained components
+ * const SimpleWidget = () => <div>Hello World</div>;
+ *
+ * const result = await buildReactUIs({
+ *   "simple": defineReactUI({
+ *     component: SimpleWidget,
+ *     name: "Simple Widget",
+ *   }),
+ * });
  * ```
  */
 export async function buildReactUIs(
