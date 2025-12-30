@@ -73,15 +73,36 @@ export function App() {
 }
 ```
 
-### Typed tools
+### Typed tools and results
+
+Use `ClientToolsFromCore` from `@mcp-apps-kit/core` for end-to-end type safety:
 
 ```tsx
-import { AppsProvider, useAppsClient } from "@mcp-apps-kit/ui-react";
-import type { AppClientTools } from "../server";
+import { AppsProvider, useAppsClient, useToolResult } from "@mcp-apps-kit/ui-react";
+import type { AppClientTools } from "../server"; // Exported from your server
 
 function Widget() {
+  // Typed client - callTool arguments and return types are inferred
   const client = useAppsClient<AppClientTools>();
-  return null;
+
+  // Typed results - result?.greet?.message is typed as string | undefined
+  const result = useToolResult<AppClientTools>();
+
+  const handleGreet = async () => {
+    // TypeScript enforces correct tool name and input shape
+    await client.callTool("greet", { name: "Alice" });
+  };
+
+  if (result?.greet) {
+    return (
+      <div>
+        <p>{result.greet.message}</p>
+        <p>at {result.greet.timestamp}</p>
+      </div>
+    );
+  }
+
+  return <button onClick={handleGreet}>Greet</button>;
 }
 
 export function App() {
@@ -91,6 +112,26 @@ export function App() {
     </AppsProvider>
   );
 }
+```
+
+The `AppClientTools` type is generated in your server code:
+
+```ts
+// server/index.ts
+import { createApp, defineTool, type ClientToolsFromCore } from "@mcp-apps-kit/core";
+
+const app = createApp({
+  tools: {
+    greet: defineTool({
+      input: z.object({ name: z.string() }),
+      output: z.object({ message: z.string(), timestamp: z.string() }),
+      handler: async (input) => ({ ... }),
+    }),
+  },
+});
+
+// Export for UI code
+export type AppClientTools = ClientToolsFromCore<typeof app.tools>;
 ```
 
 ## Examples

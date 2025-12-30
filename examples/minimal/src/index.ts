@@ -8,7 +8,9 @@
  * - Type-safe handlers using defineTool helper (no type assertions needed!)
  */
 
-import { createApp, defineTool, defineUI, type ClientToolsFromCore } from "@mcp-apps-kit/core";
+import { createApp, defineTool, type ClientToolsFromCore } from "@mcp-apps-kit/core";
+import { defineReactUI } from "@mcp-apps-kit/ui-react-builder";
+import { GreetingWidget } from "./ui/GreetingWidget";
 import { z } from "zod";
 
 // Define schemas separately for clarity
@@ -30,11 +32,11 @@ const greetTool = defineTool({
   output: greetOutput,
   visibility: "both",
 
-  // Colocated UI definition - no separate ui config needed!
-  ui: defineUI({
+  // React component UI - the Vite plugin auto-discovers and builds this!
+  ui: defineReactUI({
+    component: GreetingWidget,
     name: "Greeting Widget",
     description: "Displays greeting messages",
-    html: "./src/ui/dist/index.html",
     prefersBorder: true,
   }),
 

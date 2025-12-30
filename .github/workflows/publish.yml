@@ -56,5 +56,8 @@ jobs:
       - name: Publish @mcp-apps-kit/ui-react
         run: pnpm --filter @mcp-apps-kit/ui-react exec npm publish --access public --provenance
 
+      - name: Publish @mcp-apps-kit/ui-react-builder
+        run: pnpm --filter @mcp-apps-kit/ui-react-builder exec npm publish --access public --provenance
+
       - name: Publish @mcp-apps-kit/create-app
         run: pnpm --filter @mcp-apps-kit/create-app exec npm publish --access public --provenance

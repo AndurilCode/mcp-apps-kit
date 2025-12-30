@@ -142,6 +142,29 @@ export class OpenAIAdapter implements ProtocolAdapter {
     return null;
   }
 
+  /**
+   * Extract tool name from the OpenAI SDK.
+   * The tool name is passed via toolResponseMetadata.toolName from the server.
+   */
+  private getToolNameFromSDK(): string | undefined {
+    const openai = this.getOpenAI();
+    if (!openai) return undefined;
+
+    // Primary source: toolResponseMetadata contains toolName
+    // This is set by @mcp-apps-kit/core server when returning tool results
+    if (openai.toolResponseMetadata && typeof openai.toolResponseMetadata === "object") {
+      const meta = openai.toolResponseMetadata as { toolName?: string };
+      if (typeof meta.toolName === "string") return meta.toolName;
+    }
+
+    // Fallback: try other potential sources
+    if (typeof openai.toolName === "string") {
+      return openai.toolName;
+    }
+
+    return undefined;
+  }
+
   // === Lifecycle ===
 
   async connect(): Promise<void> {
@@ -157,6 +180,9 @@ export class OpenAIAdapter implements ProtocolAdapter {
       // Read initial host context from SDK properties
       this.readContextFromSDK();
 
+      // Try to get tool name from SDK
+      const toolName = this.getToolNameFromSDK();
+
       // Try to get initial tool context
       if (typeof openai.getToolOutput === "function") {
         this.currentToolOutput = (openai.getToolOutput as () => Record<string, unknown>)();
@@ -167,6 +193,16 @@ export class OpenAIAdapter implements ProtocolAdapter {
       } else if (openai.result) {
         this.currentToolOutput = openai.result as Record<string, unknown>;
         console.log("[OpenAI Adapter] Got result from SDK");
+      }
+
+      // Notify handlers of initial tool output (wrapped with tool name)
+      if (this.currentToolOutput && Object.keys(this.currentToolOutput).length > 0) {
+        const wrappedResult = toolName
+          ? { [toolName]: this.currentToolOutput }
+          : this.currentToolOutput;
+        for (const handler of this.toolResultHandlers) {
+          handler(wrappedResult);
+        }
       }
 
       if (typeof openai.getToolInput === "function") {
@@ -486,7 +522,11 @@ export class OpenAIAdapter implements ProtocolAdapter {
   }
 
   getToolOutput(): Record<string, unknown> | undefined {
-    return this.currentToolOutput;
+    // Wrap output with tool name so it matches what onToolResult handlers receive
+    if (!this.currentToolOutput) return undefined;
+    const toolName = this.getToolNameFromSDK();
+    const wrapped = toolName ? { [toolName]: this.currentToolOutput } : this.currentToolOutput;
+    return wrapped;
   }
 
   getToolMeta(): Record<string, unknown> | undefined {

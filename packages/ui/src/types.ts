@@ -277,7 +277,7 @@ export type ToolDefs = Record<string, { input: unknown; output?: unknown }>;
  * Extract output types from tool definitions
  */
 export type InferToolOutputs<T extends ToolDefs> = {
-  [K in keyof T]: T[K]["output"] extends unknown ? T[K]["output"] : unknown;
+  [K in keyof T]: T[K]["output"] extends undefined ? unknown : NonNullable<T[K]["output"]>;
 };
 
 /**

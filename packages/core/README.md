@@ -161,6 +161,58 @@ const app = createApp({
 });
 ```
 
+### End-to-End Type Safety with `ClientToolsFromCore`
+
+Export types from your server to use in UI code for fully typed tool results:
+
+```ts
+// server/index.ts
+import { createApp, defineTool, type ClientToolsFromCore } from "@mcp-apps-kit/core";
+import { z } from "zod";
+
+const app = createApp({
+  name: "my-app",
+  version: "1.0.0",
+  tools: {
+    greet: defineTool({
+      description: "Greet a user",
+      input: z.object({ name: z.string() }),
+      output: z.object({ message: z.string(), timestamp: z.string() }),
+      handler: async (input) => ({
+        message: `Hello, ${input.name}!`,
+        timestamp: new Date().toISOString(),
+      }),
+    }),
+  },
+});
+
+// Export types for UI code
+export type AppTools = typeof app.tools;
+export type AppClientTools = ClientToolsFromCore<AppTools>;
+```
+
+Then in your UI code, use the exported types with React hooks:
+
+```tsx
+// ui/Widget.tsx
+import { useToolResult } from "@mcp-apps-kit/ui-react";
+import type { AppClientTools } from "../server";
+
+function Widget() {
+  // Fully typed: result?.greet?.message is typed as string | undefined
+  const result = useToolResult<AppClientTools>();
+
+  if (result?.greet) {
+    return (
+      <p>
+        {result.greet.message} at {result.greet.timestamp}
+      </p>
+    );
+  }
+  return <p>Waiting for greeting...</p>;
+}
+```
+
 ## Plugins, Middleware & Events
 
 ### Plugins

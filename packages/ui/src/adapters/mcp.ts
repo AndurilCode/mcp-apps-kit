@@ -176,8 +176,13 @@ export class McpAdapter implements ProtocolAdapter {
     this.app.ontoolresult = (result) => {
       const output = this.extractToolOutput(result);
       this.currentToolOutput = output;
+
+      // Wrap output with tool name so hooks like useToolResult get { toolName: output }
+      const toolName = this.getToolNameFromContext();
+      const wrappedResult = toolName ? { [toolName]: output } : output;
+
       for (const handler of this.toolResultHandlers) {
-        handler(output);
+        handler(wrappedResult);
       }
     };
 
@@ -274,6 +279,19 @@ export class McpAdapter implements ProtocolAdapter {
     const hc = rawHostContext as { toolInfo?: unknown };
     if (!hc.toolInfo || typeof hc.toolInfo !== "object") return undefined;
     return { toolInfo: hc.toolInfo as Record<string, unknown> };
+  }
+
+  /**
+   * Extract tool name from current host context's toolInfo.
+   * Returns undefined if toolInfo is not available.
+   */
+  private getToolNameFromContext(): string | undefined {
+    if (!this.app) return undefined;
+    const hostContext = this.app.getHostContext();
+    if (!hostContext) return undefined;
+
+    const toolInfo = (hostContext as { toolInfo?: { tool?: { name?: string } } }).toolInfo;
+    return toolInfo?.tool?.name;
   }
 
   private extractToolOutput(result: unknown): Record<string, unknown> {
