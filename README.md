@@ -453,6 +453,8 @@ Local examples:
 
 ## API
 
+📖 **[API Reference](https://andurilcode.github.io/mcp-apps-kit/)** - Full TypeDoc-generated documentation
+
 Detailed package documentation:
 
 - [packages/core/README.md](packages/core/README.md)
