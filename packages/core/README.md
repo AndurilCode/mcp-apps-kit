@@ -203,7 +203,11 @@ function Widget() {
   const result = useToolResult<AppClientTools>();
 
   if (result?.greet) {
-    return <p>{result.greet.message} at {result.greet.timestamp}</p>;
+    return (
+      <p>
+        {result.greet.message} at {result.greet.timestamp}
+      </p>
+    );
   }
   return <p>Waiting for greeting...</p>;
 }
