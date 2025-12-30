@@ -55,9 +55,6 @@ jobs:
             pull-requests: write
             issues: write
 
-          # Enable Claude to push commits to PRs
-          allow_push_to_pr: true
-
           # Allow git operations for pushing commits and pnpm install
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
