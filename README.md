@@ -7,6 +7,7 @@
 [![npm @mcp-apps-kit/core](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fcore?label=%40mcp-apps-kit%2Fcore&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/core)
 [![npm @mcp-apps-kit/ui](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fui?label=%40mcp-apps-kit%2Fui&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/ui)
 [![npm @mcp-apps-kit/ui-react](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fui-react?label=%40mcp-apps-kit%2Fui-react&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/ui-react)
+[![npm @mcp-apps-kit/ui-react-builder](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fui-react-builder?label=%40mcp-apps-kit%2Fui-react-builder&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/ui-react-builder)
 [![npm @mcp-apps-kit/create-app](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fcreate-app?label=%40mcp-apps-kit%2Fcreate-app&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/create-app)
 
 Build interactive AI apps for [MCP Apps](https://blog.modelcontextprotocol.io/posts/2025-11-21-mcp-apps/) and [ChatGPT](https://developers.openai.com/apps-sdk) from a single codebase.
@@ -21,6 +22,7 @@ MCP AppsKit is a TypeScript framework for building interactive applications with
 - [Compatibility](#compatibility)
 - [Install](#install)
 - [Usage](#usage)
+  - [React Component UIs](#react-component-uis)
 - [Type-Safe Tool Definitions](#type-safe-tool-definitions)
 - [How It Works](#how-it-works)
 - [Deployment Options](#deployment-options)
@@ -70,12 +72,13 @@ This project may be a poor fit if you:
 
 ## Packages
 
-| Package                    | Description                  |
-| -------------------------- | ---------------------------- |
-| `@mcp-apps-kit/core`       | Server-side framework        |
-| `@mcp-apps-kit/ui`         | Client-side SDK (vanilla JS) |
-| `@mcp-apps-kit/ui-react`   | React bindings               |
-| `@mcp-apps-kit/create-app` | CLI scaffolding tool         |
+| Package                          | Description                        |
+| -------------------------------- | ---------------------------------- |
+| `@mcp-apps-kit/core`             | Server-side framework              |
+| `@mcp-apps-kit/ui`               | Client-side SDK (vanilla JS)       |
+| `@mcp-apps-kit/ui-react`         | React bindings                     |
+| `@mcp-apps-kit/ui-react-builder` | Build tool for React component UIs |
+| `@mcp-apps-kit/create-app`       | CLI scaffolding tool               |
 
 ## Compatibility
 
@@ -105,6 +108,12 @@ Vanilla UI SDK:
 
 ```bash
 npm install @mcp-apps-kit/ui
+```
+
+React UI builder (for defining UIs with React components):
+
+```bash
+npm install @mcp-apps-kit/ui-react-builder
 ```
 
 CLI scaffolding tool:
@@ -206,6 +215,58 @@ function RestaurantList() {
   );
 }
 ```
+
+### React Component UIs
+
+Instead of pre-building HTML files, you can define UIs using React components directly with `@mcp-apps-kit/ui-react-builder`:
+
+```typescript
+// server/index.ts
+import { createApp, defineTool } from "@mcp-apps-kit/core";
+import { defineReactUI } from "@mcp-apps-kit/ui-react-builder";
+import { RestaurantList } from "./ui/RestaurantList";
+import { z } from "zod";
+
+const app = createApp({
+  name: "restaurant-finder",
+  version: "1.0.0",
+  tools: {
+    search_restaurants: defineTool({
+      description: "Search for restaurants",
+      input: z.object({ location: z.string() }),
+      output: z.object({ restaurants: z.array(z.unknown()) }),
+      // Define UI with React component - auto-builds to HTML
+      ui: defineReactUI({
+        component: RestaurantList,
+        name: "Restaurant List",
+        prefersBorder: true,
+      }),
+      handler: async (input) => {
+        return { restaurants: await fetchRestaurants(input.location) };
+      },
+    }),
+  },
+});
+```
+
+Configure the Vite plugin to auto-discover and build React UIs:
+
+```typescript
+// vite.config.ts
+import { defineConfig } from "vite";
+import { mcpReactUI } from "@mcp-apps-kit/ui-react-builder/vite";
+
+export default defineConfig({
+  plugins: [
+    mcpReactUI({
+      serverEntry: "./src/index.ts",
+      outDir: "./src/ui/dist",
+    }),
+  ],
+});
+```
+
+The plugin scans your server entry for `defineReactUI` calls, bundles each component with React and `@mcp-apps-kit/ui-react`, and outputs self-contained HTML files.
 
 ### CLI
 
@@ -396,6 +457,7 @@ Detailed package documentation:
 - [packages/core/README.md](packages/core/README.md)
 - [packages/ui/README.md](packages/ui/README.md)
 - [packages/ui-react/README.md](packages/ui-react/README.md)
+- [packages/ui-react-builder/README.md](packages/ui-react-builder/README.md)
 - [packages/create-app/README.md](packages/create-app/README.md)
 
 ## Contributing
