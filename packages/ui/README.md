@@ -71,8 +71,14 @@ import type { AppClientTools } from "../server";
 
 const client = await createClient<AppClientTools>();
 
+// Option 1: Using callTool with tool name string
 await client.callTool("search_restaurants", { location: "Paris" });
+
+// Option 2: Using the typed tools proxy (recommended)
+await client.tools.callSearchRestaurants({ location: "Paris" });
 ```
+
+The `tools` property provides a typed proxy with methods like `callGreet()`, `callSearchRestaurants()`, etc. Method names are generated from tool names by prepending "call" and capitalizing the first letter.
 
 ### Local testing
 
@@ -122,6 +128,24 @@ const app = createApp({
 
 - `createClient(options?)` - Create a connected client with auto-detection
 - `detectProtocol()` - Detect the host platform ("mcp" | "openai" | "mock")
+
+### Typed Tools Proxy
+
+The `client.tools` property provides typed method wrappers for tool calls:
+
+```ts
+import type { AppClientTools } from "../server";
+
+const client = await createClient<AppClientTools>();
+
+// Tool name "greet" becomes method "callGreet"
+const result = await client.tools.callGreet({ name: "Alice" });
+
+// Tool name "searchRestaurants" becomes "callSearchRestaurants"
+const restaurants = await client.tools.callSearchRestaurants({ location: "Paris" });
+```
+
+This is equivalent to `client.callTool("greet", { name: "Alice" })` but provides better IDE autocomplete and type checking.
 
 ### Host Capabilities
 

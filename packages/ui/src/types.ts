@@ -318,6 +318,27 @@ export type InferToolInputs<T extends ToolDefs> = {
 };
 
 /**
+ * Typed tool methods generated from tool definitions.
+ *
+ * Creates a method for each tool with the naming convention `call{ToolName}`.
+ * For example, a tool named "greet" becomes `callGreet()`.
+ *
+ * @example
+ * ```typescript
+ * // Instead of:
+ * await client.callTool("greet", { name: "Alice" });
+ *
+ * // You can use:
+ * await client.tools.callGreet({ name: "Alice" });
+ * ```
+ */
+export type ToolMethods<T extends ToolDefs> = {
+  [K in keyof T as K extends string ? `call${Capitalize<K>}` : never]: (
+    args: InferToolInputs<T>[K]
+  ) => Promise<InferToolOutputs<T>[K]>;
+};
+
+/**
  * Tool result with optional metadata
  *
  * @internal
@@ -349,6 +370,23 @@ export interface AppsClient<T extends ToolDefs = ToolDefs> {
     name: K,
     args: InferToolInputs<T>[K]
   ): Promise<InferToolOutputs<T>[K]>;
+
+  /**
+   * Typed tool methods object.
+   *
+   * Provides direct method access to tools with the naming convention `call{ToolName}`.
+   * This is an alternative to using `callTool()` that provides a more ergonomic API.
+   *
+   * @example
+   * ```typescript
+   * // Instead of:
+   * await client.callTool("greet", { name: "Alice" });
+   *
+   * // You can use:
+   * await client.tools.callGreet({ name: "Alice" });
+   * ```
+   */
+  readonly tools: ToolMethods<T>;
 
   // === Messaging ===
 

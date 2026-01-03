@@ -17,13 +17,22 @@ import { createClient } from "@mcp-apps-kit/ui";
 // CONTEXT
 // =============================================================================
 
+// Internal context value - uses `unknown` for the client to allow any typed client
+// The actual type parameter is applied when consuming via hooks
+interface AppsContextValueInternal {
+  client: AppsClient | null;
+  isConnecting: boolean;
+  error: Error | null;
+}
+
+// Public interface with generic type parameter for typed access
 interface AppsContextValue<T extends ToolDefs = ToolDefs> {
   client: AppsClient<T> | null;
   isConnecting: boolean;
   error: Error | null;
 }
 
-const AppsContext = createContext<AppsContextValue | null>(null);
+const AppsContext = createContext<AppsContextValueInternal | null>(null);
 
 // =============================================================================
 // PROVIDER PROPS
@@ -117,13 +126,21 @@ export function AppsProvider<T extends ToolDefs = ToolDefs>({
     return <ErrorFallback error={error} reset={() => setError(null)} />;
   }
 
-  if (isConnecting && fallback) {
-    return <>{fallback}</>;
+  // Don't render children until client is connected
+  // This prevents hooks from throwing during initial connection
+  if (isConnecting) {
+    return <>{fallback ?? null}</>;
   }
 
-  return (
-    <AppsContext.Provider value={{ client, isConnecting, error }}>{children}</AppsContext.Provider>
-  );
+  // Cast to internal type - the generic T is preserved at runtime,
+  // and consumers use hooks with their own type parameter to get proper typing
+  const contextValue: AppsContextValueInternal = {
+    client: client as AppsClient | null,
+    isConnecting,
+    error,
+  };
+
+  return <AppsContext.Provider value={contextValue}>{children}</AppsContext.Provider>;
 }
 
 // =============================================================================

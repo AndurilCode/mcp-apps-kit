@@ -34,6 +34,7 @@ export type {
   ToolDefs,
   InferToolInputs,
   InferToolOutputs,
+  ToolMethods,
   ToolResult,
   AppsClient,
   CreateClientOptions,
