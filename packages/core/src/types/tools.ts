@@ -9,6 +9,36 @@ import type { EventMap, EventHandler, AnyEventHandler, UnsubscribeFn } from "../
 // Use Zod's built-in type inference utilities directly
 
 // =============================================================================
+// TYPE UTILITIES
+// =============================================================================
+
+/**
+ * Reserved metadata keys that are always allowed in tool handler output
+ */
+type ToolOutputMeta = {
+  _meta?: Record<string, unknown>;
+  _text?: string;
+  _closeWidget?: boolean;
+};
+
+/**
+ * Keys that are reserved for metadata in tool output
+ */
+type MetaKeys = keyof ToolOutputMeta;
+
+/**
+ * Enforces strict return type checking for tool handlers.
+ * Prevents returning properties not defined in the output schema.
+ *
+ * Uses a conditional type to detect excess properties at compile time.
+ */
+type StrictToolOutput<TOutput, TActual> = TActual extends TOutput & ToolOutputMeta
+  ? Exclude<keyof TActual, keyof TOutput | MetaKeys> extends never
+    ? TActual
+    : TOutput & ToolOutputMeta & { [K in Exclude<keyof TActual, keyof TOutput | MetaKeys>]: never }
+  : TOutput & ToolOutputMeta;
+
+// =============================================================================
 // TOOL DEFINITIONS
 // =============================================================================
 
@@ -324,18 +354,16 @@ export type ToolDefs = Record<string, ToolDef>;
  * });
  * ```
  */
-export function defineTool<TInput extends z.ZodType, TOutput extends z.ZodType>(
+export function defineTool<
+  TInput extends z.ZodType,
+  TOutput extends z.ZodType,
+  TActual extends z.infer<TOutput> & ToolOutputMeta = z.infer<TOutput> & ToolOutputMeta,
+>(
   definition: Omit<ToolDef<TInput, TOutput>, "handler"> & {
     handler: (
       input: z.infer<TInput>,
       context: ToolContext
-    ) => Promise<
-      z.infer<TOutput> & {
-        _meta?: Record<string, unknown>;
-        _text?: string;
-        _closeWidget?: boolean;
-      }
-    >;
+    ) => Promise<StrictToolOutput<z.infer<TOutput>, TActual>>;
   }
 ): ToolDef<TInput, TOutput> {
   return definition as ToolDef<TInput, TOutput>;
