@@ -104,6 +104,83 @@ describe("createClient contract", () => {
     });
   });
 
+  describe("tools proxy", () => {
+    it("should have a tools property", async () => {
+      const client = await createClient({ forceAdapter: "mock" });
+
+      expect(client.tools).toBeDefined();
+      expect(typeof client.tools).toBe("object");
+    });
+
+    it("should generate typed methods from tool definitions", async () => {
+      type MyTools = {
+        greet: { input: { name: string }; output: { message: string } };
+        getUser: { input: { id: number }; output: { name: string; email: string } };
+      };
+
+      const client = await createClient<MyTools>({ forceAdapter: "mock" });
+
+      // Methods should exist and be callable
+      expect(typeof client.tools.callGreet).toBe("function");
+      expect(typeof client.tools.callGetUser).toBe("function");
+    });
+
+    it("should call the underlying callTool method with correct arguments", async () => {
+      type MyTools = {
+        greet: { input: { name: string }; output: { message: string } };
+      };
+
+      const client = await createClient<MyTools>({ forceAdapter: "mock" });
+
+      // Call via tools proxy and verify it works the same as callTool
+      const proxyResult = await client.tools.callGreet({ name: "Alice" });
+      const directResult = await client.callTool("greet", { name: "Alice" });
+
+      // Both should return the same mock result structure
+      expect(proxyResult).toEqual(directResult);
+    });
+
+    it("should handle camelCase tool names correctly", async () => {
+      type MyTools = {
+        getUserProfile: { input: { userId: string }; output: { profile: object } };
+      };
+
+      const client = await createClient<MyTools>({ forceAdapter: "mock" });
+
+      // Call via tools proxy and verify it works the same as callTool
+      const proxyResult = await client.tools.callGetUserProfile({ userId: "123" });
+      const directResult = await client.callTool("getUserProfile", { userId: "123" });
+
+      // Both should return the same mock result structure
+      expect(proxyResult).toEqual(directResult);
+    });
+
+    it("should return undefined for non-call methods", async () => {
+      const client = await createClient({ forceAdapter: "mock" });
+
+      // @ts-expect-error - testing runtime behavior for invalid access
+      expect(client.tools.randomMethod).toBeUndefined();
+      // @ts-expect-error - testing runtime behavior for invalid access
+      expect(client.tools.greet).toBeUndefined(); // Missing "call" prefix
+    });
+
+    it("should return undefined for just 'call' without a tool name", async () => {
+      const client = await createClient({ forceAdapter: "mock" });
+
+      // Testing runtime behavior - proxy allows access but returns undefined
+      expect((client.tools as Record<string, unknown>).call).toBeUndefined();
+    });
+
+    it("should support 'in' operator for method existence check", async () => {
+      const client = await createClient({ forceAdapter: "mock" });
+
+      expect("callGreet" in client.tools).toBe(true);
+      expect("callAnyTool" in client.tools).toBe(true);
+      expect("randomMethod" in client.tools).toBe(false);
+      expect("call" in client.tools).toBe(false);
+    });
+  });
+
   describe("state management", () => {
     it("should store and retrieve state with mock adapter", async () => {
       const client = await createClient({ forceAdapter: "mock" });

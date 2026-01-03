@@ -19,8 +19,66 @@ import type {
   SizeChangedParams,
   CallToolHandler,
   ListToolsHandler,
+  ToolMethods,
 } from "./types";
 import type { ProtocolAdapter } from "./adapters/types";
+
+/**
+ * Create a Proxy-based tools object that generates typed methods dynamically.
+ *
+ * The Proxy intercepts property access and converts method names like `callGreet`
+ * to tool calls for the `greet` tool.
+ *
+ * @internal
+ */
+function createToolsProxy<T extends ToolDefs>(
+  callTool: <K extends keyof T>(
+    name: K,
+    args: InferToolInputs<T>[K]
+  ) => Promise<InferToolOutputs<T>[K]>
+): ToolMethods<T> {
+  return new Proxy({} as ToolMethods<T>, {
+    get(_target, prop: string | symbol) {
+      // Only handle string properties that start with "call"
+      if (typeof prop !== "string" || !prop.startsWith("call")) {
+        return undefined;
+      }
+
+      // Extract tool name: "callGreet" -> "greet", "callGetUser" -> "getUser"
+      const methodName = prop.slice(4); // Remove "call" prefix
+      if (methodName.length === 0) {
+        return undefined;
+      }
+
+      // Convert first character to lowercase: "Greet" -> "greet"
+      const toolName = methodName.charAt(0).toLowerCase() + methodName.slice(1);
+
+      // Return a function that calls the tool
+      return (args: unknown) => callTool(toolName as keyof T, args as InferToolInputs<T>[keyof T]);
+    },
+
+    // Support checking if a method exists
+    has(_target, prop: string | symbol) {
+      return typeof prop === "string" && prop.startsWith("call") && prop.length > 4;
+    },
+
+    // Prevent enumeration (tools are lazily created)
+    ownKeys() {
+      return [];
+    },
+
+    getOwnPropertyDescriptor(_target, prop: string | symbol) {
+      if (typeof prop === "string" && prop.startsWith("call") && prop.length > 4) {
+        return {
+          configurable: true,
+          enumerable: true,
+          writable: false,
+        };
+      }
+      return undefined;
+    },
+  });
+}
 
 /**
  * Create an AppsClient that wraps a protocol adapter
@@ -30,16 +88,24 @@ import type { ProtocolAdapter } from "./adapters/types";
 export function createAppsClient<T extends ToolDefs = ToolDefs>(
   adapter: ProtocolAdapter
 ): AppsClient<T> {
+  // Define callTool as a standalone function so we can use it in the proxy
+  async function callTool<K extends keyof T>(
+    name: K,
+    args: InferToolInputs<T>[K]
+  ): Promise<InferToolOutputs<T>[K]> {
+    const result = await adapter.callTool(name as string, args as Record<string, unknown>);
+    return result as InferToolOutputs<T>[K];
+  }
+
+  // Create the tools proxy for typed method access
+  const toolsProxy = createToolsProxy<T>(callTool);
+
   const client: AppsClient<T> = {
     // === Tool Operations ===
 
-    async callTool<K extends keyof T>(
-      name: K,
-      args: InferToolInputs<T>[K]
-    ): Promise<InferToolOutputs<T>[K]> {
-      const result = await adapter.callTool(name as string, args as Record<string, unknown>);
-      return result as InferToolOutputs<T>[K];
-    },
+    callTool,
+
+    tools: toolsProxy,
 
     // === Messaging ===
 

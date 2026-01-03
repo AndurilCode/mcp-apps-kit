@@ -20,7 +20,7 @@ export type {
 } from "@mcp-apps-kit/ui";
 
 // Context (placeholder - will be implemented in Phase 6)
-export { AppsProvider } from "./context";
+export { AppsProvider, useAppsContext } from "./context";
 export type { AppsProviderProps } from "./context";
 
 // Hooks (placeholder - will be implemented in Phase 6)
