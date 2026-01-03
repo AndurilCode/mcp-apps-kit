@@ -197,9 +197,11 @@ function RestaurantList() {
   const restaurants = result?.search_restaurants?.restaurants ?? [];
 
   const handleRefresh = async () => {
-    await client.callTool("search_restaurants", {
-      location: "Paris",
-    });
+    // Option 1: Using callTool with tool name string
+    await client.callTool("search_restaurants", { location: "Paris" });
+
+    // Option 2: Using the typed tools proxy (recommended)
+    await client.tools.callSearchRestaurants({ location: "Paris" });
   };
 
   return (
@@ -357,7 +359,12 @@ import type { AppClientTools } from "./server";
 
 const client = await createClient<AppClientTools>();
 
+// Option 1: Using callTool with tool name string
 await client.callTool("my_tool", { arg: "value" });
+
+// Option 2: Using the typed tools proxy (recommended)
+await client.tools.callMyTool({ arg: "value" });
+
 await client.sendFollowUpMessage("Tell me more");
 await client.requestDisplayMode("fullscreen");
 ```
