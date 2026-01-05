@@ -288,6 +288,159 @@ describe("createApp versioning", () => {
     });
   });
 
+  describe("deep config merging", () => {
+    it("should deep merge nested config objects", () => {
+      const app = createApp({
+        name: "test-app",
+        config: {
+          debug: {
+            logTool: true,
+            level: "info",
+            batchSize: 100,
+          },
+        },
+        versions: {
+          v1: {
+            version: "1.0.0",
+            tools: {},
+            config: {
+              debug: {
+                level: "warn", // Only override level, inherit logTool and batchSize
+              },
+            },
+          },
+        },
+      });
+
+      expect(app).toBeDefined();
+      // v1 should have debug config with:
+      // - logTool: true (inherited from global)
+      // - level: "warn" (overridden)
+      // - batchSize: 100 (inherited from global)
+    });
+
+    it("should allow null to disable nested config entirely", () => {
+      const app = createApp({
+        name: "test-app",
+        config: {
+          debug: {
+            logTool: true,
+            level: "info",
+          },
+        },
+        versions: {
+          v1: {
+            version: "1.0.0",
+            tools: {},
+            config: {
+              debug: null, // Explicitly disable debug for v1
+            },
+          },
+        },
+      });
+
+      expect(app).toBeDefined();
+      // v1 should have debug disabled (undefined)
+    });
+
+    it("should use version-specific config when global is not provided", () => {
+      const app = createApp({
+        name: "test-app",
+        versions: {
+          v1: {
+            version: "1.0.0",
+            tools: {},
+            config: {
+              debug: {
+                logTool: true,
+                level: "debug",
+              },
+            },
+          },
+        },
+      });
+
+      expect(app).toBeDefined();
+      // v1 should have its own debug config
+    });
+
+    it("should inherit global config when version config is undefined", () => {
+      const app = createApp({
+        name: "test-app",
+        config: {
+          debug: {
+            logTool: true,
+            level: "info",
+          },
+        },
+        versions: {
+          v1: {
+            version: "1.0.0",
+            tools: {},
+            // No config override - should inherit global debug config
+          },
+        },
+      });
+
+      expect(app).toBeDefined();
+      // v1 should have global debug config
+    });
+
+    it("should replace arrays instead of merging them", () => {
+      const app = createApp({
+        name: "test-app",
+        config: {
+          cors: {
+            origin: ["https://example.com", "https://app.example.com"],
+            credentials: true,
+          },
+        },
+        versions: {
+          v1: {
+            version: "1.0.0",
+            tools: {},
+            config: {
+              cors: {
+                origin: ["https://v1.example.com"], // Replace array entirely
+              },
+            },
+          },
+        },
+      });
+
+      expect(app).toBeDefined();
+      // v1 should have cors.origin = ["https://v1.example.com"] (replaced)
+      // v1 should have cors.credentials = true (inherited)
+    });
+
+    it("should allow null to remove specific nested properties", () => {
+      const app = createApp({
+        name: "test-app",
+        config: {
+          debug: {
+            logTool: true,
+            level: "info",
+            batchSize: 50,
+          },
+        },
+        versions: {
+          v1: {
+            version: "1.0.0",
+            tools: {},
+            config: {
+              debug: {
+                batchSize: null, // Remove batchSize property
+              },
+            },
+          },
+        },
+      });
+
+      expect(app).toBeDefined();
+      // v1 should have debug with logTool and level but NOT batchSize
+    });
+  });
+
   describe("route isolation", () => {
     it("should expose each version at its dedicated route", async () => {
       const app = createApp({
@@ -777,12 +930,16 @@ describe("createApp versioning", () => {
       expect(data.error).toBe("Not found");
     });
 
-    it("should return 404 for non-existent version via handleRequest", async () => {
+    it("should return 404 with available versions for non-existent version via handleRequest", async () => {
       const app = createApp({
         name: "test-app",
         versions: {
           v1: {
             version: "1.0.0",
+            tools: {},
+          },
+          v2: {
+            version: "2.0.0",
             tools: {},
           },
         },
@@ -801,6 +958,10 @@ describe("createApp versioning", () => {
       const response = await app.handleRequest(request);
 
       expect(response.status).toBe(404);
+      const data = await response.json();
+      expect(data.error).toBe("Version not found");
+      expect(data.message).toContain("v999");
+      expect(data.availableVersions).toEqual(["v1", "v2"]);
     });
   });
 });

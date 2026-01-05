@@ -58,6 +58,8 @@ export type {
   AppConfig,
   DebugConfig,
   DebugLogLevel,
+  VersionSpecificConfig,
+  DeepPartialWithNull,
 } from "./types/config";
 
 // OAuth types

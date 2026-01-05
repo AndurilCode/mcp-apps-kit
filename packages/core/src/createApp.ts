@@ -10,8 +10,8 @@ import type {
   AppConfigInput,
   VersionsConfig,
   VersionConfig,
-  DebugConfig,
   GlobalConfig,
+  VersionSpecificConfig,
 } from "./types/config";
 import type { UIDef, UIDefs } from "./types/ui";
 import type { Middleware } from "./middleware/types";
@@ -129,9 +129,10 @@ function validateVersionConfig<T extends ToolDefs>(
 
 /**
  * Validate global config
+ * Accepts GlobalConfig, Partial<GlobalConfig>, or VersionSpecificConfig (which allows null values)
  */
 function validateGlobalConfig(
-  config: GlobalConfig | Partial<GlobalConfig>,
+  config: GlobalConfig | Partial<GlobalConfig> | VersionSpecificConfig,
   prefix = "Config"
 ): void {
   // Validate serverRoute if provided
@@ -154,19 +155,21 @@ function validateGlobalConfig(
     }
   }
 
-  // Validate debug config if provided
-  if (config.debug !== undefined) {
-    const debug: DebugConfig = config.debug;
-    if (typeof debug !== "object" || debug === null) {
-      throw new AppError(ErrorCode.INVALID_CONFIG, `${prefix}.debug must be an object`);
+  // Validate debug config if provided (null is valid - means disable)
+  if (config.debug !== undefined && config.debug !== null) {
+    const debug = config.debug;
+    if (typeof debug !== "object") {
+      throw new AppError(ErrorCode.INVALID_CONFIG, `${prefix}.debug must be an object or null`);
     }
-    if (debug.logTool !== undefined && typeof debug.logTool !== "boolean") {
+    // Note: Nested null values (e.g., logTool: null) are valid for deep merge
+    // and will be handled by deepMerge to remove the property
+    if (debug.logTool !== undefined && debug.logTool !== null && typeof debug.logTool !== "boolean") {
       throw new AppError(
         ErrorCode.INVALID_CONFIG,
         `${prefix}.debug.logTool must be a boolean if provided`
       );
     }
-    if (debug.level !== undefined) {
+    if (debug.level !== undefined && debug.level !== null) {
       const validLevels = ["debug", "info", "warn", "error"];
       if (!validLevels.includes(debug.level)) {
         throw new AppError(
@@ -175,7 +178,7 @@ function validateGlobalConfig(
         );
       }
     }
-    if (debug.batchSize !== undefined) {
+    if (debug.batchSize !== undefined && debug.batchSize !== null) {
       if (typeof debug.batchSize !== "number" || debug.batchSize < 1) {
         throw new AppError(
           ErrorCode.INVALID_CONFIG,
@@ -183,7 +186,7 @@ function validateGlobalConfig(
         );
       }
     }
-    if (debug.flushIntervalMs !== undefined) {
+    if (debug.flushIntervalMs !== undefined && debug.flushIntervalMs !== null) {
       if (typeof debug.flushIntervalMs !== "number" || debug.flushIntervalMs < 0) {
         throw new AppError(
           ErrorCode.INVALID_CONFIG,
@@ -193,8 +196,8 @@ function validateGlobalConfig(
     }
   }
 
-  // Validate OAuth config if provided
-  if (config.oauth !== undefined) {
+  // Validate OAuth config if provided (null is valid - means disable)
+  if (config.oauth !== undefined && config.oauth !== null) {
     try {
       OAuthConfigSchema.parse(config.oauth);
     } catch (error) {
@@ -208,11 +211,11 @@ function validateGlobalConfig(
     }
   }
 
-  // Validate OpenAI config if provided
-  if (config.openai !== undefined) {
+  // Validate OpenAI config if provided (null is valid - means disable)
+  if (config.openai !== undefined && config.openai !== null) {
     const openaiConfig = config.openai as Record<string, unknown>;
-    if (typeof openaiConfig !== "object" || openaiConfig === null) {
-      throw new AppError(ErrorCode.INVALID_CONFIG, `${prefix}.openai must be an object`);
+    if (typeof openaiConfig !== "object") {
+      throw new AppError(ErrorCode.INVALID_CONFIG, `${prefix}.openai must be an object or null`);
     }
     if (openaiConfig.domain_challenge !== undefined) {
       const token = openaiConfig.domain_challenge;
@@ -321,26 +324,114 @@ function validateConfig<T extends ToolDefs>(config: unknown): asserts config is 
 }
 
 /**
+ * Deep merge two objects. Version-specific values override global values.
+ * - null explicitly removes/disables the property
+ * - undefined inherits from global
+ * - Objects are recursively merged
+ * - Arrays and primitives are replaced
+ *
+ * @param global - Global config object
+ * @param versionSpecific - Version-specific config (overrides global)
+ * @returns Merged config or undefined if disabled
+ */
+function deepMerge<T extends Record<string, unknown>>(
+  global: T | undefined,
+  versionSpecific: Partial<T> | null | undefined
+): T | undefined {
+  // null explicitly disables the config
+  if (versionSpecific === null) {
+    return undefined;
+  }
+
+  // undefined inherits from global
+  if (versionSpecific === undefined) {
+    return global;
+  }
+
+  // No global config, use version-specific
+  if (global === undefined) {
+    return versionSpecific as T;
+  }
+
+  // Deep merge objects
+  const result = { ...global } as Record<string, unknown>;
+
+  for (const [key, value] of Object.entries(versionSpecific)) {
+    if (value === null) {
+      // null removes the property
+      delete result[key];
+    } else if (value === undefined) {
+      // undefined keeps the global value (no change)
+    } else if (
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      typeof result[key] === "object" &&
+      !Array.isArray(result[key]) &&
+      result[key] !== null
+    ) {
+      // Recursively merge nested objects
+      result[key] = deepMerge(
+        result[key] as Record<string, unknown>,
+        value as Record<string, unknown>
+      );
+    } else {
+      // Replace arrays and primitives
+      result[key] = value;
+    }
+  }
+
+  return result as T;
+}
+
+/**
  * Merge global config with version-specific config
- * Version-specific config takes precedence over global config
- * Note: Nested objects (oauth, cors, openai, debug, protocol) are replaced entirely
- * by version-specific values, not deep-merged.
+ * Version-specific config takes precedence over global config.
+ *
+ * Nested objects (oauth, cors, openai, debug, protocol) are deep-merged:
+ * - Specific properties override global properties
+ * - undefined inherits from global
+ * - null explicitly disables/removes the config
+ * - Arrays and primitives are replaced (not merged)
  */
 function mergeVersionConfig<T extends ToolDefs>(
   globalConfig: GlobalConfig | undefined,
   versionConfig: VersionConfig<T>,
   globalPlugins: Plugin[] | undefined
 ): AppConfig<T> & { ui?: UIDefs } {
-  // Merge config objects (version-specific overrides global)
+  // Handle primitive config properties (null means remove, undefined means inherit)
+  const serverRoute =
+    versionConfig.config?.serverRoute === null
+      ? undefined
+      : versionConfig.config?.serverRoute ?? globalConfig?.serverRoute;
+
+  // Handle protocol (string literal, not an object - use simple override)
+  const protocol =
+    versionConfig.config?.protocol === null
+      ? undefined
+      : versionConfig.config?.protocol ?? globalConfig?.protocol;
+
+  // Deep merge nested config objects (null disables, undefined inherits)
+  // Type assertions needed because deepMerge returns Record<string, unknown>
   const mergedConfig: GlobalConfig = {
-    ...globalConfig,
-    ...versionConfig.config,
-    // Shallow merge for nested objects (version-specific replaces global entirely)
-    oauth: versionConfig.config?.oauth ?? globalConfig?.oauth,
-    cors: versionConfig.config?.cors ?? globalConfig?.cors,
-    openai: versionConfig.config?.openai ?? globalConfig?.openai,
-    debug: versionConfig.config?.debug ?? globalConfig?.debug,
-    protocol: versionConfig.config?.protocol ?? globalConfig?.protocol,
+    serverRoute,
+    protocol,
+    // Deep merge nested objects
+    oauth: deepMerge(
+      globalConfig?.oauth as Record<string, unknown> | undefined,
+      versionConfig.config?.oauth as Record<string, unknown> | null | undefined
+    ) as GlobalConfig["oauth"],
+    cors: deepMerge(
+      globalConfig?.cors as Record<string, unknown> | undefined,
+      versionConfig.config?.cors as Record<string, unknown> | null | undefined
+    ) as GlobalConfig["cors"],
+    openai: deepMerge(
+      globalConfig?.openai as Record<string, unknown> | undefined,
+      versionConfig.config?.openai as Record<string, unknown> | null | undefined
+    ) as GlobalConfig["openai"],
+    debug: deepMerge(
+      globalConfig?.debug as Record<string, unknown> | undefined,
+      versionConfig.config?.debug as Record<string, unknown> | null | undefined
+    ) as GlobalConfig["debug"],
   };
 
   // Merge plugins arrays (global + version-specific)
@@ -1009,6 +1100,18 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
           if (versionApp) {
             return versionApp.handleRequest(req, env);
           }
+          // Version key matches pattern but doesn't exist
+          return new globalThis.Response(
+            JSON.stringify({
+              error: "Version not found",
+              message: `Version "${versionKey}" does not exist`,
+              availableVersions: Array.from(versionApps.keys()),
+            }),
+            {
+              status: 404,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
         }
       }
 

@@ -245,6 +245,26 @@ export interface GlobalConfig {
  *
  * @typeParam T - The tool definitions type for type inference
  */
+/**
+ * Deep partial type that allows null at any level to remove/disable properties.
+ *
+ * - undefined: inherit from global config
+ * - null: explicitly disable/remove the property
+ * - value: override the property
+ */
+export type DeepPartialWithNull<T> = T extends object
+  ? { [P in keyof T]?: DeepPartialWithNull<T[P]> | null }
+  : T;
+
+/**
+ * Version-specific config type that allows null to disable inherited configs.
+ *
+ * - undefined: inherit from global config
+ * - null: explicitly disable/remove the config (at any nesting level)
+ * - object: deep-merge with global config
+ */
+export type VersionSpecificConfig = DeepPartialWithNull<GlobalConfig>;
+
 export interface VersionConfig<T extends ToolDefs = ToolDefs> {
   /**
    * Semantic version for this API version.
@@ -266,9 +286,21 @@ export interface VersionConfig<T extends ToolDefs = ToolDefs> {
 
   /**
    * Optional configuration overrides for this version.
-   * Merged with global config from VersionsConfig, with version-specific taking precedence.
+   * Deep-merged with global config from VersionsConfig.
+   *
+   * - Properties set to undefined: inherit from global
+   * - Properties set to null: explicitly disable/remove
+   * - Properties set to objects: deep-merge with global
+   *
+   * @example
+   * ```typescript
+   * config: {
+   *   debug: { level: "warn" }, // Override level, inherit other debug props
+   *   oauth: null,              // Disable OAuth for this version
+   * }
+   * ```
    */
-  config?: Partial<GlobalConfig>;
+  config?: VersionSpecificConfig;
 
   /**
    * Optional version-specific plugins.
