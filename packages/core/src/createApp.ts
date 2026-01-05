@@ -972,6 +972,34 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
     handleRequest: async (req: globalThis.Request, env?: unknown): Promise<globalThis.Response> => {
       // Route to appropriate version based on request path
       const url = new URL(req.url);
+
+      // Health check endpoint (shared across all versions)
+      if (url.pathname === "/health") {
+        return new globalThis.Response(
+          JSON.stringify({
+            status: "ok",
+            name: config.name,
+            versions: Array.from(versionApps.keys()),
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      // OpenAI domain verification challenge endpoint (shared across all versions)
+      if (
+        url.pathname === "/.well-known/openai-apps-challenge" &&
+        config.config?.openai?.domain_challenge
+      ) {
+        return new globalThis.Response(config.config.openai.domain_challenge, {
+          status: 200,
+          headers: { "Content-Type": "text/plain" },
+        });
+      }
+
+      // Route to version-specific MCP endpoints
       const pathParts = url.pathname.split("/").filter(Boolean);
 
       if (pathParts.length >= 2 && pathParts[0]?.match(/^v\d+$/) && pathParts[1] === "mcp") {
@@ -984,7 +1012,7 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
         }
       }
 
-      // Return 404 for unmatched version routes (consistent with Express path)
+      // Return 404 for unmatched routes (consistent with Express path)
       return new globalThis.Response(JSON.stringify({ error: "Not found" }), {
         status: 404,
         headers: { "Content-Type": "application/json" },
@@ -1025,17 +1053,19 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
           return;
         }
 
-        // Mark as fired
+        // Mark as fired BEFORE unsubscribing to prevent race conditions
         fired = true;
 
-        // Call the original handler with received payload
-        await handler(payload);
-
-        // Immediately unsubscribe from all versions to prevent other versions from triggering
+        // Unsubscribe from all versions BEFORE calling handler to prevent memory leaks
+        // This ensures cleanup happens even if handler throws or if other versions
+        // fire events during handler execution
+        isUnsubscribed = true;
         for (const unsubscribe of unsubscribers) {
           unsubscribe();
         }
-        isUnsubscribed = true;
+
+        // Call the original handler with received payload
+        await handler(payload);
       };
 
       // Register wrapper on each version app and collect unsubscribers

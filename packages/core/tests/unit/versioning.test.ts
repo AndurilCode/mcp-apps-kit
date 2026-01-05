@@ -688,4 +688,119 @@ describe("createApp versioning", () => {
       }
     });
   });
+
+  describe("handleRequest for serverless deployments", () => {
+    it("should handle /health endpoint via handleRequest", async () => {
+      const app = createApp({
+        name: "test-app",
+        versions: {
+          v1: {
+            version: "1.0.0",
+            tools: {},
+          },
+          v2: {
+            version: "2.0.0",
+            tools: {},
+          },
+        },
+      });
+
+      const request = new Request("http://localhost/health");
+      const response = await app.handleRequest(request);
+
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.status).toBe("ok");
+      expect(data.name).toBe("test-app");
+      expect(data.versions).toEqual(["v1", "v2"]);
+    });
+
+    it("should handle /.well-known/openai-apps-challenge via handleRequest", async () => {
+      const challengeToken = "test-challenge-token-123";
+      const app = createApp({
+        name: "test-app",
+        config: {
+          openai: {
+            domain_challenge: challengeToken,
+          },
+        },
+        versions: {
+          v1: {
+            version: "1.0.0",
+            tools: {},
+          },
+        },
+      });
+
+      const request = new Request("http://localhost/.well-known/openai-apps-challenge");
+      const response = await app.handleRequest(request);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Content-Type")).toBe("text/plain");
+      const text = await response.text();
+      expect(text).toBe(challengeToken);
+    });
+
+    it("should return 404 for /.well-known/openai-apps-challenge when not configured", async () => {
+      const app = createApp({
+        name: "test-app",
+        versions: {
+          v1: {
+            version: "1.0.0",
+            tools: {},
+          },
+        },
+      });
+
+      const request = new Request("http://localhost/.well-known/openai-apps-challenge");
+      const response = await app.handleRequest(request);
+
+      expect(response.status).toBe(404);
+    });
+
+    it("should return 404 for unmatched routes via handleRequest", async () => {
+      const app = createApp({
+        name: "test-app",
+        versions: {
+          v1: {
+            version: "1.0.0",
+            tools: {},
+          },
+        },
+      });
+
+      const request = new Request("http://localhost/unknown-route");
+      const response = await app.handleRequest(request);
+
+      expect(response.status).toBe(404);
+      const data = await response.json();
+      expect(data.error).toBe("Not found");
+    });
+
+    it("should return 404 for non-existent version via handleRequest", async () => {
+      const app = createApp({
+        name: "test-app",
+        versions: {
+          v1: {
+            version: "1.0.0",
+            tools: {},
+          },
+        },
+      });
+
+      const request = new Request("http://localhost/v999/mcp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          method: "tools/list",
+          params: {},
+          id: 1,
+        }),
+      });
+      const response = await app.handleRequest(request);
+
+      expect(response.status).toBe(404);
+    });
+  });
 });
