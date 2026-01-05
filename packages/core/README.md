@@ -280,12 +280,16 @@ const app = createApp({
   versions: {
     v1: {
       version: "1.0.0",
-      tools: { /* ... */ },
+      tools: {
+        /* ... */
+      },
       // Uses global OAuth config
     },
     v2: {
       version: "2.0.0",
-      tools: { /* ... */ },
+      tools: {
+        /* ... */
+      },
       config: {
         // Override OAuth for v2
         oauth: { authorizationServer: "https://auth-v2.example.com" },
@@ -322,11 +326,15 @@ const app = createApp({
   versions: {
     v1: {
       version: "1.0.0",
-      tools: { /* ... */ },
+      tools: {
+        /* ... */
+      },
     },
     v2: {
       version: "2.0.0",
-      tools: { /* ... */ },
+      tools: {
+        /* ... */
+      },
       plugins: [v2Plugin], // Only applied to v2
     },
   },
@@ -343,11 +351,15 @@ const app = createApp({
   versions: {
     v1: {
       version: "1.0.0",
-      tools: { /* ... */ },
+      tools: {
+        /* ... */
+      },
     },
     v2: {
       version: "2.0.0",
-      tools: { /* ... */ },
+      tools: {
+        /* ... */
+      },
     },
   },
 });
@@ -393,6 +405,7 @@ versions: {
 ### Shared Endpoints
 
 All versions share:
+
 - Health check: `GET /health` (returns all available versions)
 - OpenAI domain verification: `GET /.well-known/openai-apps-challenge` (if configured)
 
@@ -405,7 +418,9 @@ Single-version apps continue to work as before:
 const app = createApp({
   name: "my-app",
   version: "1.0.0",
-  tools: { /* ... */ },
+  tools: {
+    /* ... */
+  },
 });
 
 // getVersions() returns empty array for single-version apps

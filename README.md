@@ -239,6 +239,7 @@ const v2App = app.getVersion("v2");
 ```
 
 Each version can have:
+
 - Different tools and tool schemas
 - Version-specific UI components
 - Config overrides (merged with global config)
