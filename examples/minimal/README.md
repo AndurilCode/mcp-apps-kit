@@ -29,10 +29,10 @@ pnpm start
 
 Once running, the server exposes:
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /health` | Health check |
-| `POST /v1/mcp` | MCP v1 API (name only) |
+| Endpoint       | Description                 |
+| -------------- | --------------------------- |
+| `GET /health`  | Health check                |
+| `POST /v1/mcp` | MCP v1 API (name only)      |
 | `POST /v2/mcp` | MCP v2 API (name + surname) |
 
 ## Testing the API
@@ -89,9 +89,11 @@ minimal/
 Greet someone by name.
 
 **Input:**
+
 - `name` (string): Name to greet
 
 **Output:**
+
 - `message` (string): Greeting message
 - `timestamp` (string): ISO timestamp
 
@@ -100,10 +102,12 @@ Greet someone by name.
 Greet someone by name and optional surname.
 
 **Input:**
+
 - `name` (string): First name to greet
 - `surname` (string, optional): Surname
 
 **Output:**
+
 - `message` (string): Greeting message
 - `fullName` (string): The full name used in greeting
 - `timestamp` (string): ISO timestamp

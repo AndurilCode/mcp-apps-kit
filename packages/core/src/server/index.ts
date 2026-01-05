@@ -77,7 +77,7 @@ type InternalAppConfig<T extends ToolDefs> = AppConfig<T> & {
 export function createServerInstance<T extends ToolDefs>(
   config: InternalAppConfig<T>,
   pluginManager: PluginManager,
-  jwksClient: JwksClient | null = null,
+  jwksClient: JwksClient | null | (() => JwksClient | null) = null,
   versionRoute?: string
 ): ServerInstance {
   // Create protocol adapter
@@ -144,8 +144,11 @@ export function createServerInstance<T extends ToolDefs>(
       audience: config.config.oauth.audience ?? protectedResourceUrl.href,
     };
 
-    // Pass jwksClient even for custom verifiers (enables hybrid verification scenarios)
-    const oauthMiddleware = createOAuthMiddleware(oauthConfigWithAudience, jwksClient);
+    // Resolve JWKS client getter (supports lazy initialization)
+    const getJwksClient = typeof jwksClient === "function" ? jwksClient : () => jwksClient;
+
+    // Pass jwksClient getter even for custom verifiers (enables hybrid verification scenarios)
+    const oauthMiddleware = createOAuthMiddleware(oauthConfigWithAudience, getJwksClient);
     expressApp.post(serverRoute, oauthMiddleware);
   }
 
@@ -241,7 +244,7 @@ export function createServerInstance<T extends ToolDefs>(
   // Only add global endpoints when NOT a versioned server
   // Versioned servers are mounted on a shared Express app that has its own global endpoints
   const isVersionedServer = !!versionRoute;
-  
+
   if (!isVersionedServer) {
     // Health check endpoint
     expressApp.get("/health", (_req: Request, res: Response) => {

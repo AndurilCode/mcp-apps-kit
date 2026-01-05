@@ -52,7 +52,7 @@ export function GreetingWidgetV1() {
   return (
     <div className="container">
       <div className="version-badge">API v1</div>
-      
+
       {greetOutput?.message ? (
         <div className="greeting">
           <h1>{greetOutput.message}</h1>

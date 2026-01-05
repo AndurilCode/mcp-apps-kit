@@ -5,10 +5,17 @@
  */
 
 import type { ToolDefs, App, StartOptions, McpServer, ExpressMiddleware } from "./types/tools";
-import type { AppConfig, AppConfigInput, VersionsConfig, VersionConfig, DebugConfig, GlobalConfig } from "./types/config";
+import type {
+  AppConfig,
+  AppConfigInput,
+  VersionsConfig,
+  VersionConfig,
+  DebugConfig,
+  GlobalConfig,
+} from "./types/config";
 import type { UIDef, UIDefs } from "./types/ui";
 import type { Middleware } from "./middleware/types";
-import type { EventMap } from "./events/types";
+import type { EventMap, EventHandler } from "./events/types";
 import { AppError, ErrorCode, wrapError } from "./utils/errors";
 import { createServerInstance, type ServerInstance } from "./server/index";
 import { PluginManager } from "./plugins/PluginManager";
@@ -123,7 +130,10 @@ function validateVersionConfig<T extends ToolDefs>(
 /**
  * Validate global config
  */
-function validateGlobalConfig(config: GlobalConfig | Partial<GlobalConfig>, prefix = "Config"): void {
+function validateGlobalConfig(
+  config: GlobalConfig | Partial<GlobalConfig>,
+  prefix = "Config"
+): void {
   // Validate serverRoute if provided
   if (config.serverRoute !== undefined) {
     const serverRoute = config.serverRoute;
@@ -260,17 +270,17 @@ function validateConfig<T extends ToolDefs>(config: unknown): asserts config is 
     // Validate each version
     const versionKeys = Object.keys(versionsConfig.versions);
     if (versionKeys.length === 0) {
-      throw new AppError(ErrorCode.INVALID_CONFIG, "Config.versions must have at least one version");
+      throw new AppError(
+        ErrorCode.INVALID_CONFIG,
+        "Config.versions must have at least one version"
+      );
     }
 
     for (const versionKey of versionKeys) {
       validateVersionKey(versionKey);
       const versionConfig = versionsConfig.versions[versionKey];
       if (!versionConfig) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `Version "${versionKey}" config is missing`
-        );
+        throw new AppError(ErrorCode.INVALID_CONFIG, `Version "${versionKey}" config is missing`);
       }
       validateVersionConfig(versionKey, versionConfig);
 
@@ -305,7 +315,10 @@ function validateConfig<T extends ToolDefs>(config: unknown): asserts config is 
     }
 
     if (typeof cfg.tools !== "object" || cfg.tools === null) {
-      throw new AppError(ErrorCode.INVALID_CONFIG, "Config.tools is required and must be an object");
+      throw new AppError(
+        ErrorCode.INVALID_CONFIG,
+        "Config.tools is required and must be an object"
+      );
     }
 
     // Validate global config if provided
@@ -338,10 +351,7 @@ function mergeVersionConfig<T extends ToolDefs>(
   };
 
   // Merge plugins arrays (global + version-specific)
-  const mergedPlugins = [
-    ...(globalPlugins ?? []),
-    ...(versionConfig.plugins ?? []),
-  ];
+  const mergedPlugins = [...(globalPlugins ?? []), ...(versionConfig.plugins ?? [])];
 
   return {
     name: "", // Will be set from global config
@@ -513,7 +523,8 @@ function createSingleVersionApp<T extends ToolDefs>(config: AppConfig<T>): App<T
 
   function getServerInstance(): ServerInstance {
     if (!serverInstance) {
-      serverInstance = createServerInstance(normalizedConfig, pluginManager, jwksClient);
+      // Pass a getter function for JWKS client to support lazy initialization
+      serverInstance = createServerInstance(normalizedConfig, pluginManager, () => jwksClient);
       // Attach middleware chain to server instance for tool execution
       serverInstance.setMiddlewareChain(middlewareChain);
       // Attach event emitter to server instance for event emission
@@ -658,7 +669,7 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
 
   // Map of version keys to their app instances
   const versionApps = new Map<string, App<T>>();
-  
+
   // Map of version keys to their server instances
   const versionServerInstances = new Map<string, ServerInstance>();
 
@@ -671,14 +682,10 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
     configureDebugLogger(config.config.debug);
   }
 
-    // Create app instance for each version
-    for (const [versionKey, versionConfig] of Object.entries(config.versions)) {
+  // Create app instance for each version
+  for (const [versionKey, versionConfig] of Object.entries(config.versions)) {
     // Merge global and version-specific configs
-    const mergedConfig = mergeVersionConfig(
-      config.config,
-      versionConfig,
-      config.plugins
-    );
+    const mergedConfig = mergeVersionConfig(config.config, versionConfig, config.plugins);
     mergedConfig.name = config.name; // Set app name from global config
 
     // Extract colocated UIs from tool definitions
@@ -692,7 +699,10 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
     };
 
     // Configure debug logger if version-specific debug config is provided
-    if (normalizedVersionConfig.config?.debug && normalizedVersionConfig.config.debug !== config.config?.debug) {
+    if (
+      normalizedVersionConfig.config?.debug &&
+      normalizedVersionConfig.config.debug !== config.config?.debug
+    ) {
       configureDebugLogger(normalizedVersionConfig.config.debug);
     }
 
@@ -785,11 +795,12 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
     }
 
     // Create server instance for this version
+    // Pass a getter function for JWKS client to support lazy initialization
     const versionRoute = `/${versionKey}/mcp`;
     const versionServerInstance = createServerInstance(
       normalizedVersionConfig,
       versionPluginManager,
-      versionJwksClient,
+      () => versionJwksClient,
       versionRoute
     );
     versionServerInstances.set(versionKey, versionServerInstance);
@@ -850,7 +861,10 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
         return versionServerInstance.handler();
       },
 
-      handleRequest: async (req: globalThis.Request, env?: unknown): Promise<globalThis.Response> => {
+      handleRequest: async (
+        req: globalThis.Request,
+        env?: unknown
+      ): Promise<globalThis.Response> => {
         await ensureVersionOAuthInitialized();
         return versionServerInstance.handleRequest(req, env);
       },
@@ -894,15 +908,18 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
   // Add OpenAI domain verification challenge endpoint if configured
   if (config.config?.openai?.domain_challenge) {
     const challengeToken = config.config.openai.domain_challenge;
-    sharedExpressApp.get("/.well-known/openai-apps-challenge", (_req: ExpressRequest, res: ExpressResponse) => {
-      res.type("text/plain").send(challengeToken);
-    });
+    sharedExpressApp.get(
+      "/.well-known/openai-apps-challenge",
+      (_req: ExpressRequest, res: ExpressResponse) => {
+        res.type("text/plain").send(challengeToken);
+      }
+    );
   }
 
-      // Add catch-all 404 handler for unmatched routes
-      sharedExpressApp.use((_req: ExpressRequest, res: ExpressResponse) => {
-        res.status(404).json({ error: "Not found" });
-      });
+  // Add catch-all 404 handler for unmatched routes
+  sharedExpressApp.use((_req: ExpressRequest, res: ExpressResponse) => {
+    res.status(404).json({ error: "Not found" });
+  });
 
   // Create main app instance that delegates to version apps
   const mainApp: App<T> = {
@@ -921,7 +938,7 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
 
       // Start the shared HTTP server
       const port = options?.port ?? 3000;
-      
+
       return new Promise<void>((resolve, reject) => {
         try {
           const server = http.createServer(sharedExpressApp);
@@ -941,38 +958,33 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
       return firstVersion?.mcpServer as unknown as McpServer;
     },
 
-      handler: (): ExpressMiddleware => {
-        return (req: unknown, res: unknown, next: () => void) => {
-          sharedExpressApp(req as ExpressRequest, res as ExpressResponse, next);
-        };
-      },
+    handler: (): ExpressMiddleware => {
+      return (req: unknown, res: unknown, next: () => void) => {
+        sharedExpressApp(req as ExpressRequest, res as ExpressResponse, next);
+      };
+    },
 
-      handleRequest: async (req: globalThis.Request, env?: unknown): Promise<globalThis.Response> => {
-        // Route to appropriate version based on request path
-        const url = new URL(req.url);
-        const pathParts = url.pathname.split("/").filter(Boolean);
-        
-        if (pathParts.length >= 2 && pathParts[0]?.match(/^v\d+$/) && pathParts[1] === "mcp") {
-          const versionKey = pathParts[0];
-          if (versionKey) {
-            const versionApp = versionApps.get(versionKey);
-            if (versionApp) {
-              return versionApp.handleRequest(req, env);
-            }
+    handleRequest: async (req: globalThis.Request, env?: unknown): Promise<globalThis.Response> => {
+      // Route to appropriate version based on request path
+      const url = new URL(req.url);
+      const pathParts = url.pathname.split("/").filter(Boolean);
+
+      if (pathParts.length >= 2 && pathParts[0]?.match(/^v\d+$/) && pathParts[1] === "mcp") {
+        const versionKey = pathParts[0];
+        if (versionKey) {
+          const versionApp = versionApps.get(versionKey);
+          if (versionApp) {
+            return versionApp.handleRequest(req, env);
           }
         }
+      }
 
-        // Fallback to first version or return 404
-        const firstVersion = Array.from(versionApps.values())[0];
-        if (firstVersion) {
-          return firstVersion.handleRequest(req, env);
-        }
-
-        return new globalThis.Response(JSON.stringify({ error: "Not found" }), {
-          status: 404,
-          headers: { "Content-Type": "application/json" },
-        });
-      },
+      // Return 404 for unmatched version routes (consistent with Express path)
+      return new globalThis.Response(JSON.stringify({ error: "Not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    },
 
     use: (middleware: Middleware) => {
       // Apply shared middleware to all versions
@@ -995,13 +1007,43 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
       };
     },
 
-    once: (event, handler) => {
-      // Subscribe to events on all versions (one-time)
+    once: <K extends keyof EventMap>(event: K, handler: EventHandler<EventMap[K]>) => {
+      // Shared wrapper that tracks if it has fired
+      let fired = false;
       const unsubscribers: (() => void)[] = [];
+      let isUnsubscribed = false;
+
+      // Create wrapper that fires only once across all versions
+      const wrapper: EventHandler<EventMap[K]> = async (payload) => {
+        // Prevent execution if already unsubscribed or already fired
+        if (isUnsubscribed || fired) {
+          return;
+        }
+
+        // Mark as fired
+        fired = true;
+
+        // Call the original handler with received payload
+        await handler(payload);
+
+        // Immediately unsubscribe from all versions to prevent other versions from triggering
+        for (const unsubscribe of unsubscribers) {
+          unsubscribe();
+        }
+        isUnsubscribed = true;
+      };
+
+      // Register wrapper on each version app and collect unsubscribers
       for (const versionApp of versionApps.values()) {
-        unsubscribers.push(versionApp.once(event, handler));
+        unsubscribers.push(versionApp.once(event, wrapper));
       }
+
+      // Return single unsubscribe that clears all and prevents further wrapper calls
       return () => {
+        if (isUnsubscribed) {
+          return;
+        }
+        isUnsubscribed = true;
         for (const unsubscribe of unsubscribers) {
           unsubscribe();
         }
