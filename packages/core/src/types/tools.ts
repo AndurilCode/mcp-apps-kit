@@ -501,6 +501,46 @@ export interface App<T extends ToolDefs = ToolDefs> {
    * @returns Unsubscribe function
    */
   onAny(handler: AnyEventHandler): UnsubscribeFn;
+
+  // ---------------------------------------------------------------------------
+  // VERSIONING
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Get a version-specific app instance
+   *
+   * For multi-version apps, returns the app instance for the specified version.
+   * For single-version apps, returns undefined.
+   *
+   * @param versionKey - Version key (e.g., "v1", "v2")
+   * @returns App instance for the version, or undefined if not found
+   *
+   * @example
+   * ```typescript
+   * const v1App = app.getVersion("v1");
+   * if (v1App) {
+   *   v1App.use(v1SpecificMiddleware);
+   * }
+   * ```
+   */
+  getVersion(versionKey: string): App<T> | undefined;
+
+  /**
+   * Get list of available version keys
+   *
+   * For multi-version apps, returns array of version keys (e.g., ["v1", "v2"]).
+   * For single-version apps, returns empty array.
+   *
+   * @returns Array of version keys
+   *
+   * @example
+   * ```typescript
+   * const versions = app.getVersions();
+   * // ["v1", "v2"] for multi-version apps
+   * // [] for single-version apps
+   * ```
+   */
+  getVersions(): string[];
 }
 
 // =============================================================================

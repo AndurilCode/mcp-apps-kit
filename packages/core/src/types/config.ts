@@ -5,6 +5,7 @@
 import type { ToolDefs } from "./tools";
 import type { Plugin } from "../plugins/types";
 import type { OAuthConfig } from "../server/oauth/types.js";
+import type { UIDefs } from "./ui";
 
 // =============================================================================
 // PROTOCOL CONFIGURATION
@@ -237,11 +238,113 @@ export interface GlobalConfig {
 }
 
 /**
- * Main application configuration
+ * Version-specific configuration for multi-version apps
  *
- * This is the input to `createApp()`.
+ * Each version has its own tools, UI, and optional config overrides.
+ * Global config from VersionsConfig is merged with version-specific config.
+ *
+ * @typeParam T - The tool definitions type for type inference
+ */
+export interface VersionConfig<T extends ToolDefs = ToolDefs> {
+  /**
+   * Semantic version for this API version.
+   *
+   * @example "1.0.0"
+   */
+  version: string;
+
+  /**
+   * Tool definitions for this version.
+   * Each key is the tool name, value is the tool definition.
+   */
+  tools: T;
+
+  /**
+   * UI resource definitions for this version.
+   */
+  ui?: UIDefs;
+
+  /**
+   * Optional configuration overrides for this version.
+   * Merged with global config from VersionsConfig, with version-specific taking precedence.
+   */
+  config?: Partial<GlobalConfig>;
+
+  /**
+   * Optional version-specific plugins.
+   * Merged with global plugins from VersionsConfig.
+   */
+  plugins?: Plugin[];
+}
+
+/**
+ * Multi-version application configuration
+ *
+ * Allows exposing multiple MCP server versions under dedicated routes (e.g., /v1/mcp, /v2/mcp).
+ * Each version has version-specific tools and UI, while optionally sharing global configuration.
  *
  * @example
+ * ```typescript
+ * const config: VersionsConfig = {
+ *   name: "my-app",
+ *   config: {
+ *     oauth: { authorizationServer: "https://auth.example.com" },
+ *     cors: { origin: true }
+ *   },
+ *   plugins: [sharedPlugin],
+ *   versions: {
+ *     v1: {
+ *       version: "1.0.0",
+ *       tools: { greet: {...} }
+ *     },
+ *     v2: {
+ *       version: "2.0.0",
+ *       tools: { greet: {...}, search: {...} },
+ *       config: {
+ *         oauth: { authorizationServer: "https://auth-v2.example.com" }
+ *       }
+ *     }
+ *   }
+ * };
+ * ```
+ *
+ * @typeParam T - The tool definitions type for type inference (union of all version tool types)
+ */
+export interface VersionsConfig<T extends ToolDefs = ToolDefs> {
+  /**
+   * App name.
+   * Used in MCP server registration and protocol metadata.
+   *
+   * Should be a valid npm package name format (lowercase, no spaces).
+   */
+  name: string;
+
+  /**
+   * Version definitions.
+   * Keys must match pattern `/^v\d+$/` (e.g., "v1", "v2").
+   * Each version will be exposed at `/{versionKey}/mcp`.
+   */
+  versions: Record<string, VersionConfig<T>>;
+
+  /**
+   * Shared global configuration options.
+   * Merged with each version's config, with version-specific taking precedence.
+   */
+  config?: GlobalConfig;
+
+  /**
+   * Shared plugins.
+   * Merged with each version's plugins.
+   */
+  plugins?: Plugin[];
+}
+
+/**
+ * Main application configuration
+ *
+ * This is the input to `createApp()`. Supports both single-version and multi-version formats.
+ *
+ * @example Single-version (backward compatible)
  * ```typescript
  * const config: AppConfig = {
  *   name: "my-app",
@@ -305,3 +408,10 @@ export interface AppConfig<T extends ToolDefs = ToolDefs> {
    */
   plugins?: Plugin[];
 }
+
+/**
+ * Union type for createApp input - supports both single and multi-version configs
+ *
+ * @typeParam T - The tool definitions type for type inference
+ */
+export type AppConfigInput<T extends ToolDefs = ToolDefs> = AppConfig<T> | VersionsConfig<T>;

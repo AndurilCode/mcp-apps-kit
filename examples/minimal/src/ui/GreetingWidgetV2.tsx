@@ -1,35 +1,32 @@
 /**
- * Greeting Widget Component
+ * Greeting Widget V2 Component
  *
- * A React component that displays greeting messages from the greet tool.
+ * A React component for the v2 API - displays greeting messages with name + optional surname.
  * Uses @mcp-apps-kit/ui-react hooks for receiving tool output and theme changes.
- *
- * Demonstrates the typed tools proxy for calling tools with a more ergonomic API.
  */
 
 import { useEffect, useState } from "react";
 import { useToolResult, useHostContext, useAppsClient } from "@mcp-apps-kit/ui-react";
-import type { AppClientTools } from "../index";
+import type { AppClientToolsV2 } from "../index";
 
-export function GreetingWidget() {
-  const result = useToolResult<AppClientTools>();
+export function GreetingWidgetV2() {
+  const result = useToolResult<AppClientToolsV2>();
   const { theme } = useHostContext();
-  const client = useAppsClient<AppClientTools>();
+  const client = useAppsClient<AppClientToolsV2>();
 
-  // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [name, setName] = useState("");
+  const [surname, setSurname] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [greetResult, setGreetResult] = useState<{ message: string; timestamp: string } | null>(
-    null
-  );
+  const [greetResult, setGreetResult] = useState<{
+    message: string;
+    fullName: string;
+    timestamp: string;
+  } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Extract the greet output - prioritize local state from UI-initiated calls,
-  // then fall back to host-pushed tool results
   const greetOutput = greetResult ?? result?.greet;
 
-  // Apply theme to document
   useEffect(() => {
     if (typeof document !== "undefined") {
       document.documentElement.className = theme;
@@ -42,12 +39,14 @@ export function GreetingWidget() {
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      // Using the typed tools proxy - more ergonomic than callTool!
-      // Instead of: client.callTool("greet", { name })
-      const response = await client.tools.callGreet({ name: name.trim() });
+      const response = await client.tools.callGreet({
+        name: name.trim(),
+        surname: surname.trim() || undefined,
+      });
       setGreetResult(response);
       setIsModalOpen(false);
       setName("");
+      setSurname("");
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error("Failed to greet:", msg);
@@ -59,9 +58,12 @@ export function GreetingWidget() {
 
   return (
     <div className="container">
+      <div className="version-badge v2">API v2</div>
+      
       {greetOutput?.message ? (
         <div className="greeting">
           <h1>{greetOutput.message}</h1>
+          <p className="full-name">Full name: {greetOutput.fullName}</p>
           <p className="timestamp">at {new Date(greetOutput.timestamp).toLocaleTimeString()}</p>
           <button className="change-name-btn" onClick={() => setIsModalOpen(true)}>
             Change Name
@@ -79,15 +81,24 @@ export function GreetingWidget() {
       {isModalOpen && (
         <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Enter a name</h2>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your name"
-              autoFocus
-              onKeyDown={(e) => e.key === "Enter" && handleGreet()}
-            />
+            <h2>Enter your name</h2>
+            <div className="input-group">
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="First name *"
+                autoFocus
+                onKeyDown={(e) => e.key === "Enter" && surname && handleGreet()}
+              />
+              <input
+                type="text"
+                value={surname}
+                onChange={(e) => setSurname(e.target.value)}
+                placeholder="Surname (optional)"
+                onKeyDown={(e) => e.key === "Enter" && handleGreet()}
+              />
+            </div>
             {errorMessage && <p className="error-message">{errorMessage}</p>}
             <div className="modal-actions">
               <button onClick={() => setIsModalOpen(false)} disabled={isLoading}>
@@ -104,4 +115,4 @@ export function GreetingWidget() {
   );
 }
 
-export default GreetingWidget;
+export default GreetingWidgetV2;

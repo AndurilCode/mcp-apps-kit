@@ -5,11 +5,11 @@
  */
 
 import type { ToolDefs, App, StartOptions, McpServer, ExpressMiddleware } from "./types/tools";
-import type { AppConfig, DebugConfig } from "./types/config";
+import type { AppConfig, AppConfigInput, VersionsConfig, VersionConfig, DebugConfig, GlobalConfig } from "./types/config";
 import type { UIDef, UIDefs } from "./types/ui";
 import type { Middleware } from "./middleware/types";
 import type { EventMap } from "./events/types";
-import { AppError, ErrorCode } from "./utils/errors";
+import { AppError, ErrorCode, wrapError } from "./utils/errors";
 import { createServerInstance, type ServerInstance } from "./server/index";
 import { PluginManager } from "./plugins/PluginManager";
 import { MiddlewareChain } from "./middleware/MiddlewareChain";
@@ -19,6 +19,9 @@ import { OAuthConfigSchema } from "./server/oauth/types.js";
 import { getJwksUri } from "./server/oauth/discovery.js";
 import { createJwksClient } from "./server/oauth/jwks-client.js";
 import type { JwksClient } from "jwks-rsa";
+import express, { type Request as ExpressRequest, type Response as ExpressResponse } from "express";
+import http from "http";
+import type { Plugin } from "./plugins/types";
 
 /**
  * Check if a value is a UIDef object (has required 'html' property)
@@ -60,9 +63,175 @@ function extractColocatedUIs<T extends ToolDefs>(tools: T): { uiDefs: UIDefs; no
 }
 
 /**
- * Validate app configuration
+ * Check if config is a multi-version config
  */
-function validateConfig<T extends ToolDefs>(config: unknown): asserts config is AppConfig<T> {
+function isVersionsConfig<T extends ToolDefs>(
+  config: AppConfigInput<T>
+): config is VersionsConfig<T> {
+  return "versions" in config && typeof config.versions === "object";
+}
+
+/**
+ * Validate version key format (must match /^v\d+$/)
+ */
+function validateVersionKey(versionKey: string): void {
+  if (!/^v\d+$/.test(versionKey)) {
+    throw new AppError(
+      ErrorCode.INVALID_CONFIG,
+      `Version key must match pattern /^v\\d+$/, got: "${versionKey}"`
+    );
+  }
+}
+
+/**
+ * Validate a single version config
+ */
+function validateVersionConfig<T extends ToolDefs>(
+  versionKey: string,
+  versionConfig: VersionConfig<T>
+): void {
+  if (typeof versionConfig.version !== "string" || versionConfig.version.length === 0) {
+    throw new AppError(
+      ErrorCode.INVALID_CONFIG,
+      `Version "${versionKey}".version is required and must be a non-empty string`
+    );
+  }
+
+  if (typeof versionConfig.tools !== "object" || versionConfig.tools === null) {
+    throw new AppError(
+      ErrorCode.INVALID_CONFIG,
+      `Version "${versionKey}".tools is required and must be an object`
+    );
+  }
+
+  // Validate version-specific config if provided
+  if (versionConfig.config) {
+    validateGlobalConfig(versionConfig.config, `Version "${versionKey}".config`);
+  }
+
+  // Validate version-specific plugins if provided
+  if (versionConfig.plugins !== undefined) {
+    if (!Array.isArray(versionConfig.plugins)) {
+      throw new AppError(
+        ErrorCode.INVALID_CONFIG,
+        `Version "${versionKey}".plugins must be an array if provided`
+      );
+    }
+  }
+}
+
+/**
+ * Validate global config
+ */
+function validateGlobalConfig(config: GlobalConfig | Partial<GlobalConfig>, prefix = "Config"): void {
+  // Validate serverRoute if provided
+  if (config.serverRoute !== undefined) {
+    const serverRoute = config.serverRoute;
+    if (typeof serverRoute !== "string") {
+      throw new AppError(ErrorCode.INVALID_CONFIG, `${prefix}.serverRoute must be a string`);
+    }
+    if (!serverRoute.startsWith("/")) {
+      throw new AppError(
+        ErrorCode.INVALID_CONFIG,
+        `${prefix}.serverRoute must start with "/", got: "${serverRoute}"`
+      );
+    }
+    if (serverRoute === "/health") {
+      throw new AppError(
+        ErrorCode.INVALID_CONFIG,
+        `${prefix}.serverRoute cannot be "/health" as it conflicts with the health check endpoint`
+      );
+    }
+  }
+
+  // Validate debug config if provided
+  if (config.debug !== undefined) {
+    const debug: DebugConfig = config.debug;
+    if (typeof debug !== "object" || debug === null) {
+      throw new AppError(ErrorCode.INVALID_CONFIG, `${prefix}.debug must be an object`);
+    }
+    if (debug.logTool !== undefined && typeof debug.logTool !== "boolean") {
+      throw new AppError(
+        ErrorCode.INVALID_CONFIG,
+        `${prefix}.debug.logTool must be a boolean if provided`
+      );
+    }
+    if (debug.level !== undefined) {
+      const validLevels = ["debug", "info", "warn", "error"];
+      if (!validLevels.includes(debug.level)) {
+        throw new AppError(
+          ErrorCode.INVALID_CONFIG,
+          `${prefix}.debug.level must be one of: ${validLevels.join(", ")}`
+        );
+      }
+    }
+    if (debug.batchSize !== undefined) {
+      if (typeof debug.batchSize !== "number" || debug.batchSize < 1) {
+        throw new AppError(
+          ErrorCode.INVALID_CONFIG,
+          `${prefix}.debug.batchSize must be a positive number`
+        );
+      }
+    }
+    if (debug.flushIntervalMs !== undefined) {
+      if (typeof debug.flushIntervalMs !== "number" || debug.flushIntervalMs < 0) {
+        throw new AppError(
+          ErrorCode.INVALID_CONFIG,
+          `${prefix}.debug.flushIntervalMs must be a non-negative number`
+        );
+      }
+    }
+  }
+
+  // Validate OAuth config if provided
+  if (config.oauth !== undefined) {
+    try {
+      OAuthConfigSchema.parse(config.oauth);
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new AppError(
+          ErrorCode.INVALID_CONFIG,
+          `${prefix}.oauth: Invalid OAuth configuration: ${error.message}`
+        );
+      }
+      throw new AppError(ErrorCode.INVALID_CONFIG, `${prefix}.oauth: Invalid OAuth configuration`);
+    }
+  }
+
+  // Validate OpenAI config if provided
+  if (config.openai !== undefined) {
+    const openaiConfig = config.openai as Record<string, unknown>;
+    if (typeof openaiConfig !== "object" || openaiConfig === null) {
+      throw new AppError(ErrorCode.INVALID_CONFIG, `${prefix}.openai must be an object`);
+    }
+    if (openaiConfig.domain_challenge !== undefined) {
+      const token = openaiConfig.domain_challenge;
+      if (typeof token !== "string") {
+        throw new AppError(
+          ErrorCode.INVALID_CONFIG,
+          `${prefix}.openai.domain_challenge must be a string`
+        );
+      }
+      if (token.length === 0) {
+        throw new AppError(
+          ErrorCode.INVALID_CONFIG,
+          `${prefix}.openai.domain_challenge cannot be an empty string`
+        );
+      }
+      if (token.length > 1000) {
+        throw new AppError(
+          ErrorCode.INVALID_CONFIG,
+          `${prefix}.openai.domain_challenge cannot exceed 1000 characters`
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Validate app configuration (supports both single and multi-version)
+ */
+function validateConfig<T extends ToolDefs>(config: unknown): asserts config is AppConfigInput<T> {
   if (typeof config !== "object" || config === null) {
     throw new AppError(ErrorCode.INVALID_CONFIG, "Config must be an object");
   }
@@ -76,129 +245,123 @@ function validateConfig<T extends ToolDefs>(config: unknown): asserts config is 
     );
   }
 
-  if (typeof cfg.version !== "string" || cfg.version.length === 0) {
-    throw new AppError(
-      ErrorCode.INVALID_CONFIG,
-      "Config.version is required and must be a non-empty string"
-    );
-  }
+  // Check if this is a multi-version config
+  if (isVersionsConfig(cfg as unknown as AppConfigInput<T>)) {
+    const versionsConfig = cfg as unknown as VersionsConfig<T>;
 
-  if (typeof cfg.tools !== "object" || cfg.tools === null) {
-    throw new AppError(ErrorCode.INVALID_CONFIG, "Config.tools is required and must be an object");
-  }
-
-  // Validate serverRoute if provided
-  const globalConfig = cfg.config as Record<string, unknown> | undefined;
-  if (globalConfig?.serverRoute !== undefined) {
-    const serverRoute = globalConfig.serverRoute;
-    if (typeof serverRoute !== "string") {
-      throw new AppError(ErrorCode.INVALID_CONFIG, "Config.config.serverRoute must be a string");
-    }
-    if (!serverRoute.startsWith("/")) {
+    // Validate versions object
+    if (typeof versionsConfig.versions !== "object" || versionsConfig.versions === null) {
       throw new AppError(
         ErrorCode.INVALID_CONFIG,
-        `Config.config.serverRoute must start with "/", got: "${serverRoute}"`
+        "Config.versions is required and must be an object"
       );
     }
-    if (serverRoute === "/health") {
+
+    // Validate each version
+    const versionKeys = Object.keys(versionsConfig.versions);
+    if (versionKeys.length === 0) {
+      throw new AppError(ErrorCode.INVALID_CONFIG, "Config.versions must have at least one version");
+    }
+
+    for (const versionKey of versionKeys) {
+      validateVersionKey(versionKey);
+      const versionConfig = versionsConfig.versions[versionKey];
+      if (!versionConfig) {
+        throw new AppError(
+          ErrorCode.INVALID_CONFIG,
+          `Version "${versionKey}" config is missing`
+        );
+      }
+      validateVersionConfig(versionKey, versionConfig);
+
+      // Validate that version route doesn't conflict with reserved routes
+      const versionRoute = `/${versionKey}/mcp`;
+      if (versionRoute === "/health") {
+        throw new AppError(
+          ErrorCode.INVALID_CONFIG,
+          `Version "${versionKey}" route conflicts with health check endpoint`
+        );
+      }
+    }
+
+    // Validate global config if provided
+    if (versionsConfig.config) {
+      validateGlobalConfig(versionsConfig.config);
+    }
+
+    // Validate global plugins if provided
+    if (versionsConfig.plugins !== undefined) {
+      if (!Array.isArray(versionsConfig.plugins)) {
+        throw new AppError(ErrorCode.INVALID_CONFIG, "Config.plugins must be an array if provided");
+      }
+    }
+  } else {
+    // Single-version config (backward compatible)
+    if (typeof cfg.version !== "string" || cfg.version.length === 0) {
       throw new AppError(
         ErrorCode.INVALID_CONFIG,
-        'Config.config.serverRoute cannot be "/health" as it conflicts with the health check endpoint'
+        "Config.version is required and must be a non-empty string"
       );
     }
-  }
 
-  // Validate debug config if provided
-  if (globalConfig?.debug !== undefined) {
-    const debug = globalConfig.debug as DebugConfig;
-    if (typeof debug !== "object" || debug === null) {
-      throw new AppError(ErrorCode.INVALID_CONFIG, "Config.config.debug must be an object");
+    if (typeof cfg.tools !== "object" || cfg.tools === null) {
+      throw new AppError(ErrorCode.INVALID_CONFIG, "Config.tools is required and must be an object");
     }
-    if (debug.logTool !== undefined && typeof debug.logTool !== "boolean") {
-      throw new AppError(
-        ErrorCode.INVALID_CONFIG,
-        "Config.config.debug.logTool must be a boolean if provided"
-      );
-    }
-    if (debug.level !== undefined) {
-      const validLevels = ["debug", "info", "warn", "error"];
-      if (!validLevels.includes(debug.level)) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `Config.config.debug.level must be one of: ${validLevels.join(", ")}`
-        );
-      }
-    }
-    if (debug.batchSize !== undefined) {
-      if (typeof debug.batchSize !== "number" || debug.batchSize < 1) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          "Config.config.debug.batchSize must be a positive number"
-        );
-      }
-    }
-    if (debug.flushIntervalMs !== undefined) {
-      if (typeof debug.flushIntervalMs !== "number" || debug.flushIntervalMs < 0) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          "Config.config.debug.flushIntervalMs must be a non-negative number"
-        );
-      }
-    }
-  }
 
-  // Validate OAuth config if provided
-  if (globalConfig?.oauth !== undefined) {
-    try {
-      OAuthConfigSchema.parse(globalConfig.oauth);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `Invalid OAuth configuration: ${error.message}`
-        );
-      }
-      throw new AppError(ErrorCode.INVALID_CONFIG, "Invalid OAuth configuration");
-    }
-  }
-
-  // Validate OpenAI config if provided
-  if (globalConfig?.openai !== undefined) {
-    const openaiConfig = globalConfig.openai as Record<string, unknown>;
-    if (typeof openaiConfig !== "object" || openaiConfig === null) {
-      throw new AppError(ErrorCode.INVALID_CONFIG, "Config.config.openai must be an object");
-    }
-    if (openaiConfig.domain_challenge !== undefined) {
-      const token = openaiConfig.domain_challenge;
-      if (typeof token !== "string") {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          "Config.config.openai.domain_challenge must be a string"
-        );
-      }
-      if (token.length === 0) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          "Config.config.openai.domain_challenge cannot be an empty string"
-        );
-      }
-      if (token.length > 1000) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          "Config.config.openai.domain_challenge cannot exceed 1000 characters"
-        );
-      }
+    // Validate global config if provided
+    const globalConfig = cfg.config as GlobalConfig | undefined;
+    if (globalConfig) {
+      validateGlobalConfig(globalConfig);
     }
   }
 }
 
 /**
+ * Merge global config with version-specific config
+ * Version-specific config takes precedence over global config
+ */
+function mergeVersionConfig<T extends ToolDefs>(
+  globalConfig: GlobalConfig | undefined,
+  versionConfig: VersionConfig<T>,
+  globalPlugins: Plugin[] | undefined
+): AppConfig<T> & { ui?: UIDefs } {
+  // Merge config objects (version-specific overrides global)
+  const mergedConfig: GlobalConfig = {
+    ...globalConfig,
+    ...versionConfig.config,
+    // Deep merge for nested objects
+    oauth: versionConfig.config?.oauth ?? globalConfig?.oauth,
+    cors: versionConfig.config?.cors ?? globalConfig?.cors,
+    openai: versionConfig.config?.openai ?? globalConfig?.openai,
+    debug: versionConfig.config?.debug ?? globalConfig?.debug,
+    protocol: versionConfig.config?.protocol ?? globalConfig?.protocol,
+  };
+
+  // Merge plugins arrays (global + version-specific)
+  const mergedPlugins = [
+    ...(globalPlugins ?? []),
+    ...(versionConfig.plugins ?? []),
+  ];
+
+  return {
+    name: "", // Will be set from global config
+    version: versionConfig.version,
+    tools: versionConfig.tools,
+    ui: versionConfig.ui,
+    config: mergedConfig,
+    plugins: mergedPlugins.length > 0 ? mergedPlugins : undefined,
+  };
+}
+
+/**
  * Create an MCP app with unified tool and UI definitions
+ *
+ * Supports both single-version (backward compatible) and multi-version configurations.
  *
  * @param config - App configuration with tools and UI resources
  * @returns App instance for starting server or getting middleware
  *
- * @example
+ * @example Single-version (backward compatible)
  * ```typescript
  * const app = createApp({
  *   name: "my-app",
@@ -215,11 +378,44 @@ function validateConfig<T extends ToolDefs>(config: unknown): asserts config is 
  *
  * await app.start({ port: 3000 });
  * ```
+ *
+ * @example Multi-version
+ * ```typescript
+ * const app = createApp({
+ *   name: "my-app",
+ *   config: {
+ *     oauth: { authorizationServer: "https://auth.example.com" },
+ *     cors: { origin: true }
+ *   },
+ *   versions: {
+ *     v1: {
+ *       version: "1.0.0",
+ *       tools: { greet: {...} }
+ *     },
+ *     v2: {
+ *       version: "2.0.0",
+ *       tools: { greet: {...}, search: {...} }
+ *     }
+ *   }
+ * });
+ * ```
  */
-export function createApp<T extends ToolDefs>(config: AppConfig<T>): App<T> {
+export function createApp<T extends ToolDefs>(config: AppConfigInput<T>): App<T> {
   // Validate config at runtime
   validateConfig<T>(config);
 
+  // Check if this is a multi-version config
+  if (isVersionsConfig(config)) {
+    return createMultiVersionApp(config);
+  } else {
+    return createSingleVersionApp(config);
+  }
+}
+
+/**
+ * Create a single-version app (backward compatible)
+ */
+function createSingleVersionApp<T extends ToolDefs>(config: AppConfig<T>): App<T> {
   // Extract colocated UIs from tool definitions for internal server processing
   const { uiDefs, normalizedTools } = extractColocatedUIs(config.tools);
 
@@ -390,7 +586,7 @@ export function createApp<T extends ToolDefs>(config: AppConfig<T>): App<T> {
     /**
      * Handle a single request (for serverless)
      */
-    handleRequest: async (req: Request, env?: unknown): Promise<Response> => {
+    handleRequest: async (req: globalThis.Request, env?: unknown): Promise<globalThis.Response> => {
       // Initialize OAuth lazily for serverless (idempotent)
       await ensureOAuthInitialized();
 
@@ -429,6 +625,20 @@ export function createApp<T extends ToolDefs>(config: AppConfig<T>): App<T> {
     onAny: (handler) => {
       return eventEmitter.onAny(handler);
     },
+
+    /**
+     * Get a version-specific app instance (not available for single-version apps)
+     */
+    getVersion: (_versionKey: string): App<T> | undefined => {
+      return undefined;
+    },
+
+    /**
+     * Get list of available version keys (empty for single-version apps)
+     */
+    getVersions: (): string[] => {
+      return [];
+    },
   };
 
   // Emit app:init event after app is created
@@ -436,6 +646,391 @@ export function createApp<T extends ToolDefs>(config: AppConfig<T>): App<T> {
   void eventEmitter.emit("app:init", { config: normalizedConfig });
 
   return app;
+}
+
+/**
+ * Create a multi-version app
+ */
+function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): App<T> {
+  // Shared Express app for all versions
+  const sharedExpressApp = express();
+  sharedExpressApp.use(express.json());
+
+  // Map of version keys to their app instances
+  const versionApps = new Map<string, App<T>>();
+  
+  // Map of version keys to their server instances
+  const versionServerInstances = new Map<string, ServerInstance>();
+
+  // Shared OAuth JWKS clients (keyed by OAuth config hash for reuse)
+  const jwksClients = new Map<string, JwksClient>();
+  const oauthInitPromises = new Map<string, Promise<void>>();
+
+  // Configure debug logger if global debug config is provided
+  if (config.config?.debug) {
+    configureDebugLogger(config.config.debug);
+  }
+
+    // Create app instance for each version
+    for (const [versionKey, versionConfig] of Object.entries(config.versions)) {
+    // Merge global and version-specific configs
+    const mergedConfig = mergeVersionConfig(
+      config.config,
+      versionConfig,
+      config.plugins
+    );
+    mergedConfig.name = config.name; // Set app name from global config
+
+    // Extract colocated UIs from tool definitions
+    const { uiDefs, normalizedTools } = extractColocatedUIs(versionConfig.tools);
+
+    // Create normalized config with extracted UIs
+    const normalizedVersionConfig: AppConfig<T> & { ui?: UIDefs } = {
+      ...mergedConfig,
+      tools: normalizedTools,
+      ui: Object.keys(uiDefs).length > 0 ? uiDefs : undefined,
+    };
+
+    // Configure debug logger if version-specific debug config is provided
+    if (normalizedVersionConfig.config?.debug && normalizedVersionConfig.config.debug !== config.config?.debug) {
+      configureDebugLogger(normalizedVersionConfig.config.debug);
+    }
+
+    // Initialize version-specific plugin manager
+    const versionPluginManager = new PluginManager(normalizedVersionConfig.plugins ?? []);
+    let versionPluginInitialized = false;
+
+    // Initialize version-specific middleware chain
+    const versionMiddlewareChain = new MiddlewareChain();
+
+    // Initialize version-specific event emitter
+    const versionEventEmitter = new TypedEventEmitter<EventMap & Record<string, unknown>>();
+
+    // Create version-specific OAuth JWKS client key (for reuse if config is identical)
+    const oauthConfigKey = normalizedVersionConfig.config?.oauth
+      ? JSON.stringify(normalizedVersionConfig.config.oauth)
+      : "no-oauth";
+
+    // Get or create OAuth JWKS client
+    let versionJwksClient: JwksClient | null = null;
+    let versionOauthInitPromise: Promise<void> | null = null;
+
+    /**
+     * Ensure OAuth is initialized for this version (idempotent)
+     */
+    async function ensureVersionOAuthInitialized(): Promise<void> {
+      if (!normalizedVersionConfig.config?.oauth) {
+        return;
+      }
+
+      // Reuse existing JWKS client if config is identical
+      const existingClient = jwksClients.get(oauthConfigKey);
+      if (existingClient) {
+        versionJwksClient = existingClient;
+        return;
+      }
+
+      // If initialization is in progress for this config, wait for it
+      const existingPromise = oauthInitPromises.get(oauthConfigKey);
+      if (existingPromise) {
+        await existingPromise;
+        const clientAfterInit = jwksClients.get(oauthConfigKey);
+        if (clientAfterInit) {
+          versionJwksClient = clientAfterInit;
+        }
+        return;
+      }
+
+      // Start initialization
+      versionOauthInitPromise = (async () => {
+        try {
+          const oauthConfig = normalizedVersionConfig.config?.oauth;
+          if (!oauthConfig) {
+            throw new AppError(ErrorCode.INVALID_CONFIG, "OAuth configuration is missing");
+          }
+
+          try {
+            const jwksUri = await getJwksUri(oauthConfig.authorizationServer, oauthConfig.jwksUri);
+            versionJwksClient = createJwksClient({
+              jwksUri,
+              cacheMaxAge: 600000,
+              jwksRequestsPerMinute: 10,
+              timeout: 5000,
+            });
+            jwksClients.set(oauthConfigKey, versionJwksClient);
+
+            if (oauthConfig.tokenVerifier) {
+              debugLogger.info(
+                `OAuth enabled for ${versionKey} - Using custom token verifier with JWKS URI: ${jwksUri}`
+              );
+            } else {
+              debugLogger.info(`OAuth enabled for ${versionKey} - JWKS URI: ${jwksUri}`);
+            }
+          } catch (error) {
+            const errorMessage =
+              error instanceof Error ? error.message : "Unknown error during JWKS discovery";
+            throw new AppError(
+              ErrorCode.INVALID_CONFIG,
+              `OAuth initialization failed for ${versionKey}: ${errorMessage}. Please verify your authorization server URL and network connectivity.`
+            );
+          }
+        } catch (error) {
+          oauthInitPromises.delete(oauthConfigKey);
+          throw error;
+        }
+      })();
+
+      oauthInitPromises.set(oauthConfigKey, versionOauthInitPromise);
+      await versionOauthInitPromise;
+    }
+
+    // Create server instance for this version
+    const versionRoute = `/${versionKey}/mcp`;
+    const versionServerInstance = createServerInstance(
+      normalizedVersionConfig,
+      versionPluginManager,
+      versionJwksClient,
+      versionRoute
+    );
+    versionServerInstances.set(versionKey, versionServerInstance);
+
+    // Attach middleware chain and event emitter to server instance
+    versionServerInstance.setMiddlewareChain(versionMiddlewareChain);
+    versionServerInstance.setEventEmitter(versionEventEmitter);
+
+    // Mount version's Express app on shared Express app
+    // Each version server has its own Express app with its routes registered at serverRoute
+    // We mount the entire Express app, so routes registered on it will be accessible
+    // Note: Express strips the mount path, so routes registered at serverRoute on the version app
+    // will be accessible at versionRoute + serverRoute on the shared app
+    // Since serverRoute is the same as versionRoute for multi-version, this works correctly
+    sharedExpressApp.use(versionServerInstance.expressApp);
+
+    // Create version-specific app instance
+    const versionApp: App<T> = {
+      tools: versionConfig.tools,
+
+      get expressApp() {
+        return sharedExpressApp;
+      },
+
+      start: async (options?: StartOptions): Promise<void> => {
+        // Initialize plugins if not already done
+        if (!versionPluginInitialized) {
+          await versionPluginManager.init({
+            config: normalizedVersionConfig,
+            tools: normalizedVersionConfig.tools,
+          });
+          versionPluginInitialized = true;
+        }
+
+        // Initialize OAuth if configured
+        await ensureVersionOAuthInitialized();
+
+        // For multi-version apps, version servers don't start their own HTTP servers
+        // They're mounted on the shared Express app which is started at the top level
+        // Just call plugin onStart hooks
+        await versionPluginManager.start({
+          port: options?.port,
+          transport: options?.transport ?? "http",
+        });
+
+        // Emit version-specific app:start event
+        await versionEventEmitter.emit("app:start", {
+          port: options?.port,
+          transport: options?.transport ?? "http",
+        });
+      },
+
+      getServer: (): McpServer => {
+        return versionServerInstance.mcpServer as unknown as McpServer;
+      },
+
+      handler: (): ExpressMiddleware => {
+        return versionServerInstance.handler();
+      },
+
+      handleRequest: async (req: globalThis.Request, env?: unknown): Promise<globalThis.Response> => {
+        await ensureVersionOAuthInitialized();
+        return versionServerInstance.handleRequest(req, env);
+      },
+
+      use: (middleware: Middleware) => {
+        versionMiddlewareChain.use(middleware);
+      },
+
+      on: (event, handler) => {
+        return versionEventEmitter.on(event, handler);
+      },
+
+      once: (event, handler) => {
+        return versionEventEmitter.once(event, handler);
+      },
+
+      onAny: (handler) => {
+        return versionEventEmitter.onAny(handler);
+      },
+
+      getVersion: (key: string): App<T> | undefined => {
+        return versionApps.get(key);
+      },
+
+      getVersions: (): string[] => {
+        return Array.from(versionApps.keys());
+      },
+    };
+
+    versionApps.set(versionKey, versionApp);
+
+    // Emit version-specific app:init event
+    void versionEventEmitter.emit("app:init", { config: normalizedVersionConfig });
+  }
+
+  // Add health check endpoint to shared Express app
+  sharedExpressApp.get("/health", (_req: ExpressRequest, res: ExpressResponse) => {
+    res.json({ status: "ok", name: config.name, versions: Array.from(versionApps.keys()) });
+  });
+
+  // Add OpenAI domain verification challenge endpoint if configured
+  if (config.config?.openai?.domain_challenge) {
+    const challengeToken = config.config.openai.domain_challenge;
+    sharedExpressApp.get("/.well-known/openai-apps-challenge", (_req: ExpressRequest, res: ExpressResponse) => {
+      res.type("text/plain").send(challengeToken);
+    });
+  }
+
+      // Add catch-all 404 handler for unmatched routes
+      sharedExpressApp.use((_req: ExpressRequest, res: ExpressResponse) => {
+        res.status(404).json({ error: "Not found" });
+      });
+
+  // Create main app instance that delegates to version apps
+  const mainApp: App<T> = {
+    // Use tools from first version (for type inference)
+    tools: (Object.values(config.versions)[0] as VersionConfig<T> | undefined)?.tools as T,
+
+    get expressApp() {
+      return sharedExpressApp;
+    },
+
+    start: async (options?: StartOptions): Promise<void> => {
+      // Initialize all version plugins and OAuth
+      for (const [_versionKey, versionApp] of versionApps) {
+        await versionApp.start(options);
+      }
+
+      // Start the shared HTTP server
+      const port = options?.port ?? 3000;
+      
+      return new Promise<void>((resolve, reject) => {
+        try {
+          const server = http.createServer(sharedExpressApp);
+          server.listen(port, () => {
+            resolve();
+          });
+          server.on("error", reject);
+        } catch (error) {
+          reject(wrapError(error));
+        }
+      });
+    },
+
+    getServer: (): McpServer => {
+      // Return first version's server (for backward compatibility)
+      const firstVersion = Array.from(versionServerInstances.values())[0];
+      return firstVersion?.mcpServer as unknown as McpServer;
+    },
+
+      handler: (): ExpressMiddleware => {
+        return (req: unknown, res: unknown, next: () => void) => {
+          sharedExpressApp(req as ExpressRequest, res as ExpressResponse, next);
+        };
+      },
+
+      handleRequest: async (req: globalThis.Request, env?: unknown): Promise<globalThis.Response> => {
+        // Route to appropriate version based on request path
+        const url = new URL(req.url);
+        const pathParts = url.pathname.split("/").filter(Boolean);
+        
+        if (pathParts.length >= 2 && pathParts[0]?.match(/^v\d+$/) && pathParts[1] === "mcp") {
+          const versionKey = pathParts[0];
+          if (versionKey) {
+            const versionApp = versionApps.get(versionKey);
+            if (versionApp) {
+              return versionApp.handleRequest(req, env);
+            }
+          }
+        }
+
+        // Fallback to first version or return 404
+        const firstVersion = Array.from(versionApps.values())[0];
+        if (firstVersion) {
+          return firstVersion.handleRequest(req, env);
+        }
+
+        return new globalThis.Response(JSON.stringify({ error: "Not found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      },
+
+    use: (middleware: Middleware) => {
+      // Apply shared middleware to all versions
+      // Each version app has its own middleware chain, so we add the middleware to all of them
+      for (const versionApp of versionApps.values()) {
+        versionApp.use(middleware);
+      }
+    },
+
+    on: (event, handler) => {
+      // Subscribe to events on all versions
+      const unsubscribers: (() => void)[] = [];
+      for (const versionApp of versionApps.values()) {
+        unsubscribers.push(versionApp.on(event, handler));
+      }
+      return () => {
+        for (const unsubscribe of unsubscribers) {
+          unsubscribe();
+        }
+      };
+    },
+
+    once: (event, handler) => {
+      // Subscribe to events on all versions (one-time)
+      const unsubscribers: (() => void)[] = [];
+      for (const versionApp of versionApps.values()) {
+        unsubscribers.push(versionApp.once(event, handler));
+      }
+      return () => {
+        for (const unsubscribe of unsubscribers) {
+          unsubscribe();
+        }
+      };
+    },
+
+    onAny: (handler) => {
+      // Subscribe to all events on all versions
+      const unsubscribers: (() => void)[] = [];
+      for (const versionApp of versionApps.values()) {
+        unsubscribers.push(versionApp.onAny(handler));
+      }
+      return () => {
+        for (const unsubscribe of unsubscribers) {
+          unsubscribe();
+        }
+      };
+    },
+
+    getVersion: (versionKey: string): App<T> | undefined => {
+      return versionApps.get(versionKey);
+    },
+
+    getVersions: (): string[] => {
+      return Array.from(versionApps.keys());
+    },
+  };
+
+  return mainApp;
 }
 
 // Re-export defineTool from types/tools for convenience

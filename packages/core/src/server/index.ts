@@ -77,7 +77,8 @@ type InternalAppConfig<T extends ToolDefs> = AppConfig<T> & {
 export function createServerInstance<T extends ToolDefs>(
   config: InternalAppConfig<T>,
   pluginManager: PluginManager,
-  jwksClient: JwksClient | null = null
+  jwksClient: JwksClient | null = null,
+  versionRoute?: string
 ): ServerInstance {
   // Create protocol adapter
   const adapter = createAdapter(config.config?.protocol ?? "mcp");
@@ -128,8 +129,9 @@ export function createServerInstance<T extends ToolDefs>(
   let httpServer: Server | undefined;
 
   // Get configurable server route (default: "/mcp")
+  // If versionRoute is provided, use it; otherwise use config.serverRoute or default
   // Note: Validation is done in createApp's validateConfig function
-  const serverRoute = config.config?.serverRoute ?? "/mcp";
+  const serverRoute = versionRoute ?? config.config?.serverRoute ?? "/mcp";
 
   // Apply OAuth middleware if configured
   if (config.config?.oauth) {
@@ -236,34 +238,41 @@ export function createServerInstance<T extends ToolDefs>(
     res.status(405).json({ error: "DELETE not supported in stateless mode" });
   });
 
-  // Health check endpoint
-  expressApp.get("/health", (_req: Request, res: Response) => {
-    res.json({ status: "ok", name: config.name, version: config.version });
-  });
+  // Only add global endpoints when NOT a versioned server
+  // Versioned servers are mounted on a shared Express app that has its own global endpoints
+  const isVersionedServer = !!versionRoute;
+  
+  if (!isVersionedServer) {
+    // Health check endpoint
+    expressApp.get("/health", (_req: Request, res: Response) => {
+      res.json({ status: "ok", name: config.name, version: config.version });
+    });
 
-  // OpenAI domain verification challenge endpoint
-  if (config.config?.openai?.domain_challenge) {
-    const challengeToken = config.config.openai.domain_challenge;
-    expressApp.get("/.well-known/openai-apps-challenge", (_req: Request, res: Response) => {
-      res.type("text/plain").send(challengeToken);
+    // OpenAI domain verification challenge endpoint
+    if (config.config?.openai?.domain_challenge) {
+      const challengeToken = config.config.openai.domain_challenge;
+      expressApp.get("/.well-known/openai-apps-challenge", (_req: Request, res: Response) => {
+        res.type("text/plain").send(challengeToken);
+      });
+    }
+
+    // Catch-all 404 handler for unregistered routes
+    // Note: versioned servers don't add this - the shared Express app handles 404s
+    expressApp.use((_req: Request, res: Response) => {
+      res.status(404).json({ error: "Not found" });
+    });
+
+    // Error handler middleware
+    expressApp.use((err: Error, _req: Request, res: Response, _next: () => void) => {
+      const appError = wrapError(err);
+      res.status(500).json({
+        error: {
+          code: appError.code,
+          message: appError.message,
+        },
+      });
     });
   }
-
-  // Catch-all 404 handler for unregistered routes
-  expressApp.use((_req: Request, res: Response) => {
-    res.status(404).json({ error: "Not found" });
-  });
-
-  // Error handler middleware
-  expressApp.use((err: Error, _req: Request, res: Response, _next: () => void) => {
-    const appError = wrapError(err);
-    res.status(500).json({
-      error: {
-        code: appError.code,
-        message: appError.message,
-      },
-    });
-  });
 
   const instance: ServerInstance = {
     mcpServer,

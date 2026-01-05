@@ -15,6 +15,27 @@ body {
 .container {
   max-width: 400px;
   margin: 0 auto;
+  position: relative;
+}
+
+/* Version badge */
+.version-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.version-badge.v2 {
+  background: rgba(0, 200, 100, 0.3);
+  border-color: rgba(0, 200, 100, 0.5);
 }
 
 .greeting {
@@ -34,6 +55,12 @@ body {
 .greeting .timestamp {
   font-size: 0.875rem;
   opacity: 0.8;
+}
+
+.greeting .full-name {
+  font-size: 0.9rem;
+  opacity: 0.9;
+  margin-bottom: 4px;
 }
 
 .waiting {
@@ -104,6 +131,21 @@ body {
   outline: none;
   border-color: #667eea;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.input-group input {
+  margin-bottom: 0;
+}
+
+.input-group input::placeholder {
+  color: #999;
 }
 
 .modal-actions {
