@@ -148,13 +148,6 @@ Endpoints:
   - v1 MCP: http://localhost:${port}/v1/mcp (name only)
   - v2 MCP: http://localhost:${port}/v2/mcp (name + surname)
   - Health:  http://localhost:${port}/health
-
-Try it:
-  curl -X POST http://localhost:${port}/v1/mcp -H "Content-Type: application/json" \\
-    -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"greet","arguments":{"name":"World"}},"id":1}'
-
-  curl -X POST http://localhost:${port}/v2/mcp -H "Content-Type: application/json" \\
-    -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"greet","arguments":{"name":"John","surname":"Doe"}},"id":1}'
   `);
 });
 
