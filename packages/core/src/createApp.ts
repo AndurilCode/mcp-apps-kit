@@ -163,7 +163,11 @@ function validateGlobalConfig(
     }
     // Note: Nested null values (e.g., logTool: null) are valid for deep merge
     // and will be handled by deepMerge to remove the property
-    if (debug.logTool !== undefined && debug.logTool !== null && typeof debug.logTool !== "boolean") {
+    if (
+      debug.logTool !== undefined &&
+      debug.logTool !== null &&
+      typeof debug.logTool !== "boolean"
+    ) {
       throw new AppError(
         ErrorCode.INVALID_CONFIG,
         `${prefix}.debug.logTool must be a boolean if provided`
@@ -402,13 +406,13 @@ function mergeVersionConfig<T extends ToolDefs>(
   const serverRoute =
     versionConfig.config?.serverRoute === null
       ? undefined
-      : versionConfig.config?.serverRoute ?? globalConfig?.serverRoute;
+      : (versionConfig.config?.serverRoute ?? globalConfig?.serverRoute);
 
   // Handle protocol (string literal, not an object - use simple override)
   const protocol =
     versionConfig.config?.protocol === null
       ? undefined
-      : versionConfig.config?.protocol ?? globalConfig?.protocol;
+      : (versionConfig.config?.protocol ?? globalConfig?.protocol);
 
   // Deep merge nested config objects (null disables, undefined inherits)
   // Type assertions needed because deepMerge returns Record<string, unknown>
