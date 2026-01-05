@@ -27,7 +27,7 @@ import { getJwksUri } from "./server/oauth/discovery.js";
 import { createJwksClient } from "./server/oauth/jwks-client.js";
 import type { JwksClient } from "jwks-rsa";
 import express, { type Request as ExpressRequest, type Response as ExpressResponse } from "express";
-import http from "http";
+import http, { type Server } from "http";
 import type { Plugin } from "./plugins/types";
 
 /**
@@ -673,6 +673,9 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
   // Map of version keys to their server instances
   const versionServerInstances = new Map<string, ServerInstance>();
 
+  // Shared HTTP server for multi-version apps (stored here for getServer() access)
+  let sharedHttpServer: Server | undefined;
+
   // Shared OAuth JWKS clients (keyed by OAuth config hash for reuse)
   const jwksClients = new Map<string, JwksClient>();
   const oauthInitPromises = new Map<string, Promise<void>>();
@@ -698,13 +701,10 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
       ui: Object.keys(uiDefs).length > 0 ? uiDefs : undefined,
     };
 
-    // Configure debug logger if version-specific debug config is provided
-    if (
-      normalizedVersionConfig.config?.debug &&
-      normalizedVersionConfig.config.debug !== config.config?.debug
-    ) {
-      configureDebugLogger(normalizedVersionConfig.config.debug);
-    }
+    // Note: Debug logger is configured once with global config (line 681-683).
+    // We don't reconfigure it per-version because it's a global singleton.
+    // If version-specific debug configs are needed, they would require per-version
+    // logger instances, which is a larger architectural change.
 
     // Initialize version-specific plugin manager
     const versionPluginManager = new PluginManager(normalizedVersionConfig.plugins ?? []);
@@ -941,11 +941,16 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
 
       return new Promise<void>((resolve, reject) => {
         try {
-          const server = http.createServer(sharedExpressApp);
-          server.listen(port, () => {
+          sharedHttpServer = http.createServer(sharedExpressApp);
+          sharedHttpServer.listen(port, () => {
+            // Attach HTTP server to first version's ServerInstance for getServer().httpServer access
+            const firstVersion = Array.from(versionServerInstances.values())[0];
+            if (firstVersion) {
+              firstVersion.httpServer = sharedHttpServer;
+            }
             resolve();
           });
-          server.on("error", reject);
+          sharedHttpServer.on("error", reject);
         } catch (error) {
           reject(wrapError(error));
         }
@@ -953,9 +958,16 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
     },
 
     getServer: (): McpServer => {
-      // Return first version's server (for backward compatibility)
+      // Return first version's ServerInstance (cast to McpServer for type compatibility)
+      // The ServerInstance has both mcpServer and httpServer properties
+      // httpServer is attached when start() is called
       const firstVersion = Array.from(versionServerInstances.values())[0];
-      return firstVersion?.mcpServer as unknown as McpServer;
+      if (!firstVersion) {
+        throw new Error("No server instance available");
+      }
+      // Return the ServerInstance itself so httpServer is accessible
+      // Type assertion maintains backward compatibility with McpServer type
+      return firstVersion as unknown as McpServer;
     },
 
     handler: (): ExpressMiddleware => {

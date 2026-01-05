@@ -128,6 +128,9 @@ const app = createApp({
       tools: {
         greet: greetToolV2,
       },
+      config: {
+        protocol: "openai",
+      },
     },
   },
 });
