@@ -62,6 +62,7 @@ This project may be a poor fit if you:
 ## Features
 
 - Single `createApp()` entry point to define tools and UI once
+- **API Versioning**: Expose multiple API versions from a single app (e.g., `/v1/mcp`, `/v2/mcp`)
 - Type-safe tool bindings with full TypeScript inference for inputs, outputs, and UI access
 - Protocol abstraction so UI code works identically on both platforms
 - OAuth 2.1 security with JWT validation and JWKS discovery (RFC 6750, RFC 8414)
@@ -180,6 +181,69 @@ await app.start({ port: 3000 });
 export type AppTools = typeof app.tools;
 export type AppClientTools = ClientToolsFromCore<AppTools>;
 ```
+
+### API Versioning
+
+Expose multiple API versions from a single application, each with its own tools and UI:
+
+```typescript
+const app = createApp({
+  name: "my-app",
+
+  // Shared config across all versions
+  config: {
+    cors: { origin: true },
+    oauth: { authorizationServer: "https://auth.example.com" },
+  },
+
+  // Version-specific tools and config
+  versions: {
+    v1: {
+      version: "1.0.0",
+      tools: {
+        greet: defineTool({
+          description: "Greet v1",
+          input: z.object({ name: z.string() }),
+          output: z.object({ message: z.string() }),
+          handler: async ({ name }) => ({ message: `Hello, ${name}!` }),
+        }),
+      },
+    },
+    v2: {
+      version: "2.0.0",
+      tools: {
+        greet: defineTool({
+          description: "Greet v2",
+          input: z.object({ name: z.string(), surname: z.string().optional() }),
+          output: z.object({ message: z.string() }),
+          handler: async ({ name, surname }) => ({
+            message: `Hello, ${name} ${surname || ""}!`.trim(),
+          }),
+        }),
+      },
+      // Version-specific config overrides global config
+      config: {
+        protocol: "openai",
+      },
+    },
+  },
+});
+
+// Access version info programmatically
+console.log(app.getVersions()); // ["v1", "v2"]
+const v2App = app.getVersion("v2");
+
+// Each version is exposed at its dedicated route
+// - v1: http://localhost:3000/v1/mcp
+// - v2: http://localhost:3000/v2/mcp
+```
+
+Each version can have:
+- Different tools and tool schemas
+- Version-specific UI components
+- Config overrides (merged with global config)
+- Version-specific plugins (merged with global plugins)
+- Shared middleware and OAuth configuration
 
 ### UI Setup (React)
 
@@ -455,7 +519,7 @@ npm run dev
 
 Local examples:
 
-- [examples/minimal](examples/minimal/) - minimal server and UI widget
+- [examples/minimal](examples/minimal/) - minimal server with API versioning (v1 and v2)
 - [examples/restaurant-finder](examples/restaurant-finder/) - end-to-end app with search functionality
 
 ## API
