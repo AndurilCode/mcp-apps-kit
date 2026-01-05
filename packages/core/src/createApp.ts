@@ -283,15 +283,6 @@ function validateConfig<T extends ToolDefs>(config: unknown): asserts config is 
         throw new AppError(ErrorCode.INVALID_CONFIG, `Version "${versionKey}" config is missing`);
       }
       validateVersionConfig(versionKey, versionConfig);
-
-      // Validate that version route doesn't conflict with reserved routes
-      const versionRoute = `/${versionKey}/mcp`;
-      if (versionRoute === "/health") {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `Version "${versionKey}" route conflicts with health check endpoint`
-        );
-      }
     }
 
     // Validate global config if provided
@@ -332,6 +323,8 @@ function validateConfig<T extends ToolDefs>(config: unknown): asserts config is 
 /**
  * Merge global config with version-specific config
  * Version-specific config takes precedence over global config
+ * Note: Nested objects (oauth, cors, openai, debug, protocol) are replaced entirely
+ * by version-specific values, not deep-merged.
  */
 function mergeVersionConfig<T extends ToolDefs>(
   globalConfig: GlobalConfig | undefined,
@@ -342,7 +335,7 @@ function mergeVersionConfig<T extends ToolDefs>(
   const mergedConfig: GlobalConfig = {
     ...globalConfig,
     ...versionConfig.config,
-    // Deep merge for nested objects
+    // Shallow merge for nested objects (version-specific replaces global entirely)
     oauth: versionConfig.config?.oauth ?? globalConfig?.oauth,
     cors: versionConfig.config?.cors ?? globalConfig?.cors,
     openai: versionConfig.config?.openai ?? globalConfig?.openai,
@@ -923,7 +916,8 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
 
   // Create main app instance that delegates to version apps
   const mainApp: App<T> = {
-    // Use tools from first version (for type inference)
+    // Use tools from first version (for type inference).
+    // To access a specific version's tools, use getVersion(key).tools
     tools: (Object.values(config.versions)[0] as VersionConfig<T> | undefined)?.tools as T,
 
     get expressApp() {
@@ -943,10 +937,9 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
         try {
           sharedHttpServer = http.createServer(sharedExpressApp);
           sharedHttpServer.listen(port, () => {
-            // Attach HTTP server to first version's ServerInstance for getServer().httpServer access
-            const firstVersion = Array.from(versionServerInstances.values())[0];
-            if (firstVersion) {
-              firstVersion.httpServer = sharedHttpServer;
+            // Attach HTTP server to all version ServerInstances for getServer().httpServer access
+            for (const serverInstance of versionServerInstances.values()) {
+              serverInstance.httpServer = sharedHttpServer;
             }
             resolve();
           });

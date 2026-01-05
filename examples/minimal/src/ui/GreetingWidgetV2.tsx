@@ -89,7 +89,7 @@ export function GreetingWidgetV2() {
                 onChange={(e) => setName(e.target.value)}
                 placeholder="First name *"
                 autoFocus
-                onKeyDown={(e) => e.key === "Enter" && surname && handleGreet()}
+                onKeyDown={(e) => e.key === "Enter" && handleGreet()}
               />
               <input
                 type="text"

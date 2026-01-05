@@ -5,30 +5,11 @@
  * and backward compatibility with single-version apps.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { z } from "zod";
 import { createApp, type AppConfigInput, type VersionsConfig } from "../../src/index";
-import type { AddressInfo } from "node:net";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-
-// Track servers for cleanup
-const servers: Array<{ close: () => void }> = [];
-
-afterEach(async () => {
-  // Close all servers after each test
-  for (const server of servers) {
-    await new Promise<void>((resolve) => {
-      try {
-        server.close();
-        resolve();
-      } catch {
-        resolve();
-      }
-    });
-  }
-  servers.length = 0;
-});
 
 describe("createApp versioning", () => {
   describe("multi-version app creation", () => {
