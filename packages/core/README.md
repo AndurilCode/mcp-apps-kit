@@ -30,6 +30,7 @@ Interactive MCP apps often need to support multiple hosts with slightly differen
 ## Features
 
 - Single `createApp()` entry point for tools and UI definitions
+- **API Versioning**: Expose multiple API versions from a single app (e.g., `/v1/mcp`, `/v2/mcp`)
 - Zod-powered validation with strong TypeScript inference
 - Unified metadata for MCP Apps and ChatGPT Apps
 - OAuth 2.1 bearer token validation with JWKS discovery
@@ -211,6 +212,222 @@ function Widget() {
   }
   return <p>Waiting for greeting...</p>;
 }
+```
+
+## API Versioning
+
+Expose multiple API versions from a single application, each with its own tools, UI, and optional configuration overrides.
+
+### Basic Usage
+
+```ts
+const app = createApp({
+  name: "my-app",
+
+  // Shared config across all versions
+  config: {
+    cors: { origin: true },
+    debug: { logTool: true, level: "info" },
+  },
+
+  // Version definitions
+  versions: {
+    v1: {
+      version: "1.0.0",
+      tools: {
+        greet: defineTool({
+          description: "Greet v1",
+          input: z.object({ name: z.string() }),
+          output: z.object({ message: z.string() }),
+          handler: async ({ name }) => ({ message: `Hello, ${name}!` }),
+        }),
+      },
+    },
+    v2: {
+      version: "2.0.0",
+      tools: {
+        greet: defineTool({
+          description: "Greet v2",
+          input: z.object({ name: z.string(), surname: z.string().optional() }),
+          output: z.object({ message: z.string() }),
+          handler: async ({ name, surname }) => ({
+            message: `Hello, ${name} ${surname || ""}!`.trim(),
+          }),
+        }),
+      },
+    },
+  },
+});
+
+await app.start({ port: 3000 });
+
+// Each version is exposed at its dedicated route:
+// - v1: http://localhost:3000/v1/mcp
+// - v2: http://localhost:3000/v2/mcp
+```
+
+### Version-Specific Configuration
+
+Version-specific configs are merged with global config, with version-specific taking precedence:
+
+```ts
+const app = createApp({
+  name: "my-app",
+  config: {
+    cors: { origin: true },
+    oauth: { authorizationServer: "https://auth.example.com" },
+  },
+  versions: {
+    v1: {
+      version: "1.0.0",
+      tools: {
+        /* ... */
+      },
+      // Uses global OAuth config
+    },
+    v2: {
+      version: "2.0.0",
+      tools: {
+        /* ... */
+      },
+      config: {
+        // Override OAuth for v2
+        oauth: { authorizationServer: "https://auth-v2.example.com" },
+        // Override protocol
+        protocol: "openai",
+      },
+    },
+  },
+});
+```
+
+### Version-Specific Plugins
+
+Plugins are merged: global plugins apply to all versions, version-specific plugins are added per version:
+
+```ts
+const globalPlugin = createPlugin({
+  name: "global-logger",
+  onInit: () => console.log("App initializing"),
+});
+
+const v2Plugin = createPlugin({
+  name: "v2-analytics",
+  beforeToolCall: (context) => {
+    if (context.toolName === "greet") {
+      analytics.track("v2_greet_called");
+    }
+  },
+});
+
+const app = createApp({
+  name: "my-app",
+  plugins: [globalPlugin], // Applied to all versions
+  versions: {
+    v1: {
+      version: "1.0.0",
+      tools: {
+        /* ... */
+      },
+    },
+    v2: {
+      version: "2.0.0",
+      tools: {
+        /* ... */
+      },
+      plugins: [v2Plugin], // Only applied to v2
+    },
+  },
+});
+```
+
+### Version-Specific Middleware
+
+Each version can have its own middleware chain:
+
+```ts
+const app = createApp({
+  name: "my-app",
+  versions: {
+    v1: {
+      version: "1.0.0",
+      tools: {
+        /* ... */
+      },
+    },
+    v2: {
+      version: "2.0.0",
+      tools: {
+        /* ... */
+      },
+    },
+  },
+});
+
+// Add middleware to specific version
+const v2App = app.getVersion("v2");
+v2App?.use(async (context, next) => {
+  console.log("v2 middleware");
+  await next();
+});
+```
+
+### Accessing Versions Programmatically
+
+```ts
+// Get list of available version keys
+const versions = app.getVersions(); // ["v1", "v2"]
+
+// Get a specific version app instance
+const v1App = app.getVersion("v1");
+const v2App = app.getVersion("v2");
+
+// Access version-specific tools, middleware, etc.
+if (v2App) {
+  v2App.use(v2SpecificMiddleware);
+}
+```
+
+### Version Key Requirements
+
+Version keys must match the pattern `/^v\d+$/` (e.g., `v1`, `v2`, `v10`):
+
+```ts
+versions: {
+  v1: { /* ... */ },     // ✅ Valid
+  v2: { /* ... */ },     // ✅ Valid
+  v10: { /* ... */ },    // ✅ Valid
+  "v1.0": { /* ... */ }, // ❌ Invalid (must be v1, v2, etc.)
+  "beta": { /* ... */ }, // ❌ Invalid
+}
+```
+
+### Shared Endpoints
+
+All versions share:
+
+- Health check: `GET /health` (returns all available versions)
+- OpenAI domain verification: `GET /.well-known/openai-apps-challenge` (if configured)
+
+### Backward Compatibility
+
+Single-version apps continue to work as before:
+
+```ts
+// Single-version (backward compatible)
+const app = createApp({
+  name: "my-app",
+  version: "1.0.0",
+  tools: {
+    /* ... */
+  },
+});
+
+// getVersions() returns empty array for single-version apps
+app.getVersions(); // []
+
+// getVersion() returns undefined for single-version apps
+app.getVersion("v1"); // undefined
 ```
 
 ## Plugins, Middleware & Events
@@ -461,9 +678,9 @@ const app = createApp({
 
 ## Examples
 
-- `../../examples/minimal`
-- `../../examples/restaurant-finder`
-- [kanban-mcp-example](https://github.com/AndurilCode/kanban-mcp-example)
+- `../../examples/minimal` - demonstrates API versioning with v1 and v2 endpoints
+- `../../examples/restaurant-finder` - end-to-end app with search functionality
+- [kanban-mcp-example](https://github.com/AndurilCode/kanban-mcp-example) - full-featured kanban board example
 
 ## API
 

@@ -154,7 +154,7 @@ function injectAuthContext(req: Request, authContext: AuthContext): void {
  * and injects authenticated context into the request.
  *
  * @param config - OAuth configuration
- * @param jwksClient - JWKS client for JWT verification (null if custom verifier)
+ * @param jwksClient - JWKS client for JWT verification (null if custom verifier) or a getter function
  * @returns Express middleware function
  *
  * @example
@@ -165,7 +165,7 @@ function injectAuthContext(req: Request, authContext: AuthContext): void {
  */
 export function createOAuthMiddleware(
   config: OAuthConfig,
-  jwksClient: JwksClient | null
+  jwksClient: JwksClient | null | (() => JwksClient | null)
 ): (req: Request, res: Response, next: NextFunction) => Promise<void> {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -178,13 +178,15 @@ export function createOAuthMiddleware(
       if (config.tokenVerifier) {
         validatedToken = await config.tokenVerifier.verifyAccessToken(token);
       } else {
-        if (!jwksClient) {
+        // Resolve JWKS client (supports lazy initialization via getter function)
+        const resolvedJwksClient = typeof jwksClient === "function" ? jwksClient() : jwksClient;
+        if (!resolvedJwksClient) {
           throw new OAuthError(
             ErrorCode.INVALID_REQUEST,
             "OAuth configuration error: JWKS client not initialized"
           );
         }
-        validatedToken = await verifyJWT(token, config, jwksClient);
+        validatedToken = await verifyJWT(token, config, resolvedJwksClient);
       }
 
       // Validate scopes if required

@@ -1,57 +1,49 @@
 /**
- * Minimal Example App
+ * Minimal Example App with Versioning Support
  *
- * A simple "hello world" example demonstrating basic @mcp-apps-kit/core usage:
- * - Simple tool definition with Zod schema
- * - Colocated UI resource binding (UI defined alongside tool)
- * - Server startup
- * - Type-safe handlers using defineTool helper (no type assertions needed!)
+ * Demonstrates @mcp-apps-kit/core versioning feature:
+ * - v1: Simple greet tool with just name
+ * - v2: Enhanced greet tool with name + optional surname
+ * - Shared config (CORS, debug) across versions
+ * - Each version exposed at /v1/mcp and /v2/mcp
  */
 
 import { createApp, defineTool, type ClientToolsFromCore } from "@mcp-apps-kit/core";
 import { defineReactUI } from "@mcp-apps-kit/ui-react-builder";
-import { GreetingWidget } from "./ui/GreetingWidget";
+import { GreetingWidgetV1 } from "./ui/GreetingWidgetV1";
+import { GreetingWidgetV2 } from "./ui/GreetingWidgetV2";
 import { z } from "zod";
 
-// Define schemas separately for clarity
-const greetInput = z.object({
+// =============================================================================
+// V1: Simple greet tool (name only)
+// =============================================================================
+
+const greetInputV1 = z.object({
   name: z.string().describe("Name to greet"),
 });
 
-const greetOutput = z.object({
+const greetOutputV1 = z.object({
   message: z.string(),
   timestamp: z.string(),
 });
 
-// Use defineTool + defineUI for full type safety with colocated UI definition
-// No external UI config needed - the UI is defined right where it's used!
-const greetTool = defineTool({
+const greetToolV1 = defineTool({
   title: "Greet",
   description: "Greet someone by name",
-  input: greetInput,
-  output: greetOutput,
+  input: greetInputV1,
+  output: greetOutputV1,
   visibility: "both",
 
-  // React component UI - the Vite plugin auto-discovers and builds this!
   ui: defineReactUI({
-    component: GreetingWidget,
-    name: "Greeting Widget",
-    description: "Displays greeting messages",
+    component: GreetingWidgetV1,
+    name: "Greeting Widget V1",
+    description: "Displays greeting messages (v1 - name only)",
     prefersBorder: true,
   }),
 
   handler: async (input, context) => {
-    // input is automatically typed as { name: string }
-    // No type assertion needed! ✅
-
-    // With OAuth enabled: context.subject contains the authenticated user
     const userInfo = context.subject ? ` (authenticated as ${context.subject})` : "";
     const message = `Hello, ${input.name}${userInfo}!`;
-
-    // Access full auth context when OAuth is enabled
-    // const auth = context.raw?.["mcp-apps-kit/auth"];
-    // const scopes = auth?.scopes ?? [];
-    // const clientId = auth?.clientId;
 
     return {
       message,
@@ -61,16 +53,57 @@ const greetTool = defineTool({
   },
 });
 
+// =============================================================================
+// V2: Enhanced greet tool (name + optional surname)
+// =============================================================================
+
+const greetInputV2 = z.object({
+  name: z.string().describe("First name to greet"),
+  surname: z.string().optional().describe("Optional surname"),
+});
+
+const greetOutputV2 = z.object({
+  message: z.string(),
+  fullName: z.string(),
+  timestamp: z.string(),
+});
+
+const greetToolV2 = defineTool({
+  title: "Greet",
+  description: "Greet someone by name and optional surname",
+  input: greetInputV2,
+  output: greetOutputV2,
+  visibility: "both",
+
+  ui: defineReactUI({
+    component: GreetingWidgetV2,
+    name: "Greeting Widget V2",
+    description: "Displays greeting messages (v2 - with surname support)",
+    prefersBorder: true,
+  }),
+
+  handler: async (input, context) => {
+    const fullName = input.surname ? `${input.name} ${input.surname}` : input.name;
+    const userInfo = context.subject ? ` (authenticated as ${context.subject})` : "";
+    const message = `Hello, ${fullName}${userInfo}!`;
+
+    return {
+      message,
+      fullName,
+      timestamp: new Date().toISOString(),
+      _text: message,
+    };
+  },
+});
+
+// =============================================================================
+// Create Versioned App
+// =============================================================================
+
 const app = createApp({
   name: "minimal-app",
-  version: "1.0.0",
 
-  tools: {
-    greet: greetTool,
-  },
-
-  // No ui config needed - UI is colocated with the tool definition above!
-
+  // Shared config across all versions
   config: {
     cors: {
       origin: true,
@@ -80,66 +113,56 @@ const app = createApp({
       logTool: true,
       level: "info",
     },
+  },
 
-    // OAuth 2.1 Configuration (Uncomment and configure with your values)
-    //   oauth: {
-    //     // Public URL of this MCP server (the Protected Resource)
-    //     protectedResource: "http://localhost:3000",
-
-    //     // Issuer URL of your OAuth 2.1 Authorization Server
-    //     // Replace with your actual Authorization Server URL
-    //     // Examples: "https://accounts.google.com", "https://your-auth0-domain.auth0.com"
-    //     authorizationServer: "https://auth.example.com",
-
-    //     // Optional: Required OAuth scopes for all requests
-    //     // Tokens must contain ALL listed scopes
-    //     scopes: ["mcp:read"],
-
-    //     // Optional: Explicit JWKS URI (auto-discovered if not provided)
-    //     // jwksUri: "https://auth.example.com/.well-known/jwks.json",
-
-    //     // Optional: Allowed JWT signing algorithms (defaults to ["RS256"])
-    //     // algorithms: ["RS256", "RS384", "ES256"],
-
-    //     // Optional: Expected audience (defaults to protectedResource)
-    //     // audience: "https://api.example.com",
-
-    //     // Optional: Custom token verification (for token introspection, non-JWT tokens)
-    //     // tokenVerifier: {
-    //     //   async verifyAccessToken(token: string) {
-    //     //     const res = await fetch("https://auth.example.com/introspect", {
-    //     //       method: "POST",
-    //     //       body: new URLSearchParams({ token }),
-    //     //     });
-    //     //     const data = await res.json();
-    //     //     if (!data.active) throw new Error("Token inactive");
-    //     //     return {
-    //     //       token,
-    //     //       clientId: data.client_id,
-    //     //       scopes: data.scope.split(" "),
-    //     //       expiresAt: data.exp,
-    //     //       extra: { subject: data.sub },
-    //     //     };
-    //     //   },
-    //     // },
-    //   },
+  // Version definitions
+  versions: {
+    v1: {
+      version: "1.0.0",
+      tools: {
+        greet: greetToolV1,
+      },
+    },
+    v2: {
+      version: "2.0.0",
+      tools: {
+        greet: greetToolV2,
+      },
+      config: {
+        protocol: "openai",
+      },
+    },
   },
 });
 
 const port = parseInt(process.env.PORT || "3000");
 
 app.start({ port }).then(() => {
+  const versions = app.getVersions();
   console.log(`
-Minimal Example Server running on http://localhost:${port}
-MCP endpoint: http://localhost:${port}/mcp
-Health check: http://localhost:${port}/health
+Minimal Example Server with Versioning running on http://localhost:${port}
+
+Available API versions: ${versions.join(", ")}
+
+Endpoints:
+  - v1 MCP: http://localhost:${port}/v1/mcp (name only)
+  - v2 MCP: http://localhost:${port}/v2/mcp (name + surname)
+  - Health:  http://localhost:${port}/health
   `);
 });
 
+// =============================================================================
 // Export types for UI
-export type AppTools = typeof app.tools;
-export type AppClientTools = ClientToolsFromCore<AppTools>;
+// =============================================================================
 
-// Alternatively, export concrete types for better IDE support
-export type GreetInput = z.infer<typeof greetInput>;
-export type GreetOutput = z.infer<typeof greetOutput>;
+// V1 types
+export type AppToolsV1 = { greet: typeof greetToolV1 };
+export type AppClientToolsV1 = ClientToolsFromCore<AppToolsV1>;
+export type GreetInputV1 = z.infer<typeof greetInputV1>;
+export type GreetOutputV1 = z.infer<typeof greetOutputV1>;
+
+// V2 types
+export type AppToolsV2 = { greet: typeof greetToolV2 };
+export type AppClientToolsV2 = ClientToolsFromCore<AppToolsV2>;
+export type GreetInputV2 = z.infer<typeof greetInputV2>;
+export type GreetOutputV2 = z.infer<typeof greetOutputV2>;
