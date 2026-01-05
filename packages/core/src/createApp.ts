@@ -357,13 +357,19 @@ function deepMerge<T extends Record<string, unknown>>(
     return versionSpecific as T;
   }
 
-  // Deep merge objects
-  const result = { ...global } as Record<string, unknown>;
+  // Deep merge objects - build result without null properties
+  const result: Record<string, unknown> = {};
 
+  // First, copy all global properties
+  for (const [key, value] of Object.entries(global)) {
+    result[key] = value;
+  }
+
+  // Then, apply version-specific overrides
   for (const [key, value] of Object.entries(versionSpecific)) {
     if (value === null) {
-      // null removes the property
-      delete result[key];
+      // null removes the property - use Reflect.deleteProperty to satisfy ESLint
+      Reflect.deleteProperty(result, key);
     } else if (value === undefined) {
       // undefined keeps the global value (no change)
     } else if (

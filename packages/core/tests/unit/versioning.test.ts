@@ -156,7 +156,7 @@ describe("createApp versioning", () => {
         createApp({
           name: "test-app",
           versions: {
-            // @ts-expect-error - Testing runtime validation
+            // Testing runtime validation - "invalid" key fails pattern /^v\d+$/
             invalid: {
               version: "1.0.0",
               tools: {},
@@ -197,7 +197,7 @@ describe("createApp versioning", () => {
               version: "1.0.0",
               tools: {},
               config: {
-                // @ts-expect-error - Testing runtime validation
+                // Testing runtime validation - "/health" conflicts with health endpoint
                 serverRoute: "/health",
               },
             },
