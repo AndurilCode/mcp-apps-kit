@@ -56,7 +56,7 @@ describe("createLazyLoader", () => {
   });
 
   it("should handle concurrent calls without duplicate imports", async () => {
-    let resolvePromise: (value: unknown) => void;
+    let resolvePromise!: (value: unknown) => void;
     const importPromise = new Promise((resolve) => {
       resolvePromise = resolve;
     });
@@ -77,7 +77,7 @@ describe("createLazyLoader", () => {
     expect(importFn).toHaveBeenCalledTimes(1);
 
     // Resolve the import
-    resolvePromise!(mockModule);
+    resolvePromise(mockModule);
 
     // All promises should resolve to the same module
     const [result1, result2, result3] = await Promise.all([promise1, promise2, promise3]);

@@ -85,9 +85,10 @@ async function startTestServerFromApp(app: App, options: TestServerOptions): Pro
   try {
     const startPromise = app.start({ port: actualPort, transport: "http" });
 
-    // Add timeout
+    // Add timeout with cleanup to prevent memory leak
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         reject(
           new ServerStartupError(
             undefined,
@@ -100,7 +101,13 @@ async function startTestServerFromApp(app: App, options: TestServerOptions): Pro
       }, timeout);
     });
 
-    await Promise.race([startPromise, timeoutPromise]);
+    try {
+      await Promise.race([startPromise, timeoutPromise]);
+    } finally {
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+    }
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     throw new ServerStartupError(

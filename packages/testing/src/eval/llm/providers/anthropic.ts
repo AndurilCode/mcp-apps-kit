@@ -73,9 +73,12 @@ export function createAnthropicProvider(model: string, apiKey?: string): LLMProv
         ],
       });
 
+      if (!response.content || response.content.length === 0) {
+        throw new Error("Empty or missing content array in Anthropic response");
+      }
       const content = response.content[0];
       if (content?.type !== "text") {
-        throw new Error("Empty or unexpected response type from Anthropic");
+        throw new Error("Unexpected response type from Anthropic");
       }
 
       const text = content.text;
@@ -219,9 +222,12 @@ export function createAnthropicProvider(model: string, apiKey?: string): LLMProv
         ],
       });
 
+      if (!response.content || response.content.length === 0) {
+        throw new Error("Empty or missing content array in Anthropic response");
+      }
       const content = response.content[0];
       if (content?.type !== "text") {
-        throw new Error("Empty or unexpected response type from Anthropic");
+        throw new Error("Unexpected response type from Anthropic");
       }
 
       const text = content.text;

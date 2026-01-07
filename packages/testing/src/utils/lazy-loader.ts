@@ -71,6 +71,8 @@ export function createLazyLoader<T>(
         state.module = module;
         return module;
       } catch {
+        // Clear loadPromise so subsequent calls can retry loading
+        state.loadPromise = null;
         throw new ConfigurationError(
           options.packageName,
           `${options.packageName} is required for this feature. Install it with: ${options.installHint}`
@@ -112,16 +114,36 @@ export function createCachedClientFactory<TClient>(
 } {
   let cachedClient: TClient | null = null;
   let cachedApiKey: string | null = null;
+  let pendingPromise: Promise<TClient> | null = null;
 
   return {
     async get(apiKey: string): Promise<TClient> {
+      // Return cached client if available and API key matches
       if (cachedClient && cachedApiKey === apiKey) {
         return cachedClient;
       }
 
-      cachedClient = await createClient(apiKey);
-      cachedApiKey = apiKey;
-      return cachedClient;
+      // If API key changed, invalidate pending promise
+      if (cachedApiKey !== apiKey) {
+        pendingPromise = null;
+        cachedClient = null;
+        cachedApiKey = null;
+      }
+
+      // Return existing promise if creation is in progress
+      if (pendingPromise) {
+        return pendingPromise;
+      }
+
+      // Start creating client and cache the promise
+      pendingPromise = createClient(apiKey).then((client) => {
+        cachedClient = client;
+        cachedApiKey = apiKey;
+        pendingPromise = null;
+        return client;
+      });
+
+      return pendingPromise;
     },
 
     /**
@@ -130,6 +152,7 @@ export function createCachedClientFactory<TClient>(
     clear(): void {
       cachedClient = null;
       cachedApiKey = null;
+      pendingPromise = null;
     },
   };
 }
