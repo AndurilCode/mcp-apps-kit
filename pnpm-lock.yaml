@@ -281,7 +281,7 @@ importers:
   packages/ui-react:
     dependencies:
       '@mcp-apps-kit/ui':
-        specifier: ^0.2.0
+        specifier: ^0.3.0
         version: link:../ui
     devDependencies:
       '@testing-library/react':
