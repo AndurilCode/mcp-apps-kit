@@ -2,18 +2,15 @@
  * Property testing generators
  *
  * Provides generators for creating random test inputs using fast-check.
- * Requires fast-check and zod-fast-check as peer dependencies.
+ * Requires fast-check as a peer dependency.
  */
 
-import type { ZodSchema } from "zod";
 import { ConfigurationError } from "../../errors";
 import { propertyLogger } from "../../debug";
 
-// Lazy-loaded modules (use any type to avoid strict typing issues)
+// Lazy-loaded fast-check module
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let fastCheckModule: any = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let zodFastCheckModule: any = null;
 
 /**
  * Load fast-check module (lazy, throws if not available)
@@ -32,25 +29,6 @@ function getFastCheck(): any {
     }
   }
   return fastCheckModule;
-}
-
-/**
- * Load zod-fast-check module (lazy, throws if not available)
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getZodFastCheck(): any {
-  if (!zodFastCheckModule) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      zodFastCheckModule = require("zod-fast-check");
-    } catch {
-      throw new ConfigurationError(
-        "zod-fast-check",
-        "zod-fast-check is required for Zod schema generation. Install it with: npm install -D zod-fast-check"
-      );
-    }
-  }
-  return zodFastCheckModule;
 }
 
 // Type for fast-check Arbitrary
@@ -153,16 +131,5 @@ export const generators = {
     propertyLogger("Creating optional generator");
     const fc = getFastCheck();
     return fc.option(gen);
-  },
-
-  /**
-   * Generate values from a Zod schema
-   */
-  fromSchema<T>(schema: ZodSchema<T>): Arbitrary<T> {
-    propertyLogger("Creating generator from Zod schema");
-    const zodFastCheck = getZodFastCheck();
-    const fc = getFastCheck();
-    // zod-fast-check exports ZodFastCheck with an arbitrary method
-    return zodFastCheck.ZodFastCheck().arbitrary(schema, { fc });
   },
 };

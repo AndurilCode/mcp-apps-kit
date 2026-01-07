@@ -16,7 +16,7 @@ describe("Minimal Example Integration", () => {
 
   beforeAll(async () => {
     const testPort = 3004;
-    const server = await startTestServer(app as unknown, { port: testPort });
+    const server = await startTestServer(app, { port: testPort });
     await new Promise((resolve) => setTimeout(resolve, 100));
     
     const client = await createTestClient(`http://localhost:${testPort}/v1/mcp`, {
