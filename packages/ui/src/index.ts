@@ -85,6 +85,10 @@ export {
   safeStringify,
 } from "./debug/logger";
 
+// Server configuration utilities (for build-time injected config)
+export type { McpServerConfig } from "./config";
+export { getMcpServerConfig, getMcpServerBaseUrl } from "./config";
+
 // =============================================================================
 // ADAPTER EXPORTS
 // =============================================================================

@@ -283,6 +283,52 @@ export interface GlobalConfig {
    * ```
    */
   debug?: DebugConfig;
+
+  /**
+   * Server configuration to inject into all UI resources at runtime.
+   *
+   * This config is injected as `window.__MCP_SERVER_CONFIG__` into all HTML UIs
+   * when they are served. UIs can access it via `getMcpServerConfig()` or
+   * `getMcpServerBaseUrl()` from `@mcp-apps-kit/ui`.
+   *
+   * Works for both vanilla HTML (`defineUI()`) and React UIs (`defineReactUI()`).
+   *
+   * @example
+   * ```typescript
+   * config: {
+   *   serverConfig: {
+   *     baseUrl: "http://localhost:3000",
+   *     customSetting: "value",
+   *   }
+   * }
+   * ```
+   */
+  serverConfig?: ServerConfig;
+}
+
+/**
+ * Server configuration that can be injected into UI resources.
+ *
+ * These values become available in UIs via `getMcpServerConfig()` from `@mcp-apps-kit/ui`.
+ */
+export interface ServerConfig {
+  /**
+   * Base URL of the MCP server.
+   *
+   * Used by UIs to make API calls (e.g., debug logging via HTTP).
+   * Should include protocol and port (e.g., "http://localhost:3000").
+   *
+   * @example "http://localhost:3000"
+   * @example "https://api.myapp.com"
+   */
+  baseUrl?: string;
+
+  /**
+   * Additional custom configuration.
+   *
+   * Any extra values your UI needs at runtime.
+   */
+  [key: string]: unknown;
 }
 
 /**

@@ -90,7 +90,10 @@ export function createServerInstance<T extends ToolDefs>(
   });
 
   // Compute UI resource URIs with content hashes for cache busting
-  const uiUriMap = config.ui ? computeUIUris(config.name, config.ui) : {};
+  // Inject server config into UIs if provided
+  const uiUriMap = config.ui
+    ? computeUIUris(config.name, config.ui, config.config?.serverConfig)
+    : {};
 
   // Will be set by createApp
   let middlewareChainRef: MiddlewareChain | undefined;
@@ -956,15 +959,23 @@ function applyCors(app: Express, config: CORSConfig): void {
  * Compute UI resource URIs with content hashes for cache busting
  *
  * Returns a map of UI key to full URI with hash.
+ * Optionally injects server configuration into each UI.
  */
 function computeUIUris(
   serverName: string,
-  ui: UIDefs
+  ui: UIDefs,
+  serverConfig?: Record<string, unknown>
 ): Record<string, { uri: string; html: string }> {
   const result: Record<string, { uri: string; html: string }> = {};
 
   for (const [key, uiDef] of Object.entries(ui)) {
-    const html = readUIHtml(key, uiDef);
+    let html = readUIHtml(key, uiDef);
+
+    // Inject server config into HTML if provided
+    if (serverConfig) {
+      html = injectServerConfig(html, serverConfig);
+    }
+
     const contentHash = crypto.createHash("sha256").update(html).digest("hex").substring(0, 8);
     const uri = `ui://${serverName}/${key}?v=${contentHash}`;
     result[key] = { uri, html };
@@ -1048,4 +1059,39 @@ function readUIHtml(key: string, uiDef: UIDef): string {
       `Failed to read UI resource "${key}" from ${filePath}: ${(error as Error).message}`
     );
   }
+}
+
+/**
+ * Inject server configuration into HTML content.
+ *
+ * Adds a <script> tag with window.__MCP_SERVER_CONFIG__ = {...} to the HTML.
+ * UIs can access this via getMcpServerConfig() from @mcp-apps-kit/ui.
+ *
+ * Injection points (in order of preference):
+ * 1. After <head> opening tag
+ * 2. After <!DOCTYPE> or at the start if no head tag
+ */
+function injectServerConfig(html: string, serverConfig: Record<string, unknown>): string {
+  if (Object.keys(serverConfig).length === 0) {
+    return html;
+  }
+
+  const configScript = `<script>window.__MCP_SERVER_CONFIG__=${JSON.stringify(serverConfig)};</script>`;
+
+  // Try to inject after <head> tag
+  const headMatch = html.match(/<head[^>]*>/i);
+  if (headMatch) {
+    const insertPos = (headMatch.index ?? 0) + headMatch[0].length;
+    return html.slice(0, insertPos) + configScript + html.slice(insertPos);
+  }
+
+  // Fallback: inject after <!DOCTYPE> or at the start
+  const doctypeMatch = html.match(/<!DOCTYPE[^>]*>/i);
+  if (doctypeMatch) {
+    const insertPos = (doctypeMatch.index ?? 0) + doctypeMatch[0].length;
+    return html.slice(0, insertPos) + configScript + html.slice(insertPos);
+  }
+
+  // Last resort: prepend to the HTML
+  return configScript + html;
 }

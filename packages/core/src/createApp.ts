@@ -465,6 +465,10 @@ function mergeVersionConfig<T extends ToolDefs>(
       globalConfig?.debug as Record<string, unknown> | undefined,
       versionConfig.config?.debug as Record<string, unknown> | null | undefined
     ) as GlobalConfig["debug"],
+    serverConfig: deepMerge(
+      globalConfig?.serverConfig as Record<string, unknown> | undefined,
+      versionConfig.config?.serverConfig as Record<string, unknown> | null | undefined
+    ) as GlobalConfig["serverConfig"],
   };
 
   // Merge plugins arrays (global + version-specific)
