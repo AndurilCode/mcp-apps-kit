@@ -123,12 +123,18 @@ importers:
       concurrently:
         specifier: ^9.2.1
         version: 9.2.1
+      dotenv:
+        specifier: ^16.4.7
+        version: 16.4.7
       fast-check:
         specifier: ^4.5.3
         version: 4.5.3
       jsdom:
         specifier: ^27.3.0
         version: 27.3.0
+      openai:
+        specifier: ^6.15.0
+        version: 6.15.0(ws@8.18.3)(zod@4.2.1)
       tsx:
         specifier: ^4.0.0
         version: 4.21.0
@@ -3549,6 +3555,18 @@ packages:
     peerDependencies:
       ws: ^8.18.0
       zod: ^3.23.8
+    peerDependenciesMeta:
+      ws:
+        optional: true
+      zod:
+        optional: true
+
+  openai@6.15.0:
+    resolution: {integrity: sha512-F1Lvs5BoVvmZtzkUEVyh8mDQPPFolq4F+xdsx/DO8Hee8YF3IGAlZqUIsF+DVGhqf4aU0a3bTghsxB6OIsRy1g==}
+    hasBin: true
+    peerDependencies:
+      ws: ^8.18.0
+      zod: ^3.25 || ^4.0
     peerDependenciesMeta:
       ws:
         optional: true
@@ -8119,6 +8137,11 @@ snapshots:
       zod: 4.2.1
     transitivePeerDependencies:
       - encoding
+
+  openai@6.15.0(ws@8.18.3)(zod@4.2.1):
+    optionalDependencies:
+      ws: 8.18.3
+      zod: 4.2.1
 
   optionator@0.9.4:
     dependencies:

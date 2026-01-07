@@ -133,6 +133,7 @@ export async function createTestClient(
       return tools.tools.map((tool) => ({
         name: tool.name,
         description: tool.description,
+        inputSchema: tool.inputSchema as Record<string, unknown> | undefined,
       }));
     },
 

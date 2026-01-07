@@ -12,7 +12,7 @@ import type {
   EvaluationResult,
   EvalOptions,
   CustomEvalOptions,
-  CriterionResult,
+  CriteriaResults,
 } from "../../../types";
 
 /**
@@ -175,21 +175,22 @@ export function createAnthropicProvider(model: string, apiKey?: string): LLMProv
         );
       }
 
-      // Build evaluation result
-      const criteriaResults: CriterionResult[] = options.criteria.map((criterion) => {
+      // Build evaluation result as a record keyed by criterion name
+      const criteriaResults: CriteriaResults = {};
+      for (const criterion of options.criteria) {
         const result = parsed.criteria.find((c) => c.name === criterion.name);
         if (!result) {
           throw new Error(`Missing evaluation result for criterion: ${criterion.name}`);
         }
 
         const threshold = criterion.threshold ?? 0.7;
-        return {
+        criteriaResults[criterion.name] = {
           name: criterion.name,
           score: result.score,
           pass: result.score >= threshold,
           explanation: result.explanation,
         };
-      });
+      }
 
       const overallScore = parsed.overall.score;
       const passThreshold = 0.7; // Default overall threshold

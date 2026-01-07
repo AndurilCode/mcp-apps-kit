@@ -82,7 +82,7 @@ export interface TestClient {
   callTool(name: string, args: unknown): Promise<ToolResult>;
 
   /** List available tools */
-  listTools(): Promise<Array<{ name: string; description?: string }>>;
+  listTools(): Promise<Array<{ name: string; description?: string; inputSchema?: Record<string, unknown> }>>;
 
   /** List available resources */
   listResources(): Promise<Array<{ uri: string; name?: string; description?: string }>>;
@@ -323,6 +323,12 @@ export interface CriterionResult {
 }
 
 /**
+ * Criteria results as a record keyed by criterion name
+ * Allows direct access like: evaluation.criteria.accuracy
+ */
+export type CriteriaResults = Record<string, CriterionResult>;
+
+/**
  * Overall evaluation result
  */
 export interface EvaluationResult {
@@ -331,8 +337,8 @@ export interface EvaluationResult {
     score: number;
     pass: boolean;
   };
-  /** Per-criterion results */
-  criteria: CriterionResult[];
+  /** Per-criterion results - access by name, e.g., criteria.accuracy */
+  criteria: CriteriaResults;
   /** Raw LLM response for debugging */
   rawResponse?: string;
 }

@@ -20,6 +20,8 @@ MCP AppsKit Testing provides utilities for testing MCP tools, UI widgets, and fu
 - [UI Widget Testing](#ui-widget-testing)
 - [Mock Host Environment](#mock-host-environment)
 - [LLM Evaluation](#llm-evaluation)
+  - [MCP Eval (Recommended)](#mcp-eval-recommended)
+  - [Output Quality Evaluation](#output-quality-evaluation)
 - [Framework Integration](#framework-integration)
 - [API Reference](#api-reference)
 - [Examples](#examples)
@@ -550,7 +552,111 @@ unsubscribe();
 
 ## LLM Evaluation
 
-Use AI to evaluate tool output quality:
+### MCP Eval (Recommended)
+
+The recommended way to evaluate MCP tools is to let an LLM actually **use** the tools to complete tasks, then assert on the results. This tests the full integration between an AI agent and your MCP server.
+
+```ts
+import { it, expect, beforeAll, afterAll } from "vitest";
+import { setupMCPEval, describeEval } from "@mcp-apps-kit/testing";
+import { app } from "./app";
+
+// describeEval auto-skips tests if OPENAI_API_KEY is not set
+describeEval("MCP Eval Tests", () => {
+  let mcpEval;
+
+  beforeAll(async () => {
+    mcpEval = await setupMCPEval(app, { 
+      version: "v1",
+      model: "gpt-4o-mini",
+    });
+  });
+
+  afterAll(async () => {
+    await mcpEval.cleanup();
+  });
+
+  it("should greet Alice", async () => {
+    const result = await mcpEval.run("Please greet Alice");
+
+    // Assert tool was called with correct args
+    expect(result.toolCalls).toContainEqual(
+      expect.objectContaining({ name: "greet", args: { name: "Alice" }, success: true })
+    );
+
+    // Judge the response
+    const judgment = await result.judge("Should be friendly");
+    expect(judgment.pass).toBe(true);
+  });
+});
+```
+
+#### Manual Setup
+
+For more control, use `createMCPEval` with a pre-configured client:
+
+```ts
+import { createMCPEval, startTestServer, createTestClient } from "@mcp-apps-kit/testing";
+
+const server = await startTestServer(app, { port: 3001 });
+const client = await createTestClient("http://localhost:3001/v1/mcp");
+
+const mcpEval = createMCPEval(client, { model: "gpt-4o-mini" });
+// ... use mcpEval.run() ...
+
+await client.disconnect();
+await server.stop();
+```
+
+#### MCP Eval Output
+
+When `verbose: true`, the evaluator automatically reports results:
+
+```
+[MCP EVAL] Please greet Alice
+  Tools: ✓ greet({"name":"Alice"})
+  Response: Hello, Alice!
+  Duration: 1406ms
+  Judge: [PASS] (100%) - The agent successfully greeted Alice with a friendly message.
+```
+
+#### setupMCPEval Options
+
+| Option         | Type    | Default        | Description                          |
+| -------------- | ------- | -------------- | ------------------------------------ |
+| `version`      | string  | -              | API version (e.g., "v1", "v2")       |
+| `port`         | number  | auto           | Server port (auto-assigned if not set) |
+| `model`        | string  | `gpt-4o-mini`  | OpenAI model to use                  |
+| `apiKey`       | string  | env var        | OpenAI API key                       |
+| `maxTokens`    | number  | `1024`         | Maximum tokens for response          |
+| `systemPrompt` | string  | -              | Custom system prompt for the agent   |
+| `verbose`      | boolean | `true`         | Enable console output                |
+
+#### ToolCallRecord Properties
+
+Each tool call in `result.toolCalls` contains:
+
+| Property  | Type                    | Description                    |
+| --------- | ----------------------- | ------------------------------ |
+| `name`    | string                  | Tool name                      |
+| `args`    | Record<string, unknown> | Arguments passed to the tool   |
+| `result`  | unknown                 | Result returned by the tool    |
+| `success` | boolean                 | Whether the tool call succeeded |
+| `error`   | string \| undefined     | Error message if failed        |
+
+#### JudgeResult Properties
+
+The `result.judge()` method returns:
+
+| Property      | Type    | Description                         |
+| ------------- | ------- | ----------------------------------- |
+| `pass`        | boolean | Whether the response passes criteria |
+| `score`       | number  | Score from 0-1                      |
+| `explanation` | string  | Explanation from the judge          |
+
+### Output Quality Evaluation
+
+For evaluating tool output quality without agent interaction, use the LLM evaluator with criteria:
 
 ```ts
 import { createLLMEvaluator, criteria } from "@mcp-apps-kit/testing";
@@ -574,8 +680,8 @@ const evaluation = await evaluator.evaluate(result, {
 });
 
 console.log(`Overall: ${evaluation.overall.score}`);
-for (const criterion of evaluation.criteria) {
-  console.log(`${criterion.name}: ${criterion.score} - ${criterion.reasoning}`);
+for (const [name, criterion] of Object.entries(evaluation.criteria)) {
+  console.log(`${name}: ${criterion.score} - ${criterion.explanation}`);
 }
 
 // Custom evaluation with prompt
@@ -679,10 +785,14 @@ expect(result).toContainToolText("Alice");
 
 ### LLM Evaluation
 
-| Function                     | Description                  |
-| ---------------------------- | ---------------------------- |
-| `createLLMEvaluator(config)` | Create LLM evaluator         |
-| `criteria`                   | Built-in evaluation criteria |
+| Function                     | Description                                |
+| ---------------------------- | ------------------------------------------ |
+| `setupMCPEval(app, config)`  | Setup MCP evaluator from app (simplified)  |
+| `createMCPEval(client, cfg)` | Create MCP evaluator from client (manual)  |
+| `describeEval`               | `describe` that skips if no API key        |
+| `hasOpenAIKey()`             | Check if OPENAI_API_KEY is set             |
+| `createLLMEvaluator(config)` | Create LLM evaluator for output quality    |
+| `criteria`                   | Built-in evaluation criteria               |
 
 ### Framework Adapters
 
@@ -701,6 +811,7 @@ See the `examples/minimal` directory for comprehensive test examples:
 - `tests/integration.test.ts` - Integration testing
 - `tests/advanced-features.test.ts` - Test suites, property testing, mock host
 - `tests/ui-widget.test.tsx` - UI component testing
+- `tests/eval.test.ts` - MCP evaluation with LLM agent and judge
 
 ## Contributing
 

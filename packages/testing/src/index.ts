@@ -46,6 +46,7 @@ export type {
   EvalCriterion,
   EvalOptions,
   CriterionResult,
+  CriteriaResults,
   EvaluationResult,
   CustomEvalOptions,
   // UI testing types
@@ -62,6 +63,12 @@ export type {
   PromptInfo,
   PromptResult,
 } from "./types";
+
+// Eval reporter types
+export type { EvalReporterOptions, EvalReportEntry } from "./eval/reporter";
+
+// MCP eval types
+export type { MCPEval, MCPEvaluator, MCPEvalConfig, MCPEvalSetupConfig, MCPEvalResult, ToolCallRecord, JudgeResult } from "./eval/mcp";
 
 // =============================================================================
 // ERROR EXPORTS
@@ -113,8 +120,14 @@ export { generators, forAllInputs } from "./eval/property";
 // UI testing - Phase 7
 export { createMockHost, createTestEnvironment, TestEnvironmentBuilder } from "./ui";
 
-// LLM evaluation - Phase 8
+// LLM evaluation (output evaluation) - Phase 8
 export { createLLMEvaluator, criteria } from "./eval/llm";
+
+// MCP evaluation (LLM uses MCP tools) - the correct way to eval
+export { createMCPEval, setupMCPEval, describeEval, hasOpenAIKey } from "./eval/mcp";
+
+// Eval reporting
+export { EvalReporter, createEvalReporter } from "./eval/reporter";
 
 // Framework adapters - Phase 5
 // Note: Vitest and Jest adapters are exported via subpath exports in package.json
