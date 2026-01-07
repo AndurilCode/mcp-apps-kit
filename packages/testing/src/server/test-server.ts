@@ -11,6 +11,7 @@ import { serverLogger } from "../debug";
 // Type for App from @mcp-apps-kit/core (avoiding direct dependency)
 interface App {
   start(options?: { port?: number; transport?: string }): Promise<void>;
+  stop?(): Promise<void>;
   handler(): (req: unknown, res: unknown, next: () => void) => void;
 }
 
@@ -38,6 +39,8 @@ export function startTestServer(
  */
 async function startTestServerFromApp(app: App, options: TestServerOptions): Promise<TestServer> {
   const { port = 0, timeout = 10000 } = options;
+  // Track whether we used app.start() so we can call app.stop() later
+  let usedAppStart = false;
 
   serverLogger("Starting test server from App instance on port %d", port);
 
@@ -107,6 +110,7 @@ async function startTestServerFromApp(app: App, options: TestServerOptions): Pro
     // Use the app's built-in start method for fixed ports
     try {
       await app.start({ port, transport: "http" });
+      usedAppStart = true;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       throw new ServerStartupError(
@@ -131,13 +135,19 @@ async function startTestServerFromApp(app: App, options: TestServerOptions): Pro
     async stop(): Promise<void> {
       serverLogger("Stopping test server");
       if (httpServer) {
+        // Dynamic port case: we created our own HTTP server
         const server = httpServer;
         return new Promise((resolve) => {
           server.close(() => {
             resolve();
           });
         });
+      } else if (usedAppStart && app.stop) {
+        // Fixed port case: app.start() was used, call app.stop() if available
+        await app.stop();
       }
+      // Note: if app.stop is not available for fixed-port servers,
+      // the server may continue running. Consider using port 0 for tests.
     },
   };
 }
