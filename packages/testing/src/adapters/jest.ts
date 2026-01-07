@@ -12,7 +12,9 @@ import {
   matchesToolObject,
 } from "../matchers/core";
 import type { ToolResult } from "../types";
-import type { ZodSchema } from "zod";
+// ZodSchema is a type from zod, but we need to reference it in type augmentation
+// Using a type alias to avoid direct dependency issues
+type ZodSchema = import("zod").ZodSchema;
 
 // Jest's expect is available globally, but we need to type it
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

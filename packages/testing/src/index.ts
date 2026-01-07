@@ -108,15 +108,3 @@ export { createLLMEvaluator, criteria } from "./eval/llm";
 // Framework adapters - Phase 5
 // Note: Vitest and Jest adapters are exported via subpath exports in package.json
 // They are available as @mcp-apps-kit/testing/vitest and @mcp-apps-kit/testing/jest
-
-// Behavior testing - Phase 4
-// export { expectToolResult, defineTestSuite, runTestSuite } from "./eval/behavior";
-
-// Property testing - Phase 6
-// export { generators, forAllInputs } from "./eval/property";
-
-// LLM evaluation - Phase 8
-// export { createLLMEvaluator, criteria } from "./eval/llm";
-
-// UI testing - Phase 7
-// export { createMockHost } from "./ui";

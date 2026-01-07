@@ -129,7 +129,7 @@ export function expectToolResult(result: ToolResult): ToolResultAssertion {
  *
  * Attempts to parse JSON from text content, falls back to raw text.
  */
-function extractResultData(result: ToolResult): unknown {
+export function extractResultData(result: ToolResult): unknown {
   const textContent = result.content
     .filter((c) => c.type === "text")
     .map((c) => c.text ?? "")
