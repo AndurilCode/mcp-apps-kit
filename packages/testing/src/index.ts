@@ -89,9 +89,8 @@ export {
 // MAIN API EXPORTS
 // =============================================================================
 
-// Note: These will be implemented in subsequent phases
 // Server utilities - Phase 3
-// export { createTestClient, startTestServer, createTestEnvironment, TestEnvironmentBuilder } from "./server";
+export { createTestClient, startTestServer } from "./server";
 
 // Behavior testing - Phase 4
 // export { expectToolResult, defineTestSuite, runTestSuite } from "./eval/behavior";
