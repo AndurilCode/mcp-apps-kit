@@ -1069,10 +1069,10 @@ function readUIHtml(key: string, uiDef: UIDef): string {
  */
 function sanitizeJsonForScript(jsonString: string): string {
   return jsonString
-    .replace(/<\/script/gi, '<\\/script')
-    .replace(/<!--/g, '<\\!--')
-    .replace(/\u2028/g, '\\u2028')
-    .replace(/\u2029/g, '\\u2029');
+    .replace(/<\/script/gi, "<\\/script")
+    .replace(/<!--/g, "<\\!--")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
 }
 
 /**
