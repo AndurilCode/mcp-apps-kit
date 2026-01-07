@@ -50,22 +50,22 @@ Testing MCP applications involves multiple layers: validating tool behavior, tes
 ## Install
 
 ```bash
-npm install @mcp-apps-kit/testing zod
+npm install @mcp-apps-kit/testing
 ```
 
-### Optional Peer Dependencies
+This includes all dependencies for property testing (`fast-check`) and LLM evaluation (`openai`, `@anthropic-ai/sdk`).
 
-The library has optional peer dependencies that are only needed for specific features. Install them as needed:
+### Test Framework (Optional)
 
-| Feature | Package | Install |
-|---------|---------|---------|
-| Property testing | `fast-check` | `npm install -D fast-check` |
-| LLM evaluation (OpenAI) | `openai` | `npm install -D openai` |
-| LLM evaluation (Anthropic) | `@anthropic-ai/sdk` | `npm install -D @anthropic-ai/sdk` |
-| Vitest matchers | `vitest` | `npm install -D vitest` |
-| Jest matchers | `jest` | `npm install -D jest` |
+If using framework-specific matchers, ensure you have your test framework installed:
 
-> **Note**: These are marked as optional in `peerDependenciesMeta`, so they won't be auto-installed.
+```bash
+# For Vitest users
+npm install -D vitest
+
+# For Jest users
+npm install -D jest
+```
 
 ## Quick Start
 
