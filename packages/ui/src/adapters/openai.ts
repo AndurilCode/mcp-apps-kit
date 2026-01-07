@@ -21,14 +21,6 @@ import type { DebugTransport, LogEntry } from "../debug/logger";
 import { clientDebugLogger } from "../debug/logger";
 
 /**
- * Adapter for ChatGPT Apps (OpenAI)
- *
- * Supports session-scoped state persistence.
- * Integrates with the OpenAI Apps SDK.
- *
- * @internal
- */
-/**
  * Configuration options for OpenAI adapter logging
  */
 export interface OpenAIAdapterLogConfig {
@@ -52,12 +44,16 @@ export class OpenAIAdapter implements ProtocolAdapter {
   private context: HostContext;
   private state: unknown = null;
   private toolResultHandlers: Set<(result: unknown) => void> = new Set();
+  // Required by ProtocolAdapter interface but not triggered - ChatGPT provides input once at load, not via events
   private toolInputHandlers: Set<(input: unknown) => void> = new Set();
+  // Required by ProtocolAdapter interface but not triggered - ChatGPT doesn't emit cancellation events
   private toolCancelledHandlers: Set<(reason?: string) => void> = new Set();
   private hostContextHandlers: Set<(context: HostContext) => void> = new Set();
+  // Required by ProtocolAdapter interface but not triggered - ChatGPT doesn't emit teardown events
   private teardownHandlers: Set<(reason?: string) => void> = new Set();
   private currentToolInput?: Record<string, unknown>;
   private currentToolOutput?: Record<string, unknown>;
+  // Required by ProtocolAdapter interface (getToolMeta) but ChatGPT doesn't provide tool metadata
   private currentToolMeta?: Record<string, unknown>;
   private globalsHandler?: (event: MessageEvent) => void;
 
@@ -109,6 +105,27 @@ export class OpenAIAdapter implements ProtocolAdapter {
         hover: true,
       },
     };
+  }
+
+  /**
+   * Check if a message event data represents an openai:set_globals message.
+   * Handles multiple formats for backward compatibility:
+   * - String format: "openai:set_globals"
+   * - Object with type: { type: "openai:set_globals" }
+   * - Object with message: { message: "openai:set_globals" } (older SDK versions)
+   */
+  private isSetGlobalsMessage(data: unknown): boolean {
+    return (
+      data === "openai:set_globals" ||
+      (typeof data === "object" &&
+        data !== null &&
+        "type" in data &&
+        (data as { type: unknown }).type === "openai:set_globals") ||
+      (typeof data === "object" &&
+        data !== null &&
+        "message" in data &&
+        (data as { message: unknown }).message === "openai:set_globals")
+    );
   }
 
   /**
@@ -373,24 +390,7 @@ export class OpenAIAdapter implements ProtocolAdapter {
 
     // Also keep the old postMessage listener as fallback for older SDK versions
     this.globalsHandler = (event: MessageEvent) => {
-      const data = event.data as unknown;
-
-      // Handle all three formats for backward compatibility:
-      // - String format: "openai:set_globals"
-      // - Object with type: { type: "openai:set_globals" }
-      // - Object with message: { message: "openai:set_globals" } (older SDK versions)
-      const isSetGlobals =
-        data === "openai:set_globals" ||
-        (typeof data === "object" &&
-          data !== null &&
-          "type" in data &&
-          (data as { type: unknown }).type === "openai:set_globals") ||
-        (typeof data === "object" &&
-          data !== null &&
-          "message" in data &&
-          (data as { message: unknown }).message === "openai:set_globals");
-
-      if (isSetGlobals) {
+      if (this.isSetGlobalsMessage(event.data)) {
         clientDebugLogger.debug("[OpenAI Adapter] Received set_globals via postMessage (legacy)");
         this.readContextFromSDK();
         this.checkForToolOutputUpdate();
@@ -471,20 +471,7 @@ export class OpenAIAdapter implements ProtocolAdapter {
 
       // Also listen for the set_globals message (various formats)
       const messageHandler = (event: MessageEvent) => {
-        const data = event.data as unknown;
-        // Handle both string and object formats
-        const isSetGlobals =
-          data === "openai:set_globals" ||
-          (typeof data === "object" &&
-            data !== null &&
-            "type" in data &&
-            (data as { type: unknown }).type === "openai:set_globals") ||
-          (typeof data === "object" &&
-            data !== null &&
-            "message" in data &&
-            (data as { message: unknown }).message === "openai:set_globals");
-
-        if (isSetGlobals) {
+        if (this.isSetGlobalsMessage(event.data)) {
           clientDebugLogger.debug("[OpenAI Adapter] Received set_globals message");
           // Give a small delay for the globals to be applied, then check
           setTimeout(() => {
