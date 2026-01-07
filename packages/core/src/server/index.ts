@@ -125,6 +125,9 @@ export function createServerInstance<T extends ToolDefs>(
     applyCors(expressApp, config.config.cors);
   }
 
+  // Register logging API route if API transport is enabled
+  registerLoggingApiRoute(expressApp, config.config?.debug);
+
   // Track HTTP server
   let httpServer: Server | undefined;
 
@@ -452,6 +455,70 @@ export function createServerInstance<T extends ToolDefs>(
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
+
+/**
+ * Register the logging API endpoint for HTTP-based log transport
+ *
+ * This endpoint receives batched log entries from client UIs via HTTP POST
+ * and processes them through the server-side debug logger.
+ *
+ * @param expressApp - Express app to register the route on
+ * @param debugConfig - Debug configuration
+ */
+function registerLoggingApiRoute(
+  expressApp: Express,
+  debugConfig: DebugConfig | undefined
+): void {
+  // Only register if API transport is enabled
+  if (debugConfig?.transport !== "api") {
+    return;
+  }
+
+  const apiEndpoint = debugConfig.apiEndpoint ?? "/api/logs";
+
+  // Define the log entry schema
+  const logEntrySchema = z.object({
+    level: z.enum(["debug", "info", "warn", "error"]),
+    message: z.string(),
+    data: z.unknown().optional(),
+    timestamp: z.string(),
+    source: z.string().optional(),
+  });
+
+  const inputSchema = z.object({
+    entries: z.array(logEntrySchema),
+  });
+
+  // Register the logging API endpoint
+  expressApp.post(apiEndpoint, (req: Request, res: Response) => {
+    try {
+      // Validate input
+      const parseResult = inputSchema.safeParse(req.body);
+
+      if (!parseResult.success) {
+        res.status(400).json({
+          error: "Invalid log entries",
+          details: z.treeifyError(parseResult.error),
+          processed: 0,
+        });
+        return;
+      }
+
+      const { entries } = parseResult.data;
+
+      // Process entries through the debug logger
+      const processed = debugLogger.processEntries(entries as LogEntry[]);
+
+      res.json({ processed });
+    } catch (error) {
+      const appError = wrapError(error);
+      res.status(500).json({
+        error: appError.message,
+        processed: 0,
+      });
+    }
+  });
+}
 
 /**
  * Register the log_debug tool for client-side debug log transport

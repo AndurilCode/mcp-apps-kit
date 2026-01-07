@@ -71,6 +71,17 @@ export interface CORSConfig {
 export type DebugLogLevel = "debug" | "info" | "warn" | "error";
 
 /**
+ * Debug log transport mechanism
+ *
+ * - `"builtin"`: Use MCP protocol-level logging (default for MCP adapter)
+ * - `"tool"`: Use the log_debug MCP tool
+ * - `"api"`: Use self-hosted HTTP endpoint (default for OpenAI adapter)
+ *
+ * @internal
+ */
+export type DebugTransport = "builtin" | "tool" | "api";
+
+/**
  * Debug logging configuration
  *
  * Enables debug logging that transports logs through the MCP protocol,
@@ -138,6 +149,43 @@ export interface DebugConfig {
    * @default 5000
    */
   flushIntervalMs?: number;
+
+  /**
+   * Log transport mechanism.
+   *
+   * - `"builtin"`: Use MCP protocol-level logging (default for MCP adapter)
+   * - `"tool"`: Use the log_debug MCP tool
+   * - `"api"`: Use self-hosted HTTP endpoint (default for OpenAI adapter)
+   *
+   * When set to `"api"`, the server exposes a POST endpoint at the path
+   * specified by `apiEndpoint` that accepts batched log entries.
+   *
+   * @default "builtin" for MCP, "api" for OpenAI
+   */
+  transport?: DebugTransport;
+
+  /**
+   * API endpoint path for 'api' transport.
+   *
+   * This is the path where the logging API will listen for POST requests.
+   * The endpoint accepts JSON body with `{ entries: LogEntry[] }` and
+   * returns `{ processed: number }`.
+   *
+   * Only used when `transport` is set to `"api"`.
+   *
+   * @default "/api/logs"
+   *
+   * @example
+   * ```typescript
+   * config: {
+   *   debug: {
+   *     transport: "api",
+   *     apiEndpoint: "/debug/logs"
+   *   }
+   * }
+   * ```
+   */
+  apiEndpoint?: string;
 }
 
 // =============================================================================

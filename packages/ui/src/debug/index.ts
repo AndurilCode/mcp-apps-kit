@@ -9,6 +9,7 @@
 export {
   // Types
   type DebugLogLevel,
+  type DebugTransport,
   type LogEntry,
   type ClientDebugConfig,
   // Utilities

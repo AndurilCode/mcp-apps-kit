@@ -222,6 +222,116 @@ describe("OpenAIAdapter", () => {
     });
   });
 
+  describe("sendLogs batch logging", () => {
+    let fetchMock: ReturnType<typeof vi.fn>;
+    let consoleInfoSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ processed: 2 }),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      consoleInfoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      consoleInfoSpy.mockRestore();
+    });
+
+    it("should send logs to API endpoint when configured", async () => {
+      await adapter.connect();
+      adapter.configureLogging({
+        transport: "api",
+        apiEndpoint: "https://example.com/api/logs",
+      });
+
+      const entries = [
+        { level: "info" as const, message: "Log 1", timestamp: new Date().toISOString() },
+        { level: "error" as const, message: "Log 2", timestamp: new Date().toISOString() },
+      ];
+
+      const result = await adapter.sendLogs(entries);
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        "https://example.com/api/logs",
+        expect.objectContaining({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+      expect(result.processed).toBe(2);
+    });
+
+    it("should fall back to console when API fails", async () => {
+      await adapter.connect();
+      adapter.configureLogging({
+        transport: "api",
+        apiEndpoint: "https://example.com/api/logs",
+      });
+
+      fetchMock.mockRejectedValueOnce(new Error("Network error"));
+
+      const entries = [
+        { level: "info" as const, message: "Log 1", timestamp: new Date().toISOString() },
+      ];
+
+      const result = await adapter.sendLogs(entries);
+
+      expect(result.processed).toBe(1); // Fell back to console
+      expect(consoleInfoSpy).toHaveBeenCalled();
+    });
+
+    it("should fall back to console when no API endpoint configured", async () => {
+      await adapter.connect();
+      adapter.configureLogging({
+        transport: "api",
+        apiEndpoint: undefined,
+      });
+
+      const entries = [
+        { level: "info" as const, message: "Log 1", timestamp: new Date().toISOString() },
+      ];
+
+      const result = await adapter.sendLogs(entries);
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(result.processed).toBe(1);
+    });
+
+    it("should reset failure state when transport changes", async () => {
+      await adapter.connect();
+      adapter.configureLogging({
+        transport: "api",
+        apiEndpoint: "https://example.com/api/logs",
+      });
+
+      // First call fails
+      fetchMock.mockRejectedValueOnce(new Error("Network error"));
+      await adapter.sendLogs([
+        { level: "info" as const, message: "Log 1", timestamp: new Date().toISOString() },
+      ]);
+
+      // Change transport and back - should reset failure state
+      adapter.configureLogging({ transport: "tool" });
+      adapter.configureLogging({ transport: "api" });
+
+      fetchMock.mockClear();
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ processed: 1 }),
+      });
+
+      await adapter.sendLogs([
+        { level: "info" as const, message: "Log 2", timestamp: new Date().toISOString() },
+      ]);
+
+      // Should try API again
+      expect(fetchMock).toHaveBeenCalled();
+    });
+  });
+
   describe("size notifications", () => {
     it("should have sendSizeChanged method", async () => {
       await adapter.connect();

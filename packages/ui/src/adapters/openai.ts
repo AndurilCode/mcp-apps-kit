@@ -18,6 +18,7 @@ import type {
   CallToolHandler,
   ListToolsHandler,
 } from "../types";
+import type { DebugTransport, LogEntry } from "../debug/logger";
 
 /**
  * Adapter for ChatGPT Apps (OpenAI)
@@ -27,6 +28,25 @@ import type {
  *
  * @internal
  */
+/**
+ * Configuration options for OpenAI adapter logging
+ */
+export interface OpenAIAdapterLogConfig {
+  /**
+   * Log transport mechanism.
+   * - 'api': Use HTTP endpoint (default)
+   * - 'tool': Use the log_debug MCP tool
+   * - 'builtin': Not supported for OpenAI, falls back to console
+   * @default 'api'
+   */
+  transport?: DebugTransport;
+  /**
+   * API endpoint URL for 'api' transport.
+   * Required when transport is 'api'.
+   */
+  apiEndpoint?: string;
+}
+
 export class OpenAIAdapter implements ProtocolAdapter {
   private connected = false;
   private context: HostContext;
@@ -41,8 +61,33 @@ export class OpenAIAdapter implements ProtocolAdapter {
   private currentToolMeta?: Record<string, unknown>;
   private globalsHandler?: (event: MessageEvent) => void;
 
+  // Logging configuration
+  private logTransport: DebugTransport = "api";
+  private logApiEndpoint?: string;
+  private apiTransportFailed = false;
+  private toolTransportFailed = false;
+
   constructor() {
     this.context = this.createDefaultContext();
+  }
+
+  /**
+   * Configure logging transport settings
+   *
+   * @param config - Logging configuration
+   */
+  configureLogging(config: OpenAIAdapterLogConfig): void {
+    if (config.transport !== undefined) {
+      this.logTransport = config.transport;
+      // Reset failure states when transport changes
+      this.apiTransportFailed = false;
+      this.toolTransportFailed = false;
+    }
+    if (config.apiEndpoint !== undefined) {
+      this.logApiEndpoint = config.apiEndpoint;
+      // Reset API failure state when endpoint changes
+      this.apiTransportFailed = false;
+    }
   }
 
   private createDefaultContext(): HostContext {
@@ -583,19 +628,88 @@ export class OpenAIAdapter implements ProtocolAdapter {
     level: "debug" | "info" | "notice" | "warning" | "error" | "critical" | "alert" | "emergency",
     data: unknown
   ): Promise<void> {
-    // ChatGPT doesn't have protocol-level logging
-    // Map to the adapter's log method levels
-    const levelMapping: Record<typeof level, "debug" | "info" | "warning" | "error"> = {
+    // Map protocol log levels to our log levels
+    const levelMapping: Record<typeof level, "debug" | "info" | "warn" | "error"> = {
       debug: "debug",
       info: "info",
       notice: "info",
-      warning: "warning",
+      warning: "warn",
       error: "error",
       critical: "error",
       alert: "error",
       emergency: "error",
     };
-    this.log(levelMapping[level], data);
+
+    const entry: LogEntry = {
+      level: levelMapping[level],
+      message: typeof data === "string" ? data : JSON.stringify(data),
+      data: typeof data === "string" ? undefined : data,
+      timestamp: new Date().toISOString(),
+      source: "openai-adapter",
+    };
+
+    await this.sendLogs([entry]);
+  }
+
+  /**
+   * Send batched log entries to the server
+   *
+   * @param entries - Array of log entries to send
+   * @returns Number of entries processed
+   */
+  async sendLogs(entries: LogEntry[]): Promise<{ processed: number }> {
+    // Try API transport first if configured
+    if (this.logTransport === "api" && this.logApiEndpoint && !this.apiTransportFailed) {
+      try {
+        const response = await fetch(this.logApiEndpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ entries }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`API request failed with status ${String(response.status)}`);
+        }
+
+        const result = (await response.json()) as { processed: number };
+        return result;
+      } catch (error) {
+        // Mark API transport as failed and fall through to next option
+        this.apiTransportFailed = true;
+        console.info(
+          "[OpenAI Adapter] API log transport failed, trying fallback:",
+          error instanceof Error ? error.message : error
+        );
+      }
+    }
+
+    // Try tool transport if configured or as fallback
+    if (
+      (this.logTransport === "tool" || this.apiTransportFailed) &&
+      !this.toolTransportFailed &&
+      this.connected
+    ) {
+      try {
+        const result = await this.callTool("log_debug", { entries });
+        return result as { processed: number };
+      } catch (error) {
+        // Mark tool transport as failed
+        this.toolTransportFailed = true;
+        console.info(
+          "[OpenAI Adapter] Tool log transport failed, falling back to console:",
+          error instanceof Error ? error.message : error
+        );
+      }
+    }
+
+    // Fallback to console logging
+    for (const entry of entries) {
+      this.log(entry.level === "warn" ? "warning" : entry.level, entry.data ?? entry.message);
+    }
+
+    return { processed: entries.length };
   }
 
   // === Size Notifications ===

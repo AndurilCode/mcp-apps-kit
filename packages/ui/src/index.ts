@@ -76,7 +76,7 @@ export type { UIErrorCodeType } from "./errors";
 export type { ProtocolAdapter, AdapterFactory, AdapterType } from "./adapters/types";
 
 // Debug logging types and utilities
-export type { DebugLogLevel, LogEntry, ClientDebugConfig } from "./debug/logger";
+export type { DebugLogLevel, DebugTransport, LogEntry, ClientDebugConfig } from "./debug/logger";
 export {
   ClientDebugLogger,
   clientDebugLogger,

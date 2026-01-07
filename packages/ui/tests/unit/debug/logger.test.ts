@@ -259,9 +259,8 @@ describe("Client Debug Logger", () => {
       // Wait for async operations
       await vi.runAllTimersAsync();
 
-      // Should have fallen back to console
+      // Should have fallen back to console (info logs output via console.info)
       expect(consoleInfoSpy).toHaveBeenCalled();
-      expect(consoleWarnSpy).toHaveBeenCalled(); // Transport error warning
     });
 
     it("should fall back to console when enabled is false", async () => {
@@ -320,6 +319,210 @@ describe("Client Debug Logger", () => {
 
       // Should have output to console since we're destroying
       expect(consoleInfoSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe("ClientDebugLogger API Transport", () => {
+    let logger: ClientDebugLogger;
+    let consoleInfoSpy: ReturnType<typeof vi.spyOn>;
+    let fetchMock: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      consoleInfoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+      // Mock fetch for API transport tests
+      fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ processed: 1 }),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      logger = new ClientDebugLogger({
+        enabled: true,
+        level: "debug",
+        batchSize: 5,
+        flushIntervalMs: 1000,
+        source: "test",
+        transport: "api",
+        apiEndpoint: "https://example.com/api/logs",
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      logger.destroy();
+      consoleInfoSpy.mockRestore();
+      vi.unstubAllGlobals();
+    });
+
+    it("should send logs to API endpoint when transport is api", async () => {
+      logger.info("Log 1");
+      logger.info("Log 2");
+      logger.info("Log 3");
+      logger.info("Log 4");
+      logger.info("Log 5");
+
+      await vi.runAllTimersAsync();
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        "https://example.com/api/logs",
+        expect.objectContaining({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: expect.stringContaining("Log 1"),
+        })
+      );
+    });
+
+    it("should fall back to console when API endpoint is not configured", async () => {
+      // Create a new logger without apiEndpoint configured
+      const noEndpointLogger = new ClientDebugLogger({
+        enabled: true,
+        level: "debug",
+        batchSize: 5,
+        flushIntervalMs: 1000,
+        source: "test",
+        transport: "api",
+        // apiEndpoint not configured
+      });
+
+      noEndpointLogger.info("Test message");
+
+      await vi.runAllTimersAsync();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(consoleInfoSpy).toHaveBeenCalled();
+
+      noEndpointLogger.destroy();
+    });
+
+    it("should fall back to console when API request fails", async () => {
+      fetchMock.mockRejectedValueOnce(new Error("Network error"));
+
+      logger.info("Log 1");
+      logger.info("Log 2");
+      logger.info("Log 3");
+      logger.info("Log 4");
+      logger.info("Log 5");
+
+      await vi.runAllTimersAsync();
+
+      expect(consoleInfoSpy).toHaveBeenCalled();
+    });
+
+    it("should fall back to console when API returns non-ok status", async () => {
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({ error: "Server error" }),
+      });
+
+      logger.info("Log 1");
+      logger.info("Log 2");
+      logger.info("Log 3");
+      logger.info("Log 4");
+      logger.info("Log 5");
+
+      await vi.runAllTimersAsync();
+
+      expect(consoleInfoSpy).toHaveBeenCalled();
+    });
+
+    it("should allow switching between transports", async () => {
+      const mockAdapter = createMockAdapter();
+
+      // Start with API transport
+      logger.info("API log");
+      await vi.runAllTimersAsync();
+      expect(fetchMock).toHaveBeenCalled();
+
+      fetchMock.mockClear();
+
+      // Switch to tool transport
+      logger.configure({ transport: "tool" });
+      logger.setAdapter(mockAdapter);
+
+      logger.info("Tool log 1");
+      logger.info("Tool log 2");
+      logger.info("Tool log 3");
+      logger.info("Tool log 4");
+      logger.info("Tool log 5");
+      await vi.runAllTimersAsync();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(mockAdapter.callTool).toHaveBeenCalledWith("log_debug", expect.any(Object));
+    });
+
+    it("should reset failure state when transport changes", async () => {
+      // Make API fail
+      fetchMock.mockRejectedValueOnce(new Error("Network error"));
+
+      logger.info("Log 1");
+      logger.info("Log 2");
+      logger.info("Log 3");
+      logger.info("Log 4");
+      logger.info("Log 5");
+      await vi.runAllTimersAsync();
+
+      // API should have failed, logs went to console
+      expect(consoleInfoSpy).toHaveBeenCalled();
+
+      consoleInfoSpy.mockClear();
+      fetchMock.mockClear();
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ processed: 1 }),
+      });
+
+      // Change transport and back - should reset failure state
+      logger.configure({ transport: "tool" });
+      logger.configure({ transport: "api" });
+
+      logger.info("New log 1");
+      logger.info("New log 2");
+      logger.info("New log 3");
+      logger.info("New log 4");
+      logger.info("New log 5");
+      await vi.runAllTimersAsync();
+
+      // Should try API again
+      expect(fetchMock).toHaveBeenCalled();
+    });
+
+    it("should reset failure state when apiEndpoint changes", async () => {
+      // Make API fail
+      fetchMock.mockRejectedValueOnce(new Error("Network error"));
+
+      logger.info("Log 1");
+      logger.info("Log 2");
+      logger.info("Log 3");
+      logger.info("Log 4");
+      logger.info("Log 5");
+      await vi.runAllTimersAsync();
+
+      consoleInfoSpy.mockClear();
+      fetchMock.mockClear();
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ processed: 1 }),
+      });
+
+      // Change endpoint - should reset failure state
+      logger.configure({ apiEndpoint: "https://new-endpoint.com/logs" });
+
+      logger.info("New log 1");
+      logger.info("New log 2");
+      logger.info("New log 3");
+      logger.info("New log 4");
+      logger.info("New log 5");
+      await vi.runAllTimersAsync();
+
+      // Should try API again with new endpoint
+      expect(fetchMock).toHaveBeenCalledWith(
+        "https://new-endpoint.com/logs",
+        expect.any(Object)
+      );
     });
   });
 

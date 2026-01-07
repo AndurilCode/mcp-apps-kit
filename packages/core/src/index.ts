@@ -58,6 +58,7 @@ export type {
   AppConfig,
   DebugConfig,
   DebugLogLevel,
+  DebugTransport,
   VersionSpecificConfig,
   DeepPartialWithNull,
 } from "./types/config";

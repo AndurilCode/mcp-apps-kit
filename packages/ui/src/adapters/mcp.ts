@@ -588,6 +588,50 @@ export class McpAdapter implements ProtocolAdapter {
     });
   }
 
+  /**
+   * Send batched log entries via protocol-level logging
+   *
+   * MCP adapter uses the builtin sendLog for each entry since
+   * the MCP protocol supports individual log messages.
+   */
+  async sendLogs(
+    entries: Array<{
+      level: "debug" | "info" | "warn" | "error";
+      message: string;
+      data?: unknown;
+      timestamp: string;
+      source?: string;
+    }>
+  ): Promise<{ processed: number }> {
+    if (!this.app) {
+      throw new UIError(UIErrorCode.NOT_CONNECTED, "MCP Apps adapter not connected");
+    }
+
+    // Map our log levels to MCP protocol levels
+    const levelMapping: Record<string, "debug" | "info" | "warning" | "error"> = {
+      debug: "debug",
+      info: "info",
+      warn: "warning",
+      error: "error",
+    };
+
+    let processed = 0;
+    for (const entry of entries) {
+      try {
+        await this.app.sendLog({
+          level: levelMapping[entry.level] ?? "info",
+          data: entry.data ?? entry.message,
+          logger: entry.source ?? "@mcp-apps-kit/ui",
+        });
+        processed++;
+      } catch {
+        // Continue processing remaining entries even if one fails
+      }
+    }
+
+    return { processed };
+  }
+
   // === Size Notifications ===
 
   async sendSizeChanged(params: SizeChangedParams): Promise<void> {
