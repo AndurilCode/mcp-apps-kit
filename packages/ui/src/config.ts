@@ -39,11 +39,11 @@ export interface McpServerConfig {
  * - At runtime by the server (window.__MCP_SERVER_CONFIG__)
  */
 declare global {
-  // eslint-disable-next-line @typescript-eslint/naming-convention
+  // Build-time injected global
   const __MCP_SERVER_CONFIG__: McpServerConfig | undefined;
 
   interface Window {
-    // eslint-disable-next-line @typescript-eslint/naming-convention
+    // Runtime injected global
     __MCP_SERVER_CONFIG__?: McpServerConfig;
   }
 }
@@ -74,7 +74,9 @@ export function getMcpServerConfig(): McpServerConfig {
   }
 
   // Check for build-time injection (vite plugin)
+  // eslint-disable-next-line no-undef, @typescript-eslint/no-unnecessary-condition
   if (typeof __MCP_SERVER_CONFIG__ !== "undefined" && __MCP_SERVER_CONFIG__) {
+    // eslint-disable-next-line no-undef
     return __MCP_SERVER_CONFIG__;
   }
 

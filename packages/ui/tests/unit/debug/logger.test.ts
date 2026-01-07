@@ -519,10 +519,7 @@ describe("Client Debug Logger", () => {
       await vi.runAllTimersAsync();
 
       // Should try API again with new endpoint
-      expect(fetchMock).toHaveBeenCalledWith(
-        "https://new-endpoint.com/logs",
-        expect.any(Object)
-      );
+      expect(fetchMock).toHaveBeenCalledWith("https://new-endpoint.com/logs", expect.any(Object));
     });
   });
 

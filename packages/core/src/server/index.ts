@@ -468,10 +468,7 @@ export function createServerInstance<T extends ToolDefs>(
  * @param expressApp - Express app to register the route on
  * @param debugConfig - Debug configuration
  */
-function registerLoggingApiRoute(
-  expressApp: Express,
-  debugConfig: DebugConfig | undefined
-): void {
+function registerLoggingApiRoute(expressApp: Express, debugConfig: DebugConfig | undefined): void {
   // Only register if API transport is enabled
   if (debugConfig?.transport !== "api") {
     return;

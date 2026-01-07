@@ -292,20 +292,19 @@ export class OpenAIAdapter implements ProtocolAdapter {
     this.setGlobalsHandler = (event: Event) => {
       // Type assertion for custom event with detail
       const customEvent = event as CustomEvent<Record<string, unknown>>;
-      const detail = customEvent.detail;
+      const detail = customEvent.detail as Record<string, unknown> | undefined;
 
-      // Handle both formats:
-      // - ChatGPT uses event.detail.globals
-      // - MCP Inspector uses event.detail directly
-      const globals = (detail?.globals as Record<string, unknown>) ?? detail;
-
-
-      if (!globals) {
+      if (!detail) {
         // Fallback: re-read from SDK if no detail provided
         this.readContextFromSDK();
         this.checkForToolOutputUpdate();
         return;
       }
+
+      // Handle both formats:
+      // - ChatGPT uses event.detail.globals
+      // - MCP Inspector uses event.detail directly
+      const globals = (detail.globals as Record<string, unknown> | undefined) ?? detail;
 
       // Track previous values for change detection
       const previousTheme = this.context.theme;
@@ -338,7 +337,10 @@ export class OpenAIAdapter implements ProtocolAdapter {
       if (globals.toolOutput !== undefined && globals.toolOutput !== null) {
         const newOutput = globals.toolOutput as Record<string, unknown>;
         if (Object.keys(newOutput).length > 0 && newOutput !== previousToolOutput) {
-          clientDebugLogger.debug("[OpenAI Adapter] Got toolOutput from set_globals event", newOutput);
+          clientDebugLogger.debug(
+            "[OpenAI Adapter] Got toolOutput from set_globals event",
+            newOutput
+          );
           this.currentToolOutput = newOutput;
 
           // Try to get toolName from event metadata or SDK
@@ -448,7 +450,9 @@ export class OpenAIAdapter implements ProtocolAdapter {
 
         if (Date.now() - startTime > timeout) {
           // Timeout - resolve anyway as we might be in a dev/testing environment
-          clientDebugLogger.warn("[OpenAI Adapter] window.openai not found after timeout, proceeding anyway");
+          clientDebugLogger.warn(
+            "[OpenAI Adapter] window.openai not found after timeout, proceeding anyway"
+          );
           doResolve();
           return;
         }
@@ -607,6 +611,7 @@ export class OpenAIAdapter implements ProtocolAdapter {
   // === Logging ===
 
   log(level: string, data: unknown): void {
+    /* eslint-disable no-console */
     const logFn =
       {
         debug: console.debug,
@@ -614,6 +619,7 @@ export class OpenAIAdapter implements ProtocolAdapter {
         warning: console.warn,
         error: console.error,
       }[level] ?? console.log;
+    /* eslint-enable no-console */
 
     logFn("[ChatGPT Apps]", data);
   }
@@ -771,10 +777,9 @@ export class OpenAIAdapter implements ProtocolAdapter {
       } catch (error) {
         // Mark API transport as failed and fall through to next option
         this.apiTransportFailed = true;
-        clientDebugLogger.info(
-          "[OpenAI Adapter] API log transport failed, trying fallback",
-          { error: error instanceof Error ? error.message : error }
-        );
+        clientDebugLogger.info("[OpenAI Adapter] API log transport failed, trying fallback", {
+          error: error instanceof Error ? error.message : error,
+        });
       }
     }
 

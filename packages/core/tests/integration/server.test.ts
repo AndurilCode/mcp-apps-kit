@@ -566,9 +566,7 @@ describe("app.start() integration", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          entries: [
-            { level: "info", message: "Test log", timestamp: new Date().toISOString() },
-          ],
+          entries: [{ level: "info", message: "Test log", timestamp: new Date().toISOString() }],
         }),
       });
 
@@ -609,9 +607,7 @@ describe("app.start() integration", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          entries: [
-            { level: "info", message: "Test log", timestamp: new Date().toISOString() },
-          ],
+          entries: [{ level: "info", message: "Test log", timestamp: new Date().toISOString() }],
         }),
       });
       expect(customResponse.status).toBe(200);
