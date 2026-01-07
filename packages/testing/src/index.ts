@@ -53,6 +53,14 @@ export type {
   MockHostOptions,
   // Framework matcher types
   ToolResultAssertion,
+  ResourceResultAssertion,
+  PromptResultAssertion,
+  // Resource types
+  ResourceResult,
+  ResourceInfo,
+  // Prompt types
+  PromptInfo,
+  PromptResult,
 } from "./types";
 
 // =============================================================================
@@ -95,6 +103,9 @@ export { createTestClient, startTestServer } from "./server";
 // Behavior testing - Phase 4
 export { expectToolResult, defineTestSuite, runTestSuite } from "./eval/behavior";
 export type { TestSuiteConfig } from "./eval/behavior";
+
+// Resource and Prompt matchers
+export { expectResource, expectPrompt } from "./matchers";
 
 // Property testing - Phase 6
 export { generators, forAllInputs } from "./eval/property";

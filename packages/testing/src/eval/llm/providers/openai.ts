@@ -1,11 +1,12 @@
 /**
  * OpenAI provider for LLM evaluation
  *
- * Requires openai package as peer dependency.
+ * Requires openai package as an optional peer dependency.
  */
 
 import { ConfigurationError } from "../../../errors";
 import { llmLogger } from "../../../debug";
+import { createLazyLoader, createCachedClientFactory } from "../../../utils/lazy-loader";
 import type { LLMProvider } from "./index";
 import type {
   EvaluationResult,
@@ -14,59 +15,25 @@ import type {
   CriterionResult,
 } from "../../../types";
 
-// Lazy-loaded OpenAI module and client
-let openaiModule: typeof import("openai") | null = null;
-let openaiLoadPromise: Promise<typeof import("openai")> | null = null;
+/**
+ * Lazy loader for OpenAI module
+ */
+const getOpenAI = createLazyLoader(() => import("openai"), {
+  packageName: "openai",
+  installHint: "npm install -D openai",
+});
 
 /**
- * Load OpenAI module (lazy, async, throws if not available)
+ * Cached client factory for OpenAI
  */
-async function getOpenAI(): Promise<typeof import("openai")> {
-  if (openaiModule) {
-    return openaiModule;
-  }
-
-  if (openaiLoadPromise) {
-    return openaiLoadPromise;
-  }
-
-  openaiLoadPromise = (async () => {
-    try {
-      const module = await import("openai");
-      openaiModule = module;
-      return module;
-    } catch {
-      throw new ConfigurationError(
-        "openai",
-        "openai package is required for OpenAI evaluation. Install it with: npm install -D openai"
-      );
-    }
-  })();
-
-  return openaiLoadPromise;
-}
-
-// Cached client instance
-let cachedClient: import("openai").OpenAI | null = null;
-let cachedApiKey: string | null = null;
-
-/**
- * Get or create OpenAI client
- */
-async function getOrCreateClient(apiKey: string): Promise<import("openai").OpenAI> {
-  if (cachedClient && cachedApiKey === apiKey) {
-    return cachedClient;
-  }
-
+const openaiClientFactory = createCachedClientFactory(async (apiKey: string) => {
   const openai = await getOpenAI();
   // The OpenAI SDK exports the class as default export
   const OpenAIClass = openai.default ?? openai.OpenAI ?? openai;
-  cachedClient = new (OpenAIClass as new (opts: { apiKey: string }) => import("openai").OpenAI)({
+  return new (OpenAIClass as new (opts: { apiKey: string }) => import("openai").OpenAI)({
     apiKey,
   });
-  cachedApiKey = apiKey;
-  return cachedClient;
-}
+});
 
 /**
  * Create OpenAI provider
@@ -87,7 +54,7 @@ export function createOpenAIProvider(model: string, apiKey?: string): LLMProvide
       llmLogger("Evaluating result with OpenAI against %d criteria", options.criteria.length);
 
       // Get or create client (async for ESM compatibility)
-      const client = await getOrCreateClient(apiKeyValue);
+      const client = await openaiClientFactory.get(apiKeyValue);
 
       // Build evaluation prompt
       const prompt = buildEvaluationPrompt(result, options);
@@ -154,7 +121,7 @@ export function createOpenAIProvider(model: string, apiKey?: string): LLMProvide
       llmLogger("Evaluating result with custom prompt");
 
       // Get or create client (async for ESM compatibility)
-      const client = await getOrCreateClient(apiKeyValue);
+      const client = await openaiClientFactory.get(apiKeyValue);
 
       const response = await client.chat.completions.create({
         model,

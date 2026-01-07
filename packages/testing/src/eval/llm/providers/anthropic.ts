@@ -1,11 +1,12 @@
 /**
  * Anthropic provider for LLM evaluation
  *
- * Requires @anthropic-ai/sdk package as peer dependency.
+ * Requires @anthropic-ai/sdk package as an optional peer dependency.
  */
 
 import { ConfigurationError } from "../../../errors";
 import { llmLogger } from "../../../debug";
+import { createLazyLoader, createCachedClientFactory } from "../../../utils/lazy-loader";
 import type { LLMProvider } from "./index";
 import type {
   EvaluationResult,
@@ -14,61 +15,27 @@ import type {
   CriterionResult,
 } from "../../../types";
 
-// Lazy-loaded Anthropic module
-let anthropicModule: typeof import("@anthropic-ai/sdk") | null = null;
-let anthropicLoadPromise: Promise<typeof import("@anthropic-ai/sdk")> | null = null;
+/**
+ * Lazy loader for Anthropic module
+ */
+const getAnthropic = createLazyLoader(() => import("@anthropic-ai/sdk"), {
+  packageName: "@anthropic-ai/sdk",
+  installHint: "npm install -D @anthropic-ai/sdk",
+});
 
 /**
- * Load Anthropic module (lazy, async, throws if not available)
+ * Cached client factory for Anthropic
  */
-async function getAnthropic(): Promise<typeof import("@anthropic-ai/sdk")> {
-  if (anthropicModule) {
-    return anthropicModule;
-  }
-
-  if (anthropicLoadPromise) {
-    return anthropicLoadPromise;
-  }
-
-  anthropicLoadPromise = (async () => {
-    try {
-      const module = await import("@anthropic-ai/sdk");
-      anthropicModule = module;
-      return module;
-    } catch {
-      throw new ConfigurationError(
-        "@anthropic-ai/sdk",
-        "@anthropic-ai/sdk package is required for Anthropic evaluation. Install it with: npm install -D @anthropic-ai/sdk"
-      );
-    }
-  })();
-
-  return anthropicLoadPromise;
-}
-
-// Cached client instance
-let cachedClient: import("@anthropic-ai/sdk").Anthropic | null = null;
-let cachedApiKey: string | null = null;
-
-/**
- * Get or create Anthropic client
- */
-async function getOrCreateClient(apiKey: string): Promise<import("@anthropic-ai/sdk").Anthropic> {
-  if (cachedClient && cachedApiKey === apiKey) {
-    return cachedClient;
-  }
-
+const anthropicClientFactory = createCachedClientFactory(async (apiKey: string) => {
   const anthropicMod = await getAnthropic();
   // The Anthropic SDK exports the class as default export or as Anthropic
   const AnthropicClass = anthropicMod.default ?? anthropicMod.Anthropic ?? anthropicMod;
-  cachedClient = new (AnthropicClass as new (opts: {
+  return new (AnthropicClass as new (opts: {
     apiKey: string;
   }) => import("@anthropic-ai/sdk").Anthropic)({
     apiKey,
   });
-  cachedApiKey = apiKey;
-  return cachedClient;
-}
+});
 
 /**
  * Create Anthropic provider
@@ -89,7 +56,7 @@ export function createAnthropicProvider(model: string, apiKey?: string): LLMProv
       llmLogger("Evaluating result with Anthropic against %d criteria", options.criteria.length);
 
       // Get or create client (async for ESM compatibility)
-      const client = await getOrCreateClient(apiKeyValue);
+      const client = await anthropicClientFactory.get(apiKeyValue);
 
       // Build evaluation prompt
       const prompt = buildEvaluationPrompt(result, options);
@@ -239,7 +206,7 @@ export function createAnthropicProvider(model: string, apiKey?: string): LLMProv
       llmLogger("Evaluating result with custom prompt");
 
       // Get or create client (async for ESM compatibility)
-      const client = await getOrCreateClient(apiKeyValue);
+      const client = await anthropicClientFactory.get(apiKeyValue);
 
       const response = await client.messages.create({
         model,

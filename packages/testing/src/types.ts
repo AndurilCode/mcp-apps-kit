@@ -90,6 +90,12 @@ export interface TestClient {
   /** Read a resource by URI */
   readResource(uri: string): Promise<{ contents: ContentBlock[] }>;
 
+  /** List available prompts */
+  listPrompts(): Promise<Array<{ name: string; description?: string }>>;
+
+  /** Get a prompt by name with optional arguments */
+  getPrompt(name: string, args?: Record<string, string>): Promise<PromptResult>;
+
   /** Get call history (if trackHistory enabled) */
   getCallHistory(): ToolCall[];
 
@@ -419,6 +425,70 @@ export interface MockHost {
 }
 
 // =============================================================================
+// RESOURCE TYPES
+// =============================================================================
+
+/**
+ * Result from reading an MCP resource
+ */
+export interface ResourceResult {
+  /** Resource contents */
+  contents: ContentBlock[];
+}
+
+/**
+ * Resource metadata
+ */
+export interface ResourceInfo {
+  /** Resource URI */
+  uri: string;
+  /** Resource name */
+  name?: string;
+  /** Resource description */
+  description?: string;
+  /** MIME type */
+  mimeType?: string;
+}
+
+// =============================================================================
+// PROMPT TYPES
+// =============================================================================
+
+/**
+ * Prompt metadata
+ */
+export interface PromptInfo {
+  /** Prompt name */
+  name: string;
+  /** Prompt description */
+  description?: string;
+  /** Prompt arguments */
+  arguments?: Array<{
+    name: string;
+    description?: string;
+    required?: boolean;
+  }>;
+}
+
+/**
+ * Result from getting a prompt
+ */
+export interface PromptResult {
+  /** Prompt description */
+  description?: string;
+  /** Prompt messages */
+  messages: Array<{
+    role: "user" | "assistant";
+    content: {
+      type: "text" | "image" | "resource";
+      text?: string;
+      data?: string;
+      mimeType?: string;
+    };
+  }>;
+}
+
+// =============================================================================
 // FRAMEWORK MATCHER TYPES
 // =============================================================================
 
@@ -436,4 +506,36 @@ export interface ToolResultAssertion {
   toHaveError(code?: string): void;
   /** Assert result contains text */
   toContainText(text: string): void;
+}
+
+/**
+ * Assertion interface for resource results
+ */
+export interface ResourceResultAssertion {
+  /** Assert resource has content */
+  toHaveContent(): void;
+  /** Assert resource contains specific text */
+  toContainText(text: string): void;
+  /** Assert resource matches MIME type */
+  toHaveMimeType(mimeType: string): void;
+  /** Match resource content against Zod schema (for JSON resources) */
+  toMatchSchema(schema: ZodType): void;
+  /** Assert resource content matches expected object (partial) */
+  toMatchObject(expected: unknown): void;
+}
+
+/**
+ * Assertion interface for prompt results
+ */
+export interface PromptResultAssertion {
+  /** Assert prompt has messages */
+  toHaveMessages(): void;
+  /** Assert prompt has specific number of messages */
+  toHaveMessageCount(count: number): void;
+  /** Assert prompt contains user message with text */
+  toContainUserMessage(text: string): void;
+  /** Assert prompt contains assistant message with text */
+  toContainAssistantMessage(text: string): void;
+  /** Assert prompt has description */
+  toHaveDescription(description?: string): void;
 }

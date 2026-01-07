@@ -161,6 +161,34 @@ export async function createTestClient(
       };
     },
 
+    async listPrompts() {
+      const prompts = await client.listPrompts();
+      return prompts.prompts.map((prompt) => ({
+        name: prompt.name,
+        description: prompt.description,
+      }));
+    },
+
+    async getPrompt(name: string, args?: Record<string, string>) {
+      const result = await client.getPrompt({ name, arguments: args });
+      type PromptContent = { type: string; text?: string; data?: string; mimeType?: string };
+      return {
+        description: result.description,
+        messages: result.messages.map((message) => {
+          const content = message.content as PromptContent;
+          return {
+            role: message.role,
+            content: {
+              type: content.type as "text" | "image" | "resource",
+              text: content.text,
+              data: content.data,
+              mimeType: content.mimeType,
+            },
+          };
+        }),
+      };
+    },
+
     getCallHistory: () => [...callHistory],
     clearHistory: () => {
       callHistory.length = 0;

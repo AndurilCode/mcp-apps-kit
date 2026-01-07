@@ -7,38 +7,16 @@
 import type { PropertyTestOptions } from "../../types";
 import { PropertyFailureError } from "../../errors";
 import { propertyLogger } from "../../debug";
+import { createLazyLoader } from "../../utils/lazy-loader";
 import { type LazyArbitrary, isLazyArbitrary } from "./generators";
 
-// Lazy-loaded fast-check module
-let fastCheckModule: typeof import("fast-check") | null = null;
-let fastCheckLoadPromise: Promise<typeof import("fast-check")> | null = null;
-
 /**
- * Load fast-check module (lazy, async, throws if not available)
+ * Lazy loader for fast-check module
  */
-async function getFastCheck(): Promise<typeof import("fast-check")> {
-  if (fastCheckModule) {
-    return fastCheckModule;
-  }
-
-  if (fastCheckLoadPromise) {
-    return fastCheckLoadPromise;
-  }
-
-  fastCheckLoadPromise = (async () => {
-    try {
-      const module = await import("fast-check");
-      fastCheckModule = module;
-      return module;
-    } catch {
-      throw new Error(
-        "fast-check is required for property testing. Install it with: npm install -D fast-check"
-      );
-    }
-  })();
-
-  return fastCheckLoadPromise;
-}
+const getFastCheck = createLazyLoader(() => import("fast-check"), {
+  packageName: "fast-check",
+  installHint: "npm install -D fast-check",
+});
 
 // Type for fast-check Arbitrary - use proper import type
 type Arbitrary<T> = import("fast-check").Arbitrary<T>;

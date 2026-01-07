@@ -12,3 +12,9 @@ export {
   matchesToolObject,
 } from "./core";
 export type { MatcherResult } from "./core";
+
+// Resource matchers
+export { expectResource } from "./resource";
+
+// Prompt matchers
+export { expectPrompt } from "./prompt";

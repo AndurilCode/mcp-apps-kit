@@ -53,23 +53,34 @@ Testing MCP applications involves multiple layers: validating tool behavior, tes
 npm install @mcp-apps-kit/testing
 ```
 
-This package includes all dependencies needed for:
+This package includes core dependencies for:
 
 - **Core testing**: Server management, test client, assertions
-- **Property-based testing**: `fast-check` for random input generation
-- **LLM evaluation**: `openai` and `@anthropic-ai/sdk` for AI-powered quality assessment
+- **MCP Protocol**: `@modelcontextprotocol/sdk` for MCP communication
+- **Schema validation**: `zod` for runtime type checking
 
-### Test Framework (Optional)
+### Optional Dependencies
 
-If using framework-specific matchers (`.toBeSuccessfulToolResult()`, etc.), install your test framework:
+Install optional dependencies only for the features you need:
 
 ```bash
-# For Vitest users
+# For property-based testing
+npm install -D fast-check
+
+# For LLM evaluation with OpenAI
+npm install -D openai
+
+# For LLM evaluation with Anthropic
+npm install -D @anthropic-ai/sdk
+
+# For Vitest framework matchers
 npm install -D vitest
 
-# For Jest users
+# For Jest framework matchers
 npm install -D jest
 ```
+
+These are optional peer dependencies—the library will throw helpful error messages if you try to use a feature without its required dependency.
 
 ## Quick Start
 
@@ -254,7 +265,7 @@ expectToolResult(result).toMatchObject({
 });
 ```
 
-### Available Matchers
+### Available Tool Matchers
 
 | Matcher                     | Description                                       |
 | --------------------------- | ------------------------------------------------- |
@@ -263,6 +274,73 @@ expectToolResult(result).toMatchObject({
 | `.toContainText(text)`      | Assert result contains text                       |
 | `.toMatchSchema(zodSchema)` | Validate result against Zod schema                |
 | `.toMatchObject(expected)`  | Partial object matching                           |
+
+### expectResource
+
+Standalone assertion builder for MCP resource results:
+
+```ts
+import { expectResource } from "@mcp-apps-kit/testing";
+
+const result = await client.readResource("file:///config.json");
+
+// Check for content
+expectResource(result).toHaveContent();
+
+// Check text content
+expectResource(result).toContainText("apiKey");
+
+// Check MIME type
+expectResource(result).toHaveMimeType("application/json");
+
+// Validate JSON against Zod schema
+const schema = z.object({ apiKey: z.string() });
+expectResource(result).toMatchSchema(schema);
+
+// Partial object matching
+expectResource(result).toMatchObject({ apiKey: "sk-..." });
+```
+
+### Available Resource Matchers
+
+| Matcher                     | Description                              |
+| --------------------------- | ---------------------------------------- |
+| `.toHaveContent()`          | Assert resource has content              |
+| `.toContainText(text)`      | Assert resource contains text            |
+| `.toHaveMimeType(mimeType)` | Assert resource has specific MIME type   |
+| `.toMatchSchema(zodSchema)` | Validate JSON content against Zod schema |
+| `.toMatchObject(expected)`  | Partial object matching for JSON content |
+
+### expectPrompt
+
+Standalone assertion builder for MCP prompt results:
+
+```ts
+import { expectPrompt } from "@mcp-apps-kit/testing";
+
+const result = await client.getPrompt("code-review", { language: "typescript" });
+
+// Check for messages
+expectPrompt(result).toHaveMessages();
+expectPrompt(result).toHaveMessageCount(2);
+
+// Check message content
+expectPrompt(result).toContainUserMessage("Review this code");
+expectPrompt(result).toContainAssistantMessage("I'll analyze");
+
+// Check description
+expectPrompt(result).toHaveDescription("Code review prompt");
+```
+
+### Available Prompt Matchers
+
+| Matcher                            | Description                                |
+| ---------------------------------- | ------------------------------------------ |
+| `.toHaveMessages()`                | Assert prompt has messages                 |
+| `.toHaveMessageCount(count)`       | Assert prompt has specific number of msgs  |
+| `.toContainUserMessage(text)`      | Assert user message contains text          |
+| `.toContainAssistantMessage(text)` | Assert assistant message contains text     |
+| `.toHaveDescription(desc?)`        | Assert prompt has (optional specific) desc |
 
 ## Test Suites
 
@@ -578,11 +656,13 @@ expect(result).toContainToolText("Alice");
 
 ### Behavior Testing
 
-| Function                      | Description              |
-| ----------------------------- | ------------------------ |
-| `expectToolResult(result)`    | Create assertion builder |
-| `defineTestSuite(config)`     | Define test suite        |
-| `runTestSuite(client, suite)` | Run test suite           |
+| Function                      | Description                       |
+| ----------------------------- | --------------------------------- |
+| `expectToolResult(result)`    | Create tool assertion builder     |
+| `expectResource(result)`      | Create resource assertion builder |
+| `expectPrompt(result)`        | Create prompt assertion builder   |
+| `defineTestSuite(config)`     | Define test suite                 |
+| `runTestSuite(client, suite)` | Run test suite                    |
 
 ### Property Testing
 
