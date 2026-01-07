@@ -47,7 +47,6 @@ export {
 } from "./retry";
 export {
   wrapWithErrorInjection,
-  resetErrorInjectionState,
   type ToolErrorConfig,
   type ErrorInjectionConfig,
   type ErrorInjectionState,

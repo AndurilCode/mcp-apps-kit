@@ -183,22 +183,3 @@ export function createRunErrorConfig(
   };
 }
 
-/**
- * Reset error injection state for a wrapped client.
- *
- * @deprecated Use `wrappedClient.reset()` instead. The state is internal to the wrapped client
- * and this function requires passing the state explicitly, which is not practical.
- *
- * @example
- * ```typescript
- * // Old way (deprecated):
- * resetErrorInjectionState(client, state);
- *
- * // New way:
- * const wrappedClient = wrapWithErrorInjection(client, config);
- * wrappedClient.reset();
- * ```
- */
-export function resetErrorInjectionState(_client: TestClient, state: ErrorInjectionState): void {
-  state.callCounts.clear();
-}
