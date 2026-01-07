@@ -11,7 +11,9 @@
     "start": "tsx src/index.ts",
     "build": "pnpm build:ui && tsc",
     "build:ui": "vite build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@mcp-apps-kit/core": "workspace:*",
@@ -23,6 +25,7 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@mcp-apps-kit/testing": "workspace:*",
     "@types/node": "^25.0.3",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
@@ -31,6 +34,7 @@
     "tsx": "^4.0.0",
     "typescript": "^5.0.0",
     "vite": "^7.3.0",
-    "vite-plugin-singlefile": "^2.3.0"
+    "vite-plugin-singlefile": "^2.3.0",
+    "vitest": "^4.0.16"
   }
 }

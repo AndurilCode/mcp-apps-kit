@@ -128,6 +128,7 @@ export function expectToolResult(result: ToolResult): ToolResultAssertion {
  * Extract data from tool result for comparison
  *
  * Attempts to parse JSON from text content, falls back to raw text.
+ * The text content should contain JSON when structuredContent was used.
  */
 export function extractResultData(result: ToolResult): unknown {
   const textContent = result.content
@@ -139,9 +140,18 @@ export function extractResultData(result: ToolResult): unknown {
     return null;
   }
 
-  // Try to parse as JSON
+  // Try to parse as JSON first
   try {
-    return JSON.parse(textContent);
+    const parsed = JSON.parse(textContent);
+    // If it's a string that looks like JSON was stringified, try parsing again
+    if (typeof parsed === "string") {
+      try {
+        return JSON.parse(parsed);
+      } catch {
+        return parsed;
+      }
+    }
+    return parsed;
   } catch {
     // Not JSON, return as string
     return textContent;

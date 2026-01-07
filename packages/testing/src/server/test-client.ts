@@ -7,6 +7,7 @@
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import type {
   TestClient,
   TestClientOptions,
@@ -90,41 +91,81 @@ export async function createTestClient(
       });
 
       // Call the tool with timeout
+      // Use client.request to get structuredContent (the actual structured data)
       const result = await Promise.race([
-        client.callTool({ name, arguments: args as Record<string, unknown> }),
+        client.request(
+          {
+            method: "tools/call",
+            params: {
+              name,
+              arguments: args as Record<string, unknown>,
+            },
+          },
+          CallToolResultSchema
+        ) as { content?: Array<{ type: string; text?: string; data?: string; mimeType?: string }>; structuredContent?: unknown; isError?: boolean },
         timeoutPromise,
       ]);
 
       const duration = Date.now() - startTime;
 
       // Convert MCP result to ToolResult
-      const toolResult: ToolResult = {
-        content: (result.content ?? []).map((block) => {
-          if (block.type === "text") {
-            return {
-              type: "text" as const,
-              text: block.text,
-            };
-          }
-          if (block.type === "image") {
-            return {
-              type: "image" as const,
-              data: block.data,
-              mimeType: block.mimeType,
-            };
-          }
-          if (block.type === "resource") {
-            return {
-              type: "resource" as const,
-              data: block.data,
-              mimeType: block.mimeType,
-            };
-          }
+      // The MCP SDK's request with CallToolResultSchema returns:
+      // - content: array of content blocks (text, image, resource)
+      // - structuredContent: the actual structured data from the tool handler (when available)
+      // - isError: boolean indicating if the call failed
+      // When _text is provided, content[0].text = _text, and structuredContent = the full object
+      // When _text is not provided, content[0].text = JSON.stringify(structured), and structuredContent = the object
+      
+      const contentBlocks = (result.content ?? []).map((block) => {
+        if (block.type === "text") {
           return {
             type: "text" as const,
-            text: String(block),
+            text: block.text,
           };
-        }),
+        }
+        if (block.type === "image") {
+          return {
+            type: "image" as const,
+            data: block.data,
+            mimeType: block.mimeType,
+          };
+        }
+        if (block.type === "resource") {
+          return {
+            type: "resource" as const,
+            data: block.data,
+            mimeType: block.mimeType,
+          };
+        }
+        return {
+          type: "text" as const,
+          text: String(block),
+        };
+      });
+
+      // Access structuredContent from the result
+      // The CallToolResultSchema result should have structuredContent property
+      // TypeScript types might not include it, but it's there at runtime
+      const resultAny = result as unknown as Record<string, unknown>;
+      const structuredContent = resultAny.structuredContent;
+
+      // Prefer structuredContent if available (the actual structured data)
+      // This is the structured output from the tool handler
+      if (structuredContent !== undefined && structuredContent !== null) {
+        // Use structuredContent as the primary data source
+        // Replace or add it as JSON in the first text block for easier testing
+        if (contentBlocks.length > 0 && contentBlocks[0]?.type === "text") {
+          contentBlocks[0].text = JSON.stringify(structuredContent);
+        } else {
+          contentBlocks.unshift({
+            type: "text",
+            text: JSON.stringify(structuredContent),
+          });
+        }
+      }
+
+      const toolResult: ToolResult = {
+        content: contentBlocks,
         isError: result.isError,
       };
 
