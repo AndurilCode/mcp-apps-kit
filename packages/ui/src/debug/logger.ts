@@ -434,10 +434,7 @@ export class ClientDebugLogger {
 
     // Check if we can use any remote transport
     if (!this.canUseRemoteTransport()) {
-      // Output to console as fallback
-      for (const entry of this.buffer) {
-        this.outputToConsole(entry);
-      }
+      // No remote transport - just clear buffer (already output to console in log())
       this.buffer = [];
       return;
     }
@@ -453,19 +450,15 @@ export class ClientDebugLogger {
         await this.flushToTool(entriesToFlush);
       }
     } catch {
-      // If transport fails, disable it and fall back to console
+      // If transport fails, disable it (already output to console in log())
       if (this.config.transport === "api" && !this.apiTransportFailed) {
         this.apiTransportFailed = true;
         // eslint-disable-next-line no-console
-        console.info("[ClientDebugLogger] API log transport unavailable, using console fallback");
+        console.warn("[ClientDebugLogger] API log transport failed, will only use console");
       } else if (this.config.transport === "tool" && !this.mcpTransportFailed) {
         this.mcpTransportFailed = true;
         // eslint-disable-next-line no-console
-        console.info("[ClientDebugLogger] MCP log transport unavailable, using console fallback");
-      }
-      // Output failed entries to console
-      for (const entry of entriesToFlush) {
-        this.outputToConsole(entry);
+        console.warn("[ClientDebugLogger] MCP log transport failed, will only use console");
       }
     } finally {
       this.isFlushing = false;
@@ -513,12 +506,9 @@ export class ClientDebugLogger {
    */
   private addToBuffer(entry: LogEntry): void {
     // Handle buffer overflow - drop oldest entries if we've reached max size
+    // (already output to console in log(), so just drop from buffer)
     if (this.buffer.length >= this.config.maxBufferSize) {
-      const dropped = this.buffer.shift();
-      if (dropped) {
-        // Output dropped entry to console as fallback
-        this.outputToConsole(dropped);
-      }
+      this.buffer.shift();
     }
 
     this.buffer.push(entry);
@@ -549,14 +539,13 @@ export class ClientDebugLogger {
 
     const entry = this.createEntry(level, message, data);
 
-    // If no remote transport is available, output directly to console
-    if (!this.canUseRemoteTransport()) {
-      this.outputToConsole(entry);
-      return;
-    }
+    // Always output to console first
+    this.outputToConsole(entry);
 
-    // Add to buffer for batching
-    this.addToBuffer(entry);
+    // If remote transport is available, also send via API/tool
+    if (this.canUseRemoteTransport()) {
+      this.addToBuffer(entry);
+    }
   }
 
   /**
@@ -593,14 +582,8 @@ export class ClientDebugLogger {
    * Call this when the client is being destroyed.
    */
   destroy(): void {
-    // Flush any remaining logs
-    if (this.buffer.length > 0) {
-      // Output to console since we're destroying
-      for (const entry of this.buffer) {
-        this.outputToConsole(entry);
-      }
-      this.buffer = [];
-    }
+    // Clear buffer (already output to console in log())
+    this.buffer = [];
 
     // Cancel any pending flush
     if (this.flushTimer) {

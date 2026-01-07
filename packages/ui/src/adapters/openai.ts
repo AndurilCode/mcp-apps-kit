@@ -1,4 +1,3 @@
-/* eslint-disable no-console -- Debug logging is intentional for this adapter */
 /**
  * OpenAI/ChatGPT Apps adapter
  *
@@ -19,6 +18,7 @@ import type {
   ListToolsHandler,
 } from "../types";
 import type { DebugTransport, LogEntry } from "../debug/logger";
+import { clientDebugLogger } from "../debug/logger";
 
 /**
  * Adapter for ChatGPT Apps (OpenAI)
@@ -167,14 +167,14 @@ export class OpenAIAdapter implements ProtocolAdapter {
       };
     }
 
-    console.log("[OpenAI Adapter] Read context from SDK:", this.context);
+    clientDebugLogger.debug("[OpenAI Adapter] Read context from SDK", this.context);
   }
 
   /**
    * Notify all registered handlers of context changes
    */
   private notifyContextChange(): void {
-    console.log(
+    clientDebugLogger.debug(
       `[OpenAI Adapter] Notifying ${String(this.hostContextHandlers.size)} context change handlers`
     );
     // Create a new object reference to trigger React state updates
@@ -224,7 +224,7 @@ export class OpenAIAdapter implements ProtocolAdapter {
 
     // Log available SDK methods for debugging
     if (openai) {
-      console.log("[OpenAI Adapter] Available SDK methods:", Object.keys(openai));
+      clientDebugLogger.debug("[OpenAI Adapter] Available SDK methods", Object.keys(openai));
 
       // Read initial host context from SDK properties
       this.readContextFromSDK();
@@ -235,13 +235,13 @@ export class OpenAIAdapter implements ProtocolAdapter {
       // Try to get initial tool context
       if (typeof openai.getToolOutput === "function") {
         this.currentToolOutput = (openai.getToolOutput as () => Record<string, unknown>)();
-        console.log("[OpenAI Adapter] Got tool output from SDK");
+        clientDebugLogger.debug("[OpenAI Adapter] Got tool output from SDK");
       } else if (openai.toolOutput) {
         this.currentToolOutput = openai.toolOutput as Record<string, unknown>;
-        console.log("[OpenAI Adapter] Got tool output from SDK property");
+        clientDebugLogger.debug("[OpenAI Adapter] Got tool output from SDK property");
       } else if (openai.result) {
         this.currentToolOutput = openai.result as Record<string, unknown>;
-        console.log("[OpenAI Adapter] Got result from SDK");
+        clientDebugLogger.debug("[OpenAI Adapter] Got result from SDK");
       }
 
       // Notify handlers of initial tool output (wrapped with tool name)
@@ -282,18 +282,23 @@ export class OpenAIAdapter implements ProtocolAdapter {
    * Set up listener for openai:set_globals custom DOM event
    * The host fires these events when global values change (theme, locale, toolOutput, etc.)
    *
-   * Per OpenAI Apps SDK docs, the event is a custom DOM event with:
-   * - event.detail.globals containing the updated values
+   * Handles two formats:
+   * - ChatGPT: event.detail.globals.toolOutput (nested under globals)
+   * - MCP Inspector: event.detail.toolOutput (flat, no globals wrapper)
    */
   private setupGlobalsListener(): void {
     if (typeof window === "undefined") return;
 
     this.setGlobalsHandler = (event: Event) => {
       // Type assertion for custom event with detail
-      const customEvent = event as CustomEvent<{ globals?: Record<string, unknown> }>;
-      const globals = customEvent.detail?.globals;
+      const customEvent = event as CustomEvent<Record<string, unknown>>;
+      const detail = customEvent.detail;
 
-      console.log("[OpenAI Adapter] Received openai:set_globals event", globals);
+      // Handle both formats:
+      // - ChatGPT uses event.detail.globals
+      // - MCP Inspector uses event.detail directly
+      const globals = (detail?.globals as Record<string, unknown>) ?? detail;
+
 
       if (!globals) {
         // Fallback: re-read from SDK if no detail provided
@@ -325,7 +330,7 @@ export class OpenAIAdapter implements ProtocolAdapter {
         this.context.locale !== previousLocale ||
         this.context.displayMode !== previousDisplayMode
       ) {
-        console.log("[OpenAI Adapter] Context changed, notifying handlers");
+        clientDebugLogger.debug("[OpenAI Adapter] Context changed, notifying handlers");
         this.notifyContextChange();
       }
 
@@ -333,11 +338,21 @@ export class OpenAIAdapter implements ProtocolAdapter {
       if (globals.toolOutput !== undefined && globals.toolOutput !== null) {
         const newOutput = globals.toolOutput as Record<string, unknown>;
         if (Object.keys(newOutput).length > 0 && newOutput !== previousToolOutput) {
-          console.log("[OpenAI Adapter] Got toolOutput from set_globals event:", newOutput);
+          clientDebugLogger.debug("[OpenAI Adapter] Got toolOutput from set_globals event", newOutput);
           this.currentToolOutput = newOutput;
 
-          // Notify handlers
-          const toolName = this.getToolNameFromSDK();
+          // Try to get toolName from event metadata or SDK
+          let toolName: string | undefined;
+          if (
+            globals.toolResponseMetadata &&
+            typeof globals.toolResponseMetadata === "object" &&
+            (globals.toolResponseMetadata as { toolName?: string }).toolName
+          ) {
+            toolName = (globals.toolResponseMetadata as { toolName?: string }).toolName;
+          } else {
+            toolName = this.getToolNameFromSDK();
+          }
+
           const wrappedResult = toolName ? { [toolName]: newOutput } : newOutput;
           for (const handler of this.toolResultHandlers) {
             handler(wrappedResult);
@@ -366,7 +381,7 @@ export class OpenAIAdapter implements ProtocolAdapter {
           (data as { type: unknown }).type === "openai:set_globals");
 
       if (isSetGlobals) {
-        console.log("[OpenAI Adapter] Received set_globals via postMessage (legacy)");
+        clientDebugLogger.debug("[OpenAI Adapter] Received set_globals via postMessage (legacy)");
         this.readContextFromSDK();
         this.checkForToolOutputUpdate();
       }
@@ -389,7 +404,7 @@ export class OpenAIAdapter implements ProtocolAdapter {
     }
 
     if (newOutput && Object.keys(newOutput).length > 0 && newOutput !== this.currentToolOutput) {
-      console.log("[OpenAI Adapter] toolOutput updated:", newOutput);
+      clientDebugLogger.debug("[OpenAI Adapter] toolOutput updated", newOutput);
       this.currentToolOutput = newOutput;
 
       const toolName = this.getToolNameFromSDK();
@@ -403,11 +418,11 @@ export class OpenAIAdapter implements ProtocolAdapter {
   private async waitForOpenAI(timeout = 5000): Promise<void> {
     // If already available, return immediately
     if (this.getOpenAI()) {
-      console.log("[OpenAI Adapter] window.openai already available");
+      clientDebugLogger.debug("[OpenAI Adapter] window.openai already available");
       return;
     }
 
-    console.log("[OpenAI Adapter] Waiting for window.openai...");
+    clientDebugLogger.debug("[OpenAI Adapter] Waiting for window.openai...");
 
     // Wait for the openai global to be injected
     return new Promise((resolve) => {
@@ -426,14 +441,14 @@ export class OpenAIAdapter implements ProtocolAdapter {
         if (resolved) return;
 
         if (this.getOpenAI()) {
-          console.log("[OpenAI Adapter] window.openai found via polling");
+          clientDebugLogger.debug("[OpenAI Adapter] window.openai found via polling");
           doResolve();
           return;
         }
 
         if (Date.now() - startTime > timeout) {
           // Timeout - resolve anyway as we might be in a dev/testing environment
-          console.warn("[OpenAI Adapter] window.openai not found after timeout, proceeding anyway");
+          clientDebugLogger.warn("[OpenAI Adapter] window.openai not found after timeout, proceeding anyway");
           doResolve();
           return;
         }
@@ -458,14 +473,14 @@ export class OpenAIAdapter implements ProtocolAdapter {
             (data as { message: unknown }).message === "openai:set_globals");
 
         if (isSetGlobals) {
-          console.log("[OpenAI Adapter] Received set_globals message");
+          clientDebugLogger.debug("[OpenAI Adapter] Received set_globals message");
           // Give a small delay for the globals to be applied, then check
           setTimeout(() => {
             if (this.getOpenAI()) {
-              console.log("[OpenAI Adapter] window.openai available after set_globals");
+              clientDebugLogger.debug("[OpenAI Adapter] window.openai available after set_globals");
               doResolve();
             } else {
-              console.log(
+              clientDebugLogger.debug(
                 "[OpenAI Adapter] window.openai still not available after set_globals, continuing poll"
               );
             }
@@ -622,12 +637,12 @@ export class OpenAIAdapter implements ProtocolAdapter {
 
   onHostContextChange(handler: (context: HostContext) => void): () => void {
     this.hostContextHandlers.add(handler);
-    console.log(
+    clientDebugLogger.debug(
       `[OpenAI Adapter] Host context handler added, total: ${String(this.hostContextHandlers.size)}`
     );
     return () => {
       this.hostContextHandlers.delete(handler);
-      console.log(
+      clientDebugLogger.debug(
         `[OpenAI Adapter] Host context handler removed, total: ${String(this.hostContextHandlers.size)}`
       );
     };
@@ -756,9 +771,9 @@ export class OpenAIAdapter implements ProtocolAdapter {
       } catch (error) {
         // Mark API transport as failed and fall through to next option
         this.apiTransportFailed = true;
-        console.info(
-          "[OpenAI Adapter] API log transport failed, trying fallback:",
-          error instanceof Error ? error.message : error
+        clientDebugLogger.info(
+          "[OpenAI Adapter] API log transport failed, trying fallback",
+          { error: error instanceof Error ? error.message : error }
         );
       }
     }
@@ -775,9 +790,9 @@ export class OpenAIAdapter implements ProtocolAdapter {
       } catch (error) {
         // Mark tool transport as failed
         this.toolTransportFailed = true;
-        console.info(
-          "[OpenAI Adapter] Tool log transport failed, falling back to console:",
-          error instanceof Error ? error.message : error
+        clientDebugLogger.info(
+          "[OpenAI Adapter] Tool log transport failed, falling back to console",
+          { error: error instanceof Error ? error.message : error }
         );
       }
     }

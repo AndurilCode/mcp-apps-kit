@@ -40,7 +40,15 @@ export function GreetingWidgetV2() {
   } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const greetOutput = greetResult ?? result?.greet;
+  // Handle both wrapped ({ greet: {...} }) and unwrapped ({...}) result formats
+  // Wrapped: when toolResponseMetadata.toolName is available (real ChatGPT)
+  // Unwrapped: when toolName is not available (MCP Inspector)
+  const rawResult = result?.greet ?? result;
+  const greetOutput =
+    greetResult ??
+    (rawResult && "message" in rawResult
+      ? (rawResult as { message: string; fullName: string; timestamp: string })
+      : undefined);
 
   useEffect(() => {
     if (typeof document !== "undefined") {
