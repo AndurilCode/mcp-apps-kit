@@ -317,7 +317,7 @@ describe("Advanced Features", () => {
           const result = await env.client.callTool("greet", { name });
           // Property: should always contain the input name in response
           const text = result.content[0]?.text ?? "";
-          return text.includes(name) || !result.isError;
+          return text.includes(name) && !result.isError;
         },
         { numRuns: 5 } // Keep small for test speed
       );

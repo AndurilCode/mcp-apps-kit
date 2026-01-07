@@ -123,11 +123,6 @@ export function createAnthropicProvider(
     ): Promise<unknown> {
       llmLogger("Evaluating result with custom prompt");
 
-      const Anthropic = getAnthropic();
-      const client = new Anthropic.Anthropic({
-        apiKey: process.env.ANTHROPIC_API_KEY!,
-      });
-
       const response = await client.messages.create({
         model,
         max_tokens: 4096,
