@@ -130,12 +130,38 @@ export class AssertionError extends TestingError {
  */
 export class PropertyFailureError extends TestingError {
   constructor(
+    /** The original counterexample that failed the property */
     public readonly failingInput: unknown,
+    /** The shrunk (simplified) counterexample after shrinking */
     public readonly shrunkInput: unknown,
-    message?: string
+    message?: string,
+    /** Optional: the seed used for reproducibility */
+    public readonly seed?: number,
+    /** Optional: number of shrink steps performed */
+    public readonly numShrinks?: number
   ) {
     super("PROPERTY_FAILURE", message ?? "Property test failed", undefined);
     this.name = "PropertyFailureError";
+  }
+
+  /**
+   * Get a reproducibility hint for the failing test
+   */
+  getReproduceHint(): string {
+    if (this.seed !== undefined) {
+      return `To reproduce this failure, run with seed: ${this.seed}`;
+    }
+    return "Set a seed in test options to make failures reproducible";
+  }
+
+  override toJSON(): Record<string, unknown> {
+    return {
+      ...super.toJSON(),
+      failingInput: this.failingInput,
+      shrunkInput: this.shrunkInput,
+      seed: this.seed,
+      numShrinks: this.numShrinks,
+    };
   }
 }
 

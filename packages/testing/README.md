@@ -44,8 +44,8 @@ Testing MCP applications involves multiple layers: validating tool behavior, tes
 ## Compatibility
 
 - Node.js: `>= 20`
-- Zod: `^4.0.0` (peer dependency)
-- Test Frameworks: Vitest `^4.0.0` or Jest `^29.0.0`
+- Zod: `^4.0.0` (bundled dependency)
+- Test Frameworks: Vitest `^3.0.0 || ^4.0.0` or Jest `^29.0.0` (optional peer dependencies)
 
 ## Install
 
@@ -53,11 +53,15 @@ Testing MCP applications involves multiple layers: validating tool behavior, tes
 npm install @mcp-apps-kit/testing
 ```
 
-This includes all dependencies for property testing (`fast-check`) and LLM evaluation (`openai`, `@anthropic-ai/sdk`).
+This package includes all dependencies needed for:
+
+- **Core testing**: Server management, test client, assertions
+- **Property-based testing**: `fast-check` for random input generation
+- **LLM evaluation**: `openai` and `@anthropic-ai/sdk` for AI-powered quality assessment
 
 ### Test Framework (Optional)
 
-If using framework-specific matchers, ensure you have your test framework installed:
+If using framework-specific matchers (`.toBeSuccessfulToolResult()`, etc.), install your test framework:
 
 ```bash
 # For Vitest users

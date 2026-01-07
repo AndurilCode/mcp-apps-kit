@@ -16,24 +16,58 @@ import type {
 
 // Lazy-loaded Anthropic module
 let anthropicModule: typeof import("@anthropic-ai/sdk") | null = null;
+let anthropicLoadPromise: Promise<typeof import("@anthropic-ai/sdk")> | null = null;
 
 /**
- * Load Anthropic module (lazy, throws if not available)
+ * Load Anthropic module (lazy, async, throws if not available)
  */
-function getAnthropic(): typeof import("@anthropic-ai/sdk") {
-  if (!anthropicModule) {
+async function getAnthropic(): Promise<typeof import("@anthropic-ai/sdk")> {
+  if (anthropicModule) {
+    return anthropicModule;
+  }
+
+  if (anthropicLoadPromise) {
+    return anthropicLoadPromise;
+  }
+
+  anthropicLoadPromise = (async () => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
-      anthropicModule = require("@anthropic-ai/sdk");
+      const module = await import("@anthropic-ai/sdk");
+      anthropicModule = module;
+      return module;
     } catch {
       throw new ConfigurationError(
         "@anthropic-ai/sdk",
         "@anthropic-ai/sdk package is required for Anthropic evaluation. Install it with: npm install -D @anthropic-ai/sdk"
       );
     }
+  })();
+
+  return anthropicLoadPromise;
+}
+
+// Cached client instance
+let cachedClient: import("@anthropic-ai/sdk").Anthropic | null = null;
+let cachedApiKey: string | null = null;
+
+/**
+ * Get or create Anthropic client
+ */
+async function getOrCreateClient(apiKey: string): Promise<import("@anthropic-ai/sdk").Anthropic> {
+  if (cachedClient && cachedApiKey === apiKey) {
+    return cachedClient;
   }
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  return anthropicModule!;
+
+  const anthropicMod = await getAnthropic();
+  // The Anthropic SDK exports the class as default export or as Anthropic
+  const AnthropicClass = anthropicMod.default ?? anthropicMod.Anthropic ?? anthropicMod;
+  cachedClient = new (AnthropicClass as new (opts: {
+    apiKey: string;
+  }) => import("@anthropic-ai/sdk").Anthropic)({
+    apiKey,
+  });
+  cachedApiKey = apiKey;
+  return cachedClient;
 }
 
 /**
@@ -50,12 +84,12 @@ export function createAnthropicProvider(model: string, apiKey?: string): LLMProv
     );
   }
 
-  const Anthropic = getAnthropic();
-  const client = new Anthropic.Anthropic({ apiKey: apiKeyValue });
-
   return {
     async evaluate(result: unknown, options: EvalOptions): Promise<EvaluationResult> {
       llmLogger("Evaluating result with Anthropic against %d criteria", options.criteria.length);
+
+      // Get or create client (async for ESM compatibility)
+      const client = await getOrCreateClient(apiKeyValue);
 
       // Build evaluation prompt
       const prompt = buildEvaluationPrompt(result, options);
@@ -203,6 +237,9 @@ export function createAnthropicProvider(model: string, apiKey?: string): LLMProv
 
     async evaluateWithPrompt(result: unknown, options: CustomEvalOptions): Promise<unknown> {
       llmLogger("Evaluating result with custom prompt");
+
+      // Get or create client (async for ESM compatibility)
+      const client = await getOrCreateClient(apiKeyValue);
 
       const response = await client.messages.create({
         model,

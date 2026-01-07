@@ -74,13 +74,12 @@ describe("Versioning", () => {
     expectToolResult(v1Result).toHaveNoError();
     expectToolResult(v2Result).toHaveNoError();
 
-    const v1Text = v1Result.content[0]?.text;
-    const v2Text = v2Result.content[0]?.text;
-    expect(v1Text, "v1 result should have text content").toBeDefined();
-    expect(v2Text, "v2 result should have text content").toBeDefined();
+    // Use structuredContent for typed data assertions
+    const v1Data = v1Result.structuredContent as Record<string, unknown>;
+    const v2Data = v2Result.structuredContent as Record<string, unknown>;
 
-    const v1Data = JSON.parse(v1Text!);
-    const v2Data = JSON.parse(v2Text!);
+    expect(v1Data, "v1 result should have structuredContent").toBeDefined();
+    expect(v2Data, "v2 result should have structuredContent").toBeDefined();
 
     // v1 doesn't have fullName
     expect(v1Data).not.toHaveProperty("fullName");
@@ -93,9 +92,10 @@ describe("Versioning", () => {
     const result = await v1Env.client.callTool("greet", { name: "Alice" });
 
     expectToolResult(result).toHaveNoError();
-    const text = result.content[0]?.text;
-    expect(text, "result should have text content").toBeDefined();
-    const data = JSON.parse(text!);
+
+    // Use structuredContent for typed data assertions
+    const data = result.structuredContent as { message: string };
+    expect(data, "result should have structuredContent").toBeDefined();
     expect(data.message).toContain("Alice");
   });
 
@@ -106,9 +106,10 @@ describe("Versioning", () => {
     });
 
     expectToolResult(result).toHaveNoError();
-    const text = result.content[0]?.text;
-    expect(text, "result should have text content").toBeDefined();
-    const data = JSON.parse(text!);
+
+    // Use structuredContent for typed data assertions
+    const data = result.structuredContent as { fullName: string };
+    expect(data, "result should have structuredContent").toBeDefined();
     expect(data.fullName).toBe("Bob Smith");
   });
 });

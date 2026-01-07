@@ -43,7 +43,8 @@ export async function createTestEnvironment(
 
   // Start server from App instance
   if (options.app) {
-    const port = options.port ?? 3000;
+    // Default to port 0 (ephemeral) for test isolation - avoids port conflicts
+    const port = options.port ?? 0;
     server = await startTestServer(options.app as App, { port });
 
     // Wait a bit for server to be ready

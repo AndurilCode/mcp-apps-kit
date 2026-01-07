@@ -41,8 +41,8 @@ describe("Greet Tool V1", () => {
       expectToolResult(result).toHaveNoError();
       expectToolResult(result).toContainText("Alice");
 
-      // Parse structured content
-      const data = JSON.parse(result.content[0]?.text ?? "{}");
+      // Use structuredContent for typed data assertions
+      const data = result.structuredContent as { message: string; timestamp: string };
       expect(data.message).toContain("Alice");
       expect(data.timestamp).toBeDefined();
     });
@@ -52,7 +52,8 @@ describe("Greet Tool V1", () => {
 
       expectToolResult(result).toHaveNoError();
 
-      const data = JSON.parse(result.content[0]?.text ?? "{}");
+      // Use structuredContent for typed data assertions
+      const data = result.structuredContent as { message: string; timestamp: string };
       expect(() => new Date(data.timestamp)).not.toThrow();
       expect(new Date(data.timestamp).toISOString()).toBe(data.timestamp);
     });

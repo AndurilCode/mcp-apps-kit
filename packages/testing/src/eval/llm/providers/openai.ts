@@ -14,26 +14,58 @@ import type {
   CriterionResult,
 } from "../../../types";
 
-// Lazy-loaded OpenAI module
+// Lazy-loaded OpenAI module and client
 let openaiModule: typeof import("openai") | null = null;
+let openaiLoadPromise: Promise<typeof import("openai")> | null = null;
 
 /**
- * Load OpenAI module (lazy, throws if not available)
+ * Load OpenAI module (lazy, async, throws if not available)
  */
-function getOpenAI(): typeof import("openai") {
-  if (!openaiModule) {
+async function getOpenAI(): Promise<typeof import("openai")> {
+  if (openaiModule) {
+    return openaiModule;
+  }
+
+  if (openaiLoadPromise) {
+    return openaiLoadPromise;
+  }
+
+  openaiLoadPromise = (async () => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
-      openaiModule = require("openai");
+      const module = await import("openai");
+      openaiModule = module;
+      return module;
     } catch {
       throw new ConfigurationError(
         "openai",
         "openai package is required for OpenAI evaluation. Install it with: npm install -D openai"
       );
     }
+  })();
+
+  return openaiLoadPromise;
+}
+
+// Cached client instance
+let cachedClient: import("openai").OpenAI | null = null;
+let cachedApiKey: string | null = null;
+
+/**
+ * Get or create OpenAI client
+ */
+async function getOrCreateClient(apiKey: string): Promise<import("openai").OpenAI> {
+  if (cachedClient && cachedApiKey === apiKey) {
+    return cachedClient;
   }
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  return openaiModule!;
+
+  const openai = await getOpenAI();
+  // The OpenAI SDK exports the class as default export
+  const OpenAIClass = openai.default ?? openai.OpenAI ?? openai;
+  cachedClient = new (OpenAIClass as new (opts: { apiKey: string }) => import("openai").OpenAI)({
+    apiKey,
+  });
+  cachedApiKey = apiKey;
+  return cachedClient;
 }
 
 /**
@@ -50,12 +82,12 @@ export function createOpenAIProvider(model: string, apiKey?: string): LLMProvide
     );
   }
 
-  const OpenAI = getOpenAI();
-  const client = new OpenAI.OpenAI({ apiKey: apiKeyValue });
-
   return {
     async evaluate(result: unknown, options: EvalOptions): Promise<EvaluationResult> {
       llmLogger("Evaluating result with OpenAI against %d criteria", options.criteria.length);
+
+      // Get or create client (async for ESM compatibility)
+      const client = await getOrCreateClient(apiKeyValue);
 
       // Build evaluation prompt
       const prompt = buildEvaluationPrompt(result, options);
@@ -120,6 +152,9 @@ export function createOpenAIProvider(model: string, apiKey?: string): LLMProvide
 
     async evaluateWithPrompt(result: unknown, options: CustomEvalOptions): Promise<unknown> {
       llmLogger("Evaluating result with custom prompt");
+
+      // Get or create client (async for ESM compatibility)
+      const client = await getOrCreateClient(apiKeyValue);
 
       const response = await client.chat.completions.create({
         model,

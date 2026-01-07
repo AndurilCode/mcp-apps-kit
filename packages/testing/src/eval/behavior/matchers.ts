@@ -127,35 +127,51 @@ export function expectToolResult(result: ToolResult): ToolResultAssertion {
 /**
  * Extract data from tool result for comparison
  *
- * Attempts to parse JSON from text content, falls back to raw text.
- * The text content should contain JSON when structuredContent was used.
+ * Priority order:
+ * 1. Use structuredContent if present (the typed data from the tool)
+ * 2. If single text block, try to parse as JSON
+ * 3. If multiple text blocks or not JSON, return text content as-is
  */
 export function extractResultData(result: ToolResult): unknown {
-  const textContent = result.content
-    .filter((c) => c.type === "text")
-    .map((c) => c.text ?? "")
-    .join("\n");
+  // 1. Prefer structuredContent when available - this is the actual typed data
+  if (result.structuredContent !== undefined) {
+    return result.structuredContent;
+  }
 
-  if (!textContent) {
+  // 2. Get text content blocks
+  const textBlocks = result.content.filter((c) => c.type === "text");
+
+  if (textBlocks.length === 0) {
     return null;
   }
 
-  // Try to parse as JSON first
-  try {
-    const parsed: unknown = JSON.parse(textContent);
-    // If it's a string that looks like JSON was stringified, try parsing again
-    if (typeof parsed === "string") {
-      try {
-        return JSON.parse(parsed);
-      } catch {
-        return parsed;
-      }
+  // 3. If single text block, try to parse as JSON
+  if (textBlocks.length === 1) {
+    const text = textBlocks[0]?.text ?? "";
+    if (!text) {
+      return null;
     }
-    return parsed;
-  } catch {
-    // Not JSON, return as string
-    return textContent;
+
+    try {
+      const parsed: unknown = JSON.parse(text);
+      // If it's a string that looks like JSON was stringified, try parsing again
+      if (typeof parsed === "string") {
+        try {
+          return JSON.parse(parsed);
+        } catch {
+          return parsed;
+        }
+      }
+      return parsed;
+    } catch {
+      // Not JSON, return as string
+      return text;
+    }
   }
+
+  // 4. Multiple text blocks - return as array of text strings
+  // This prevents lossy concatenation that could break JSON parsing
+  return textBlocks.map((c) => c.text ?? "");
 }
 
 /**

@@ -25,10 +25,16 @@ export interface ContentBlock {
  * Result from calling an MCP tool
  */
 export interface ToolResult {
-  /** Result content */
+  /** Result content (display text blocks) */
   content: ContentBlock[];
   /** Whether the call resulted in an error */
   isError?: boolean;
+  /**
+   * Structured content from the tool result (if present).
+   * This is the typed data returned by the tool, separate from display text.
+   * Use this for assertions when you want to test the actual data.
+   */
+  structuredContent?: unknown;
 }
 
 /**

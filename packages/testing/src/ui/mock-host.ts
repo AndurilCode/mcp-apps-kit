@@ -46,7 +46,6 @@ export function createMockHost(options: MockHostOptions = {}): MockHost {
   const teardownHandlers: Array<(reason?: string) => void> = [];
   const cancelledHandlers: Array<(reason?: string) => void> = [];
 
-  // Try to load MockAdapter from @mcp-apps-kit/ui if available
   // Define interface for the UI adapter methods we use
   interface UIAdapter {
     emitToolResult?(result: unknown): void;
@@ -54,17 +53,52 @@ export function createMockHost(options: MockHostOptions = {}): MockHost {
     emitToolCancelled?(reason?: string): void;
     emitTeardown?(reason?: string): void;
   }
+
+  // UI adapter will be loaded lazily on first use
   let uiAdapter: UIAdapter | null = null;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const uiModule = require("@mcp-apps-kit/ui/adapters/mock") as {
-      MockAdapter: new () => UIAdapter;
-    };
-    uiAdapter = new uiModule.MockAdapter();
-    uiLogger("Using MockAdapter from @mcp-apps-kit/ui");
-  } catch {
-    uiLogger("@mcp-apps-kit/ui not available, using standalone mock");
+  let uiAdapterLoaded = false;
+
+  // Try to load MockAdapter from @mcp-apps-kit/ui if available (async, lazy)
+  async function getUIAdapter(): Promise<UIAdapter | null> {
+    if (uiAdapterLoaded) {
+      return uiAdapter;
+    }
+
+    try {
+      // Dynamic import of optional @mcp-apps-kit/ui package
+      // This may not be installed, so we catch and ignore errors
+      const modulePath = "@mcp-apps-kit/ui/adapters/mock";
+      const uiModule = (await import(/* webpackIgnore: true */ modulePath)) as {
+        MockAdapter?: new () => UIAdapter;
+        default?: { MockAdapter?: new () => UIAdapter } | (new () => UIAdapter);
+      };
+
+      // Handle various module export patterns
+      let MockAdapterClass: (new () => UIAdapter) | undefined;
+      if (typeof uiModule.MockAdapter === "function") {
+        MockAdapterClass = uiModule.MockAdapter;
+      } else if (uiModule.default) {
+        if (typeof uiModule.default === "function") {
+          MockAdapterClass = uiModule.default as new () => UIAdapter;
+        } else if (typeof uiModule.default.MockAdapter === "function") {
+          MockAdapterClass = uiModule.default.MockAdapter;
+        }
+      }
+
+      if (MockAdapterClass) {
+        uiAdapter = new MockAdapterClass();
+        uiLogger("Using MockAdapter from @mcp-apps-kit/ui");
+      }
+    } catch {
+      uiLogger("@mcp-apps-kit/ui not available, using standalone mock");
+    }
+
+    uiAdapterLoaded = true;
+    return uiAdapter;
   }
+
+  // Kick off async loading but don't wait
+  void getUIAdapter();
 
   return {
     emitToolResult(result: unknown): void {

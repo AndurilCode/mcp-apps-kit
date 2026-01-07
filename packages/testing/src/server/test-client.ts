@@ -38,11 +38,14 @@ export async function createTestClient(
     const startTime = Date.now();
     const timestamp = new Date();
 
+    // Track timeout timer so we can clear it on success
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
     try {
       clientLogger("Calling tool %s with args %o", name, args);
 
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
+        timeoutId = setTimeout(() => {
           reject(new TimeoutError(timeout, `Tool call timed out after ${timeout}ms`));
         }, timeout);
       });
@@ -59,6 +62,11 @@ export async function createTestClient(
         timeoutPromise,
       ]);
 
+      // Clear timeout on success to prevent timer leak
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+
       const duration = Date.now() - startTime;
 
       // Build content blocks from the result
@@ -73,22 +81,16 @@ export async function createTestClient(
         return { type: "text" as const, text: JSON.stringify(block) };
       });
 
-      // Access structuredContent from the raw result
+      // Access structuredContent from the raw result and store separately
+      // This preserves original display text while providing typed data for assertions
       const structuredContent = (result as { structuredContent?: unknown }).structuredContent;
-
-      // If structuredContent exists, use it as the primary data
-      if (structuredContent !== undefined && structuredContent !== null) {
-        const jsonStr = JSON.stringify(structuredContent);
-        if (contentBlocks.length > 0 && contentBlocks[0]?.type === "text") {
-          contentBlocks[0].text = jsonStr;
-        } else {
-          contentBlocks.unshift({ type: "text", text: jsonStr });
-        }
-      }
 
       const toolResult: ToolResult = {
         content: contentBlocks,
         isError: result.isError,
+        // Store structuredContent separately - matchers can use this for data assertions
+        // while toContainText() tests actual display text
+        structuredContent: structuredContent ?? undefined,
       };
 
       if (trackHistory) {
@@ -98,6 +100,11 @@ export async function createTestClient(
       clientLogger("Tool %s completed in %dms", name, duration);
       return toolResult;
     } catch (error) {
+      // Clear timeout on error to prevent timer leak
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+
       const duration = Date.now() - startTime;
       const err = error instanceof Error ? error : new Error(String(error));
 

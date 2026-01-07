@@ -40,7 +40,8 @@ describe("Greet Tool V2", () => {
 
       expectToolResult(result).toHaveNoError();
 
-      const data = JSON.parse(result.content[0]?.text ?? "{}");
+      // Use structuredContent for typed data assertions
+      const data = result.structuredContent as { message: string; fullName: string };
       expect(data.message).toContain("Alice");
       expect(data.fullName).toBe("Alice");
     });
@@ -53,7 +54,8 @@ describe("Greet Tool V2", () => {
 
       expectToolResult(result).toHaveNoError();
 
-      const data = JSON.parse(result.content[0]?.text ?? "{}");
+      // Use structuredContent for typed data assertions
+      const data = result.structuredContent as { message: string; fullName: string };
       expect(data.message).toContain("Alice Smith");
       expect(data.fullName).toBe("Alice Smith");
     });
@@ -80,13 +82,13 @@ describe("Greet Tool V2", () => {
       // Test case: name only
       const result1 = await env.client.callTool("greet", { name: "Alice" });
       expectToolResult(result1).toHaveNoError();
-      const data1 = JSON.parse(result1.content[0]?.text ?? "{}");
+      const data1 = result1.structuredContent as { fullName: string };
       expect(data1.fullName).toBe("Alice");
 
       // Test case: name and surname
       const result2 = await env.client.callTool("greet", { name: "Bob", surname: "Smith" });
       expectToolResult(result2).toHaveNoError();
-      const data2 = JSON.parse(result2.content[0]?.text ?? "{}");
+      const data2 = result2.structuredContent as { fullName: string };
       expect(data2.fullName).toBe("Bob Smith");
     });
   });

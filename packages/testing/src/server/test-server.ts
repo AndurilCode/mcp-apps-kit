@@ -3,7 +3,7 @@
  */
 
 import { spawn } from "node:child_process";
-import { createServer, type Server } from "node:http";
+import { createServer } from "node:http";
 import type { TestServer, TestServerOptions, ExternalServerOptions } from "../types";
 import { ServerStartupError } from "../errors";
 import { serverLogger } from "../debug";
@@ -35,33 +35,59 @@ export function startTestServer(
 }
 
 /**
+ * Find an available port by binding to port 0 and getting the assigned port
+ */
+async function findAvailablePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.listen(0, () => {
+      const addr = server.address();
+      if (addr && typeof addr === "object" && "port" in addr) {
+        const port = addr.port;
+        server.close((err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(port);
+          }
+        });
+      } else {
+        server.close();
+        reject(new Error("Failed to detect available port"));
+      }
+    });
+    server.on("error", reject);
+  });
+}
+
+/**
  * Internal: Start server from App instance
+ *
+ * Both port=0 and fixed port paths now use app.start() for consistent
+ * lifecycle behavior (plugin initialization, OAuth setup, etc.)
  */
 async function startTestServerFromApp(app: App, options: TestServerOptions): Promise<TestServer> {
   const { port = 0, timeout = 10000 } = options;
-  // Track whether we used app.start() so we can call app.stop() later
-  let usedAppStart = false;
 
   serverLogger("Starting test server from App instance on port %d", port);
 
-  let httpServer: Server | null = null;
   let actualPort = port;
 
-  // When port is 0, create our own HTTP server to detect the bound port
+  // When port is 0, find an available port first
   if (port === 0) {
-    // Use the app's handler to create our own HTTP server
-    const handler = app.handler();
-    httpServer = createServer((req, res) => {
-      handler(req, res, () => {
-        // No next middleware
-        res.statusCode = 404;
-        res.end("Not Found");
-      });
-    });
+    serverLogger("Finding available port...");
+    actualPort = await findAvailablePort();
+    serverLogger("Found available port: %d", actualPort);
+  }
 
-    const server = httpServer;
-    await new Promise<void>((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
+  // Always use app.start() for consistent lifecycle behavior
+  // This ensures plugins, OAuth, and other initialization happens properly
+  try {
+    const startPromise = app.start({ port: actualPort, transport: "http" });
+
+    // Add timeout
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
         reject(
           new ServerStartupError(
             undefined,
@@ -72,55 +98,18 @@ async function startTestServerFromApp(app: App, options: TestServerOptions): Pro
           )
         );
       }, timeout);
-
-      server.listen(0, () => {
-        clearTimeout(timeoutId);
-        const addr = server.address();
-        if (addr && typeof addr === "object" && "port" in addr) {
-          actualPort = addr.port;
-          serverLogger("Dynamic port detected: %d", actualPort);
-          resolve();
-        } else {
-          reject(
-            new ServerStartupError(
-              undefined,
-              timeout,
-              undefined,
-              "Failed to detect bound port from server",
-              undefined
-            )
-          );
-        }
-      });
-
-      server.on("error", (err) => {
-        clearTimeout(timeoutId);
-        reject(
-          new ServerStartupError(
-            undefined,
-            timeout,
-            undefined,
-            `Failed to start server: ${err.message}`,
-            err
-          )
-        );
-      });
     });
-  } else {
-    // Use the app's built-in start method for fixed ports
-    try {
-      await app.start({ port, transport: "http" });
-      usedAppStart = true;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      throw new ServerStartupError(
-        undefined,
-        timeout,
-        undefined,
-        `Failed to start app server: ${err.message}`,
-        err
-      );
-    }
+
+    await Promise.race([startPromise, timeoutPromise]);
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    throw new ServerStartupError(
+      undefined,
+      timeout,
+      undefined,
+      `Failed to start app server: ${err.message}`,
+      err
+    );
   }
 
   const baseUrl = `http://localhost:${actualPort}`;
@@ -134,20 +123,11 @@ async function startTestServerFromApp(app: App, options: TestServerOptions): Pro
     port: actualPort,
     async stop(): Promise<void> {
       serverLogger("Stopping test server");
-      if (httpServer) {
-        // Dynamic port case: we created our own HTTP server
-        const server = httpServer;
-        return new Promise((resolve) => {
-          server.close(() => {
-            resolve();
-          });
-        });
-      } else if (usedAppStart && app.stop) {
-        // Fixed port case: app.start() was used, call app.stop() if available
+      if (app.stop) {
         await app.stop();
       }
-      // Note: if app.stop is not available for fixed-port servers,
-      // the server may continue running. Consider using port 0 for tests.
+      // Note: if app.stop is not available, the server may continue running.
+      // MCP apps should implement stop() for proper cleanup.
     },
   };
 }
