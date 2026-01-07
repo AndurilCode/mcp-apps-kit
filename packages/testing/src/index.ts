@@ -93,6 +93,10 @@ export {
 export { createTestClient, startTestServer } from "./server";
 
 // Behavior testing - Phase 4
+export { expectToolResult, defineTestSuite, runTestSuite } from "./eval/behavior";
+export type { TestSuiteConfig } from "./eval/behavior";
+
+// Behavior testing - Phase 4
 // export { expectToolResult, defineTestSuite, runTestSuite } from "./eval/behavior";
 
 // Property testing - Phase 6
