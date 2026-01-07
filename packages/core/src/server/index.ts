@@ -465,6 +465,16 @@ export function createServerInstance<T extends ToolDefs>(
  * This endpoint receives batched log entries from client UIs via HTTP POST
  * and processes them through the server-side debug logger.
  *
+ * **CORS Note:** When UIs are served from a different origin (e.g., ChatGPT's
+ * `ui://` protocol, or a separate domain), you MUST configure CORS in your
+ * app config to allow cross-origin requests to this endpoint. Example:
+ *
+ * ```ts
+ * config: {
+ *   cors: { origin: true, credentials: true }
+ * }
+ * ```
+ *
  * @param expressApp - Express app to register the route on
  * @param debugConfig - Debug configuration
  */
@@ -1084,6 +1094,12 @@ function sanitizeJsonForScript(jsonString: string): string {
  * Injection points (in order of preference):
  * 1. After <head> opening tag
  * 2. After <!DOCTYPE> or at the start if no head tag
+ *
+ * **Security Warning:** Do NOT include user-controlled data in serverConfig.
+ * While JSON is sanitized for script context (e.g., `</script>` is escaped),
+ * including untrusted user input could lead to XSS vulnerabilities if that
+ * data is later rendered unsafely in the UI. Only include trusted server-side
+ * configuration values (e.g., baseUrl, feature flags, API endpoints).
  */
 function injectServerConfig(html: string, serverConfig: Record<string, unknown>): string {
   if (Object.keys(serverConfig).length === 0) {

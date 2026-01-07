@@ -441,7 +441,6 @@ export class ClientDebugLogger {
 
     this.isFlushing = true;
     const entriesToFlush = [...this.buffer];
-    this.buffer = [];
 
     try {
       if (this.canUseApiTransport()) {
@@ -449,16 +448,25 @@ export class ClientDebugLogger {
       } else if (this.canUseToolTransport()) {
         await this.flushToTool(entriesToFlush);
       }
-    } catch {
+      // Clear buffer only after successful flush
+      this.buffer = this.buffer.slice(entriesToFlush.length);
+    } catch (error) {
       // If transport fails, disable it (already output to console in log())
+      // Don't re-add entries since they were already output to console
+      this.buffer = this.buffer.slice(entriesToFlush.length);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       if (this.config.transport === "api" && !this.apiTransportFailed) {
         this.apiTransportFailed = true;
         // eslint-disable-next-line no-console
-        console.warn("[ClientDebugLogger] API log transport failed, will only use console");
+        console.warn(
+          `[ClientDebugLogger] API log transport failed: ${errorMessage}. Will only use console`
+        );
       } else if (this.config.transport === "tool" && !this.mcpTransportFailed) {
         this.mcpTransportFailed = true;
         // eslint-disable-next-line no-console
-        console.warn("[ClientDebugLogger] MCP log transport failed, will only use console");
+        console.warn(
+          `[ClientDebugLogger] MCP log transport failed: ${errorMessage}. Will only use console`
+        );
       }
     } finally {
       this.isFlushing = false;
@@ -507,7 +515,8 @@ export class ClientDebugLogger {
   private addToBuffer(entry: LogEntry): void {
     // Handle buffer overflow - drop oldest entries if we've reached max size
     // (already output to console in log(), so just drop from buffer)
-    if (this.buffer.length >= this.config.maxBufferSize) {
+    // Use while loop to handle rapid logging scenarios
+    while (this.buffer.length >= this.config.maxBufferSize) {
       this.buffer.shift();
     }
 
