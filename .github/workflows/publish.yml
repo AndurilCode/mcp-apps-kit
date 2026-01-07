@@ -61,3 +61,6 @@ jobs:
 
       - name: Publish @mcp-apps-kit/create-app
         run: pnpm --filter @mcp-apps-kit/create-app exec npm publish --access public --provenance
+
+      - name: Publish @mcp-apps-kit/testing
+        run: pnpm --filter @mcp-apps-kit/testing exec npm publish --access public --provenance
