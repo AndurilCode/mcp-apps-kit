@@ -80,6 +80,21 @@ const greetToolV2 = defineTool({
     name: "Greeting Widget V2",
     description: "Displays greeting messages (v2 - with surname support)",
     prefersBorder: true,
+    // CSP configuration for ChatGPT - allow connections and resources
+    csp: {
+      // Allow fetch/XHR to your server (use your public URL or ngrok)
+      connectDomains: [
+        "http://localhost:3000", // Local dev
+        "https://*.ngrok-free.app", // ngrok tunnels
+        // Add your production domain here
+      ],
+      // Allow fonts, images, scripts, stylesheets from CDNs
+      resourceDomains: [
+        "https://fonts.googleapis.com",
+        "https://fonts.gstatic.com",
+        // Add other CDNs as needed
+      ],
+    },
   }),
 
   handler: async (input, context) => {

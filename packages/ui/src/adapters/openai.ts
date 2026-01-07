@@ -267,59 +267,137 @@ export class OpenAIAdapter implements ProtocolAdapter {
       }
     }
 
-    // Subscribe to context changes via postMessage
+    // Subscribe to openai:set_globals events for context and toolOutput updates
     this.setupGlobalsListener();
 
     this.connected = true;
   }
 
   /**
-   * Set up listener for openai:set_globals messages
-   * The host fires these events when context values change (theme, locale, etc.)
+   * Custom event handler for openai:set_globals
+   */
+  private setGlobalsHandler?: (event: Event) => void;
+
+  /**
+   * Set up listener for openai:set_globals custom DOM event
+   * The host fires these events when global values change (theme, locale, toolOutput, etc.)
+   *
+   * Per OpenAI Apps SDK docs, the event is a custom DOM event with:
+   * - event.detail.globals containing the updated values
    */
   private setupGlobalsListener(): void {
     if (typeof window === "undefined") return;
 
+    this.setGlobalsHandler = (event: Event) => {
+      // Type assertion for custom event with detail
+      const customEvent = event as CustomEvent<{ globals?: Record<string, unknown> }>;
+      const globals = customEvent.detail?.globals;
+
+      console.log("[OpenAI Adapter] Received openai:set_globals event", globals);
+
+      if (!globals) {
+        // Fallback: re-read from SDK if no detail provided
+        this.readContextFromSDK();
+        this.checkForToolOutputUpdate();
+        return;
+      }
+
+      // Track previous values for change detection
+      const previousTheme = this.context.theme;
+      const previousLocale = this.context.locale;
+      const previousDisplayMode = this.context.displayMode;
+      const previousToolOutput = this.currentToolOutput;
+
+      // Update context from globals
+      if (globals.theme !== undefined) {
+        this.context.theme = globals.theme as "light" | "dark";
+      }
+      if (globals.locale !== undefined) {
+        this.context.locale = globals.locale as string;
+      }
+      if (globals.displayMode !== undefined) {
+        this.context.displayMode = globals.displayMode as "inline" | "fullscreen" | "pip";
+      }
+
+      // Check if context changed
+      if (
+        this.context.theme !== previousTheme ||
+        this.context.locale !== previousLocale ||
+        this.context.displayMode !== previousDisplayMode
+      ) {
+        console.log("[OpenAI Adapter] Context changed, notifying handlers");
+        this.notifyContextChange();
+      }
+
+      // Handle toolOutput updates
+      if (globals.toolOutput !== undefined && globals.toolOutput !== null) {
+        const newOutput = globals.toolOutput as Record<string, unknown>;
+        if (Object.keys(newOutput).length > 0 && newOutput !== previousToolOutput) {
+          console.log("[OpenAI Adapter] Got toolOutput from set_globals event:", newOutput);
+          this.currentToolOutput = newOutput;
+
+          // Notify handlers
+          const toolName = this.getToolNameFromSDK();
+          const wrappedResult = toolName ? { [toolName]: newOutput } : newOutput;
+          for (const handler of this.toolResultHandlers) {
+            handler(wrappedResult);
+          }
+        }
+      }
+
+      // Handle toolInput updates
+      if (globals.toolInput !== undefined) {
+        this.currentToolInput = globals.toolInput as Record<string, unknown>;
+      }
+    };
+
+    // Listen for the custom DOM event (not postMessage!)
+    window.addEventListener("openai:set_globals", this.setGlobalsHandler);
+
+    // Also keep the old postMessage listener as fallback for older SDK versions
     this.globalsHandler = (event: MessageEvent) => {
       const data = event.data as unknown;
 
-      // Handle various message formats for set_globals
       const isSetGlobals =
         data === "openai:set_globals" ||
         (typeof data === "object" &&
           data !== null &&
           "type" in data &&
-          (data as { type: unknown }).type === "openai:set_globals") ||
-        (typeof data === "object" &&
-          data !== null &&
-          "message" in data &&
-          (data as { message: unknown }).message === "openai:set_globals");
+          (data as { type: unknown }).type === "openai:set_globals");
 
       if (isSetGlobals) {
-        console.log("[OpenAI Adapter] Received set_globals event, refreshing context");
-
-        // Give a small delay for the globals to be applied
-        setTimeout(() => {
-          const previousTheme = this.context.theme;
-          const previousLocale = this.context.locale;
-          const previousDisplayMode = this.context.displayMode;
-
-          this.readContextFromSDK();
-
-          // Check if anything actually changed
-          if (
-            this.context.theme !== previousTheme ||
-            this.context.locale !== previousLocale ||
-            this.context.displayMode !== previousDisplayMode
-          ) {
-            console.log("[OpenAI Adapter] Context changed, notifying handlers");
-            this.notifyContextChange();
-          }
-        }, 10);
+        console.log("[OpenAI Adapter] Received set_globals via postMessage (legacy)");
+        this.readContextFromSDK();
+        this.checkForToolOutputUpdate();
       }
     };
 
     window.addEventListener("message", this.globalsHandler);
+  }
+
+  /**
+   * Check if toolOutput has been updated and notify handlers
+   */
+  private checkForToolOutputUpdate(): void {
+    const openai = this.getOpenAI();
+    if (!openai) return;
+
+    let newOutput: Record<string, unknown> | undefined;
+
+    if (openai.toolOutput) {
+      newOutput = openai.toolOutput as Record<string, unknown>;
+    }
+
+    if (newOutput && Object.keys(newOutput).length > 0 && newOutput !== this.currentToolOutput) {
+      console.log("[OpenAI Adapter] toolOutput updated:", newOutput);
+      this.currentToolOutput = newOutput;
+
+      const toolName = this.getToolNameFromSDK();
+      const wrappedResult = toolName ? { [toolName]: newOutput } : newOutput;
+      for (const handler of this.toolResultHandlers) {
+        handler(wrappedResult);
+      }
+    }
   }
 
   private async waitForOpenAI(timeout = 5000): Promise<void> {
