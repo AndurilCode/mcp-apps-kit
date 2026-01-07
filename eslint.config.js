@@ -15,6 +15,7 @@ export default [
     files: [
       "packages/core/**/*.ts",
       "packages/create-app/**/*.ts",
+      "packages/testing/**/*.ts",
       "packages/ui-react-builder/**/*.ts",
     ],
     languageOptions: {
@@ -23,6 +24,7 @@ export default [
         project: [
           "./packages/core/tsconfig.json",
           "./packages/create-app/tsconfig.json",
+          "./packages/testing/tsconfig.json",
           "./packages/ui-react-builder/tsconfig.json",
         ],
         tsconfigRootDir: import.meta.dirname,

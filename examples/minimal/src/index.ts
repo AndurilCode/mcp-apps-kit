@@ -162,11 +162,16 @@ const app = createApp({
   },
 });
 
-const port = parseInt(process.env.PORT || "3000");
+// Export app before starting (for testing)
+export { app };
 
-app.start({ port }).then(() => {
-  const versions = app.getVersions();
-  console.log(`
+// Only start server if not in test environment
+if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
+  const port = parseInt(process.env.PORT || "3000");
+
+  app.start({ port }).then(() => {
+    const versions = app.getVersions();
+    console.log(`
 Minimal Example Server with Versioning running on http://localhost:${port}
 
 Available API versions: ${versions.join(", ")}
@@ -181,7 +186,8 @@ Debug logging:
   - v1: Uses log_debug MCP tool (default for MCP adapter)
   - v2: Uses HTTP API transport at /api/logs (ideal for OpenAI/ChatGPT)
   `);
-});
+  });
+}
 
 // =============================================================================
 // Export types for UI

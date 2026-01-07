@@ -66,6 +66,37 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
 }
 ```
 
+## Testing
+
+Run all tests:
+
+```bash
+pnpm test
+```
+
+### LLM Evaluation Tests
+
+The project includes LLM-based evaluation tests that use OpenAI to assess the quality of tool responses. To run these tests:
+
+1. Copy `.env.example` to `.env`:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Add your OpenAI API key to `.env`:
+
+   ```
+   OPENAI_API_KEY=sk-your-actual-api-key
+   ```
+
+3. Run the tests:
+   ```bash
+   pnpm test -- eval.test.ts
+   ```
+
+> **Note**: Without the `OPENAI_API_KEY` environment variable, the eval tests will be automatically skipped.
+
 ## Project Structure
 
 ```
@@ -77,9 +108,17 @@ minimal/
       GreetingWidgetV2.tsx    # V2 UI widget (name + surname)
       styles.css              # Shared styles
       dist/                   # Built UI HTML files
+  tests/
+    eval.test.ts              # LLM evaluation tests
+    greet-v1.test.ts          # V1 tool tests
+    greet-v2.test.ts          # V2 tool tests
+    integration.test.ts       # Integration tests
+    ...
+  .env.example                # Environment variables template
   package.json
   tsconfig.json
   vite.config.ts
+  vitest.config.ts
 ```
 
 ## Tools

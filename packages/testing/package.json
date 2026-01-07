@@ -1,0 +1,99 @@
+{
+  "name": "@mcp-apps-kit/testing",
+  "version": "0.2.8",
+  "description": "Testing utilities for MCP applications",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": {
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./vitest": {
+      "types": "./dist/vitest.d.ts",
+      "import": {
+        "default": "./dist/vitest.js"
+      },
+      "require": {
+        "default": "./dist/vitest.cjs"
+      }
+    },
+    "./jest": {
+      "types": "./dist/jest.d.ts",
+      "import": {
+        "default": "./dist/jest.js"
+      },
+      "require": {
+        "default": "./dist/jest.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "testing",
+    "test",
+    "sdk"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AndurilCode/mcp-apps-kit.git",
+    "directory": "packages/testing"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.1",
+    "debug": "^4.0.0",
+    "zod": "^4.0.0"
+  },
+  "peerDependencies": {
+    "@anthropic-ai/sdk": ">=0.30.0",
+    "fast-check": "^3.0.0",
+    "jest": "^29.0.0",
+    "openai": "^4.0.0",
+    "vitest": "^3 || ^4"
+  },
+  "peerDependenciesMeta": {
+    "@anthropic-ai/sdk": {
+      "optional": true
+    },
+    "fast-check": {
+      "optional": true
+    },
+    "jest": {
+      "optional": true
+    },
+    "openai": {
+      "optional": true
+    },
+    "vitest": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "sideEffects": false,
+  "devDependencies": {
+    "@types/debug": "^4.1.12"
+  }
+}
