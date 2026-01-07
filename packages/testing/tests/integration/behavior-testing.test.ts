@@ -5,8 +5,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { defineTestSuite, runTestSuite } from "../../src/eval/behavior";
-import type { TestClient } from "../../src/types";
+import { defineTestSuite } from "../../src/eval/behavior";
 
 describe("Behavior Testing Integration", () => {
   it("should define and run a test suite", async () => {

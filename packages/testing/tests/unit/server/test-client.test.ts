@@ -2,9 +2,9 @@
  * Unit tests for TestClient
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { createTestClient } from "../../../src/server";
-import { ConnectionError, TimeoutError } from "../../../src/errors";
+import { ConnectionError } from "../../../src/errors";
 
 describe("createTestClient", () => {
   it("should create a client with default options", async () => {

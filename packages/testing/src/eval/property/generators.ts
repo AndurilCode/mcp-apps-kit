@@ -130,6 +130,6 @@ export const generators = {
   optional<T>(gen: Arbitrary<T>): Arbitrary<T | undefined> {
     propertyLogger("Creating optional generator");
     const fc = getFastCheck();
-    return fc.option(gen);
+    return fc.option(gen, { nil: undefined });
   },
 };

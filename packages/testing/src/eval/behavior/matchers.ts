@@ -164,7 +164,7 @@ export function extractResultData(result: ToolResult): unknown {
  * Checks if actual object contains all properties from expected object
  * with matching values (recursive for nested objects).
  */
-function deepMatch(actual: unknown, expected: unknown): boolean {
+export function deepMatch(actual: unknown, expected: unknown): boolean {
   // Exact match
   if (actual === expected) {
     return true;

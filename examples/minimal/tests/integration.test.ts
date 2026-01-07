@@ -64,12 +64,11 @@ describe("Minimal Example Integration", () => {
   it("should handle multiple sequential calls", async () => {
     env.client.clearHistory();
 
-    const results = await Promise.all([
-      env.client.callTool("greet", { name: "First" }),
-      env.client.callTool("greet", { name: "Second" }),
-      env.client.callTool("greet", { name: "Third" }),
-    ]);
+    const result1 = await env.client.callTool("greet", { name: "First" });
+    const result2 = await env.client.callTool("greet", { name: "Second" });
+    const result3 = await env.client.callTool("greet", { name: "Third" });
 
+    const results = [result1, result2, result3];
     expect(results).toHaveLength(3);
     results.forEach((result) => {
       expectToolResult(result).toHaveNoError();

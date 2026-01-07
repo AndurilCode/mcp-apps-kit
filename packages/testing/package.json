@@ -70,7 +70,7 @@
   },
   "peerDependencies": {
     "jest": "^29.0.0",
-    "vitest": "^4.0.0"
+    "vitest": "^3 || ^4"
   },
   "peerDependenciesMeta": {
     "jest": {

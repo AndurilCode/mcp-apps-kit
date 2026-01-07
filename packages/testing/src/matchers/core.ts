@@ -7,7 +7,7 @@
 
 import type { ZodSchema } from "zod";
 import type { ToolResult } from "../types";
-import { extractResultData } from "../eval/behavior/matchers";
+import { extractResultData, deepMatch } from "../eval/behavior/matchers";
 
 /**
  * Matcher result interface
@@ -123,14 +123,14 @@ export function matchesToolObject(
 ): MatcherResult {
   const actual = extractResultData(result);
 
-  // Simple deep equality check (can be enhanced)
-  const matches = JSON.stringify(actual) === JSON.stringify(expected);
+  // Use deepMatch for partial object matching
+  const matches = deepMatch(actual, expected);
 
   return {
     pass: matches,
     message: () =>
       matches
-        ? `Expected tool result not to match object, but it did`
-        : `Expected tool result to match object, but it didn't. Actual: ${JSON.stringify(actual)}, Expected: ${JSON.stringify(expected)}`,
+        ? `Expected tool result not to partially match object, but it did`
+        : `Expected tool result to partially match object, but it didn't. Actual: ${JSON.stringify(actual)}, Expected: ${JSON.stringify(expected)}`,
   };
 }

@@ -313,11 +313,16 @@ describe("Advanced Features", () => {
       // Using built-in string generator instead of fromSchema
       await forAllInputs(
         generators.string({ minLength: 1, maxLength: 20 }),
-        async (name) => {
+        async (name: string) => {
           const result = await env.client.callTool("greet", { name });
           // Property: should always contain the input name in response
-          const text = result.content[0]?.text ?? "";
-          return text.includes(name) && !result.isError;
+          if (result.isError) {
+            return false;
+          }
+          // Parse JSON to check the actual message field (avoids JSON escaping issues)
+          const text = result.content[0]?.text ?? "{}";
+          const data = JSON.parse(text);
+          return typeof data.message === "string" && data.message.includes(name);
         },
         { numRuns: 5 } // Keep small for test speed
       );

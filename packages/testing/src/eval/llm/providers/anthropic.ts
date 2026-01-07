@@ -32,7 +32,8 @@ function getAnthropic(): typeof import("@anthropic-ai/sdk") {
       );
     }
   }
-  return anthropicModule;
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  return anthropicModule!;
 }
 
 /**
@@ -74,18 +75,46 @@ export function createAnthropicProvider(
         ],
       });
 
-      const content = response.content[0];
+      if (!response.content || response.content.length === 0) {
+        throw new Error("Empty content in Anthropic response");
+      }
+
+      const content = response.content[0]!;
       if (content.type !== "text") {
         throw new Error("Unexpected response type from Anthropic");
       }
 
       const text = content.text;
 
-      // Parse response
-      const parsed = JSON.parse(text) as {
+      // Parse response - strip markdown code fences and parse JSON
+      let parsed: {
         criteria: Array<{ name: string; score: number; explanation: string }>;
         overall: { score: number };
       };
+
+      try {
+        // Strip common markdown code fences (```json ... ``` or ``` ... ```)
+        let cleanText = text.trim();
+        if (cleanText.startsWith("```")) {
+          // Remove opening fence (with optional language tag)
+          cleanText = cleanText.replace(/^```[a-z]*\n?/i, "");
+          // Remove closing fence
+          cleanText = cleanText.replace(/\n?```$/i, "");
+        }
+        cleanText = cleanText.trim();
+
+        parsed = JSON.parse(cleanText) as {
+          criteria: Array<{ name: string; score: number; explanation: string }>;
+          overall: { score: number };
+        };
+      } catch (parseError) {
+        const preview = text.length > 200 ? text.substring(0, 200) + "..." : text;
+        const errorMsg = parseError instanceof Error ? parseError.message : String(parseError);
+        throw new Error(
+          `Failed to parse Anthropic response as JSON (expected { criteria: [...], overall: { score } }). ` +
+          `Parse error: ${errorMsg}. Response preview: ${preview}`
+        );
+      }
 
       // Build evaluation result
       const criteriaResults: CriterionResult[] = options.criteria.map((criterion) => {
@@ -134,7 +163,11 @@ export function createAnthropicProvider(
         ],
       });
 
-      const content = response.content[0];
+      if (!response.content || response.content.length === 0) {
+        throw new Error("Empty content in Anthropic response");
+      }
+
+      const content = response.content[0]!;
       if (content.type !== "text") {
         throw new Error("Unexpected response type from Anthropic");
       }

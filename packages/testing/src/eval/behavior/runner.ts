@@ -57,7 +57,7 @@ export async function runTestSuite(
     }
 
     const caseStartTime = Date.now();
-    let caseResult: TestCaseResult;
+    let caseResult: TestCaseResult | undefined;
 
     try {
       // Run beforeEach if provided
@@ -68,34 +68,38 @@ export async function runTestSuite(
       // Execute the test case
       const result = await runTestCase(client, suite.tool, testCase);
 
-      // Run afterEach if provided
-      if (suite.afterEach) {
-        await suite.afterEach();
-      }
-
-      const duration = Date.now() - caseStartTime;
       passed++;
       caseResult = {
         name: testCase.name,
         status: "passed",
-        duration,
+        duration: 0, // Will be set in finally
         actual: result,
         expected: testCase.expected,
       };
     } catch (error) {
-      const duration = Date.now() - caseStartTime;
       failed++;
       caseResult = {
         name: testCase.name,
         status: "failed",
-        duration,
+        duration: 0, // Will be set in finally
         error: error instanceof Error ? error : new Error(String(error)),
         actual: undefined,
         expected: testCase.expected,
       };
+    } finally {
+      // Run afterEach if provided (always runs)
+      if (suite.afterEach) {
+        await suite.afterEach();
+      }
+
+      // Compute duration once and assign to caseResult
+      const duration = Date.now() - caseStartTime;
+      if (caseResult) {
+        caseResult.duration = duration;
+      }
     }
 
-    caseResults.push(caseResult);
+    caseResults.push(caseResult!);
   }
 
   const duration = Date.now() - startTime;

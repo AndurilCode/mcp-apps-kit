@@ -3,6 +3,7 @@
  */
 
 import { spawn } from "node:child_process";
+import { createServer, type Server } from "node:http";
 import type { TestServer, TestServerOptions, ExternalServerOptions } from "../types";
 import { ServerStartupError } from "../errors";
 import { serverLogger } from "../debug";
@@ -41,23 +42,75 @@ async function startTestServerFromApp(
 
   serverLogger("Starting test server from App instance on port %d", port);
 
-  try {
-    await app.start({ port, transport: "http" });
-  } catch (error) {
-    const err = error instanceof Error ? error : new Error(String(error));
-    throw new ServerStartupError(
-      undefined,
-      timeout,
-      undefined,
-      `Failed to start app server: ${err.message}`,
-      err
-    );
-  }
-
+  let httpServer: Server | null = null;
   let actualPort = port;
+
+  // When port is 0, create our own HTTP server to detect the bound port
   if (port === 0) {
-    actualPort = 3000;
-    serverLogger("Dynamic port requested, using fallback port %d", actualPort);
+    // Use the app's handler to create our own HTTP server
+    const handler = app.handler();
+    httpServer = createServer((req, res) => {
+      handler(req, res, () => {
+        // No next middleware
+        res.statusCode = 404;
+        res.end("Not Found");
+      });
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new ServerStartupError(
+          undefined,
+          timeout,
+          undefined,
+          `Server did not start within ${timeout}ms`,
+          undefined
+        ));
+      }, timeout);
+
+      httpServer!.listen(0, () => {
+        clearTimeout(timeoutId);
+        const addr = httpServer!.address();
+        if (addr && typeof addr === "object" && "port" in addr) {
+          actualPort = addr.port;
+          serverLogger("Dynamic port detected: %d", actualPort);
+          resolve();
+        } else {
+          reject(new ServerStartupError(
+            undefined,
+            timeout,
+            undefined,
+            "Failed to detect bound port from server",
+            undefined
+          ));
+        }
+      });
+
+      httpServer!.on("error", (err) => {
+        clearTimeout(timeoutId);
+        reject(new ServerStartupError(
+          undefined,
+          timeout,
+          undefined,
+          `Failed to start server: ${err.message}`,
+          err
+        ));
+      });
+    });
+  } else {
+    // Use the app's built-in start method for fixed ports
+    try {
+      await app.start({ port, transport: "http" });
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      throw new ServerStartupError(
+        undefined,
+        timeout,
+        undefined,
+        `Failed to start app server: ${err.message}`,
+        err
+      );
+    }
   }
 
   const baseUrl = `http://localhost:${actualPort}`;
@@ -71,6 +124,11 @@ async function startTestServerFromApp(
     port: actualPort,
     async stop(): Promise<void> {
       serverLogger("Stopping test server");
+      if (httpServer) {
+        return new Promise((resolve) => {
+          httpServer!.close(() => resolve());
+        });
+      }
     },
   };
 }

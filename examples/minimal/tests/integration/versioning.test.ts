@@ -9,7 +9,7 @@ import {
   createTestClient,
 } from "@mcp-apps-kit/testing";
 import type { TestEnvironment } from "@mcp-apps-kit/testing";
-import { app } from "../src/index.js";
+import { app } from "../../src/index.js";
 
 describe("Versioning", () => {
   let v1Env: TestEnvironment;
