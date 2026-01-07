@@ -9,6 +9,7 @@
 [![npm @mcp-apps-kit/ui-react](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fui-react?label=%40mcp-apps-kit%2Fui-react&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/ui-react)
 [![npm @mcp-apps-kit/ui-react-builder](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fui-react-builder?label=%40mcp-apps-kit%2Fui-react-builder&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/ui-react-builder)
 [![npm @mcp-apps-kit/create-app](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fcreate-app?label=%40mcp-apps-kit%2Fcreate-app&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/create-app)
+[![npm @mcp-apps-kit/testing](https://img.shields.io/npm/v/%40mcp-apps-kit%2Ftesting?label=%40mcp-apps-kit%2Ftesting&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/testing)
 
 Build interactive AI apps for [MCP Apps](https://blog.modelcontextprotocol.io/posts/2025-11-21-mcp-apps/) and [ChatGPT](https://developers.openai.com/apps-sdk) from a single codebase.
 
@@ -70,6 +71,7 @@ This project may be a poor fit if you:
 - Framework agnostic UI: React, Vue, Svelte, or vanilla JS
 - Plugins, middleware, and events for logging, authentication, and analytics
 - Debug logging from UI to server via MCP protocol (optional `log_debug` tool)
+- **Testing utilities**: Behavior testing, property-based testing, UI mocks, and LLM-powered evaluation
 
 ## Packages
 
@@ -80,6 +82,7 @@ This project may be a poor fit if you:
 | `@mcp-apps-kit/ui-react`         | React bindings                     |
 | `@mcp-apps-kit/ui-react-builder` | Build tool for React component UIs |
 | `@mcp-apps-kit/create-app`       | CLI scaffolding tool               |
+| `@mcp-apps-kit/testing`          | Testing utilities for MCP apps     |
 
 ## Compatibility
 
@@ -122,6 +125,22 @@ CLI scaffolding tool:
 ```bash
 npx @mcp-apps-kit/create-app@latest
 ```
+
+Testing utilities:
+
+```bash
+npm install @mcp-apps-kit/testing
+```
+
+The testing library provides:
+
+- **Test environment**: Start MCP servers and create test clients with call history tracking
+- **Assertions**: Custom matchers for tool results, resources, and prompts (`expectToolResult`, `expectResource`, `expectPrompt`)
+- **Test suites**: Declarative test definitions with hooks and skip flags
+- **Property-based testing**: Generate random inputs with fast-check to discover edge cases
+- **Mock host**: Test UI widgets without a browser
+- **LLM evaluation**: Let an AI agent use your tools and judge the responses (OpenAI/Anthropic)
+- **Framework integration**: Native Vitest and Jest matchers
 
 ## Usage
 
@@ -534,6 +553,7 @@ Detailed package documentation:
 - [packages/ui-react/README.md](packages/ui-react/README.md)
 - [packages/ui-react-builder/README.md](packages/ui-react-builder/README.md)
 - [packages/create-app/README.md](packages/create-app/README.md)
+- [packages/testing/README.md](packages/testing/README.md)
 
 ## Contributing
 
