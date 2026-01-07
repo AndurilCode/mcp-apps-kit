@@ -21,6 +21,17 @@ import type { ProtocolAdapter } from "../adapters/types";
 export type DebugLogLevel = "debug" | "info" | "warn" | "error";
 
 /**
+ * Debug log transport mechanism
+ *
+ * - `"builtin"`: Use MCP protocol-level logging (default for MCP adapter)
+ * - `"tool"`: Use the log_debug MCP tool
+ * - `"api"`: Use HTTP endpoint (default for OpenAI adapter)
+ *
+ * @internal
+ */
+export type DebugTransport = "builtin" | "tool" | "api";
+
+/**
  * A single log entry
  *
  * @internal
@@ -80,6 +91,27 @@ export interface ClientDebugConfig {
    * @default "mcp-apps-ui"
    */
   source?: string;
+
+  /**
+   * Log transport mechanism.
+   *
+   * - `"builtin"`: Use MCP protocol-level logging (default for MCP adapter)
+   * - `"tool"`: Use the log_debug MCP tool
+   * - `"api"`: Use HTTP endpoint (default for OpenAI adapter)
+   *
+   * @default "tool"
+   */
+  transport?: DebugTransport;
+
+  /**
+   * API endpoint URL for 'api' transport.
+   *
+   * This is the full URL where logs will be sent via HTTP POST.
+   * Only used when `transport` is set to `"api"`.
+   *
+   * @example "https://myapp.example.com/api/logs"
+   */
+  apiEndpoint?: string;
 }
 
 // =============================================================================
@@ -204,13 +236,23 @@ export function safeStringify(data: unknown): string {
  *
  * @internal
  */
+/**
+ * Required config type with transport and apiEndpoint as optional
+ * since they have different defaults based on adapter type
+ */
+type RequiredClientDebugConfig = Required<Omit<ClientDebugConfig, "transport" | "apiEndpoint">> & {
+  transport: DebugTransport;
+  apiEndpoint: string | undefined;
+};
+
 export class ClientDebugLogger {
   private adapter: ProtocolAdapter | null = null;
-  private config: Required<ClientDebugConfig>;
+  private config: RequiredClientDebugConfig;
   private buffer: LogEntry[] = [];
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private isFlushing = false;
   private mcpTransportFailed = false;
+  private apiTransportFailed = false;
 
   /**
    * Create a client debug logger
@@ -225,6 +267,8 @@ export class ClientDebugLogger {
       maxBufferSize: config.maxBufferSize ?? 100,
       flushIntervalMs: config.flushIntervalMs ?? 5000,
       source: config.source ?? "mcp-apps-ui",
+      transport: config.transport ?? "tool",
+      apiEndpoint: config.apiEndpoint,
     };
   }
 
@@ -241,6 +285,7 @@ export class ClientDebugLogger {
     this.adapter = adapter;
     // Reset failure state when adapter changes - new adapter might have log_debug tool
     this.mcpTransportFailed = false;
+    this.apiTransportFailed = false;
   }
 
   /**
@@ -271,13 +316,48 @@ export class ClientDebugLogger {
     if (config.source !== undefined) {
       this.config.source = config.source;
     }
+    if (config.transport !== undefined) {
+      this.config.transport = config.transport;
+      // Reset failure states when transport changes
+      this.mcpTransportFailed = false;
+      this.apiTransportFailed = false;
+    }
+    if (config.apiEndpoint !== undefined) {
+      this.config.apiEndpoint = config.apiEndpoint;
+      // Reset API failure state when endpoint changes
+      this.apiTransportFailed = false;
+    }
   }
 
   /**
-   * Check if MCP transport is enabled and available
+   * Check if MCP tool transport is enabled and available
    */
-  private canUseMcpTransport(): boolean {
-    return this.config.enabled && !this.mcpTransportFailed && this.adapter?.isConnected() === true;
+  private canUseToolTransport(): boolean {
+    return (
+      this.config.enabled &&
+      this.config.transport === "tool" &&
+      !this.mcpTransportFailed &&
+      this.adapter?.isConnected() === true
+    );
+  }
+
+  /**
+   * Check if API transport is enabled and available
+   */
+  private canUseApiTransport(): boolean {
+    return (
+      this.config.enabled &&
+      this.config.transport === "api" &&
+      !this.apiTransportFailed &&
+      !!this.config.apiEndpoint
+    );
+  }
+
+  /**
+   * Check if any remote transport is available
+   */
+  private canUseRemoteTransport(): boolean {
+    return this.canUseToolTransport() || this.canUseApiTransport();
   }
 
   /**
@@ -308,6 +388,37 @@ export class ClientDebugLogger {
   }
 
   /**
+   * Flush logs to the API endpoint
+   */
+  private async flushToApi(entries: LogEntry[]): Promise<void> {
+    if (!this.config.apiEndpoint) {
+      throw new Error("API endpoint not configured");
+    }
+
+    const response = await fetch(this.config.apiEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ entries }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API request failed with status ${String(response.status)}`);
+    }
+  }
+
+  /**
+   * Flush logs to the MCP tool
+   */
+  private async flushToTool(entries: LogEntry[]): Promise<void> {
+    if (!this.adapter) {
+      throw new Error("Adapter not connected");
+    }
+    await this.adapter.callTool("log_debug", { entries });
+  }
+
+  /**
    * Flush all buffered logs to the server
    */
   async flush(): Promise<void> {
@@ -321,36 +432,41 @@ export class ClientDebugLogger {
       this.flushTimer = null;
     }
 
-    // Check if we can use MCP transport
-    if (!this.canUseMcpTransport()) {
-      // Output to console as fallback
-      for (const entry of this.buffer) {
-        this.outputToConsole(entry);
-      }
+    // Check if we can use any remote transport
+    if (!this.canUseRemoteTransport()) {
+      // No remote transport - just clear buffer (already output to console in log())
       this.buffer = [];
       return;
     }
 
     this.isFlushing = true;
     const entriesToFlush = [...this.buffer];
-    this.buffer = [];
 
     try {
-      if (this.adapter) {
-        await this.adapter.callTool("log_debug", { entries: entriesToFlush });
+      if (this.canUseApiTransport()) {
+        await this.flushToApi(entriesToFlush);
+      } else if (this.canUseToolTransport()) {
+        await this.flushToTool(entriesToFlush);
       }
-    } catch {
-      // If MCP call fails (e.g., log_debug tool not registered),
-      // disable MCP transport and fall back to console permanently
-      if (!this.mcpTransportFailed) {
-        this.mcpTransportFailed = true;
-        // Log once that we're falling back to console
+      // Clear buffer only after successful flush
+      this.buffer = this.buffer.slice(entriesToFlush.length);
+    } catch (error) {
+      // If transport fails, disable it (already output to console in log())
+      // Don't re-add entries since they were already output to console
+      this.buffer = this.buffer.slice(entriesToFlush.length);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (this.config.transport === "api" && !this.apiTransportFailed) {
+        this.apiTransportFailed = true;
         // eslint-disable-next-line no-console
-        console.info("[ClientDebugLogger] MCP log transport unavailable, using console fallback");
-      }
-      // Output failed entries to console
-      for (const entry of entriesToFlush) {
-        this.outputToConsole(entry);
+        console.warn(
+          `[ClientDebugLogger] API log transport failed: ${errorMessage}. Will only use console`
+        );
+      } else if (this.config.transport === "tool" && !this.mcpTransportFailed) {
+        this.mcpTransportFailed = true;
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[ClientDebugLogger] MCP log transport failed: ${errorMessage}. Will only use console`
+        );
       }
     } finally {
       this.isFlushing = false;
@@ -398,12 +514,10 @@ export class ClientDebugLogger {
    */
   private addToBuffer(entry: LogEntry): void {
     // Handle buffer overflow - drop oldest entries if we've reached max size
-    if (this.buffer.length >= this.config.maxBufferSize) {
-      const dropped = this.buffer.shift();
-      if (dropped) {
-        // Output dropped entry to console as fallback
-        this.outputToConsole(dropped);
-      }
+    // (already output to console in log(), so just drop from buffer)
+    // Use while loop to handle rapid logging scenarios
+    while (this.buffer.length >= this.config.maxBufferSize) {
+      this.buffer.shift();
     }
 
     this.buffer.push(entry);
@@ -434,14 +548,13 @@ export class ClientDebugLogger {
 
     const entry = this.createEntry(level, message, data);
 
-    // If MCP transport is not available, output directly to console
-    if (!this.canUseMcpTransport()) {
-      this.outputToConsole(entry);
-      return;
-    }
+    // Always output to console first
+    this.outputToConsole(entry);
 
-    // Add to buffer for batching
-    this.addToBuffer(entry);
+    // If remote transport is available, also send via API/tool
+    if (this.canUseRemoteTransport()) {
+      this.addToBuffer(entry);
+    }
   }
 
   /**
@@ -478,14 +591,8 @@ export class ClientDebugLogger {
    * Call this when the client is being destroyed.
    */
   destroy(): void {
-    // Flush any remaining logs
-    if (this.buffer.length > 0) {
-      // Output to console since we're destroying
-      for (const entry of this.buffer) {
-        this.outputToConsole(entry);
-      }
-      this.buffer = [];
-    }
+    // Clear buffer (already output to console in log())
+    this.buffer = [];
 
     // Cancel any pending flush
     if (this.flushTimer) {

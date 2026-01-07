@@ -3,11 +3,26 @@
  *
  * A React component for the v2 API - displays greeting messages with name + optional surname.
  * Uses @mcp-apps-kit/ui-react hooks for receiving tool output and theme changes.
+ *
+ * This version demonstrates the debug logging API transport feature:
+ * - Logs are sent via HTTP to /api/logs endpoint
+ * - Useful for OpenAI/ChatGPT environments where MCP tool logging isn't available
  */
 
 import { useEffect, useState } from "react";
 import { useToolResult, useHostContext, useAppsClient } from "@mcp-apps-kit/ui-react";
+import { clientDebugLogger, getMcpServerBaseUrl } from "@mcp-apps-kit/ui";
 import type { AppClientToolsV2 } from "../index";
+
+// Configure the debug logger to use API transport
+// getMcpServerBaseUrl() reads the base URL injected at build time via vite.config.ts
+clientDebugLogger.configure({
+  enabled: true,
+  level: "debug",
+  transport: "api",
+  apiEndpoint: `${getMcpServerBaseUrl()}/api/logs`,
+  source: "greeting-widget-v2",
+});
 
 export function GreetingWidgetV2() {
   const result = useToolResult<AppClientToolsV2>();
@@ -25,12 +40,22 @@ export function GreetingWidgetV2() {
   } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const greetOutput = greetResult ?? result?.greet;
+  // Handle both wrapped ({ greet: {...} }) and unwrapped ({...}) result formats
+  // Wrapped: when toolResponseMetadata.toolName is available (real ChatGPT)
+  // Unwrapped: when toolName is not available (MCP Inspector)
+  const rawResult = result?.greet ?? result;
+  const greetOutput =
+    greetResult ??
+    (rawResult && "message" in rawResult
+      ? (rawResult as { message: string; fullName: string; timestamp: string })
+      : undefined);
 
   useEffect(() => {
     if (typeof document !== "undefined") {
       document.documentElement.className = theme;
     }
+    // Log theme changes via API transport
+    clientDebugLogger.debug("Theme changed", { theme });
   }, [theme]);
 
   const handleGreet = async () => {
@@ -38,17 +63,35 @@ export function GreetingWidgetV2() {
 
     setIsLoading(true);
     setErrorMessage(null);
+
+    // Log the greet attempt via API transport
+    clientDebugLogger.info("Greet initiated", {
+      name: name.trim(),
+      surname: surname.trim() || undefined,
+    });
+
     try {
       const response = await client.tools.callGreet({
         name: name.trim(),
         surname: surname.trim() || undefined,
       });
-      setGreetResult(response);
+
+      // Log success via API transport
+      clientDebugLogger.info("Greet successful", response);
+
+      // Extract from structuredContent if present (handles different response formats)
+      const result =
+        (response as { structuredContent?: typeof response }).structuredContent ?? response;
+      setGreetResult(result);
       setIsModalOpen(false);
       setName("");
       setSurname("");
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
+
+      // Log error via API transport
+      clientDebugLogger.error("Greet failed", { error: msg });
+
       console.error("Failed to greet:", msg);
       setErrorMessage(msg);
     } finally {

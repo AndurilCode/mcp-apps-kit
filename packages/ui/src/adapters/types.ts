@@ -16,6 +16,7 @@ import type {
   CallToolHandler,
   ListToolsHandler,
 } from "../types";
+import type { LogEntry } from "../debug/logger";
 
 // =============================================================================
 // PROTOCOL ADAPTER INTERFACE
@@ -240,6 +241,17 @@ export interface ProtocolAdapter {
     level: "debug" | "info" | "notice" | "warning" | "error" | "critical" | "alert" | "emergency",
     data: unknown
   ): Promise<void>;
+
+  /**
+   * Send batched log entries to the server
+   *
+   * Optional method for adapters that support batch logging.
+   * When not implemented, falls back to multiple sendLog calls.
+   *
+   * @param entries - Array of log entries to send
+   * @returns Number of entries processed
+   */
+  sendLogs?(entries: LogEntry[]): Promise<{ processed: number }>;
 
   // === Size Notifications ===
 

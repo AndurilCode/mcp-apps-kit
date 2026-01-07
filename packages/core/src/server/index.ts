@@ -90,7 +90,10 @@ export function createServerInstance<T extends ToolDefs>(
   });
 
   // Compute UI resource URIs with content hashes for cache busting
-  const uiUriMap = config.ui ? computeUIUris(config.name, config.ui) : {};
+  // Inject server config into UIs if provided
+  const uiUriMap = config.ui
+    ? computeUIUris(config.name, config.ui, config.config?.serverConfig)
+    : {};
 
   // Will be set by createApp
   let middlewareChainRef: MiddlewareChain | undefined;
@@ -124,6 +127,9 @@ export function createServerInstance<T extends ToolDefs>(
   if (config.config?.cors) {
     applyCors(expressApp, config.config.cors);
   }
+
+  // Register logging API route if API transport is enabled
+  registerLoggingApiRoute(expressApp, config.config?.debug);
 
   // Track HTTP server
   let httpServer: Server | undefined;
@@ -452,6 +458,77 @@ export function createServerInstance<T extends ToolDefs>(
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
+
+/**
+ * Register the logging API endpoint for HTTP-based log transport
+ *
+ * This endpoint receives batched log entries from client UIs via HTTP POST
+ * and processes them through the server-side debug logger.
+ *
+ * **CORS Note:** When UIs are served from a different origin (e.g., ChatGPT's
+ * `ui://` protocol, or a separate domain), you MUST configure CORS in your
+ * app config to allow cross-origin requests to this endpoint. Example:
+ *
+ * ```ts
+ * config: {
+ *   cors: { origin: true, credentials: true }
+ * }
+ * ```
+ *
+ * @param expressApp - Express app to register the route on
+ * @param debugConfig - Debug configuration
+ */
+function registerLoggingApiRoute(expressApp: Express, debugConfig: DebugConfig | undefined): void {
+  // Only register if API transport is enabled
+  if (debugConfig?.transport !== "api") {
+    return;
+  }
+
+  const apiEndpoint = debugConfig.apiEndpoint ?? "/api/logs";
+
+  // Define the log entry schema
+  const logEntrySchema = z.object({
+    level: z.enum(["debug", "info", "warn", "error"]),
+    message: z.string(),
+    data: z.unknown().optional(),
+    timestamp: z.string(),
+    source: z.string().optional(),
+  });
+
+  const inputSchema = z.object({
+    entries: z.array(logEntrySchema),
+  });
+
+  // Register the logging API endpoint
+  expressApp.post(apiEndpoint, (req: Request, res: Response) => {
+    try {
+      // Validate input
+      const parseResult = inputSchema.safeParse(req.body);
+
+      if (!parseResult.success) {
+        res.status(400).json({
+          error: "Invalid log entries",
+          details: z.treeifyError(parseResult.error),
+          processed: 0,
+        });
+        return;
+      }
+
+      const { entries } = parseResult.data;
+
+      // Process entries through the debug logger
+      const processed = debugLogger.processEntries(entries as LogEntry[]);
+
+      res.json({ processed });
+    } catch (error) {
+      const appError = wrapError(error);
+      res.status(500).json({
+        error: appError.message,
+        processed: 0,
+      });
+    }
+  });
+}
 
 /**
  * Register the log_debug tool for client-side debug log transport
@@ -889,15 +966,23 @@ function applyCors(app: Express, config: CORSConfig): void {
  * Compute UI resource URIs with content hashes for cache busting
  *
  * Returns a map of UI key to full URI with hash.
+ * Optionally injects server configuration into each UI.
  */
 function computeUIUris(
   serverName: string,
-  ui: UIDefs
+  ui: UIDefs,
+  serverConfig?: Record<string, unknown>
 ): Record<string, { uri: string; html: string }> {
   const result: Record<string, { uri: string; html: string }> = {};
 
   for (const [key, uiDef] of Object.entries(ui)) {
-    const html = readUIHtml(key, uiDef);
+    let html = readUIHtml(key, uiDef);
+
+    // Inject server config into HTML if provided
+    if (serverConfig) {
+      html = injectServerConfig(html, serverConfig);
+    }
+
     const contentHash = crypto.createHash("sha256").update(html).digest("hex").substring(0, 8);
     const uri = `ui://${serverName}/${key}?v=${contentHash}`;
     result[key] = { uri, html };
@@ -981,4 +1066,63 @@ function readUIHtml(key: string, uiDef: UIDef): string {
       `Failed to read UI resource "${key}" from ${filePath}: ${(error as Error).message}`
     );
   }
+}
+
+/**
+ * Sanitize a JSON string for safe embedding within a <script> tag.
+ *
+ * Escapes sequences that could break out of the script context:
+ * - </script> -> <\/script> (prevents script tag termination)
+ * - <!-- -> <\!-- (prevents HTML comment injection)
+ * - U+2028 -> \u2028 (Line Separator - can terminate JS strings in some contexts)
+ * - U+2029 -> \u2029 (Paragraph Separator - can terminate JS strings in some contexts)
+ */
+function sanitizeJsonForScript(jsonString: string): string {
+  return jsonString
+    .replace(/<\/script/gi, "<\\/script")
+    .replace(/<!--/g, "<\\!--")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
+
+/**
+ * Inject server configuration into HTML content.
+ *
+ * Adds a <script> tag with window.__MCP_SERVER_CONFIG__ = {...} to the HTML.
+ * UIs can access this via getMcpServerConfig() from @mcp-apps-kit/ui.
+ *
+ * Injection points (in order of preference):
+ * 1. After <head> opening tag
+ * 2. After <!DOCTYPE> or at the start if no head tag
+ *
+ * **Security Warning:** Do NOT include user-controlled data in serverConfig.
+ * While JSON is sanitized for script context (e.g., `</script>` is escaped),
+ * including untrusted user input could lead to XSS vulnerabilities if that
+ * data is later rendered unsafely in the UI. Only include trusted server-side
+ * configuration values (e.g., baseUrl, feature flags, API endpoints).
+ */
+function injectServerConfig(html: string, serverConfig: Record<string, unknown>): string {
+  if (Object.keys(serverConfig).length === 0) {
+    return html;
+  }
+
+  const sanitizedJson = sanitizeJsonForScript(JSON.stringify(serverConfig));
+  const configScript = `<script>window.__MCP_SERVER_CONFIG__=${sanitizedJson};</script>`;
+
+  // Try to inject after <head> tag
+  const headMatch = html.match(/<head[^>]*>/i);
+  if (headMatch) {
+    const insertPos = (headMatch.index ?? 0) + headMatch[0].length;
+    return html.slice(0, insertPos) + configScript + html.slice(insertPos);
+  }
+
+  // Fallback: inject after <!DOCTYPE> or at the start
+  const doctypeMatch = html.match(/<!DOCTYPE[^>]*>/i);
+  if (doctypeMatch) {
+    const insertPos = (doctypeMatch.index ?? 0) + doctypeMatch[0].length;
+    return html.slice(0, insertPos) + configScript + html.slice(insertPos);
+  }
+
+  // Last resort: prepend to the HTML
+  return configScript + html;
 }

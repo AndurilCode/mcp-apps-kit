@@ -328,6 +328,22 @@ export class MockAdapter implements ProtocolAdapter {
     console.log(`[MockAdapter] sendLog(${level}):`, data);
   }
 
+  async sendLogs(
+    entries: Array<{
+      level: "debug" | "info" | "warn" | "error";
+      message: string;
+      data?: unknown;
+      timestamp: string;
+      source?: string;
+    }>
+  ): Promise<{ processed: number }> {
+    for (const entry of entries) {
+      // eslint-disable-next-line no-console
+      console.log(`[MockAdapter] sendLogs(${entry.level}):`, entry.message, entry.data);
+    }
+    return { processed: entries.length };
+  }
+
   // === Size Notifications ===
 
   async sendSizeChanged(params: SizeChangedParams): Promise<void> {

@@ -198,6 +198,29 @@ function validateGlobalConfig(
         );
       }
     }
+    if (debug.transport !== undefined && debug.transport !== null) {
+      const validTransports = ["builtin", "tool", "api"];
+      if (!validTransports.includes(debug.transport)) {
+        throw new AppError(
+          ErrorCode.INVALID_CONFIG,
+          `${prefix}.debug.transport must be one of: ${validTransports.join(", ")}`
+        );
+      }
+    }
+    if (debug.apiEndpoint !== undefined && debug.apiEndpoint !== null) {
+      if (typeof debug.apiEndpoint !== "string") {
+        throw new AppError(
+          ErrorCode.INVALID_CONFIG,
+          `${prefix}.debug.apiEndpoint must be a string`
+        );
+      }
+      if (!debug.apiEndpoint.startsWith("/")) {
+        throw new AppError(
+          ErrorCode.INVALID_CONFIG,
+          `${prefix}.debug.apiEndpoint must start with "/", got: "${debug.apiEndpoint}"`
+        );
+      }
+    }
   }
 
   // Validate OAuth config if provided (null is valid - means disable)
@@ -442,6 +465,10 @@ function mergeVersionConfig<T extends ToolDefs>(
       globalConfig?.debug as Record<string, unknown> | undefined,
       versionConfig.config?.debug as Record<string, unknown> | null | undefined
     ) as GlobalConfig["debug"],
+    serverConfig: deepMerge(
+      globalConfig?.serverConfig as Record<string, unknown> | undefined,
+      versionConfig.config?.serverConfig as Record<string, unknown> | null | undefined
+    ) as GlobalConfig["serverConfig"],
   };
 
   // Merge plugins arrays (global + version-specific)

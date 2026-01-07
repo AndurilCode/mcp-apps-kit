@@ -542,6 +542,174 @@ describe("app.start() integration", () => {
     });
   });
 
+  describe("debug logging API transport", () => {
+    it("should register /api/logs endpoint when transport is api", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {},
+        config: {
+          debug: {
+            transport: "api",
+            apiEndpoint: "/api/logs",
+            level: "debug",
+          },
+        },
+      });
+
+      await app.start({ port: 3020 });
+      const httpServer = app.getServer().httpServer;
+      if (httpServer) servers.push(httpServer);
+
+      // POST to /api/logs should work
+      const response = await fetch("http://localhost:3020/api/logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entries: [{ level: "info", message: "Test log", timestamp: new Date().toISOString() }],
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      const result = await response.json();
+      expect(result).toHaveProperty("processed");
+      expect(result.processed).toBe(1);
+    });
+
+    it("should use custom apiEndpoint path when configured", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {},
+        config: {
+          debug: {
+            transport: "api",
+            apiEndpoint: "/custom/log-endpoint",
+            level: "debug",
+          },
+        },
+      });
+
+      await app.start({ port: 3021 });
+      const httpServer = app.getServer().httpServer;
+      if (httpServer) servers.push(httpServer);
+
+      // Default /api/logs should not exist
+      const defaultResponse = await fetch("http://localhost:3021/api/logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: [] }),
+      });
+      expect(defaultResponse.status).toBe(404);
+
+      // Custom endpoint should work
+      const customResponse = await fetch("http://localhost:3021/custom/log-endpoint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entries: [{ level: "info", message: "Test log", timestamp: new Date().toISOString() }],
+        }),
+      });
+      expect(customResponse.status).toBe(200);
+    });
+
+    it("should NOT register logging API when transport is not api", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {},
+        config: {
+          debug: {
+            transport: "tool",
+            level: "debug",
+          },
+        },
+      });
+
+      await app.start({ port: 3022 });
+      const httpServer = app.getServer().httpServer;
+      if (httpServer) servers.push(httpServer);
+
+      // /api/logs should not exist
+      const response = await fetch("http://localhost:3022/api/logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: [] }),
+      });
+      expect(response.status).toBe(404);
+    });
+
+    it("should validate log entry format", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {},
+        config: {
+          debug: {
+            transport: "api",
+            apiEndpoint: "/api/logs",
+            level: "debug",
+          },
+        },
+      });
+
+      await app.start({ port: 3023 });
+      const httpServer = app.getServer().httpServer;
+      if (httpServer) servers.push(httpServer);
+
+      // Invalid entry format should return 400
+      const response = await fetch("http://localhost:3023/api/logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entries: [
+            { invalid: "entry" }, // Missing required fields
+          ],
+        }),
+      });
+
+      expect(response.status).toBe(400);
+      const result = await response.json();
+      expect(result).toHaveProperty("error");
+    });
+
+    it("should process multiple log entries", async () => {
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {},
+        config: {
+          debug: {
+            transport: "api",
+            apiEndpoint: "/api/logs",
+            level: "debug",
+          },
+        },
+      });
+
+      await app.start({ port: 3024 });
+      const httpServer = app.getServer().httpServer;
+      if (httpServer) servers.push(httpServer);
+
+      const response = await fetch("http://localhost:3024/api/logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entries: [
+            { level: "debug", message: "Debug log", timestamp: new Date().toISOString() },
+            { level: "info", message: "Info log", timestamp: new Date().toISOString() },
+            { level: "warn", message: "Warn log", timestamp: new Date().toISOString() },
+            { level: "error", message: "Error log", timestamp: new Date().toISOString() },
+          ],
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      const result = await response.json();
+      expect(result.processed).toBe(4);
+    });
+  });
+
   describe("OpenAI domain_challenge configuration", () => {
     it("should expose challenge endpoint when domain_challenge is configured", async () => {
       const app = createApp({

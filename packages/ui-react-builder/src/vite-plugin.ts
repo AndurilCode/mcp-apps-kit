@@ -83,6 +83,31 @@ const silentLogger: PluginLogger = {
 };
 
 /**
+ * Server configuration injected into UIs at build time.
+ *
+ * These values are available in the UI via `getMcpServerConfig()` from @mcp-apps-kit/ui.
+ */
+export type McpServerConfig = {
+  /**
+   * Base URL of the MCP server.
+   *
+   * Used by UIs to make API calls (e.g., debug logging via HTTP).
+   * Should include protocol and port (e.g., "http://localhost:3000").
+   *
+   * @example "http://localhost:3000"
+   * @example "https://api.myapp.com"
+   */
+  baseUrl?: string;
+
+  /**
+   * Additional custom configuration.
+   *
+   * Any extra values your UI needs at runtime.
+   */
+  [key: string]: unknown;
+};
+
+/**
  * Options for the MCP React UI Vite plugin.
  */
 export interface McpReactUIOptions {
@@ -130,6 +155,24 @@ export interface McpReactUIOptions {
    * Use `true` when your Vite config exists solely to build MCP UI HTML.
    */
   standalone?: boolean;
+
+  /**
+   * Server configuration to inject into UIs at build time.
+   *
+   * These values become available in the UI via `getMcpServerConfig()` from @mcp-apps-kit/ui.
+   * Useful for injecting the server base URL, API endpoints, or other runtime config.
+   *
+   * @example
+   * ```typescript
+   * mcpReactUI({
+   *   serverEntry: "./src/index.ts",
+   *   serverConfig: {
+   *     baseUrl: "http://localhost:3000",
+   *   },
+   * })
+   * ```
+   */
+  serverConfig?: McpServerConfig;
 }
 
 /**
@@ -294,6 +337,7 @@ async function buildDiscoveredUIs(
 ): Promise<void> {
   const minify = options.minify ?? isProduction;
   const outDir = options.outDir ?? "./dist/ui";
+  const serverConfig = options.serverConfig ?? {};
 
   // Load global CSS if specified
   let globalCss: string | undefined;
@@ -352,6 +396,7 @@ if (rootElement) {
       jsxImportSource: "react",
       define: {
         "process.env.NODE_ENV": minify ? '"production"' : '"development"',
+        __MCP_SERVER_CONFIG__: JSON.stringify(serverConfig),
       },
     });
 

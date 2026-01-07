@@ -71,6 +71,17 @@ export interface CORSConfig {
 export type DebugLogLevel = "debug" | "info" | "warn" | "error";
 
 /**
+ * Debug log transport mechanism
+ *
+ * - `"builtin"`: Use MCP protocol-level logging (default for MCP adapter)
+ * - `"tool"`: Use the log_debug MCP tool
+ * - `"api"`: Use self-hosted HTTP endpoint (default for OpenAI adapter)
+ *
+ * @internal
+ */
+export type DebugTransport = "builtin" | "tool" | "api";
+
+/**
  * Debug logging configuration
  *
  * Enables debug logging that transports logs through the MCP protocol,
@@ -138,6 +149,43 @@ export interface DebugConfig {
    * @default 5000
    */
   flushIntervalMs?: number;
+
+  /**
+   * Log transport mechanism.
+   *
+   * - `"builtin"`: Use MCP protocol-level logging (default for MCP adapter)
+   * - `"tool"`: Use the log_debug MCP tool
+   * - `"api"`: Use self-hosted HTTP endpoint (default for OpenAI adapter)
+   *
+   * When set to `"api"`, the server exposes a POST endpoint at the path
+   * specified by `apiEndpoint` that accepts batched log entries.
+   *
+   * @default "builtin" for MCP, "api" for OpenAI
+   */
+  transport?: DebugTransport;
+
+  /**
+   * API endpoint path for 'api' transport.
+   *
+   * This is the path where the logging API will listen for POST requests.
+   * The endpoint accepts JSON body with `{ entries: LogEntry[] }` and
+   * returns `{ processed: number }`.
+   *
+   * Only used when `transport` is set to `"api"`.
+   *
+   * @default "/api/logs"
+   *
+   * @example
+   * ```typescript
+   * config: {
+   *   debug: {
+   *     transport: "api",
+   *     apiEndpoint: "/debug/logs"
+   *   }
+   * }
+   * ```
+   */
+  apiEndpoint?: string;
 }
 
 // =============================================================================
@@ -235,6 +283,52 @@ export interface GlobalConfig {
    * ```
    */
   debug?: DebugConfig;
+
+  /**
+   * Server configuration to inject into all UI resources at runtime.
+   *
+   * This config is injected as `window.__MCP_SERVER_CONFIG__` into all HTML UIs
+   * when they are served. UIs can access it via `getMcpServerConfig()` or
+   * `getMcpServerBaseUrl()` from `@mcp-apps-kit/ui`.
+   *
+   * Works for both vanilla HTML (`defineUI()`) and React UIs (`defineReactUI()`).
+   *
+   * @example
+   * ```typescript
+   * config: {
+   *   serverConfig: {
+   *     baseUrl: "http://localhost:3000",
+   *     customSetting: "value",
+   *   }
+   * }
+   * ```
+   */
+  serverConfig?: ServerConfig;
+}
+
+/**
+ * Server configuration that can be injected into UI resources.
+ *
+ * These values become available in UIs via `getMcpServerConfig()` from `@mcp-apps-kit/ui`.
+ */
+export interface ServerConfig {
+  /**
+   * Base URL of the MCP server.
+   *
+   * Used by UIs to make API calls (e.g., debug logging via HTTP).
+   * Should include protocol and port (e.g., "http://localhost:3000").
+   *
+   * @example "http://localhost:3000"
+   * @example "https://api.myapp.com"
+   */
+  baseUrl?: string;
+
+  /**
+   * Additional custom configuration.
+   *
+   * Any extra values your UI needs at runtime.
+   */
+  [key: string]: unknown;
 }
 
 /**

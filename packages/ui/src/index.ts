@@ -76,7 +76,7 @@ export type { UIErrorCodeType } from "./errors";
 export type { ProtocolAdapter, AdapterFactory, AdapterType } from "./adapters/types";
 
 // Debug logging types and utilities
-export type { DebugLogLevel, LogEntry, ClientDebugConfig } from "./debug/logger";
+export type { DebugLogLevel, DebugTransport, LogEntry, ClientDebugConfig } from "./debug/logger";
 export {
   ClientDebugLogger,
   clientDebugLogger,
@@ -84,6 +84,10 @@ export {
   safeSerialize,
   safeStringify,
 } from "./debug/logger";
+
+// Server configuration utilities (for build-time injected config)
+export type { McpServerConfig } from "./config";
+export { getMcpServerConfig, getMcpServerBaseUrl } from "./config";
 
 // =============================================================================
 // ADAPTER EXPORTS

@@ -15,6 +15,10 @@ export default defineConfig({
       // Standalone mode prevents Vite from requiring a traditional app entry (e.g. index.html)
       // and avoids emitting unrelated build artifacts.
       standalone: true,
+
+      // Note: serverConfig can also be set here for build-time injection.
+      // However, this example uses runtime injection via config.serverConfig
+      // in the app config (src/index.ts), which works for both React and vanilla UIs.
     }),
   ],
 });
