@@ -391,6 +391,8 @@ export interface MockHost {
   emitToolResult(result: unknown): void;
   /** Set the theme */
   setTheme(theme: "light" | "dark"): void;
+  /** Get the current theme */
+  getTheme(): "light" | "dark";
   /** Emit cancellation */
   emitToolCancelled(reason?: string): void;
   /** Emit teardown */
@@ -401,8 +403,16 @@ export interface MockHost {
   clearHistory(): void;
   /** Register tool call handler */
   onToolCall(handler: (name: string, args: unknown) => void): () => void;
-  /** Get underlying adapter */
-  getAdapter(): unknown; // Using unknown to avoid direct dependency on @mcp-apps-kit/ui
+  /** Register tool result handler */
+  onToolResult(handler: (result: unknown) => void): () => void;
+  /** Register teardown handler */
+  onTeardown(handler: (reason?: string) => void): () => void;
+  /** Register tool cancelled handler */
+  onToolCancelled(handler: (reason?: string) => void): () => void;
+  /** Simulate a tool call (for testing) */
+  simulateToolCall(name: string, args: unknown): void;
+  /** Get underlying adapter (if @mcp-apps-kit/ui is available) */
+  getAdapter(): unknown;
 }
 
 // =============================================================================

@@ -9,6 +9,7 @@ import {
   createTestClient,
   createTestEnvironment,
   TestEnvironmentBuilder,
+  createMockHost,
   defineTestSuite,
   runTestSuite,
   generators,
@@ -86,6 +87,113 @@ describe("Advanced Features", () => {
       const result = await env.client.callTool("greet", { name: "BuilderTest" });
       expectToolResult(result).toHaveNoError();
       expectToolResult(result).toContainText("BuilderTest");
+    });
+  });
+
+  // ==========================================================================
+  // createMockHost (UI testing)
+  // ==========================================================================
+  describe("createMockHost", () => {
+    it("should create a mock host with default options", () => {
+      const mockHost = createMockHost();
+      expect(mockHost).toBeDefined();
+      expect(mockHost.getTheme()).toBe("light");
+    });
+
+    it("should create a mock host with custom theme", () => {
+      const mockHost = createMockHost({
+        initialContext: { theme: "dark" },
+      });
+      expect(mockHost.getTheme()).toBe("dark");
+    });
+
+    it("should allow setting theme", () => {
+      const mockHost = createMockHost();
+      expect(mockHost.getTheme()).toBe("light");
+      mockHost.setTheme("dark");
+      expect(mockHost.getTheme()).toBe("dark");
+    });
+
+    it("should track tool call history via simulateToolCall", () => {
+      const mockHost = createMockHost();
+      
+      mockHost.simulateToolCall("greet", { name: "Test" });
+      mockHost.simulateToolCall("calculate", { a: 1, b: 2 });
+
+      const history = mockHost.getToolCallHistory();
+      expect(history).toHaveLength(2);
+      expect(history[0]?.name).toBe("greet");
+      expect(history[0]?.args).toEqual({ name: "Test" });
+      expect(history[1]?.name).toBe("calculate");
+    });
+
+    it("should clear history", () => {
+      const mockHost = createMockHost();
+      mockHost.simulateToolCall("test", {});
+      expect(mockHost.getToolCallHistory()).toHaveLength(1);
+      
+      mockHost.clearHistory();
+      expect(mockHost.getToolCallHistory()).toHaveLength(0);
+    });
+
+    it("should emit and handle tool results", () => {
+      const mockHost = createMockHost();
+      const results: unknown[] = [];
+
+      mockHost.onToolResult((result) => {
+        results.push(result);
+      });
+
+      mockHost.emitToolResult({ message: "Hello!" });
+      mockHost.emitToolResult({ count: 42 });
+
+      expect(results).toHaveLength(2);
+      expect(results[0]).toEqual({ message: "Hello!" });
+      expect(results[1]).toEqual({ count: 42 });
+    });
+
+    it("should register and unregister tool call handlers", () => {
+      const mockHost = createMockHost();
+      const calls: Array<{ name: string; args: unknown }> = [];
+
+      const unsubscribe = mockHost.onToolCall((name, args) => {
+        calls.push({ name, args });
+      });
+
+      mockHost.simulateToolCall("test1", { x: 1 });
+      expect(calls).toHaveLength(1);
+
+      unsubscribe();
+      mockHost.simulateToolCall("test2", { x: 2 });
+      expect(calls).toHaveLength(1); // Should not increase
+    });
+
+    it("should handle teardown events", () => {
+      const mockHost = createMockHost();
+      const reasons: Array<string | undefined> = [];
+
+      mockHost.onTeardown((reason) => {
+        reasons.push(reason);
+      });
+
+      mockHost.emitTeardown("user closed");
+      mockHost.emitTeardown();
+
+      expect(reasons).toEqual(["user closed", undefined]);
+    });
+
+    it("should handle tool cancelled events", () => {
+      const mockHost = createMockHost();
+      const reasons: Array<string | undefined> = [];
+
+      mockHost.onToolCancelled((reason) => {
+        reasons.push(reason);
+      });
+
+      mockHost.emitToolCancelled("timeout");
+      mockHost.emitToolCancelled();
+
+      expect(reasons).toEqual(["timeout", undefined]);
     });
   });
 

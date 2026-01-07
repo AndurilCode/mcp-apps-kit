@@ -1,70 +1,130 @@
 /**
  * Mock host environment for UI testing
  *
- * Wraps MockAdapter from @mcp-apps-kit/ui and adds testing utilities.
+ * Provides a mock host environment for testing UI widgets without
+ * requiring an actual MCP host platform.
  */
 
 import type { MockHost, MockHostOptions, ToolCall } from "../types";
 import { uiLogger } from "../debug";
 
-// Lazy-loaded MockAdapter (to avoid direct dependency)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let MockAdapterClass: any = null;
-
-/**
- * Load MockAdapter class (lazy, throws if not available)
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getMockAdapter(): any {
-  if (!MockAdapterClass) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const uiModule = require("@mcp-apps-kit/ui/adapters/mock");
-      MockAdapterClass = uiModule.MockAdapter;
-    } catch {
-      throw new Error(
-        "@mcp-apps-kit/ui is required for mock host testing. Install it with: npm install @mcp-apps-kit/ui"
-      );
-    }
-  }
-  return MockAdapterClass;
-}
-
 /**
  * Create a mock host environment for testing UI components
+ *
+ * This creates a standalone mock host that can be used to test UI widgets
+ * without requiring an actual host platform (like Claude Desktop or ChatGPT).
+ *
+ * @param options - Mock host configuration
+ * @returns Mock host instance
+ *
+ * @example
+ * ```typescript
+ * const mockHost = createMockHost({
+ *   initialContext: { theme: 'dark' },
+ * });
+ *
+ * // Register a tool call handler
+ * mockHost.onToolCall((name, args) => {
+ *   console.log(`Tool called: ${name}`, args);
+ * });
+ *
+ * // Emit a tool result (simulating what the host would send)
+ * mockHost.emitToolResult({ message: 'Hello!' });
+ *
+ * // Check tool call history
+ * const history = mockHost.getToolCallHistory();
+ * ```
  */
 export function createMockHost(options: MockHostOptions = {}): MockHost {
   uiLogger("Creating mock host with options: %o", options);
 
-  const MockAdapter = getMockAdapter();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const adapter = new MockAdapter(options) as any;
-
-  // Tool call history tracking
+  // Internal state
+  let currentTheme: "light" | "dark" = options.initialContext?.theme ?? "light";
   const toolCallHistory: ToolCall[] = [];
-
-  // Tool call handlers
   const toolCallHandlers: Array<(name: string, args: unknown) => void> = [];
+  const toolResultHandlers: Array<(result: unknown) => void> = [];
+  const teardownHandlers: Array<(reason?: string) => void> = [];
+  const cancelledHandlers: Array<(reason?: string) => void> = [];
+
+  // Try to load MockAdapter from @mcp-apps-kit/ui if available
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let uiAdapter: any = null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { MockAdapter } = require("@mcp-apps-kit/ui/adapters/mock");
+    uiAdapter = new MockAdapter();
+    uiLogger("Using MockAdapter from @mcp-apps-kit/ui");
+  } catch {
+    uiLogger("@mcp-apps-kit/ui not available, using standalone mock");
+  }
 
   return {
     emitToolResult(result: unknown): void {
       uiLogger("Mock host emitting tool result: %o", result);
-      adapter.emitToolResult?.(result);
+      
+      // Record in history
+      toolCallHistory.push({
+        name: "_result",
+        args: result,
+        result: {
+          content: [{ type: "text", text: JSON.stringify(result) }],
+          isError: false,
+        },
+        duration: 0,
+        timestamp: new Date(),
+      });
+
+      // Notify handlers
+      for (const handler of toolResultHandlers) {
+        handler(result);
+      }
+
+      // Forward to UI adapter if available
+      if (uiAdapter?.emitToolResult) {
+        uiAdapter.emitToolResult(result);
+      }
     },
 
     setTheme(theme: "light" | "dark"): void {
       uiLogger("Mock host setting theme: %s", theme);
-      adapter.setTheme?.(theme);
+      currentTheme = theme;
+
+      // Forward to UI adapter if available
+      if (uiAdapter?.setHostContext) {
+        uiAdapter.setHostContext({ theme });
+      }
+    },
+
+    getTheme(): "light" | "dark" {
+      return currentTheme;
     },
 
     emitToolCancelled(reason?: string): void {
       uiLogger("Mock host emitting tool cancelled: %s", reason);
-      adapter.emitToolCancelled?.(reason);
+
+      // Notify handlers
+      for (const handler of cancelledHandlers) {
+        handler(reason);
+      }
+
+      // Forward to UI adapter if available
+      if (uiAdapter?.emitToolCancelled) {
+        uiAdapter.emitToolCancelled(reason);
+      }
     },
 
     emitTeardown(reason?: string): void {
       uiLogger("Mock host emitting teardown: %s", reason);
-      adapter.emitTeardown?.(reason);
+
+      // Notify handlers
+      for (const handler of teardownHandlers) {
+        handler(reason);
+      }
+
+      // Forward to UI adapter if available
+      if (uiAdapter?.emitTeardown) {
+        uiAdapter.emitTeardown(reason);
+      }
     },
 
     getToolCallHistory(): ToolCall[] {
@@ -86,8 +146,58 @@ export function createMockHost(options: MockHostOptions = {}): MockHost {
       };
     },
 
+    onToolResult(handler: (result: unknown) => void): () => void {
+      toolResultHandlers.push(handler);
+      return () => {
+        const index = toolResultHandlers.indexOf(handler);
+        if (index >= 0) {
+          toolResultHandlers.splice(index, 1);
+        }
+      };
+    },
+
+    onTeardown(handler: (reason?: string) => void): () => void {
+      teardownHandlers.push(handler);
+      return () => {
+        const index = teardownHandlers.indexOf(handler);
+        if (index >= 0) {
+          teardownHandlers.splice(index, 1);
+        }
+      };
+    },
+
+    onToolCancelled(handler: (reason?: string) => void): () => void {
+      cancelledHandlers.push(handler);
+      return () => {
+        const index = cancelledHandlers.indexOf(handler);
+        if (index >= 0) {
+          cancelledHandlers.splice(index, 1);
+        }
+      };
+    },
+
+    /**
+     * Simulate a tool call (for testing)
+     */
+    simulateToolCall(name: string, args: unknown): void {
+      uiLogger("Mock host simulating tool call: %s with args: %o", name, args);
+
+      // Record in history
+      toolCallHistory.push({
+        name,
+        args,
+        duration: 0,
+        timestamp: new Date(),
+      });
+
+      // Notify handlers
+      for (const handler of toolCallHandlers) {
+        handler(name, args);
+      }
+    },
+
     getAdapter(): unknown {
-      return adapter;
+      return uiAdapter;
     },
   };
 }
