@@ -3,11 +3,25 @@
  *
  * A React component for the v1 API - displays greeting messages with name only.
  * Uses @mcp-apps-kit/ui-react hooks for receiving tool output and theme changes.
+ *
+ * This version demonstrates the debug logging via MCP tool transport:
+ * - Logs are sent via the log_debug MCP tool
+ * - Default behavior for MCP adapter (Claude Desktop, etc.)
  */
 
 import { useEffect, useState } from "react";
 import { useToolResult, useHostContext, useAppsClient } from "@mcp-apps-kit/ui-react";
+import { clientDebugLogger } from "@mcp-apps-kit/ui";
 import type { AppClientToolsV1 } from "../index";
+
+// Configure the debug logger to use MCP tool transport
+// This sends logs via the log_debug MCP tool (default for MCP adapter)
+clientDebugLogger.configure({
+  enabled: true,
+  level: "debug",
+  transport: "tool", // Uses the log_debug MCP tool
+  source: "greeting-widget-v1",
+});
 
 export function GreetingWidgetV1() {
   const result = useToolResult<AppClientToolsV1>();
@@ -28,6 +42,8 @@ export function GreetingWidgetV1() {
     if (typeof document !== "undefined") {
       document.documentElement.className = theme;
     }
+    // Log theme changes via MCP tool transport
+    clientDebugLogger.debug("Theme changed", { theme });
   }, [theme]);
 
   const handleGreet = async () => {
@@ -35,13 +51,28 @@ export function GreetingWidgetV1() {
 
     setIsLoading(true);
     setErrorMessage(null);
+
+    // Log the greet attempt via MCP tool transport
+    clientDebugLogger.info("Greet initiated", { name: name.trim() });
+
     try {
       const response = await client.tools.callGreet({ name: name.trim() });
-      setGreetResult(response);
+
+      // Log success via MCP tool transport
+      clientDebugLogger.info("Greet successful", response);
+
+      // Extract from structuredContent if present (handles different response formats)
+      const result =
+        (response as { structuredContent?: typeof response }).structuredContent ?? response;
+      setGreetResult(result);
       setIsModalOpen(false);
       setName("");
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
+
+      // Log error via MCP tool transport
+      clientDebugLogger.error("Greet failed", { error: msg });
+
       console.error("Failed to greet:", msg);
       setErrorMessage(msg);
     } finally {

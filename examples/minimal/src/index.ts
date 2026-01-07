@@ -111,7 +111,12 @@ const app = createApp({
     protocol: "mcp",
     debug: {
       logTool: true,
-      level: "info",
+      level: "debug",
+    },
+    // Server config injected into all UIs at runtime
+    // UIs can access via getMcpServerConfig() / getMcpServerBaseUrl() from @mcp-apps-kit/ui
+    serverConfig: {
+      baseUrl: process.env.SERVER_URL ?? `http://localhost:${process.env.PORT ?? "3000"}`,
     },
   },
 
@@ -122,6 +127,7 @@ const app = createApp({
       tools: {
         greet: greetToolV1,
       },
+      // v1 uses the log_debug MCP tool (default behavior)
     },
     v2: {
       version: "2.0.0",
@@ -130,6 +136,12 @@ const app = createApp({
       },
       config: {
         protocol: "openai",
+        // v2 uses the API transport for debug logging (ideal for OpenAI/ChatGPT)
+        debug: {
+          transport: "api",
+          apiEndpoint: "/api/logs",
+          level: "debug",
+        },
       },
     },
   },
@@ -145,9 +157,14 @@ Minimal Example Server with Versioning running on http://localhost:${port}
 Available API versions: ${versions.join(", ")}
 
 Endpoints:
-  - v1 MCP: http://localhost:${port}/v1/mcp (name only)
-  - v2 MCP: http://localhost:${port}/v2/mcp (name + surname)
-  - Health:  http://localhost:${port}/health
+  - v1 MCP:     http://localhost:${port}/v1/mcp (uses log_debug MCP tool)
+  - v2 MCP:     http://localhost:${port}/v2/mcp (uses API transport for logging)
+  - v2 Logs:    http://localhost:${port}/api/logs (debug log API endpoint)
+  - Health:     http://localhost:${port}/health
+
+Debug logging:
+  - v1: Uses log_debug MCP tool (default for MCP adapter)
+  - v2: Uses HTTP API transport at /api/logs (ideal for OpenAI/ChatGPT)
   `);
 });
 
