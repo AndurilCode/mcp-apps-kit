@@ -87,7 +87,7 @@ const silentLogger: PluginLogger = {
  *
  * These values are available in the UI via `getMcpServerConfig()` from @mcp-apps-kit/ui.
  */
-export interface McpServerConfig {
+export type McpServerConfig = {
   /**
    * Base URL of the MCP server.
    *
@@ -105,7 +105,7 @@ export interface McpServerConfig {
    * Any extra values your UI needs at runtime.
    */
   [key: string]: unknown;
-}
+};
 
 /**
  * Options for the MCP React UI Vite plugin.

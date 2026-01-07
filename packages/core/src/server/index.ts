@@ -1059,6 +1059,23 @@ function readUIHtml(key: string, uiDef: UIDef): string {
 }
 
 /**
+ * Sanitize a JSON string for safe embedding within a <script> tag.
+ *
+ * Escapes sequences that could break out of the script context:
+ * - </script> -> <\/script> (prevents script tag termination)
+ * - <!-- -> <\!-- (prevents HTML comment injection)
+ * - U+2028 -> \u2028 (Line Separator - can terminate JS strings in some contexts)
+ * - U+2029 -> \u2029 (Paragraph Separator - can terminate JS strings in some contexts)
+ */
+function sanitizeJsonForScript(jsonString: string): string {
+  return jsonString
+    .replace(/<\/script/gi, '<\\/script')
+    .replace(/<!--/g, '<\\!--')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
+/**
  * Inject server configuration into HTML content.
  *
  * Adds a <script> tag with window.__MCP_SERVER_CONFIG__ = {...} to the HTML.
@@ -1073,7 +1090,8 @@ function injectServerConfig(html: string, serverConfig: Record<string, unknown>)
     return html;
   }
 
-  const configScript = `<script>window.__MCP_SERVER_CONFIG__=${JSON.stringify(serverConfig)};</script>`;
+  const sanitizedJson = sanitizeJsonForScript(JSON.stringify(serverConfig));
+  const configScript = `<script>window.__MCP_SERVER_CONFIG__=${sanitizedJson};</script>`;
 
   // Try to inject after <head> tag
   const headMatch = html.match(/<head[^>]*>/i);

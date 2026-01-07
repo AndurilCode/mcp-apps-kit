@@ -20,7 +20,7 @@
 /**
  * Server configuration type matching McpServerConfig from the vite plugin.
  */
-export interface McpServerConfig {
+export type McpServerConfig = {
   /**
    * Base URL of the MCP server.
    * @example "http://localhost:3000"
@@ -31,7 +31,7 @@ export interface McpServerConfig {
    * Additional custom configuration values.
    */
   [key: string]: unknown;
-}
+};
 
 /**
  * Declare the global variable that can be injected either:
