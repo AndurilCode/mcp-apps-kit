@@ -15,5 +15,5 @@ export type { TestSuiteConfig } from "./behavior";
 // Property testing - Phase 6
 export { generators, forAllInputs } from "./property";
 
-// LLM evaluation - will be added in Phase 8
-// export { createLLMEvaluator, criteria } from "./llm";
+// LLM evaluation - Phase 8
+export { createLLMEvaluator, criteria } from "./llm";
