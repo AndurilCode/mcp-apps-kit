@@ -7,6 +7,8 @@ import {
   expectToolResult,
   startTestServer,
   createTestClient,
+  createTestEnvironment,
+  TestEnvironmentBuilder,
   defineTestSuite,
   runTestSuite,
   generators,
@@ -18,17 +20,87 @@ import { app } from "../src/index.js";
 
 describe("Advanced Features", () => {
   // ==========================================================================
+  // createTestEnvironment (simplified setup)
+  // ==========================================================================
+  describe("createTestEnvironment", () => {
+    let env: TestEnvironment;
+
+    beforeAll(async () => {
+      env = await createTestEnvironment({
+        app,
+        port: 3009,
+        version: "v1",
+        clientOptions: { trackHistory: true },
+      });
+    });
+
+    afterAll(async () => {
+      await env.cleanup();
+    });
+
+    it("should create environment with app and version", () => {
+      expect(env.server).toBeDefined();
+      expect(env.client).toBeDefined();
+      expect(env.server.url).toBe("http://localhost:3009");
+    });
+
+    it("should call tools through environment", async () => {
+      const result = await env.client.callTool("greet", { name: "EnvTest" });
+      expectToolResult(result).toHaveNoError();
+      expectToolResult(result).toContainText("EnvTest");
+    });
+
+    it("should track history when enabled", async () => {
+      env.client.clearHistory();
+      await env.client.callTool("greet", { name: "HistoryTest" });
+      const history = env.client.getCallHistory();
+      expect(history).toHaveLength(1);
+    });
+  });
+
+  // ==========================================================================
+  // TestEnvironmentBuilder (fluent API)
+  // ==========================================================================
+  describe("TestEnvironmentBuilder", () => {
+    let env: TestEnvironment;
+
+    beforeAll(async () => {
+      env = await new TestEnvironmentBuilder()
+        .withApp(app)
+        .withPort(3008)
+        .withVersion("v1")
+        .withClientOptions({ trackHistory: true })
+        .build();
+    });
+
+    afterAll(async () => {
+      await env.cleanup();
+    });
+
+    it("should create environment using builder pattern", () => {
+      expect(env.server).toBeDefined();
+      expect(env.client).toBeDefined();
+    });
+
+    it("should call tools through builder-created environment", async () => {
+      const result = await env.client.callTool("greet", { name: "BuilderTest" });
+      expectToolResult(result).toHaveNoError();
+      expectToolResult(result).toContainText("BuilderTest");
+    });
+  });
+
+  // ==========================================================================
   // Test Suites (declarative test definitions)
   // ==========================================================================
   describe("defineTestSuite / runTestSuite", () => {
     let env: TestEnvironment;
 
     beforeAll(async () => {
-      const testPort = 3010;
-      const server = await startTestServer(app, { port: testPort });
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      const client = await createTestClient(`http://localhost:${testPort}/v1/mcp`);
-      env = { server, client, cleanup: async () => { await client.disconnect(); await server.stop(); } };
+      env = await createTestEnvironment({
+        app,
+        port: 3010,
+        version: "v1",
+      });
     });
 
     afterAll(async () => {
@@ -98,11 +170,11 @@ describe("Advanced Features", () => {
     let env: TestEnvironment;
 
     beforeAll(async () => {
-      const testPort = 3011;
-      const server = await startTestServer(app, { port: testPort });
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      const client = await createTestClient(`http://localhost:${testPort}/v1/mcp`);
-      env = { server, client, cleanup: async () => { await client.disconnect(); await server.stop(); } };
+      env = await createTestEnvironment({
+        app,
+        port: 3011,
+        version: "v1",
+      });
     });
 
     afterAll(async () => {
@@ -151,11 +223,11 @@ describe("Advanced Features", () => {
     let env: TestEnvironment;
 
     beforeAll(async () => {
-      const testPort = 3012;
-      const server = await startTestServer(app, { port: testPort });
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      const client = await createTestClient(`http://localhost:${testPort}/v1/mcp`);
-      env = { server, client, cleanup: async () => { await client.disconnect(); await server.stop(); } };
+      env = await createTestEnvironment({
+        app,
+        port: 3012,
+        version: "v1",
+      });
     });
 
     afterAll(async () => {

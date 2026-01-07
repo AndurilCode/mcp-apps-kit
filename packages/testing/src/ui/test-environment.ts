@@ -28,9 +28,14 @@ interface App {
  *
  * @example
  * ```typescript
- * const env = await createTestEnvironment({
- *   app: myApp,
- * });
+ * // Basic usage
+ * const env = await createTestEnvironment({ app: myApp });
+ *
+ * // With versioned app
+ * const env = await createTestEnvironment({ app: myApp, version: 'v1' });
+ *
+ * // With specific port
+ * const env = await createTestEnvironment({ app: myApp, port: 3001, version: 'v1' });
  * ```
  */
 export async function createTestEnvironment(
@@ -43,7 +48,11 @@ export async function createTestEnvironment(
 
   // Start server from App instance
   if (options.app) {
-    server = await startTestServer(options.app as App, { port: 0 });
+    const port = options.port ?? 3000;
+    server = await startTestServer(options.app as App, { port });
+    
+    // Wait a bit for server to be ready
+    await new Promise((resolve) => setTimeout(resolve, 100));
   } else if (options.serverUrl) {
     // Use existing server URL
     server = {
@@ -58,8 +67,15 @@ export async function createTestEnvironment(
     throw new Error("Either app or serverUrl must be provided");
   }
 
+  // Build MCP URL with version if specified
+  let mcpUrl = server.mcpUrl;
+  if (options.version) {
+    // For versioned apps, use /{version}/mcp instead of /mcp
+    mcpUrl = `${server.url}/${options.version}/mcp`;
+  }
+
   // Create test client
-  client = await createTestClient(server.mcpUrl, options.clientOptions);
+  client = await createTestClient(mcpUrl, options.clientOptions);
 
   return {
     server,
@@ -78,6 +94,8 @@ export async function createTestEnvironment(
 export class TestEnvironmentBuilder {
   private app?: unknown;
   private serverUrl?: string;
+  private port?: number;
+  private version?: string;
   private clientOptions?: Parameters<typeof createTestClient>[1];
 
   /**
@@ -97,6 +115,22 @@ export class TestEnvironmentBuilder {
   }
 
   /**
+   * Set the server port
+   */
+  withPort(port: number): this {
+    this.port = port;
+    return this;
+  }
+
+  /**
+   * Set the API version (for versioned apps)
+   */
+  withVersion(version: string): this {
+    this.version = version;
+    return this;
+  }
+
+  /**
    * Set client options
    */
   withClientOptions(options: Parameters<typeof createTestClient>[1]): this {
@@ -111,6 +145,8 @@ export class TestEnvironmentBuilder {
     return createTestEnvironment({
       app: this.app,
       serverUrl: this.serverUrl,
+      port: this.port,
+      version: this.version,
       clientOptions: this.clientOptions,
     });
   }

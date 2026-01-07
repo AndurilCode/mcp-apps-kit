@@ -154,6 +154,10 @@ export interface TestEnvironmentOptions {
   serverUrl?: string;
   /** Test client options */
   clientOptions?: TestClientOptions;
+  /** Server port (default: auto-assigned) */
+  port?: number;
+  /** API version for versioned apps (e.g., 'v1', 'v2') */
+  version?: string;
 }
 
 /**
