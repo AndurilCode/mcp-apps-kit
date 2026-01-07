@@ -96,6 +96,18 @@ importers:
       '@mcp-apps-kit/testing':
         specifier: workspace:*
         version: link:../../packages/testing
+      '@testing-library/dom':
+        specifier: ^10.4.1
+        version: 10.4.1
+      '@testing-library/jest-dom':
+        specifier: ^6.9.1
+        version: 6.9.1
+      '@testing-library/react':
+        specifier: ^16.3.1
+        version: 16.3.1(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      '@testing-library/user-event':
+        specifier: ^14.6.1
+        version: 14.6.1(@testing-library/dom@10.4.1)
       '@types/node':
         specifier: ^25.0.3
         version: 25.0.3
@@ -114,6 +126,9 @@ importers:
       fast-check:
         specifier: ^4.5.3
         version: 4.5.3
+      jsdom:
+        specifier: ^27.3.0
+        version: 27.3.0
       tsx:
         specifier: ^4.0.0
         version: 4.21.0
@@ -129,9 +144,6 @@ importers:
       vitest:
         specifier: ^4.0.16
         version: 4.0.16(@types/node@25.0.3)(jsdom@27.3.0)(tsx@4.21.0)(yaml@2.8.2)
-      zod-fast-check:
-        specifier: ^0.10.1
-        version: 0.10.1(fast-check@4.5.3)(zod@4.2.1)
 
   examples/restaurant-finder:
     dependencies:
@@ -249,9 +261,6 @@ importers:
       zod:
         specifier: ^4.0.0
         version: 4.2.1
-      zod-fast-check:
-        specifier: ^0.10.1
-        version: 0.10.1(fast-check@3.23.2)(zod@4.2.1)
     devDependencies:
       '@types/debug':
         specifier: ^4.1.12
@@ -1798,6 +1807,12 @@ packages:
         optional: true
       '@types/react-dom':
         optional: true
+
+  '@testing-library/user-event@14.6.1':
+    resolution: {integrity: sha512-vq7fv0rnt+QTXgPxr5Hjc210p6YKq2kmdziLgnsZGgLJ9e6VAShx1pACLuRjd/AS/sr7phAR58OIIpf0LlmQNw==}
+    engines: {node: '>=12', npm: '>=6'}
+    peerDependencies:
+      '@testing-library/dom': '>=7.21.4'
 
   '@tybys/wasm-util@0.9.0':
     resolution: {integrity: sha512-6+7nlbMVX/PVDCwaIQ8nTOPveOcFLSt8GcXdx8hD0bt39uWxYT88uXzqTd4fTvqta7oeUJqudepapKNt2DYJFw==}
@@ -4372,12 +4387,6 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
-  zod-fast-check@0.10.1:
-    resolution: {integrity: sha512-P+rqsg//CQZSFaG61QNRdnrDn8ARTxoMi4P0/GqRvyBjIiVXQCHB6R8yqkAwQNNSFxMD9cdDoPtOZRBe0rfwNg==}
-    peerDependencies:
-      fast-check: '>2.23.0 <4.0.0'
-      zod: ^3.18.0
-
   zod-to-json-schema@3.25.0:
     resolution: {integrity: sha512-HvWtU2UG41LALjajJrML6uQejQhNJx+JBO9IflpSja4R03iNWfKXrj6W2h7ljuLyc1nKS+9yDyL/9tD1U/yBnQ==}
     peerDependencies:
@@ -5988,6 +5997,10 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.7
       '@types/react-dom': 19.2.3(@types/react@19.2.7)
+
+  '@testing-library/user-event@14.6.1(@testing-library/dom@10.4.1)':
+    dependencies:
+      '@testing-library/dom': 10.4.1
 
   '@tybys/wasm-util@0.9.0':
     dependencies:
@@ -8878,16 +8891,6 @@ snapshots:
       yargs-parser: 21.1.1
 
   yocto-queue@0.1.0: {}
-
-  zod-fast-check@0.10.1(fast-check@3.23.2)(zod@4.2.1):
-    dependencies:
-      fast-check: 3.23.2
-      zod: 4.2.1
-
-  zod-fast-check@0.10.1(fast-check@4.5.3)(zod@4.2.1):
-    dependencies:
-      fast-check: 4.5.3
-      zod: 4.2.1
 
   zod-to-json-schema@3.25.0(zod@4.2.1):
     dependencies:
