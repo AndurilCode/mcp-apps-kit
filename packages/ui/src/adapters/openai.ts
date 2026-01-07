@@ -375,12 +375,20 @@ export class OpenAIAdapter implements ProtocolAdapter {
     this.globalsHandler = (event: MessageEvent) => {
       const data = event.data as unknown;
 
+      // Handle all three formats for backward compatibility:
+      // - String format: "openai:set_globals"
+      // - Object with type: { type: "openai:set_globals" }
+      // - Object with message: { message: "openai:set_globals" } (older SDK versions)
       const isSetGlobals =
         data === "openai:set_globals" ||
         (typeof data === "object" &&
           data !== null &&
           "type" in data &&
-          (data as { type: unknown }).type === "openai:set_globals");
+          (data as { type: unknown }).type === "openai:set_globals") ||
+        (typeof data === "object" &&
+          data !== null &&
+          "message" in data &&
+          (data as { message: unknown }).message === "openai:set_globals");
 
       if (isSetGlobals) {
         clientDebugLogger.debug("[OpenAI Adapter] Received set_globals via postMessage (legacy)");
