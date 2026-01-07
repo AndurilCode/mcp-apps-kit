@@ -68,7 +68,33 @@ export type {
 export type { EvalReporterOptions, EvalReportEntry } from "./eval/reporter";
 
 // MCP eval types
-export type { MCPEval, MCPEvaluator, MCPEvalConfig, MCPEvalSetupConfig, MCPEvalResult, ToolCallRecord, JudgeResult } from "./eval/mcp";
+export type { 
+  MCPEval, 
+  MCPEvaluator, 
+  MCPEvalConfig, 
+  MCPEvalSetupConfig, 
+  MCPRunOptions,
+  MCPEvalResult, 
+  ToolCallRecord, 
+  JudgeResult,
+  JudgeCriterion,
+  JudgeOptions,
+  CriterionJudgeResult,
+  TokenUsage,
+  TokenPricing,
+  MCPSession,
+  BatchEvalCase,
+  BatchCaseResult,
+  BatchSummary,
+  BatchResult,
+  BatchOptions,
+  RetryConfig,
+  RateLimitConfig,
+  ResilienceConfig,
+  ToolErrorConfig,
+  ErrorInjectionConfig,
+  ProviderType,
+} from "./eval/mcp";
 
 // =============================================================================
 // ERROR EXPORTS
@@ -124,7 +150,22 @@ export { createMockHost, createTestEnvironment, TestEnvironmentBuilder } from ".
 export { createLLMEvaluator, criteria } from "./eval/llm";
 
 // MCP evaluation (LLM uses MCP tools) - the correct way to eval
-export { createMCPEval, setupMCPEval, describeEval, hasOpenAIKey } from "./eval/mcp";
+export { 
+  createMCPEval, 
+  setupMCPEval, 
+  describeEval, 
+  hasOpenAIKey,
+  hasAnthropicKey,
+  hasAnyProviderKey,
+  createSession,
+  runBatch,
+  printBatchSummary,
+  MCPEvalReporter,
+  getReporter,
+  getGlobalCollector,
+  clearGlobalCollector,
+  printGlobalSummary,
+} from "./eval/mcp";
 
 // Eval reporting
 export { EvalReporter, createEvalReporter } from "./eval/reporter";

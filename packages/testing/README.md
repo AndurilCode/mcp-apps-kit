@@ -561,13 +561,14 @@ import { it, expect, beforeAll, afterAll } from "vitest";
 import { setupMCPEval, describeEval } from "@mcp-apps-kit/testing";
 import { app } from "./app";
 
-// describeEval auto-skips tests if OPENAI_API_KEY is not set
+// describeEval auto-skips tests if no LLM provider key is set
 describeEval("MCP Eval Tests", () => {
   let mcpEval;
 
   beforeAll(async () => {
     mcpEval = await setupMCPEval(app, { 
       version: "v1",
+      provider: "openai", // or "anthropic" (auto-detected from env vars if not specified)
       model: "gpt-4o-mini",
     });
   });
@@ -588,6 +589,116 @@ describeEval("MCP Eval Tests", () => {
     const judgment = await result.judge("Should be friendly");
     expect(judgment.pass).toBe(true);
   });
+});
+```
+
+#### Multi-Turn Conversations
+
+Use sessions for multi-turn conversations where context is maintained:
+
+```ts
+const session = mcpEval.createSession();
+
+// First turn
+const r1 = await session.run("Create a user named Alice");
+
+// Second turn (automatically has context from first)
+const r2 = await session.run("Now greet that user");
+
+// Check total usage across the session
+console.log(session.getUsage().totalTokens);
+
+// Clean up
+session.end();
+```
+
+Or pass history manually:
+
+```ts
+const result1 = await mcpEval.run("Create a user named Alice");
+const result2 = await mcpEval.run("Now greet that user", { 
+  history: result1.history 
+});
+```
+
+#### Batch Evaluation
+
+Run multiple evaluations and get aggregated results:
+
+```ts
+const batch = await mcpEval.runBatch([
+  { prompt: "Greet Alice", expect: { tool: "greet", args: { name: "Alice" } } },
+  { prompt: "Greet Bob", expect: { tool: "greet", args: { name: "Bob" } } },
+  { prompt: "Greet José", judgeCriteria: "Should greet with proper accent" },
+]);
+
+expect(batch.summary.successRate).toBe(1.0);
+console.log(`Passed: ${batch.summary.passed}/${batch.summary.total}`);
+
+// Failed cases for debugging
+for (const failure of batch.failures) {
+  console.log(`${failure.name}: ${failure.toolAssertion?.reason}`);
+}
+```
+
+#### Multi-Criteria Judging
+
+Judge responses against multiple criteria at once:
+
+```ts
+const judgment = await result.judge({
+  criteria: [
+    { name: "friendly", description: "Response should be friendly" },
+    { name: "accurate", description: "Response should mention the name" },
+    { name: "concise", description: "Response should be under 50 words" },
+  ],
+  threshold: 0.8,
+});
+
+expect(judgment.pass).toBe(true);
+expect(judgment.criteria?.friendly.pass).toBe(true);
+expect(judgment.criteria?.accurate.score).toBeGreaterThan(0.9);
+```
+
+#### Error Injection
+
+Test how the LLM handles tool errors:
+
+```ts
+// Configure mock errors at setup
+const mcpEval = await setupMCPEval(app, {
+  version: "v1",
+  mockErrors: {
+    "greet": { error: "Service unavailable", probability: 0.5 }
+  }
+});
+
+// Or inject error for a specific run
+const result = await mcpEval.run("Greet Alice", {
+  injectError: { tool: "greet", error: "Network timeout" }
+});
+
+expect(result.toolCalls).toContainEqual(
+  expect.objectContaining({ name: "greet", success: false })
+);
+```
+
+#### Retry and Rate Limiting
+
+Configure resilience for production-grade evaluations:
+
+```ts
+const mcpEval = await setupMCPEval(app, {
+  version: "v1",
+  retry: {
+    maxAttempts: 3,
+    delay: 1000,
+    backoff: "exponential",
+  },
+  timeout: 30000,
+  rateLimit: {
+    requestsPerMinute: 60,
+  },
 });
 ```
 
@@ -626,11 +737,16 @@ When `verbose: true`, the evaluator automatically reports results:
 | -------------- | ------- | -------------- | ------------------------------------ |
 | `version`      | string  | -              | API version (e.g., "v1", "v2")       |
 | `port`         | number  | auto           | Server port (auto-assigned if not set) |
-| `model`        | string  | `gpt-4o-mini`  | OpenAI model to use                  |
-| `apiKey`       | string  | env var        | OpenAI API key                       |
+| `provider`     | string  | auto-detect    | LLM provider: "openai" or "anthropic" |
+| `model`        | string  | provider default | Model to use                        |
+| `apiKey`       | string  | env var        | API key for provider                 |
 | `maxTokens`    | number  | `1024`         | Maximum tokens for response          |
 | `systemPrompt` | string  | -              | Custom system prompt for the agent   |
 | `verbose`      | boolean | `true`         | Enable console output                |
+| `retry`        | object  | -              | Retry config (maxAttempts, delay, backoff) |
+| `rateLimit`    | object  | -              | Rate limit config (requestsPerMinute) |
+| `timeout`      | number  | `60000`        | Timeout per evaluation in ms         |
+| `mockErrors`   | object  | -              | Tool error injection config          |
 
 #### ToolCallRecord Properties
 
@@ -785,14 +901,19 @@ expect(result).toContainToolText("Alice");
 
 ### LLM Evaluation
 
-| Function                     | Description                                |
-| ---------------------------- | ------------------------------------------ |
-| `setupMCPEval(app, config)`  | Setup MCP evaluator from app (simplified)  |
-| `createMCPEval(client, cfg)` | Create MCP evaluator from client (manual)  |
-| `describeEval`               | `describe` that skips if no API key        |
-| `hasOpenAIKey()`             | Check if OPENAI_API_KEY is set             |
-| `createLLMEvaluator(config)` | Create LLM evaluator for output quality    |
-| `criteria`                   | Built-in evaluation criteria               |
+| Function                      | Description                                |
+| ----------------------------- | ------------------------------------------ |
+| `setupMCPEval(app, config)`   | Setup MCP evaluator from app (simplified)  |
+| `createMCPEval(client, cfg)`  | Create MCP evaluator from client (manual)  |
+| `describeEval`                | `describe` that skips if no API key        |
+| `hasOpenAIKey()`              | Check if OPENAI_API_KEY is set             |
+| `hasAnthropicKey()`           | Check if ANTHROPIC_API_KEY is set          |
+| `hasAnyProviderKey()`         | Check if any LLM provider key is set       |
+| `createSession(evaluator)`    | Create multi-turn conversation session     |
+| `runBatch(evaluator, cases)`  | Run batch evaluation                       |
+| `printBatchSummary(result)`   | Print formatted batch summary              |
+| `createLLMEvaluator(config)`  | Create LLM evaluator for output quality    |
+| `criteria`                    | Built-in evaluation criteria               |
 
 ### Framework Adapters
 
