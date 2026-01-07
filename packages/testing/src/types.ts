@@ -4,7 +4,7 @@
  * Core types used across all testing utilities.
  */
 
-import type { Client } from "@modelcontextprotocol/sdk";
+import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { ZodSchema } from "zod";
 
 // =============================================================================

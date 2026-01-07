@@ -9,14 +9,17 @@ import type { ZodSchema } from "zod";
 import { ConfigurationError } from "../../errors";
 import { propertyLogger } from "../../debug";
 
-// Lazy-loaded fast-check module
-let fastCheckModule: typeof import("fast-check") | null = null;
-let zodFastCheckModule: typeof import("zod-fast-check") | null = null;
+// Lazy-loaded modules (use any type to avoid strict typing issues)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let fastCheckModule: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let zodFastCheckModule: any = null;
 
 /**
  * Load fast-check module (lazy, throws if not available)
  */
-function getFastCheck(): typeof import("fast-check") {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getFastCheck(): any {
   if (!fastCheckModule) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -34,7 +37,8 @@ function getFastCheck(): typeof import("fast-check") {
 /**
  * Load zod-fast-check module (lazy, throws if not available)
  */
-function getZodFastCheck(): typeof import("zod-fast-check") {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getZodFastCheck(): any {
   if (!zodFastCheckModule) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -50,8 +54,8 @@ function getZodFastCheck(): typeof import("zod-fast-check") {
 }
 
 // Type for fast-check Arbitrary
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Arbitrary<T> = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
+type Arbitrary<_T> = any;
 
 /**
  * Built-in value generators for property testing
@@ -113,6 +117,7 @@ export const generators = {
   /**
    * Generate random arrays
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   array<T>(gen: Arbitrary<T>, options?: { minLength?: number; maxLength?: number }): Arbitrary<T[]> {
     propertyLogger("Creating array generator with options: %o", options);
     const fc = getFastCheck();
@@ -125,10 +130,11 @@ export const generators = {
   /**
    * Generate random objects
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   object<T>(shape: { [K in keyof T]: Arbitrary<T[K]> }): Arbitrary<T> {
     propertyLogger("Creating object generator");
     const fc = getFastCheck();
-    return fc.record(shape as Record<string, Arbitrary<unknown>>);
+    return fc.record(shape);
   },
 
   /**
@@ -137,7 +143,7 @@ export const generators = {
   oneOf<T>(...values: T[]): Arbitrary<T> {
     propertyLogger("Creating oneOf generator with %d values", values.length);
     const fc = getFastCheck();
-    return fc.oneof(...values.map((v) => fc.constant(v)));
+    return fc.oneof(...values.map((v: T) => fc.constant(v)));
   },
 
   /**
@@ -156,6 +162,7 @@ export const generators = {
     propertyLogger("Creating generator from Zod schema");
     const zodFastCheck = getZodFastCheck();
     const fc = getFastCheck();
-    return zodFastCheck.arbitrary(schema, { fc });
+    // zod-fast-check exports ZodFastCheck with an arbitrary method
+    return zodFastCheck.ZodFastCheck().arbitrary(schema, { fc });
   },
 };

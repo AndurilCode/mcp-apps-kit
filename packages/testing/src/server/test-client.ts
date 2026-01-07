@@ -1,8 +1,5 @@
 /**
  * Test client wrapper around MCP SDK Client
- *
- * Provides a simplified interface for testing MCP servers with
- * optional call history tracking and timeout/retry support.
  */
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -13,48 +10,24 @@ import type {
   TestClientOptions,
   ToolResult,
   ToolCall,
-  ContentBlock,
 } from "../types";
 import { ConnectionError, TimeoutError } from "../errors";
 import { clientLogger } from "../debug";
 
 /**
  * Create a test client connected to an MCP server
- *
- * @param url - MCP server endpoint URL (e.g., 'http://localhost:3000/mcp')
- * @param options - Client options
- * @returns Connected test client
- *
- * @example
- * ```typescript
- * const client = await createTestClient('http://localhost:3000/mcp', {
- *   trackHistory: true,
- *   timeout: 5000,
- * });
- * ```
  */
 export async function createTestClient(
   url: string,
   options: TestClientOptions = {}
 ): Promise<TestClient> {
-  const {
-    trackHistory = false,
-    timeout = 30000,
-    retries = 0,
-  } = options;
+  const { trackHistory = false, timeout = 30000, retries = 0 } = options;
 
   clientLogger("Creating test client for %s", url);
 
   const client = new Client(
-    {
-      name: "mcp-testing-client",
-      version: "1.0.0",
-    },
-    {
-      capabilities: {
-        tools: {},
-      },
-    }
+    { name: "mcp-testing-client", version: "1.0.0" },
+    { capabilities: {} }
   );
 
   let transport: StreamableHTTPClientTransport | undefined;
@@ -69,9 +42,6 @@ export async function createTestClient(
     throw new ConnectionError(url, `Failed to connect: ${err.message}`, err);
   }
 
-  /**
-   * Call a tool with timeout and retry support
-   */
   async function callToolWithRetry(
     name: string,
     args: unknown,
@@ -83,84 +53,49 @@ export async function createTestClient(
     try {
       clientLogger("Calling tool %s with args %o", name, args);
 
-      // Create a timeout promise
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
           reject(new TimeoutError(timeout, `Tool call timed out after ${timeout}ms`));
         }, timeout);
       });
 
-      // Call the tool with timeout
-      // Use client.request to get structuredContent (the actual structured data)
+      // Use client.request with CallToolResultSchema
       const result = await Promise.race([
         client.request(
           {
             method: "tools/call",
-            params: {
-              name,
-              arguments: args as Record<string, unknown>,
-            },
+            params: { name, arguments: args as Record<string, unknown> },
           },
           CallToolResultSchema
-        ) as { content?: Array<{ type: string; text?: string; data?: string; mimeType?: string }>; structuredContent?: unknown; isError?: boolean },
+        ),
         timeoutPromise,
       ]);
 
       const duration = Date.now() - startTime;
 
-      // Convert MCP result to ToolResult
-      // The MCP SDK's request with CallToolResultSchema returns:
-      // - content: array of content blocks (text, image, resource)
-      // - structuredContent: the actual structured data from the tool handler (when available)
-      // - isError: boolean indicating if the call failed
-      // When _text is provided, content[0].text = _text, and structuredContent = the full object
-      // When _text is not provided, content[0].text = JSON.stringify(structured), and structuredContent = the object
-      
-      const contentBlocks = (result.content ?? []).map((block) => {
+      // Build content blocks from the result
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const contentBlocks = (result.content ?? []).map((block: any) => {
         if (block.type === "text") {
-          return {
-            type: "text" as const,
-            text: block.text,
-          };
+          return { type: "text" as const, text: block.text };
         }
         if (block.type === "image") {
-          return {
-            type: "image" as const,
-            data: block.data,
-            mimeType: block.mimeType,
-          };
+          return { type: "image" as const, data: block.data, mimeType: block.mimeType };
         }
-        if (block.type === "resource") {
-          return {
-            type: "resource" as const,
-            data: block.data,
-            mimeType: block.mimeType,
-          };
-        }
-        return {
-          type: "text" as const,
-          text: String(block),
-        };
+        return { type: "text" as const, text: String(block) };
       });
 
-      // Access structuredContent from the result
-      // The CallToolResultSchema result should have structuredContent property
-      // TypeScript types might not include it, but it's there at runtime
-      const resultAny = result as unknown as Record<string, unknown>;
-      const structuredContent = resultAny.structuredContent;
+      // Access structuredContent from the raw result
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const structuredContent = (result as any).structuredContent;
 
-      // Prefer structuredContent if available (the actual structured data)
-      // This is the structured output from the tool handler
+      // If structuredContent exists, use it as the primary data
       if (structuredContent !== undefined && structuredContent !== null) {
-        // Use structuredContent as the primary data source
-        // Replace or add it as JSON in the first text block for easier testing
+        const jsonStr = JSON.stringify(structuredContent);
         if (contentBlocks.length > 0 && contentBlocks[0]?.type === "text") {
-          contentBlocks[0].text = JSON.stringify(structuredContent);
+          contentBlocks[0].text = jsonStr;
         } else {
-          contentBlocks.unshift({
-            type: "text",
-            text: JSON.stringify(structuredContent),
-          });
+          contentBlocks.unshift({ type: "text", text: jsonStr });
         }
       }
 
@@ -169,16 +104,8 @@ export async function createTestClient(
         isError: result.isError,
       };
 
-      const toolCall: ToolCall = {
-        name,
-        args,
-        result: toolResult,
-        duration,
-        timestamp,
-      };
-
       if (trackHistory) {
-        callHistory.push(toolCall);
+        callHistory.push({ name, args, result: toolResult, duration, timestamp });
       }
 
       clientLogger("Tool %s completed in %dms", name, duration);
@@ -187,22 +114,13 @@ export async function createTestClient(
       const duration = Date.now() - startTime;
       const err = error instanceof Error ? error : new Error(String(error));
 
-      // Retry logic
       if (attempt < retries && err instanceof TimeoutError) {
         clientLogger("Tool call failed, retrying (%d/%d)", attempt + 1, retries);
         return callToolWithRetry(name, args, attempt + 1);
       }
 
-      const toolCall: ToolCall = {
-        name,
-        args,
-        error: err,
-        duration,
-        timestamp,
-      };
-
       if (trackHistory) {
-        callHistory.push(toolCall);
+        callHistory.push({ name, args, error: err, duration, timestamp });
       }
 
       throw err;
@@ -236,35 +154,21 @@ export async function createTestClient(
     async readResource(uri: string) {
       const result = await client.readResource({ uri });
       return {
-        contents: result.contents.map((content) => {
-          if (content.type === "text") {
-            return {
-              type: "text" as const,
-              text: content.text,
-            };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        contents: result.contents.map((content: any) => {
+          if (content.text !== undefined) {
+            return { type: "text" as const, text: content.text };
           }
-          if (content.type === "image") {
-            return {
-              type: "image" as const,
-              data: content.data,
-              mimeType: content.mimeType,
-            };
+          if (content.blob !== undefined) {
+            return { type: "image" as const, data: content.blob, mimeType: content.mimeType };
           }
-          return {
-            type: "text" as const,
-            text: String(content),
-          };
+          return { type: "text" as const, text: String(content) };
         }),
       };
     },
 
-    getCallHistory(): ToolCall[] {
-      return [...callHistory];
-    },
-
-    clearHistory(): void {
-      callHistory.length = 0;
-    },
+    getCallHistory: () => [...callHistory],
+    clearHistory: () => { callHistory.length = 0; },
 
     async disconnect(): Promise<void> {
       clientLogger("Disconnecting client");

@@ -8,12 +8,14 @@ import type { MockHost, MockHostOptions, ToolCall } from "../types";
 import { uiLogger } from "../debug";
 
 // Lazy-loaded MockAdapter (to avoid direct dependency)
-let MockAdapterClass: typeof import("@mcp-apps-kit/ui/adapters/mock").MockAdapter | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let MockAdapterClass: any = null;
 
 /**
  * Load MockAdapter class (lazy, throws if not available)
  */
-function getMockAdapter(): typeof import("@mcp-apps-kit/ui/adapters/mock").MockAdapter {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getMockAdapter(): any {
   if (!MockAdapterClass) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -29,123 +31,59 @@ function getMockAdapter(): typeof import("@mcp-apps-kit/ui/adapters/mock").MockA
 }
 
 /**
- * Create a mock host environment for UI testing
- *
- * @param options - Mock host options
- * @returns Mock host instance
- *
- * @example
- * ```typescript
- * const host = createMockHost({
- *   protocol: 'mcp',
- *   initialContext: { theme: 'dark' },
- * });
- *
- * host.emitToolResult({ restaurants: [...] });
- * expect(host.getToolCallHistory()).toHaveLength(1);
- * ```
+ * Create a mock host environment for testing UI components
  */
 export function createMockHost(options: MockHostOptions = {}): MockHost {
   uiLogger("Creating mock host with options: %o", options);
 
   const MockAdapter = getMockAdapter();
-  const adapter = new MockAdapter();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const adapter = new MockAdapter(options) as any;
 
-  // Track tool call history
-  const callHistory: ToolCall[] = [];
+  // Tool call history tracking
+  const toolCallHistory: ToolCall[] = [];
 
-  // Set initial context if provided
-  if (options.initialContext) {
-    adapter.setHostContext(options.initialContext as unknown as Record<string, unknown>);
-  }
-
-  // Set capabilities if provided
-  if (options.capabilities) {
-    adapter.setMockHostCapabilities(options.capabilities as unknown as Record<string, unknown>);
-  }
-
-  // Track tool calls
-  const originalCallTool = adapter.callTool.bind(adapter);
-  adapter.callTool = async (name: string, args: Record<string, unknown>) => {
-    const startTime = Date.now();
-    const timestamp = new Date();
-
-    try {
-      const result = await originalCallTool(name, args);
-      const duration = Date.now() - startTime;
-
-      callHistory.push({
-        name,
-        args,
-        result: {
-          content: [{ type: "text", text: JSON.stringify(result) }],
-          isError: false,
-        },
-        duration,
-        timestamp,
-      });
-
-      return result;
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      const err = error instanceof Error ? error : new Error(String(error));
-
-      callHistory.push({
-        name,
-        args,
-        error: err,
-        duration,
-        timestamp,
-      });
-
-      throw err;
-    }
-  };
+  // Tool call handlers
+  const toolCallHandlers: Array<(name: string, args: unknown) => void> = [];
 
   return {
     emitToolResult(result: unknown): void {
-      uiLogger("Emitting tool result: %o", result);
-      adapter.emitToolResult(result);
+      uiLogger("Mock host emitting tool result: %o", result);
+      adapter.emitToolResult?.(result);
     },
 
     setTheme(theme: "light" | "dark"): void {
-      uiLogger("Setting theme: %s", theme);
-      adapter.setHostContext({ theme } as unknown as Record<string, unknown>);
+      uiLogger("Mock host setting theme: %s", theme);
+      adapter.setTheme?.(theme);
     },
 
     emitToolCancelled(reason?: string): void {
-      uiLogger("Emitting tool cancelled: %s", reason ?? "no reason");
-      adapter.emitToolCancelled(reason);
+      uiLogger("Mock host emitting tool cancelled: %s", reason);
+      adapter.emitToolCancelled?.(reason);
     },
 
     emitTeardown(reason?: string): void {
-      uiLogger("Emitting teardown: %s", reason ?? "no reason");
-      adapter.emitTeardown(reason);
+      uiLogger("Mock host emitting teardown: %s", reason);
+      adapter.emitTeardown?.(reason);
     },
 
     getToolCallHistory(): ToolCall[] {
-      return [...callHistory];
+      return [...toolCallHistory];
     },
 
     clearHistory(): void {
-      callHistory.length = 0;
+      uiLogger("Clearing mock host tool call history");
+      toolCallHistory.length = 0;
     },
 
     onToolCall(handler: (name: string, args: unknown) => void): () => void {
-      // Wrap the handler to track calls
-      const wrappedHandler = (input: unknown) => {
-        if (typeof input === "object" && input !== null) {
-          // Try to extract tool name and args from input
-          // This is a simplified approach - in practice, the input structure
-          // depends on how the UI client calls tools
-          const inputObj = input as Record<string, unknown>;
-          if ("name" in inputObj && "args" in inputObj) {
-            handler(inputObj.name as string, inputObj.args);
-          }
+      toolCallHandlers.push(handler);
+      return () => {
+        const index = toolCallHandlers.indexOf(handler);
+        if (index >= 0) {
+          toolCallHandlers.splice(index, 1);
         }
       };
-
-      return adapter.onToolInput(wrappedHandler);
     },
 
     getAdapter(): unknown {

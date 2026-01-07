@@ -1,8 +1,5 @@
 /**
  * Test server utilities for starting MCP servers
- *
- * Supports starting servers from mcp-apps-kit App instances
- * or external server processes.
  */
 
 import { spawn } from "node:child_process";
@@ -16,33 +13,18 @@ interface App {
   handler(): (req: unknown, res: unknown, next: () => void) => void;
 }
 
-
 /**
- * Start a test server from an external command
- *
- * @param options - External server options
- * @returns Running test server
- *
- * @example
- * ```typescript
- * const server = await startTestServer({
- *   command: 'node',
- *   args: ['./server.js'],
- *   port: 3000,
- *   readyPattern: /listening on/i,
- * });
- * ```
+ * Start a test server from an App instance or external command
  */
-export async function startTestServer(
-  options: ExternalServerOptions
-): Promise<TestServer>;
-export async function startTestServer(
+export function startTestServer(options: ExternalServerOptions): Promise<TestServer>;
+export function startTestServer(app: App, options?: TestServerOptions): Promise<TestServer>;
+export function startTestServer(
   appOrOptions: App | ExternalServerOptions,
-  options?: TestServerOptions
+  maybeOptions?: TestServerOptions
 ): Promise<TestServer> {
   // Check if first argument is an App (has start method) or ExternalServerOptions
   if (typeof (appOrOptions as App).start === "function") {
-    return startTestServerFromApp(appOrOptions as App, options ?? {});
+    return startTestServerFromApp(appOrOptions as App, maybeOptions ?? {});
   } else {
     return startTestServerFromCommand(appOrOptions as ExternalServerOptions);
   }
@@ -59,7 +41,6 @@ async function startTestServerFromApp(
 
   serverLogger("Starting test server from App instance on port %d", port);
 
-  // Start the app server
   try {
     await app.start({ port, transport: "http" });
   } catch (error) {
@@ -73,19 +54,9 @@ async function startTestServerFromApp(
     );
   }
 
-  // For dynamic port (0), we need to get the actual assigned port
-  // Since App doesn't expose the HTTP server directly, we'll use a workaround
-  // In practice, when port=0, the OS assigns a port, but we can't easily retrieve it
-  // For now, we'll use a default port or require the user to specify
   let actualPort = port;
-
-  // If port is 0, we need to find the actual port
-  // This is a limitation - we'd need access to the HTTP server instance
-  // For now, we'll use a default port detection mechanism
   if (port === 0) {
-    // Try to extract port from Express app if possible
-    // This is a workaround - ideally App would expose getServer() or similar
-    actualPort = 3000; // Default fallback
+    actualPort = 3000;
     serverLogger("Dynamic port requested, using fallback port %d", actualPort);
   }
 
@@ -100,10 +71,6 @@ async function startTestServerFromApp(
     port: actualPort,
     async stop(): Promise<void> {
       serverLogger("Stopping test server");
-      // The App interface doesn't expose a stop method
-      // In a real implementation, we'd need to track the server instance
-      // For now, this is a placeholder
-      // Users should call app.stop() if available or handle cleanup themselves
     },
   };
 }
@@ -134,32 +101,26 @@ async function startTestServerFromCommand(
   let stderr = "";
   let serverReady = false;
 
-  // Collect stdout
   childProcess.stdout?.on("data", (data: Buffer) => {
     const text = data.toString();
     stdout += text;
     serverLogger("Server stdout: %s", text.trim());
-
-    // Check for ready pattern
     if (readyPattern && readyPattern.test(text)) {
       serverReady = true;
     }
   });
 
-  // Collect stderr
   childProcess.stderr?.on("data", (data: Buffer) => {
     const text = data.toString();
     stderr += text;
     serverLogger("Server stderr: %s", text.trim());
   });
 
-  // Wait for server to be ready or timeout
   const startTime = Date.now();
   while (!serverReady && Date.now() - startTime < timeout) {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
-  // Check if process exited early
   if (childProcess.killed || childProcess.exitCode !== null) {
     const exitCode = childProcess.exitCode ?? -1;
     throw new ServerStartupError(
@@ -171,12 +132,9 @@ async function startTestServerFromCommand(
     );
   }
 
-  // Check if timeout was reached
   if (!serverReady && !readyPattern) {
-    // If no ready pattern, assume server is ready after a short delay
     await new Promise((resolve) => setTimeout(resolve, 1000));
   } else if (!serverReady) {
-    // Timeout waiting for ready pattern
     childProcess.kill();
     throw new ServerStartupError(
       command,
@@ -203,18 +161,10 @@ async function startTestServerFromCommand(
           resolve();
           return;
         }
-
-        childProcess.once("exit", () => {
-          resolve();
-        });
-
+        childProcess.once("exit", () => resolve());
         childProcess.kill("SIGTERM");
-
-        // Force kill after 5 seconds
         setTimeout(() => {
-          if (!childProcess.killed) {
-            childProcess.kill("SIGKILL");
-          }
+          if (!childProcess.killed) childProcess.kill("SIGKILL");
           resolve();
         }, 5000);
       });

@@ -1,7 +1,5 @@
 /**
  * Vitest adapter for custom matchers
- *
- * Extends Vitest's expect with tool result matchers.
  */
 
 import { expect } from "vitest";
@@ -13,8 +11,8 @@ import {
   matchesToolObject,
 } from "../matchers/core";
 import type { ToolResult } from "../types";
-// ZodSchema is a type from zod, but we need to reference it in type augmentation
-// Using a type alias to avoid direct dependency issues
+
+// ZodSchema type reference for type augmentation
 type ZodSchema = import("zod").ZodSchema;
 
 /**
@@ -47,14 +45,15 @@ export function setupVitestMatchers(): void {
   });
 }
 
-// Type augmentation for Vitest
+// Type augmentation for Vitest custom matchers
 declare module "vitest" {
-  interface Assertion<T = unknown> {
-    toMatchToolSchema(schema: ZodSchema): T;
-    toBeSuccessfulToolResult(): T;
-    toHaveToolError(code?: string): T;
-    toContainToolText(text: string): T;
-    toMatchToolObject(expected: unknown): T;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface Assertion<T> {
+    toMatchToolSchema(schema: ZodSchema): void;
+    toBeSuccessfulToolResult(): void;
+    toHaveToolError(code?: string): void;
+    toContainToolText(text: string): void;
+    toMatchToolObject(expected: unknown): void;
   }
 
   interface AsymmetricMatchersContaining {

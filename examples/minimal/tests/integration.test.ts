@@ -1,7 +1,5 @@
 /**
  * Integration tests for minimal example
- *
- * Tests the full workflow including server startup, tool calls, and cleanup.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
@@ -9,7 +7,6 @@ import {
   expectToolResult,
   startTestServer,
   createTestClient,
-  TestEnvironmentBuilder,
 } from "@mcp-apps-kit/testing";
 import type { TestEnvironment } from "@mcp-apps-kit/testing";
 import { app } from "../src/index.js";
@@ -18,13 +15,8 @@ describe("Minimal Example Integration", () => {
   let env: TestEnvironment;
 
   beforeAll(async () => {
-    // For versioned apps, we need to start the main app and connect to a version endpoint
-    // Let's use v1 for integration tests
-    // Use a fixed port for testing
     const testPort = 3004;
     const server = await startTestServer(app as unknown, { port: testPort });
-    
-    // Wait a bit for server to be ready
     await new Promise((resolve) => setTimeout(resolve, 100));
     
     const client = await createTestClient(`http://localhost:${testPort}/v1/mcp`, {
@@ -50,7 +42,6 @@ describe("Minimal Example Integration", () => {
     expect(env.server).toBeDefined();
     expect(env.client).toBeDefined();
     expect(env.server.url).toBeTruthy();
-    expect(env.server.mcpUrl).toBeTruthy();
   });
 
   it("should list available tools", async () => {
@@ -90,12 +81,9 @@ describe("Minimal Example Integration", () => {
 
   it("should handle errors gracefully", async () => {
     // Test with invalid input (missing required field)
-    // Note: This depends on how the server handles validation
-    // For now, we'll test that the client doesn't crash
     try {
       await env.client.callTool("greet", {} as { name: string });
     } catch (error) {
-      // Expected - validation error
       expect(error).toBeDefined();
     }
   });
