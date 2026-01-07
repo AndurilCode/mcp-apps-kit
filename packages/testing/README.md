@@ -566,7 +566,7 @@ describeEval("MCP Eval Tests", () => {
   let mcpEval;
 
   beforeAll(async () => {
-    mcpEval = await setupMCPEval(app, { 
+    mcpEval = await setupMCPEval(app, {
       version: "v1",
       provider: "openai", // or "anthropic" (auto-detected from env vars if not specified)
       model: "gpt-4o-mini",
@@ -616,8 +616,8 @@ Or pass history manually:
 
 ```ts
 const result1 = await mcpEval.run("Create a user named Alice");
-const result2 = await mcpEval.run("Now greet that user", { 
-  history: result1.history 
+const result2 = await mcpEval.run("Now greet that user", {
+  history: result1.history,
 });
 ```
 
@@ -669,18 +669,16 @@ Test how the LLM handles tool errors:
 const mcpEval = await setupMCPEval(app, {
   version: "v1",
   mockErrors: {
-    "greet": { error: "Service unavailable", probability: 0.5 }
-  }
+    greet: { error: "Service unavailable", probability: 0.5 },
+  },
 });
 
 // Or inject error for a specific run
 const result = await mcpEval.run("Greet Alice", {
-  injectError: { tool: "greet", error: "Network timeout" }
+  injectError: { tool: "greet", error: "Network timeout" },
 });
 
-expect(result.toolCalls).toContainEqual(
-  expect.objectContaining({ name: "greet", success: false })
-);
+expect(result.toolCalls).toContainEqual(expect.objectContaining({ name: "greet", success: false }));
 ```
 
 #### Retry and Rate Limiting
@@ -733,42 +731,42 @@ When `verbose: true`, the evaluator automatically reports results:
 
 #### setupMCPEval Options
 
-| Option         | Type    | Default        | Description                          |
-| -------------- | ------- | -------------- | ------------------------------------ |
-| `version`      | string  | -              | API version (e.g., "v1", "v2")       |
-| `port`         | number  | auto           | Server port (auto-assigned if not set) |
-| `provider`     | string  | auto-detect    | LLM provider: "openai" or "anthropic" |
-| `model`        | string  | provider default | Model to use                        |
-| `apiKey`       | string  | env var        | API key for provider                 |
-| `maxTokens`    | number  | `1024`         | Maximum tokens for response          |
-| `systemPrompt` | string  | -              | Custom system prompt for the agent   |
-| `verbose`      | boolean | `true`         | Enable console output                |
-| `retry`        | object  | -              | Retry config (maxAttempts, delay, backoff) |
-| `rateLimit`    | object  | -              | Rate limit config (requestsPerMinute) |
-| `timeout`      | number  | `60000`        | Timeout per evaluation in ms         |
-| `mockErrors`   | object  | -              | Tool error injection config          |
+| Option         | Type    | Default          | Description                                |
+| -------------- | ------- | ---------------- | ------------------------------------------ |
+| `version`      | string  | -                | API version (e.g., "v1", "v2")             |
+| `port`         | number  | auto             | Server port (auto-assigned if not set)     |
+| `provider`     | string  | auto-detect      | LLM provider: "openai" or "anthropic"      |
+| `model`        | string  | provider default | Model to use                               |
+| `apiKey`       | string  | env var          | API key for provider                       |
+| `maxTokens`    | number  | `1024`           | Maximum tokens for response                |
+| `systemPrompt` | string  | -                | Custom system prompt for the agent         |
+| `verbose`      | boolean | `true`           | Enable console output                      |
+| `retry`        | object  | -                | Retry config (maxAttempts, delay, backoff) |
+| `rateLimit`    | object  | -                | Rate limit config (requestsPerMinute)      |
+| `timeout`      | number  | `60000`          | Timeout per evaluation in ms               |
+| `mockErrors`   | object  | -                | Tool error injection config                |
 
 #### ToolCallRecord Properties
 
 Each tool call in `result.toolCalls` contains:
 
-| Property  | Type                    | Description                    |
-| --------- | ----------------------- | ------------------------------ |
-| `name`    | string                  | Tool name                      |
-| `args`    | Record<string, unknown> | Arguments passed to the tool   |
-| `result`  | unknown                 | Result returned by the tool    |
+| Property  | Type                    | Description                     |
+| --------- | ----------------------- | ------------------------------- |
+| `name`    | string                  | Tool name                       |
+| `args`    | Record<string, unknown> | Arguments passed to the tool    |
+| `result`  | unknown                 | Result returned by the tool     |
 | `success` | boolean                 | Whether the tool call succeeded |
-| `error`   | string \| undefined     | Error message if failed        |
+| `error`   | string \| undefined     | Error message if failed         |
 
 #### JudgeResult Properties
 
 The `result.judge()` method returns:
 
-| Property      | Type    | Description                         |
-| ------------- | ------- | ----------------------------------- |
+| Property      | Type    | Description                          |
+| ------------- | ------- | ------------------------------------ |
 | `pass`        | boolean | Whether the response passes criteria |
-| `score`       | number  | Score from 0-1                      |
-| `explanation` | string  | Explanation from the judge          |
+| `score`       | number  | Score from 0-1                       |
+| `explanation` | string  | Explanation from the judge           |
 
 ### Output Quality Evaluation
 
@@ -901,19 +899,19 @@ expect(result).toContainToolText("Alice");
 
 ### LLM Evaluation
 
-| Function                      | Description                                |
-| ----------------------------- | ------------------------------------------ |
-| `setupMCPEval(app, config)`   | Setup MCP evaluator from app (simplified)  |
-| `createMCPEval(client, cfg)`  | Create MCP evaluator from client (manual)  |
-| `describeEval`                | `describe` that skips if no API key        |
-| `hasOpenAIKey()`              | Check if OPENAI_API_KEY is set             |
-| `hasAnthropicKey()`           | Check if ANTHROPIC_API_KEY is set          |
-| `hasAnyProviderKey()`         | Check if any LLM provider key is set       |
-| `createSession(evaluator)`    | Create multi-turn conversation session     |
-| `runBatch(evaluator, cases)`  | Run batch evaluation                       |
-| `printBatchSummary(result)`   | Print formatted batch summary              |
-| `createLLMEvaluator(config)`  | Create LLM evaluator for output quality    |
-| `criteria`                    | Built-in evaluation criteria               |
+| Function                     | Description                               |
+| ---------------------------- | ----------------------------------------- |
+| `setupMCPEval(app, config)`  | Setup MCP evaluator from app (simplified) |
+| `createMCPEval(client, cfg)` | Create MCP evaluator from client (manual) |
+| `describeEval`               | `describe` that skips if no API key       |
+| `hasOpenAIKey()`             | Check if OPENAI_API_KEY is set            |
+| `hasAnthropicKey()`          | Check if ANTHROPIC_API_KEY is set         |
+| `hasAnyProviderKey()`        | Check if any LLM provider key is set      |
+| `createSession(evaluator)`   | Create multi-turn conversation session    |
+| `runBatch(evaluator, cases)` | Run batch evaluation                      |
+| `printBatchSummary(result)`  | Print formatted batch summary             |
+| `createLLMEvaluator(config)` | Create LLM evaluator for output quality   |
+| `criteria`                   | Built-in evaluation criteria              |
 
 ### Framework Adapters
 

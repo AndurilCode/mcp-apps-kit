@@ -49,7 +49,7 @@ export async function createOpenAIProvider(config: ProviderConfig): Promise<LLMP
           return {
             role: "tool" as const,
             content: msg.content,
-            tool_call_id: msg.toolCallId!,
+            tool_call_id: msg.toolCallId ?? "",
           };
         }
         if (msg.role === "assistant" && msg.toolCalls) {
@@ -67,7 +67,7 @@ export async function createOpenAIProvider(config: ProviderConfig): Promise<LLMP
           };
         }
         return {
-          role: msg.role as "system" | "user" | "assistant",
+          role: msg.role,
           content: msg.content,
         };
       });
@@ -84,7 +84,9 @@ export async function createOpenAIProvider(config: ProviderConfig): Promise<LLMP
       const completion = await openai.chat.completions.create({
         model,
         max_tokens: maxTokens,
-        messages: openaiMessages as Parameters<typeof openai.chat.completions.create>[0]["messages"],
+        messages: openaiMessages as Parameters<
+          typeof openai.chat.completions.create
+        >[0]["messages"],
         tools: openaiTools && openaiTools.length > 0 ? openaiTools : undefined,
       });
 
@@ -162,7 +164,7 @@ export async function createOpenAIProvider(config: ProviderConfig): Promise<LLMP
 
 function safeParseJSON(str: string): Record<string, unknown> {
   try {
-    return JSON.parse(str);
+    return JSON.parse(str) as Record<string, unknown>;
   } catch {
     return {};
   }

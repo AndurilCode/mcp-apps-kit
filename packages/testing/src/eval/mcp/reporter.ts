@@ -121,9 +121,7 @@ export class MCPEvalReporter {
     // Report multi-criteria results if present
     if (judgment.criteria) {
       for (const [name, criterion] of Object.entries(judgment.criteria)) {
-        const criterionStatus = criterion.pass
-          ? color("✓", colors.green)
-          : color("✗", colors.red);
+        const criterionStatus = criterion.pass ? color("✓", colors.green) : color("✗", colors.red);
         console.log(
           color(`    ${name}:`, colors.gray),
           criterionStatus,
@@ -164,9 +162,8 @@ export class MCPEvalReporter {
 
     // Main stats
     const passedStr = color(String(summary.passed), colors.green);
-    const failedStr = summary.failed > 0 
-      ? color(String(summary.failed), colors.red)
-      : String(summary.failed);
+    const failedStr =
+      summary.failed > 0 ? color(String(summary.failed), colors.red) : String(summary.failed);
     console.log(
       `Total: ${summary.total} | Passed: ${passedStr} | Failed: ${failedStr} | Success Rate: ${formatPercent(summary.successRate)}`
     );
@@ -177,9 +174,7 @@ export class MCPEvalReporter {
       console.log(color("Tool Usage:", colors.cyan));
       for (const [tool, stats] of Object.entries(summary.toolStats)) {
         const successRate = stats.calls > 0 ? stats.successes / stats.calls : 0;
-        console.log(
-          `  ${tool}: ${stats.calls} calls (${formatPercent(successRate)} success)`
-        );
+        console.log(`  ${tool}: ${stats.calls} calls (${formatPercent(successRate)} success)`);
       }
     }
 
@@ -233,9 +228,7 @@ export class MCPEvalReporter {
   reportBatchCase(caseResult: BatchCaseResult, index: number): void {
     if (!this.verbose) return;
 
-    const status = caseResult.passed
-      ? color("[PASS]", colors.green)
-      : color("[FAIL]", colors.red);
+    const status = caseResult.passed ? color("[PASS]", colors.green) : color("[FAIL]", colors.red);
 
     console.log(`  ${index + 1}. ${caseResult.name}: ${status}`);
 
@@ -252,14 +245,13 @@ export class MCPEvalReporter {
     if (!this.verbose) return;
 
     const percent = ((current / total) * 100).toFixed(0);
-    const bar = "█".repeat(Math.floor(current / total * 20)) + 
-                "░".repeat(20 - Math.floor(current / total * 20));
-    
+    const bar =
+      "█".repeat(Math.floor((current / total) * 20)) +
+      "░".repeat(20 - Math.floor((current / total) * 20));
+
     // Use carriage return to overwrite line (works in TTY)
     if (process.stdout?.isTTY) {
-      process.stdout.write(
-        `\r[${bar}] ${current}/${total} (${percent}%) - ${passed} passed`
-      );
+      process.stdout.write(`\r[${bar}] ${current}/${total} (${percent}%) - ${passed} passed`);
       if (current === total) {
         console.log(""); // New line when done
       }
@@ -274,7 +266,7 @@ let defaultReporter: MCPEvalReporter | null = null;
  * Get or create the default reporter
  */
 export function getReporter(verbose: boolean = true): MCPEvalReporter {
-  if (!defaultReporter || defaultReporter["verbose"] !== verbose) {
+  if (defaultReporter?.["verbose"] !== verbose) {
     defaultReporter = new MCPEvalReporter(verbose);
   }
   return defaultReporter;
@@ -340,7 +332,7 @@ class GlobalResultsCollector {
     }
 
     const totalDuration = Date.now() - this.startTime;
-    
+
     // Aggregate stats
     let totalTokens = 0;
     let totalPromptTokens = 0;
@@ -357,7 +349,7 @@ class GlobalResultsCollector {
         totalTokens += result.usage.totalTokens;
         totalPromptTokens += result.usage.promptTokens;
         totalCompletionTokens += result.usage.completionTokens;
-        
+
         if (result.usage.estimatedCost) {
           hasCost = true;
           const costStr = result.usage.estimatedCost.replace(/[$¢]/g, "");
@@ -367,16 +359,15 @@ class GlobalResultsCollector {
 
       // Tool usage
       for (const tc of result.toolCalls) {
-        if (!toolStats[tc.name]) {
-          toolStats[tc.name] = { calls: 0, successes: 0, failures: 0 };
-        }
-        const stats = toolStats[tc.name]!;
+        const existing = toolStats[tc.name];
+        const stats = existing ?? { calls: 0, successes: 0, failures: 0 };
         stats.calls++;
         if (tc.success) {
           stats.successes++;
         } else {
           stats.failures++;
         }
+        toolStats[tc.name] = stats;
       }
 
       // Judge results
@@ -392,7 +383,11 @@ class GlobalResultsCollector {
     // Print summary
     console.log("");
     console.log(color("╔" + "═".repeat(58) + "╗", colors.cyan));
-    console.log(color("║", colors.cyan) + color("  MCP EVAL GLOBAL SUMMARY".padEnd(58), colors.bold) + color("║", colors.cyan));
+    console.log(
+      color("║", colors.cyan) +
+        color("  MCP EVAL GLOBAL SUMMARY".padEnd(58), colors.bold) +
+        color("║", colors.cyan)
+    );
     console.log(color("╚" + "═".repeat(58) + "╝", colors.cyan));
     console.log("");
 
@@ -400,14 +395,18 @@ class GlobalResultsCollector {
     console.log(color("Overview:", colors.cyan));
     console.log(`  Total Evaluations: ${this.results.length}`);
     console.log(`  Total Duration: ${(totalDuration / 1000).toFixed(1)}s`);
-    console.log(`  Avg Duration: ${(this.results.reduce((a, r) => a + r.duration, 0) / this.results.length).toFixed(0)}ms per eval`);
+    console.log(
+      `  Avg Duration: ${(this.results.reduce((a, r) => a + r.duration, 0) / this.results.length).toFixed(0)}ms per eval`
+    );
     console.log("");
 
     // Token usage
     if (totalTokens > 0) {
       console.log(color("Token Usage:", colors.cyan));
       console.log(`  Total: ${totalTokens.toLocaleString()} tokens`);
-      console.log(`  Input: ${totalPromptTokens.toLocaleString()} | Output: ${totalCompletionTokens.toLocaleString()}`);
+      console.log(
+        `  Input: ${totalPromptTokens.toLocaleString()} | Output: ${totalCompletionTokens.toLocaleString()}`
+      );
       if (hasCost) {
         console.log(`  Est. Cost: $${totalCost.toFixed(6)}`);
       }
@@ -419,9 +418,7 @@ class GlobalResultsCollector {
       console.log(color("Tool Usage:", colors.cyan));
       for (const [tool, stats] of Object.entries(toolStats)) {
         const successRate = stats.calls > 0 ? stats.successes / stats.calls : 0;
-        console.log(
-          `  ${tool}: ${stats.calls} calls (${formatPercent(successRate)} success)`
-        );
+        console.log(`  ${tool}: ${stats.calls} calls (${formatPercent(successRate)} success)`);
       }
       console.log("");
     }
@@ -433,8 +430,8 @@ class GlobalResultsCollector {
       console.log(color("Judge Results:", colors.cyan));
       console.log(
         `  Passed: ${color(String(judgePassCount), colors.green)} | ` +
-        `Failed: ${color(String(judgeFailCount), judgeFailCount > 0 ? colors.red : colors.green)} | ` +
-        `Pass Rate: ${formatPercent(passRate)}`
+          `Failed: ${color(String(judgeFailCount), judgeFailCount > 0 ? colors.red : colors.green)} | ` +
+          `Pass Rate: ${formatPercent(passRate)}`
       );
       console.log("");
     }
@@ -469,13 +466,12 @@ class GlobalResultsCollector {
       }
 
       for (const tc of result.toolCalls) {
-        if (!toolStats[tc.name]) {
-          toolStats[tc.name] = { calls: 0, successes: 0, failures: 0 };
-        }
-        const stats = toolStats[tc.name]!;
+        const existing = toolStats[tc.name];
+        const stats = existing ?? { calls: 0, successes: 0, failures: 0 };
         stats.calls++;
         if (tc.success) stats.successes++;
         else stats.failures++;
+        toolStats[tc.name] = stats;
       }
 
       if (result.judgeResult) {
@@ -499,13 +495,13 @@ const globalCollector = new GlobalResultsCollector();
 
 /**
  * Get the global results collector
- * 
+ *
  * Use this to collect results across all tests and print a summary at the end.
- * 
+ *
  * @example
  * ```typescript
  * import { getGlobalCollector } from "@mcp-apps-kit/testing";
- * 
+ *
  * // In afterAll at the top level of your test file:
  * afterAll(() => {
  *   getGlobalCollector().printSummary();

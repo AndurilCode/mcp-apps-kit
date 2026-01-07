@@ -1,6 +1,6 @@
 /**
  * Provider types for MCP evaluation
- * 
+ *
  * Abstraction layer for different LLM providers (OpenAI, Anthropic, etc.)
  */
 
@@ -61,13 +61,10 @@ export interface ProviderConfig {
 export interface LLMProvider {
   /** Provider name */
   readonly name: "openai" | "anthropic";
-  
+
   /** Create a chat completion */
-  createCompletion(
-    messages: ProviderMessage[],
-    tools?: ProviderTool[]
-  ): Promise<ProviderResponse>;
-  
+  createCompletion(messages: ProviderMessage[], tools?: ProviderTool[]): Promise<ProviderResponse>;
+
   /** Create a JSON completion (for judging) */
   createJSONCompletion(
     messages: ProviderMessage[]

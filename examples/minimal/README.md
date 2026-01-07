@@ -79,11 +79,13 @@ pnpm test
 The project includes LLM-based evaluation tests that use OpenAI to assess the quality of tool responses. To run these tests:
 
 1. Copy `.env.example` to `.env`:
+
    ```bash
    cp .env.example .env
    ```
 
 2. Add your OpenAI API key to `.env`:
+
    ```
    OPENAI_API_KEY=sk-your-actual-api-key
    ```

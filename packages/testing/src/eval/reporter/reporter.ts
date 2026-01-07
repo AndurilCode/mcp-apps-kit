@@ -30,9 +30,15 @@ const colors = {
  * Default console output implementation
  */
 const defaultOutput: EvalReporterOutput = {
-  log: (msg: string) => console.log(msg),
-  warn: (msg: string) => console.warn(msg),
-  error: (msg: string) => console.error(msg),
+  log: (msg: string) => {
+    console.log(msg);
+  },
+  warn: (msg: string) => {
+    console.warn(msg);
+  },
+  error: (msg: string) => {
+    console.error(msg);
+  },
 };
 
 /**
@@ -162,9 +168,7 @@ export class EvalReporter {
     const durationStr = this.color(`${duration}ms`, colors.gray);
 
     this.output.log("");
-    this.output.log(
-      `${badge} ${this.color(testName, colors.bold)} ${tool}${inputStr}`
-    );
+    this.output.log(`${badge} ${this.color(testName, colors.bold)} ${tool}${inputStr}`);
     this.output.log(`  Score: ${score} | Duration: ${durationStr}`);
 
     // Criteria - don't truncate in verbose mode
@@ -182,7 +186,7 @@ export class EvalReporter {
         this.output.log(`  ${this.color("LLM Response:", colors.magenta)}`);
         // Pretty print the JSON response
         try {
-          const parsed = JSON.parse(evaluation.rawResponse);
+          const parsed = JSON.parse(evaluation.rawResponse) as unknown;
           const formatted = JSON.stringify(parsed, null, 2);
           for (const line of formatted.split("\n")) {
             this.output.log(`    ${line}`);
@@ -230,9 +234,7 @@ export class EvalReporter {
           .filter((c) => !c.pass)
           .map((c) => c.name)
           .join(", ");
-        this.output.log(
-          `  ${this.color("✗", colors.red)} ${entry.testName} - ${failedCriteria}`
-        );
+        this.output.log(`  ${this.color("✗", colors.red)} ${entry.testName} - ${failedCriteria}`);
       }
     }
 

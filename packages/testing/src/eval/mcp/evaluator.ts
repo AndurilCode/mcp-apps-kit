@@ -24,7 +24,12 @@ import {
   type ProviderTool,
 } from "./providers";
 import { createSession, type MCPSession } from "./session";
-import { createResilientWrapper, type ResilienceConfig, type RetryConfig, type RateLimitConfig } from "./retry";
+import {
+  createResilientWrapper,
+  type ResilienceConfig,
+  type RetryConfig,
+  type RateLimitConfig,
+} from "./retry";
 import { wrapWithErrorInjection, type ToolErrorConfig } from "./error-injection";
 import { runBatch, type BatchEvalCase, type BatchOptions, type BatchResult } from "./batch";
 import type { TestClient, TestServer } from "../../types";
@@ -137,13 +142,13 @@ export interface MCPEvalResult {
    * Judge the agent's response using LLM
    * @param criteria - What to evaluate: either a string description or an object with multiple criteria
    * @returns Judgment result with pass/fail, score, and explanation
-   * 
+   *
    * @example Single criterion
    * ```typescript
    * const judgment = await result.judge("Response should be friendly");
    * expect(judgment.pass).toBe(true);
    * ```
-   * 
+   *
    * @example Multiple criteria
    * ```typescript
    * const judgment = await result.judge({
@@ -203,13 +208,13 @@ export interface MCPEvaluator {
    * @param options - Optional run-time options
    */
   run(prompt: string, options?: MCPRunOptions): Promise<MCPEvalResult>;
-  
+
   /**
    * Create a session for multi-turn conversations
    * The session maintains conversation history automatically
    */
   createSession(): MCPSession;
-  
+
   /**
    * Run a batch of evaluations
    * @param cases - Array of evaluation cases
@@ -265,12 +270,12 @@ export interface TokenPricing {
 
 /**
  * Estimate cost based on token usage
- * 
+ *
  * @param promptTokens - Number of input tokens
  * @param completionTokens - Number of output tokens
  * @param pricing - Pricing per 1M tokens (required)
  * @returns Formatted cost string, or undefined if no pricing provided
- * 
+ *
  * @example
  * ```typescript
  * const mcpEval = await setupMCPEval(app, {
@@ -370,13 +375,11 @@ export function createMCPEval(client: TestClient, config: MCPEvalConfig = {}): M
   let provider: LLMProvider | null = null;
 
   async function getProvider(): Promise<LLMProvider> {
-    if (!provider) {
-      provider = await createProvider(providerType, {
-        apiKey,
-        model,
-        maxTokens,
-      });
-    }
+    provider ??= await createProvider(providerType, {
+      apiKey,
+      model,
+      maxTokens,
+    });
     return provider;
   }
 
@@ -441,7 +444,7 @@ export function createMCPEval(client: TestClient, config: MCPEvalConfig = {}): M
         iterations++;
         llmLogger("MCP eval iteration %d", iterations);
 
-        const completion = await withResilience(() => 
+        const completion = await withResilience(() =>
           llm.createCompletion(messages, providerTools)
         );
 
@@ -476,9 +479,7 @@ export function createMCPEval(client: TestClient, config: MCPEvalConfig = {}): M
                 args,
                 result: result.structuredContent ?? result.content,
                 success: !result.isError,
-                error: result.isError
-                  ? String(result.content?.[0]?.text ?? "Unknown error")
-                  : undefined,
+                error: result.isError ? (result.content?.[0]?.text ?? "Unknown error") : undefined,
               };
               toolCalls.push(record);
 
@@ -713,18 +714,13 @@ Respond with JSON: {
         },
       };
     },
-    
+
     createSession(): MCPSession {
-      // The 'this' here refers to the MCPEvaluator we're creating
-      // eslint-disable-next-line @typescript-eslint/no-this-alias
-      const self = this as MCPEvaluator;
-      return createSession(self);
+      return createSession(this);
     },
-    
+
     runBatch(cases: BatchEvalCase[], options?: BatchOptions): Promise<BatchResult> {
-      // eslint-disable-next-line @typescript-eslint/no-this-alias
-      const self = this as MCPEvaluator;
-      return runBatch(self, cases, options);
+      return runBatch(this, cases, options);
     },
   };
 }

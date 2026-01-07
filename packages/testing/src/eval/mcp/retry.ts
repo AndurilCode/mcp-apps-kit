@@ -1,6 +1,6 @@
 /**
  * Retry and Rate Limiting utilities for MCP Eval
- * 
+ *
  * Handles LLM API resilience: retries, timeouts, and rate limiting.
  */
 
@@ -37,7 +37,9 @@ export interface RateLimitConfig {
 /**
  * Default retry configuration
  */
-const DEFAULT_RETRY_CONFIG: Required<Omit<RetryConfig, "retryOn">> & { retryOn?: Array<string | RegExp> } = {
+const DEFAULT_RETRY_CONFIG: Required<Omit<RetryConfig, "retryOn">> & {
+  retryOn?: Array<string | RegExp>;
+} = {
   maxAttempts: 3,
   delay: 1000,
   backoff: "exponential",
@@ -94,10 +96,7 @@ function isTransientError(error: Error, retryOn?: Array<string | RegExp>): boole
 /**
  * Calculate delay for a retry attempt
  */
-function calculateDelay(
-  attempt: number,
-  config: Required<Omit<RetryConfig, "retryOn">>
-): number {
+function calculateDelay(attempt: number, config: Required<Omit<RetryConfig, "retryOn">>): number {
   let delay = config.delay;
 
   switch (config.backoff) {
@@ -134,11 +133,11 @@ function sleep(ms: number): Promise<void> {
 
 /**
  * Wrap an async function with retry logic
- * 
+ *
  * @param fn - The async function to wrap
  * @param config - Retry configuration
  * @returns Wrapped function with retry behavior
- * 
+ *
  * @example
  * ```typescript
  * const fetchWithRetry = withRetry(
@@ -147,10 +146,7 @@ function sleep(ms: number): Promise<void> {
  * );
  * ```
  */
-export function withRetry<T>(
-  fn: () => Promise<T>,
-  config: RetryConfig = {}
-): () => Promise<T> {
+export function withRetry<T>(fn: () => Promise<T>, config: RetryConfig = {}): () => Promise<T> {
   const mergedConfig = { ...DEFAULT_RETRY_CONFIG, ...config };
 
   return async (): Promise<T> => {
@@ -181,7 +177,7 @@ export function withRetry<T>(
     }
 
     // Should never reach here, but TypeScript needs it
-    throw lastError;
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
   };
 }
 
@@ -239,15 +235,12 @@ export class RateLimiter {
 
 /**
  * Wrap an async function with timeout
- * 
+ *
  * @param fn - The async function to wrap
  * @param timeoutMs - Timeout in milliseconds
  * @returns Wrapped function with timeout
  */
-export function withTimeout<T>(
-  fn: () => Promise<T>,
-  timeoutMs: number
-): () => Promise<T> {
+export function withTimeout<T>(fn: () => Promise<T>, timeoutMs: number): () => Promise<T> {
   return async (): Promise<T> => {
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => {
@@ -270,10 +263,10 @@ export interface ResilienceConfig {
 
 /**
  * Create a resilient wrapper combining retry, rate limiting, and timeout
- * 
+ *
  * @param config - Resilience configuration
  * @returns A function that wraps async operations with resilience
- * 
+ *
  * @example
  * ```typescript
  * const resilient = createResilientWrapper({
@@ -281,11 +274,13 @@ export interface ResilienceConfig {
  *   rateLimit: { requestsPerMinute: 60 },
  *   timeout: 30000,
  * });
- * 
+ *
  * const result = await resilient(() => llmApi.call());
  * ```
  */
-export function createResilientWrapper(config: ResilienceConfig = {}): <T>(fn: () => Promise<T>) => Promise<T> {
+export function createResilientWrapper(
+  config: ResilienceConfig = {}
+): <T>(fn: () => Promise<T>) => Promise<T> {
   // Create rate limiter if configured
   const rateLimiter = config.rateLimit?.requestsPerMinute
     ? new RateLimiter(config.rateLimit.requestsPerMinute)

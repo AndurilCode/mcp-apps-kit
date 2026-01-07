@@ -1,6 +1,6 @@
 /**
  * Error Injection for MCP Eval
- * 
+ *
  * Allows testing how LLMs handle tool errors gracefully.
  */
 
@@ -41,11 +41,11 @@ interface ErrorInjectionState {
 
 /**
  * Wrap a TestClient with error injection capabilities
- * 
+ *
  * @param client - The original test client
  * @param config - Error injection configuration
  * @returns A wrapped client that can inject errors
- * 
+ *
  * @example
  * ```typescript
  * const wrappedClient = wrapWithErrorInjection(client, {
@@ -74,7 +74,9 @@ export function wrapWithErrorInjection(
     listPrompts: () => client.listPrompts(),
     getPrompt: (name: string, args?: Record<string, string>) => client.getPrompt(name, args),
     getCallHistory: () => client.getCallHistory(),
-    clearHistory: () => client.clearHistory(),
+    clearHistory: () => {
+      client.clearHistory();
+    },
     disconnect: () => client.disconnect(),
 
     // Wrap callTool with error injection
@@ -139,11 +141,13 @@ export interface RunErrorInjectionOptions {
 
 /**
  * Create a single-use error injector for a specific run
- * 
+ *
  * @param options - Error injection options for this run
  * @returns An error injection config for a single tool call
  */
-export function createRunErrorConfig(options: RunErrorInjectionOptions): ErrorInjectionConfig | undefined {
+export function createRunErrorConfig(
+  options: RunErrorInjectionOptions
+): ErrorInjectionConfig | undefined {
   if (!options.injectError) {
     return undefined;
   }
@@ -164,9 +168,6 @@ export function createRunErrorConfig(options: RunErrorInjectionOptions): ErrorIn
  * Reset error injection state for a wrapped client
  * (Useful for testing retry scenarios)
  */
-export function resetErrorInjectionState(
-  _client: TestClient,
-  state: ErrorInjectionState
-): void {
+export function resetErrorInjectionState(_client: TestClient, state: ErrorInjectionState): void {
   state.callCounts.clear();
 }

@@ -68,14 +68,14 @@ export type {
 export type { EvalReporterOptions, EvalReportEntry } from "./eval/reporter";
 
 // MCP eval types
-export type { 
-  MCPEval, 
-  MCPEvaluator, 
-  MCPEvalConfig, 
-  MCPEvalSetupConfig, 
+export type {
+  MCPEval,
+  MCPEvaluator,
+  MCPEvalConfig,
+  MCPEvalSetupConfig,
   MCPRunOptions,
-  MCPEvalResult, 
-  ToolCallRecord, 
+  MCPEvalResult,
+  ToolCallRecord,
   JudgeResult,
   JudgeCriterion,
   JudgeOptions,
@@ -150,10 +150,10 @@ export { createMockHost, createTestEnvironment, TestEnvironmentBuilder } from ".
 export { createLLMEvaluator, criteria } from "./eval/llm";
 
 // MCP evaluation (LLM uses MCP tools) - the correct way to eval
-export { 
-  createMCPEval, 
-  setupMCPEval, 
-  describeEval, 
+export {
+  createMCPEval,
+  setupMCPEval,
+  describeEval,
   hasOpenAIKey,
   hasAnthropicKey,
   hasAnyProviderKey,

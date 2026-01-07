@@ -1,6 +1,6 @@
 /**
  * Anthropic provider for MCP evaluation
- * 
+ *
  * Requires @anthropic-ai/sdk >=0.30.0 for tool support.
  */
 
@@ -28,15 +28,15 @@ const getAnthropic = createLazyLoader(() => import("@anthropic-ai/sdk"), {
  */
 export async function createAnthropicProvider(config: ProviderConfig): Promise<LLMProvider> {
   const anthropicModule = await getAnthropic();
-  const AnthropicClass =
-    anthropicModule.default ?? anthropicModule.Anthropic ?? anthropicModule;
-  
+  const AnthropicClass = anthropicModule.default ?? anthropicModule.Anthropic ?? anthropicModule;
+
   // Use 'any' here because the Anthropic SDK types vary significantly between versions
   // The runtime behavior is consistent, but TypeScript can't verify it statically
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
   const anthropic = new (AnthropicClass as any)({
     apiKey: config.apiKey,
   });
+  /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
 
   const model = config.model;
   const maxTokens = config.maxTokens ?? 1024;
@@ -55,7 +55,7 @@ export async function createAnthropicProvider(config: ProviderConfig): Promise<L
       const conversationMessages = messages.filter((m) => m.role !== "system");
 
       // Build Anthropic messages format
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/restrict-plus-operands */
       const anthropicMessages: any[] = [];
 
       for (const msg of conversationMessages) {
@@ -103,7 +103,7 @@ export async function createAnthropicProvider(config: ProviderConfig): Promise<L
 
           // Check if last message is a user message with tool results
           const lastMsg = anthropicMessages[anthropicMessages.length - 1];
-          if (lastMsg && lastMsg.role === "user" && Array.isArray(lastMsg.content)) {
+          if (lastMsg?.role === "user" && Array.isArray(lastMsg.content)) {
             lastMsg.content.push(toolResult);
           } else {
             anthropicMessages.push({
@@ -164,6 +164,7 @@ export async function createAnthropicProvider(config: ProviderConfig): Promise<L
           totalTokens: (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0),
         },
       };
+      /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/restrict-plus-operands */
     },
 
     async createJSONCompletion(
@@ -183,7 +184,7 @@ export async function createAnthropicProvider(config: ProviderConfig): Promise<L
         content: msg.content,
       }));
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/restrict-plus-operands */
       const response: any = await anthropic.messages.create({
         model,
         max_tokens: 512,
@@ -207,6 +208,7 @@ export async function createAnthropicProvider(config: ProviderConfig): Promise<L
           totalTokens: (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0),
         },
       };
+      /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/restrict-plus-operands */
     },
   };
 }

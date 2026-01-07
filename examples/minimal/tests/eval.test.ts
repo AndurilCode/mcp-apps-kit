@@ -261,13 +261,10 @@ describeEval("MCP Eval - Batch Evaluation", () => {
   });
 
   it("should aggregate token usage in batch", async () => {
-    const batch = await mcpEval.runBatch(
-      [
-        { prompt: "Greet Emma" },
-        { prompt: "Greet Frank" },
-      ],
-      { verbose: false, printSummary: false }
-    );
+    const batch = await mcpEval.runBatch([{ prompt: "Greet Emma" }, { prompt: "Greet Frank" }], {
+      verbose: false,
+      printSummary: false,
+    });
 
     // Should have aggregated usage
     expect(batch.summary.totalUsage).toBeDefined();

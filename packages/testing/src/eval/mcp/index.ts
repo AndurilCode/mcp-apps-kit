@@ -5,8 +5,8 @@
  * to complete tasks, then assertions are made on the results.
  */
 
-export { 
-  createMCPEval, 
+export {
+  createMCPEval,
   setupMCPEval,
   describeEval,
   hasOpenAIKey,
@@ -15,20 +15,20 @@ export {
   type TokenPricing,
   type MCPEval,
   type MCPEvaluator,
-  type MCPEvalConfig, 
+  type MCPEvalConfig,
   type MCPEvalSetupConfig,
   type MCPRunOptions,
-  type MCPEvalResult, 
-  type ToolCallRecord, 
+  type MCPEvalResult,
+  type ToolCallRecord,
   type JudgeResult,
   type JudgeCriterion,
   type JudgeOptions,
   type CriterionJudgeResult,
   type TokenUsage,
 } from "./evaluator";
-export { 
-  MCPEvalReporter, 
-  getReporter, 
+export {
+  MCPEvalReporter,
+  getReporter,
   printBatchSummary,
   getGlobalCollector,
   clearGlobalCollector,

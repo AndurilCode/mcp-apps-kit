@@ -82,7 +82,9 @@ export interface TestClient {
   callTool(name: string, args: unknown): Promise<ToolResult>;
 
   /** List available tools */
-  listTools(): Promise<Array<{ name: string; description?: string; inputSchema?: Record<string, unknown> }>>;
+  listTools(): Promise<
+    Array<{ name: string; description?: string; inputSchema?: Record<string, unknown> }>
+  >;
 
   /** List available resources */
   listResources(): Promise<Array<{ uri: string; name?: string; description?: string }>>;

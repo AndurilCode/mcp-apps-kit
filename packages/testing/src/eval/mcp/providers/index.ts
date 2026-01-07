@@ -1,6 +1,6 @@
 /**
  * LLM Provider factory
- * 
+ *
  * Creates provider instances based on configuration.
  */
 
@@ -9,11 +9,11 @@ import { createOpenAIProvider } from "./openai";
 import { createAnthropicProvider } from "./anthropic";
 import type { LLMProvider, ProviderConfig } from "./types";
 
-export type { 
-  LLMProvider, 
-  ProviderConfig, 
-  ProviderMessage, 
-  ProviderTool, 
+export type {
+  LLMProvider,
+  ProviderConfig,
+  ProviderMessage,
+  ProviderTool,
   ProviderResponse,
   ProviderToolCall,
 } from "./types";
@@ -63,11 +63,11 @@ export function getDefaultModel(provider: ProviderType): string {
 
 /**
  * Create an LLM provider instance
- * 
+ *
  * @param provider - Provider type ("openai" or "anthropic")
  * @param config - Provider configuration
  * @returns Configured LLM provider
- * 
+ *
  * @example
  * ```typescript
  * const provider = await createProvider("openai", {
@@ -95,7 +95,7 @@ export async function createProvider(
 
 /**
  * Detect provider from available API keys
- * 
+ *
  * Returns the first available provider based on environment variables.
  */
 export function detectProvider(): ProviderType | undefined {

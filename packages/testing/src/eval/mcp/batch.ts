@@ -1,10 +1,16 @@
 /**
  * Batch Evaluation for MCP Eval
- * 
+ *
  * Run multiple evaluations and aggregate results.
  */
 
-import type { MCPEvaluator, MCPEvalResult, TokenUsage, ToolCallRecord, JudgeResult } from "./evaluator";
+import type {
+  MCPEvaluator,
+  MCPEvalResult,
+  TokenUsage,
+  ToolCallRecord,
+  JudgeResult,
+} from "./evaluator";
 import { getReporter } from "./reporter";
 import { llmLogger } from "../../debug";
 
@@ -136,8 +142,9 @@ function checkToolAssertion(
 
     // Check args if specified
     if (expected.args) {
+      const expectedArgs = expected.args;
       const argsMatch = matchingCalls.some((tc) => {
-        return Object.entries(expected.args!).every(([key, value]) => {
+        return Object.entries(expectedArgs).every(([key, value]) => {
           return tc.args[key] === value;
         });
       });
@@ -163,19 +170,19 @@ function sleep(ms: number): Promise<void> {
 
 /**
  * Run a batch of evaluations
- * 
+ *
  * @param evaluator - The MCP evaluator to use
  * @param cases - Array of evaluation cases
  * @param options - Batch options
  * @returns Batch result with summary and individual results
- * 
+ *
  * @example
  * ```typescript
  * const batch = await runBatch(mcpEval, [
  *   { prompt: "Greet Alice", expect: { tool: "greet", args: { name: "Alice" } } },
  *   { prompt: "Greet Bob", expect: { tool: "greet", args: { name: "Bob" } } },
  * ]);
- * 
+ *
  * expect(batch.summary.successRate).toBe(1.0);
  * ```
  */
@@ -190,7 +197,7 @@ export async function runBatch(
 
   const results: BatchCaseResult[] = [];
   const failures: BatchCaseResult[] = [];
-  
+
   // Track total usage
   let totalUsage: TokenUsage = {
     promptTokens: 0,
@@ -236,12 +243,13 @@ export async function runBatch(
       totalUsage.promptTokens += result.usage.promptTokens;
       totalUsage.completionTokens += result.usage.completionTokens;
       totalUsage.totalTokens += result.usage.totalTokens;
-      
+
       // Aggregate estimated costs from individual results
       if (result.usage.estimatedCost) {
         const costStr = result.usage.estimatedCost.replace(/[$¢]/g, "");
-        const cost = parseFloat(costStr) || 0;
-        totalUsage.estimatedCost = `$${((parseFloat(totalUsage.estimatedCost?.replace(/[$¢]/g, "") || "0") + cost)).toFixed(6)}`;
+        const cost = parseFloat(costStr);
+        const currentCost = parseFloat(totalUsage.estimatedCost?.replace(/[$¢]/g, "") ?? "0");
+        totalUsage.estimatedCost = `$${((isNaN(currentCost) ? 0 : currentCost) + (isNaN(cost) ? 0 : cost)).toFixed(6)}`;
       }
     }
 
@@ -284,15 +292,12 @@ export async function runBatch(
   // Run cases (sequential or parallel)
   if (options.parallel) {
     // Run all cases in parallel
-    const caseResults = await Promise.all(
-      cases.map((evalCase, index) => runCase(evalCase, index))
-    );
+    const caseResults = await Promise.all(cases.map((evalCase, index) => runCase(evalCase, index)));
     results.push(...caseResults);
   } else {
     // Run cases sequentially with progress reporting
     let passedCount = 0;
-    for (let i = 0; i < cases.length; i++) {
-      const evalCase = cases[i]!;
+    for (const [i, evalCase] of cases.entries()) {
       const caseResult = await runCase(evalCase, i);
       results.push(caseResult);
 
@@ -364,6 +369,7 @@ export function extendWithBatch(evaluator: MCPEvaluator): MCPEvaluator & {
 } {
   return {
     ...evaluator,
-    runBatch: (cases: BatchEvalCase[], options?: BatchOptions) => runBatch(evaluator, cases, options),
+    runBatch: (cases: BatchEvalCase[], options?: BatchOptions) =>
+      runBatch(evaluator, cases, options),
   };
 }
