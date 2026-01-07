@@ -6,6 +6,7 @@
 
 import type { MCPEvalResult, MCPEvaluator, TokenUsage } from "./evaluator";
 import type { ProviderMessage } from "./providers";
+import { parseCostToDollars, formatCostAsDollars } from "./cost-utils";
 
 /**
  * A session for multi-turn conversations
@@ -79,15 +80,12 @@ export function createSession(evaluator: MCPEvaluator): MCPSession {
         aggregatedUsage.completionTokens += result.usage.completionTokens;
         aggregatedUsage.totalTokens += result.usage.totalTokens;
 
-        // Update estimated cost (sum all costs)
+        // Update estimated cost (sum all costs, normalizing both operands to dollars)
         if (result.usage.estimatedCost) {
-          const currentCost = parseFloat(
-            aggregatedUsage.estimatedCost?.replace(/[$¢]/g, "") ?? "0"
-          );
-          const newCost = parseFloat(result.usage.estimatedCost.replace(/[$¢]/g, ""));
-          const isCents = result.usage.estimatedCost.includes("¢");
-          const totalCost = currentCost + (isCents ? newCost / 100 : newCost);
-          aggregatedUsage.estimatedCost = `$${totalCost.toFixed(4)}`;
+          const currentCostDollars = parseCostToDollars(aggregatedUsage.estimatedCost);
+          const newCostDollars = parseCostToDollars(result.usage.estimatedCost);
+          const totalCost = currentCostDollars + newCostDollars;
+          aggregatedUsage.estimatedCost = formatCostAsDollars(totalCost, 4);
         }
       }
 

@@ -47,9 +47,13 @@ export {
 } from "./retry";
 export {
   wrapWithErrorInjection,
+  resetErrorInjectionState,
   type ToolErrorConfig,
   type ErrorInjectionConfig,
+  type ErrorInjectionState,
+  type TestClientWithReset,
 } from "./error-injection";
+export { parseCostToDollars, formatCostAsDollars } from "./cost-utils";
 export {
   runBatch,
   extendWithBatch,

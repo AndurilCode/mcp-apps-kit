@@ -179,7 +179,12 @@ export async function createAnthropicProvider(config: ProviderConfig): Promise<L
         ? `${systemMessage.content}\n\nIMPORTANT: Respond ONLY with valid JSON, no other text.`
         : "IMPORTANT: Respond ONLY with valid JSON, no other text.";
 
-      const anthropicMessages = conversationMessages.map((msg) => ({
+      // Filter to only include valid Anthropic roles (user/assistant), excluding tool roles
+      const safeMessages = conversationMessages.filter(
+        (m) => m.role === "user" || m.role === "assistant"
+      );
+
+      const anthropicMessages = safeMessages.map((msg) => ({
         role: msg.role as "user" | "assistant",
         content: msg.content,
       }));

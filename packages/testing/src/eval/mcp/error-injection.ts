@@ -35,8 +35,19 @@ export interface ErrorInjectionConfig {
 /**
  * Runtime error injection state
  */
-interface ErrorInjectionState {
+export interface ErrorInjectionState {
   callCounts: Map<string, number>;
+}
+
+/**
+ * Extended TestClient with error injection reset capability
+ */
+export interface TestClientWithReset extends TestClient {
+  /**
+   * Reset error injection state (clears call counts).
+   * Useful for testing retry scenarios.
+   */
+  reset(): void;
 }
 
 /**
@@ -44,7 +55,7 @@ interface ErrorInjectionState {
  *
  * @param client - The original test client
  * @param config - Error injection configuration
- * @returns A wrapped client that can inject errors
+ * @returns A wrapped client that can inject errors and be reset
  *
  * @example
  * ```typescript
@@ -53,12 +64,15 @@ interface ErrorInjectionState {
  *     greet: { error: "Service unavailable", probability: 0.5 }
  *   }
  * });
+ *
+ * // Later, reset the error injection state
+ * wrappedClient.reset();
  * ```
  */
 export function wrapWithErrorInjection(
   client: TestClient,
   config: ErrorInjectionConfig
-): TestClient {
+): TestClientWithReset {
   const state: ErrorInjectionState = {
     callCounts: new Map(),
   };
@@ -78,6 +92,11 @@ export function wrapWithErrorInjection(
       client.clearHistory();
     },
     disconnect: () => client.disconnect(),
+
+    // Reset error injection state
+    reset(): void {
+      state.callCounts.clear();
+    },
 
     // Wrap callTool with error injection
     async callTool(name: string, args: unknown): Promise<ToolResult> {
@@ -165,8 +184,20 @@ export function createRunErrorConfig(
 }
 
 /**
- * Reset error injection state for a wrapped client
- * (Useful for testing retry scenarios)
+ * Reset error injection state for a wrapped client.
+ *
+ * @deprecated Use `wrappedClient.reset()` instead. The state is internal to the wrapped client
+ * and this function requires passing the state explicitly, which is not practical.
+ *
+ * @example
+ * ```typescript
+ * // Old way (deprecated):
+ * resetErrorInjectionState(client, state);
+ *
+ * // New way:
+ * const wrappedClient = wrapWithErrorInjection(client, config);
+ * wrappedClient.reset();
+ * ```
  */
 export function resetErrorInjectionState(_client: TestClient, state: ErrorInjectionState): void {
   state.callCounts.clear();

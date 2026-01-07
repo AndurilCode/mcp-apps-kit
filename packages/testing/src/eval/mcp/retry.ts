@@ -242,13 +242,22 @@ export class RateLimiter {
  */
 export function withTimeout<T>(fn: () => Promise<T>, timeoutMs: number): () => Promise<T> {
   return async (): Promise<T> => {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         reject(new Error(`Operation timed out after ${timeoutMs}ms`));
       }, timeoutMs);
     });
 
-    return Promise.race([fn(), timeoutPromise]);
+    try {
+      const result = await Promise.race([fn(), timeoutPromise]);
+      return result;
+    } finally {
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+    }
   };
 }
 

@@ -13,6 +13,7 @@ import type {
 } from "./evaluator";
 import { getReporter } from "./reporter";
 import { llmLogger } from "../../debug";
+import { parseCostToDollars, formatCostAsDollars } from "./cost-utils";
 
 /**
  * A single evaluation case in a batch
@@ -244,12 +245,11 @@ export async function runBatch(
       totalUsage.completionTokens += result.usage.completionTokens;
       totalUsage.totalTokens += result.usage.totalTokens;
 
-      // Aggregate estimated costs from individual results
+      // Aggregate estimated costs from individual results (normalizing to dollars)
       if (result.usage.estimatedCost) {
-        const costStr = result.usage.estimatedCost.replace(/[$¢]/g, "");
-        const cost = parseFloat(costStr);
-        const currentCost = parseFloat(totalUsage.estimatedCost?.replace(/[$¢]/g, "") ?? "0");
-        totalUsage.estimatedCost = `$${((isNaN(currentCost) ? 0 : currentCost) + (isNaN(cost) ? 0 : cost)).toFixed(6)}`;
+        const currentCostDollars = parseCostToDollars(totalUsage.estimatedCost);
+        const newCostDollars = parseCostToDollars(result.usage.estimatedCost);
+        totalUsage.estimatedCost = formatCostAsDollars(currentCostDollars + newCostDollars);
       }
     }
 
