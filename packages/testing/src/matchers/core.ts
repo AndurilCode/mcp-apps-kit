@@ -5,7 +5,7 @@
  * by both Vitest and Jest adapters.
  */
 
-import type { ZodSchema } from "zod";
+import type { ZodType } from "zod";
 import type { ToolResult } from "../types";
 import { extractResultData, deepMatch } from "../eval/behavior/matchers";
 
@@ -20,10 +20,7 @@ export interface MatcherResult {
 /**
  * Check if tool result matches a Zod schema
  */
-export function matchesToolSchema(
-  result: ToolResult,
-  schema: ZodSchema
-): MatcherResult {
+export function matchesToolSchema(result: ToolResult, schema: ZodType): MatcherResult {
   const actual = extractResultData(result);
   const parseResult = schema.safeParse(actual);
 
@@ -58,10 +55,7 @@ export function isSuccessfulToolResult(result: ToolResult): MatcherResult {
 /**
  * Check if tool result has an error (optionally with specific code)
  */
-export function hasToolError(
-  result: ToolResult,
-  code?: string
-): MatcherResult {
+export function hasToolError(result: ToolResult, code?: string): MatcherResult {
   if (!result.isError) {
     return {
       pass: false,
@@ -95,10 +89,7 @@ export function hasToolError(
 /**
  * Check if tool result contains specific text
  */
-export function containsToolText(
-  result: ToolResult,
-  text: string
-): MatcherResult {
+export function containsToolText(result: ToolResult, text: string): MatcherResult {
   const allText = result.content
     .filter((c) => c.type === "text")
     .map((c) => c.text ?? "")
@@ -117,10 +108,7 @@ export function containsToolText(
 /**
  * Check if tool result matches an object (partial match)
  */
-export function matchesToolObject(
-  result: ToolResult,
-  expected: unknown
-): MatcherResult {
+export function matchesToolObject(result: ToolResult, expected: unknown): MatcherResult {
   const actual = extractResultData(result);
 
   // Use deepMatch for partial object matching

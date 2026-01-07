@@ -5,11 +5,7 @@
  */
 
 // Behavior testing
-export {
-  expectToolResult,
-  defineTestSuite,
-  runTestSuite,
-} from "./behavior";
+export { expectToolResult, defineTestSuite, runTestSuite } from "./behavior";
 export type { TestSuiteConfig } from "./behavior";
 
 // Property testing - Phase 6

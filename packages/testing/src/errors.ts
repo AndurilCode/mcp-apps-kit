@@ -17,7 +17,11 @@ export class TestingError extends Error {
    */
   public readonly code: string;
 
-  constructor(code: string, message: string, public readonly cause?: Error) {
+  constructor(
+    code: string,
+    message: string,
+    public readonly cause?: Error
+  ) {
     super(message);
     this.name = "TestingError";
     this.code = code;
@@ -69,11 +73,7 @@ export class TimeoutError extends TestingError {
     message?: string,
     cause?: Error
   ) {
-    super(
-      "TIMEOUT_ERROR",
-      message ?? `Operation timed out after ${timeout}ms`,
-      cause
-    );
+    super("TIMEOUT_ERROR", message ?? `Operation timed out after ${timeout}ms`, cause);
     this.name = "TimeoutError";
   }
 }
@@ -116,11 +116,7 @@ export class AssertionError extends TestingError {
     public readonly expected: unknown,
     message?: string
   ) {
-    super(
-      "ASSERTION_ERROR",
-      message ?? "Assertion failed",
-      undefined
-    );
+    super("ASSERTION_ERROR", message ?? "Assertion failed", undefined);
     this.name = "AssertionError";
   }
 }
@@ -138,11 +134,7 @@ export class PropertyFailureError extends TestingError {
     public readonly shrunkInput: unknown,
     message?: string
   ) {
-    super(
-      "PROPERTY_FAILURE",
-      message ?? "Property test failed",
-      undefined
-    );
+    super("PROPERTY_FAILURE", message ?? "Property test failed", undefined);
     this.name = "PropertyFailureError";
   }
 }

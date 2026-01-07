@@ -23,7 +23,7 @@ let anthropicModule: typeof import("@anthropic-ai/sdk") | null = null;
 function getAnthropic(): typeof import("@anthropic-ai/sdk") {
   if (!anthropicModule) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
       anthropicModule = require("@anthropic-ai/sdk");
     } catch {
       throw new ConfigurationError(
@@ -39,10 +39,7 @@ function getAnthropic(): typeof import("@anthropic-ai/sdk") {
 /**
  * Create Anthropic provider
  */
-export function createAnthropicProvider(
-  model: string,
-  apiKey?: string
-): LLMProvider {
+export function createAnthropicProvider(model: string, apiKey?: string): LLMProvider {
   llmLogger("Creating Anthropic provider with model: %s", model);
 
   const apiKeyValue = apiKey ?? process.env.ANTHROPIC_API_KEY;
@@ -75,13 +72,9 @@ export function createAnthropicProvider(
         ],
       });
 
-      if (!response.content || response.content.length === 0) {
-        throw new Error("Empty content in Anthropic response");
-      }
-
-      const content = response.content[0]!;
-      if (content.type !== "text") {
-        throw new Error("Unexpected response type from Anthropic");
+      const content = response.content[0];
+      if (content?.type !== "text") {
+        throw new Error("Empty or unexpected response type from Anthropic");
       }
 
       const text = content.text;
@@ -103,16 +96,78 @@ export function createAnthropicProvider(
         }
         cleanText = cleanText.trim();
 
-        parsed = JSON.parse(cleanText) as {
+        const rawParsed: unknown = JSON.parse(cleanText);
+
+        // Runtime validation of parsed structure
+        const preview = text.length > 200 ? text.substring(0, 200) + "..." : text;
+
+        if (typeof rawParsed !== "object" || rawParsed === null) {
+          throw new Error(
+            `Expected parsed response to be an object, got ${typeof rawParsed}. Response preview: ${preview}`
+          );
+        }
+
+        const parsedObj = rawParsed as Record<string, unknown>;
+
+        if (!Array.isArray(parsedObj.criteria)) {
+          throw new Error(
+            `Expected parsed.criteria to be an array, got ${typeof parsedObj.criteria}. Response preview: ${preview}`
+          );
+        }
+
+        // Validate each criterion in the array
+        for (let i = 0; i < parsedObj.criteria.length; i++) {
+          const item = parsedObj.criteria[i] as Record<string, unknown>;
+          if (typeof item !== "object" || item === null) {
+            throw new Error(
+              `Expected parsed.criteria[${i}] to be an object, got ${typeof item}. Response preview: ${preview}`
+            );
+          }
+          if (typeof item.name !== "string") {
+            throw new Error(
+              `Expected parsed.criteria[${i}].name to be a string, got ${typeof item.name}. Response preview: ${preview}`
+            );
+          }
+          if (typeof item.score !== "number") {
+            throw new Error(
+              `Expected parsed.criteria[${i}].score to be a number, got ${typeof item.score}. Response preview: ${preview}`
+            );
+          }
+          if (typeof item.explanation !== "string") {
+            throw new Error(
+              `Expected parsed.criteria[${i}].explanation to be a string, got ${typeof item.explanation}. Response preview: ${preview}`
+            );
+          }
+        }
+
+        if (typeof parsedObj.overall !== "object" || parsedObj.overall === null) {
+          throw new Error(
+            `Expected parsed.overall to be an object, got ${typeof parsedObj.overall}. Response preview: ${preview}`
+          );
+        }
+
+        const overallObj = parsedObj.overall as Record<string, unknown>;
+        if (typeof overallObj.score !== "number") {
+          throw new Error(
+            `Expected parsed.overall.score to be a number, got ${typeof overallObj.score}. Response preview: ${preview}`
+          );
+        }
+
+        parsed = rawParsed as {
           criteria: Array<{ name: string; score: number; explanation: string }>;
           overall: { score: number };
         };
       } catch (parseError) {
+        // Re-throw validation errors as-is
+        if (parseError instanceof Error && parseError.message.includes("Expected parsed")) {
+          throw parseError;
+        }
+        // Wrap JSON parse errors with context
         const preview = text.length > 200 ? text.substring(0, 200) + "..." : text;
         const errorMsg = parseError instanceof Error ? parseError.message : String(parseError);
         throw new Error(
           `Failed to parse Anthropic response as JSON (expected { criteria: [...], overall: { score } }). ` +
-          `Parse error: ${errorMsg}. Response preview: ${preview}`
+            `Parse error: ${errorMsg}. Response preview: ${preview}`
         );
       }
 
@@ -146,10 +201,7 @@ export function createAnthropicProvider(
       };
     },
 
-    async evaluateWithPrompt(
-      result: unknown,
-      options: CustomEvalOptions
-    ): Promise<unknown> {
+    async evaluateWithPrompt(result: unknown, options: CustomEvalOptions): Promise<unknown> {
       llmLogger("Evaluating result with custom prompt");
 
       const response = await client.messages.create({
@@ -163,13 +215,9 @@ export function createAnthropicProvider(
         ],
       });
 
-      if (!response.content || response.content.length === 0) {
-        throw new Error("Empty content in Anthropic response");
-      }
-
-      const content = response.content[0]!;
-      if (content.type !== "text") {
-        throw new Error("Unexpected response type from Anthropic");
+      const content = response.content[0];
+      if (content?.type !== "text") {
+        throw new Error("Empty or unexpected response type from Anthropic");
       }
 
       const text = content.text;
@@ -211,11 +259,11 @@ function buildEvaluationPrompt(result: unknown, options: EvalOptions): string {
 
   prompt +=
     "\nReturn a JSON object with this structure:\n" +
-    '{\n' +
+    "{\n" +
     '  "criteria": [\n' +
     '    { "name": "criterion_name", "score": 0.0-1.0, "explanation": "..." },\n' +
-    '    ...\n' +
-    '  ],\n' +
+    "    ...\n" +
+    "  ],\n" +
     '  "overall": { "score": 0.0-1.0 }\n' +
     "}\n";
 

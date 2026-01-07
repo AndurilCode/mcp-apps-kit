@@ -18,7 +18,9 @@ interface App {
  * Start a test server from an App instance or external command
  */
 export function startTestServer(options: ExternalServerOptions): Promise<TestServer>;
+// eslint-disable-next-line no-redeclare
 export function startTestServer(app: App, options?: TestServerOptions): Promise<TestServer>;
+// eslint-disable-next-line no-redeclare
 export function startTestServer(
   appOrOptions: App | ExternalServerOptions,
   maybeOptions?: TestServerOptions
@@ -34,10 +36,7 @@ export function startTestServer(
 /**
  * Internal: Start server from App instance
  */
-async function startTestServerFromApp(
-  app: App,
-  options: TestServerOptions
-): Promise<TestServer> {
+async function startTestServerFromApp(app: App, options: TestServerOptions): Promise<TestServer> {
   const { port = 0, timeout = 10000 } = options;
 
   serverLogger("Starting test server from App instance on port %d", port);
@@ -57,44 +56,51 @@ async function startTestServerFromApp(
       });
     });
 
+    const server = httpServer;
     await new Promise<void>((resolve, reject) => {
       const timeoutId = setTimeout(() => {
-        reject(new ServerStartupError(
-          undefined,
-          timeout,
-          undefined,
-          `Server did not start within ${timeout}ms`,
-          undefined
-        ));
+        reject(
+          new ServerStartupError(
+            undefined,
+            timeout,
+            undefined,
+            `Server did not start within ${timeout}ms`,
+            undefined
+          )
+        );
       }, timeout);
 
-      httpServer!.listen(0, () => {
+      server.listen(0, () => {
         clearTimeout(timeoutId);
-        const addr = httpServer!.address();
+        const addr = server.address();
         if (addr && typeof addr === "object" && "port" in addr) {
           actualPort = addr.port;
           serverLogger("Dynamic port detected: %d", actualPort);
           resolve();
         } else {
-          reject(new ServerStartupError(
-            undefined,
-            timeout,
-            undefined,
-            "Failed to detect bound port from server",
-            undefined
-          ));
+          reject(
+            new ServerStartupError(
+              undefined,
+              timeout,
+              undefined,
+              "Failed to detect bound port from server",
+              undefined
+            )
+          );
         }
       });
 
-      httpServer!.on("error", (err) => {
+      server.on("error", (err) => {
         clearTimeout(timeoutId);
-        reject(new ServerStartupError(
-          undefined,
-          timeout,
-          undefined,
-          `Failed to start server: ${err.message}`,
-          err
-        ));
+        reject(
+          new ServerStartupError(
+            undefined,
+            timeout,
+            undefined,
+            `Failed to start server: ${err.message}`,
+            err
+          )
+        );
       });
     });
   } else {
@@ -125,8 +131,11 @@ async function startTestServerFromApp(
     async stop(): Promise<void> {
       serverLogger("Stopping test server");
       if (httpServer) {
+        const server = httpServer;
         return new Promise((resolve) => {
-          httpServer!.close(() => resolve());
+          server.close(() => {
+            resolve();
+          });
         });
       }
     },
@@ -136,17 +145,8 @@ async function startTestServerFromApp(
 /**
  * Internal: Start server from external command
  */
-async function startTestServerFromCommand(
-  options: ExternalServerOptions
-): Promise<TestServer> {
-  const {
-    command,
-    args = [],
-    port,
-    readyPattern,
-    timeout = 10000,
-    env = {},
-  } = options;
+async function startTestServerFromCommand(options: ExternalServerOptions): Promise<TestServer> {
+  const { command, args = [], port, readyPattern, timeout = 10000, env = {} } = options;
 
   serverLogger("Starting external server: %s %s", command, args.join(" "));
 
@@ -163,7 +163,7 @@ async function startTestServerFromCommand(
     const text = data.toString();
     stdout += text;
     serverLogger("Server stdout: %s", text.trim());
-    if (readyPattern && readyPattern.test(text)) {
+    if (readyPattern?.test(text)) {
       serverReady = true;
     }
   });
@@ -219,7 +219,9 @@ async function startTestServerFromCommand(
           resolve();
           return;
         }
-        childProcess.once("exit", () => resolve());
+        childProcess.once("exit", () => {
+          resolve();
+        });
         childProcess.kill("SIGTERM");
         setTimeout(() => {
           if (!childProcess.killed) childProcess.kill("SIGKILL");

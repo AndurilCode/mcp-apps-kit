@@ -26,7 +26,7 @@ import { llmLogger } from "../../debug";
 export function createLLMEvaluator(config: LLMEvaluatorConfig): LLMEvaluator {
   llmLogger("Creating LLM evaluator: %s with model: %s", config.provider, config.model);
 
-  let provider: ReturnType<typeof createOpenAIProvider> | ReturnType<typeof createAnthropicProvider>;
+  let provider: ReturnType<typeof createOpenAIProvider>;
 
   switch (config.provider) {
     case "openai":

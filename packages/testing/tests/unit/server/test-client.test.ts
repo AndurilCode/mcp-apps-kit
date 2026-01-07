@@ -10,9 +10,7 @@ describe("createTestClient", () => {
   it("should create a client with default options", async () => {
     // This test requires a running server
     // For now, we'll test error cases
-    await expect(
-      createTestClient("http://localhost:99999/mcp")
-    ).rejects.toThrow(ConnectionError);
+    await expect(createTestClient("http://localhost:99999/mcp")).rejects.toThrow(ConnectionError);
   });
 
   it("should track history when enabled", async () => {

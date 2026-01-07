@@ -57,11 +57,7 @@ export const criteria = {
   /**
    * Custom criterion - create a custom evaluation criterion
    */
-  custom(
-    name: string,
-    description: string,
-    options?: { threshold?: number }
-  ): EvalCriterion {
+  custom(name: string, description: string, options?: { threshold?: number }): EvalCriterion {
     return {
       name,
       description,

@@ -5,12 +5,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
-import type {
-  TestClient,
-  TestClientOptions,
-  ToolResult,
-  ToolCall,
-} from "../types";
+import type { TestClient, TestClientOptions, ToolResult, ToolCall } from "../types";
 import { ConnectionError, TimeoutError } from "../errors";
 import { clientLogger } from "../debug";
 
@@ -25,10 +20,7 @@ export async function createTestClient(
 
   clientLogger("Creating test client for %s", url);
 
-  const client = new Client(
-    { name: "mcp-testing-client", version: "1.0.0" },
-    { capabilities: {} }
-  );
+  const client = new Client({ name: "mcp-testing-client", version: "1.0.0" }, { capabilities: {} });
 
   let transport: StreamableHTTPClientTransport | undefined;
   const callHistory: ToolCall[] = [];
@@ -42,11 +34,7 @@ export async function createTestClient(
     throw new ConnectionError(url, `Failed to connect: ${err.message}`, err);
   }
 
-  async function callToolWithRetry(
-    name: string,
-    args: unknown,
-    attempt = 0
-  ): Promise<ToolResult> {
+  async function callToolWithRetry(name: string, args: unknown, attempt = 0): Promise<ToolResult> {
     const startTime = Date.now();
     const timestamp = new Date();
 
@@ -74,20 +62,19 @@ export async function createTestClient(
       const duration = Date.now() - startTime;
 
       // Build content blocks from the result
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const contentBlocks = (result.content ?? []).map((block: any) => {
+      type ContentBlock = { type: string; text?: string; data?: string; mimeType?: string };
+      const contentBlocks = (result.content ?? []).map((block: ContentBlock) => {
         if (block.type === "text") {
           return { type: "text" as const, text: block.text };
         }
         if (block.type === "image") {
           return { type: "image" as const, data: block.data, mimeType: block.mimeType };
         }
-        return { type: "text" as const, text: String(block) };
+        return { type: "text" as const, text: JSON.stringify(block) };
       });
 
       // Access structuredContent from the raw result
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const structuredContent = (result as any).structuredContent;
+      const structuredContent = (result as { structuredContent?: unknown }).structuredContent;
 
       // If structuredContent exists, use it as the primary data
       if (structuredContent !== undefined && structuredContent !== null) {
@@ -153,22 +140,24 @@ export async function createTestClient(
 
     async readResource(uri: string) {
       const result = await client.readResource({ uri });
+      type ResourceContent = { text?: string; blob?: string; mimeType?: string };
       return {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        contents: result.contents.map((content: any) => {
+        contents: result.contents.map((content: ResourceContent) => {
           if (content.text !== undefined) {
             return { type: "text" as const, text: content.text };
           }
           if (content.blob !== undefined) {
             return { type: "image" as const, data: content.blob, mimeType: content.mimeType };
           }
-          return { type: "text" as const, text: String(content) };
+          return { type: "text" as const, text: JSON.stringify(content) };
         }),
       };
     },
 
     getCallHistory: () => [...callHistory],
-    clearHistory: () => { callHistory.length = 0; },
+    clearHistory: () => {
+      callHistory.length = 0;
+    },
 
     async disconnect(): Promise<void> {
       clientLogger("Disconnecting client");

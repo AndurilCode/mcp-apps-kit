@@ -3,11 +3,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import {
-  expectToolResult,
-  startTestServer,
-  createTestClient,
-} from "@mcp-apps-kit/testing";
+import { expectToolResult, startTestServer, createTestClient } from "@mcp-apps-kit/testing";
 import type { TestEnvironment } from "@mcp-apps-kit/testing";
 import { app } from "../src/index.js";
 
@@ -18,7 +14,7 @@ describe("Minimal Example Integration", () => {
     const testPort = 3004;
     const server = await startTestServer(app, { port: testPort });
     await new Promise((resolve) => setTimeout(resolve, 100));
-    
+
     const client = await createTestClient(`http://localhost:${testPort}/v1/mcp`, {
       trackHistory: true,
       timeout: 10000,

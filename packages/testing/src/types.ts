@@ -5,7 +5,7 @@
  */
 
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import type { ZodSchema } from "zod";
+import type { ZodType } from "zod";
 
 // =============================================================================
 // TOOL RESULT TYPES
@@ -344,10 +344,7 @@ export interface LLMEvaluator {
   /** Evaluate result against criteria */
   evaluate(result: unknown, options: EvalOptions): Promise<EvaluationResult>;
   /** Evaluate with custom prompt */
-  evaluateWithPrompt(
-    result: unknown,
-    options: CustomEvalOptions
-  ): Promise<unknown>;
+  evaluateWithPrompt(result: unknown, options: CustomEvalOptions): Promise<unknown>;
 }
 
 /**
@@ -426,7 +423,7 @@ export interface ToolResultAssertion {
   /** Match against expected object (partial) */
   toMatchObject(expected: unknown): void;
   /** Match against Zod schema */
-  toMatchSchema(schema: ZodSchema): void;
+  toMatchSchema(schema: ZodType): void;
   /** Assert no error occurred */
   toHaveNoError(): void;
   /** Assert error occurred (optionally with code) */

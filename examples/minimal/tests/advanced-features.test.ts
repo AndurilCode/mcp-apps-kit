@@ -116,7 +116,7 @@ describe("Advanced Features", () => {
 
     it("should track tool call history via simulateToolCall", () => {
       const mockHost = createMockHost();
-      
+
       mockHost.simulateToolCall("greet", { name: "Test" });
       mockHost.simulateToolCall("calculate", { a: 1, b: 2 });
 
@@ -131,7 +131,7 @@ describe("Advanced Features", () => {
       const mockHost = createMockHost();
       mockHost.simulateToolCall("test", {});
       expect(mockHost.getToolCallHistory()).toHaveLength(1);
-      
+
       mockHost.clearHistory();
       expect(mockHost.getToolCallHistory()).toHaveLength(0);
     });
@@ -242,8 +242,12 @@ describe("Advanced Features", () => {
       const suite = defineTestSuite({
         name: "Hooks Suite",
         tool: "greet",
-        beforeEach: async () => { beforeCount++; },
-        afterEach: async () => { afterCount++; },
+        beforeEach: async () => {
+          beforeCount++;
+        },
+        afterEach: async () => {
+          afterCount++;
+        },
         cases: [
           { name: "case1", input: { name: "Test1" } },
           { name: "case2", input: { name: "Test2" } },
@@ -384,7 +388,7 @@ describe("Advanced Features", () => {
       const testPort = 3013;
       const server = await startTestServer(app, { port: testPort });
       await new Promise((resolve) => setTimeout(resolve, 100));
-      
+
       const client = await createTestClient(`http://localhost:${testPort}/v1/mcp`, {
         trackHistory: true,
       });
@@ -413,7 +417,7 @@ describe("Advanced Features", () => {
       const client = await createTestClient(`http://localhost:${testPort}/v1/mcp`);
 
       const tools = await client.listTools();
-      expect(tools.some(t => t.name === "greet")).toBe(true);
+      expect(tools.some((t) => t.name === "greet")).toBe(true);
       expect(tools[0]).toHaveProperty("name");
       expect(tools[0]).toHaveProperty("description");
 
@@ -425,7 +429,7 @@ describe("Advanced Features", () => {
       const testPort = 3015;
       const server = await startTestServer(app, { port: testPort });
       await new Promise((resolve) => setTimeout(resolve, 100));
-      
+
       // Client with short timeout
       const client = await createTestClient(`http://localhost:${testPort}/v1/mcp`, {
         timeout: 5000, // 5 second timeout

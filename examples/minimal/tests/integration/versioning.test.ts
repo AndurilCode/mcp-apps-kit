@@ -3,11 +3,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import {
-  expectToolResult,
-  startTestServer,
-  createTestClient,
-} from "@mcp-apps-kit/testing";
+import { expectToolResult, startTestServer, createTestClient } from "@mcp-apps-kit/testing";
 import type { TestEnvironment } from "@mcp-apps-kit/testing";
 import { app } from "../../src/index.js";
 
@@ -61,14 +57,14 @@ describe("Versioning", () => {
     const tools = await v1Env.client.listTools();
     // May include log_debug tool if debug is enabled
     expect(tools.length).toBeGreaterThanOrEqual(1);
-    expect(tools.some(t => t.name === "greet")).toBe(true);
+    expect(tools.some((t) => t.name === "greet")).toBe(true);
   });
 
   it("should list tools for v2", async () => {
     const tools = await v2Env.client.listTools();
     // May include log_debug tool if debug is enabled
     expect(tools.length).toBeGreaterThanOrEqual(1);
-    expect(tools.some(t => t.name === "greet")).toBe(true);
+    expect(tools.some((t) => t.name === "greet")).toBe(true);
   });
 
   it("should have different output schemas for v1 and v2", async () => {
@@ -78,12 +74,17 @@ describe("Versioning", () => {
     expectToolResult(v1Result).toHaveNoError();
     expectToolResult(v2Result).toHaveNoError();
 
-    const v1Data = JSON.parse(v1Result.content[0]?.text ?? "{}");
-    const v2Data = JSON.parse(v2Result.content[0]?.text ?? "{}");
+    const v1Text = v1Result.content[0]?.text;
+    const v2Text = v2Result.content[0]?.text;
+    expect(v1Text, "v1 result should have text content").toBeDefined();
+    expect(v2Text, "v2 result should have text content").toBeDefined();
+
+    const v1Data = JSON.parse(v1Text!);
+    const v2Data = JSON.parse(v2Text!);
 
     // v1 doesn't have fullName
     expect(v1Data).not.toHaveProperty("fullName");
-    
+
     // v2 has fullName
     expect(v2Data).toHaveProperty("fullName");
   });
@@ -92,7 +93,9 @@ describe("Versioning", () => {
     const result = await v1Env.client.callTool("greet", { name: "Alice" });
 
     expectToolResult(result).toHaveNoError();
-    const data = JSON.parse(result.content[0]?.text ?? "{}");
+    const text = result.content[0]?.text;
+    expect(text, "result should have text content").toBeDefined();
+    const data = JSON.parse(text!);
     expect(data.message).toContain("Alice");
   });
 
@@ -103,7 +106,9 @@ describe("Versioning", () => {
     });
 
     expectToolResult(result).toHaveNoError();
-    const data = JSON.parse(result.content[0]?.text ?? "{}");
+    const text = result.content[0]?.text;
+    expect(text, "result should have text content").toBeDefined();
+    const data = JSON.parse(text!);
     expect(data.fullName).toBe("Bob Smith");
   });
 });

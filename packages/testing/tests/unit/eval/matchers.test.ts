@@ -31,9 +31,7 @@ describe("expectToolResult", () => {
 
     it("should handle partial matches", () => {
       const result: ToolResult = {
-        content: [
-          { type: "text", text: '{"message":"Hello, Alice!","timestamp":"2024-01-01"}' },
-        ],
+        content: [{ type: "text", text: '{"message":"Hello, Alice!","timestamp":"2024-01-01"}' }],
         isError: false,
       };
       expect(() => {

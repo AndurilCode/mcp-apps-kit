@@ -3,11 +3,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import {
-  expectToolResult,
-  startTestServer,
-  createTestClient,
-} from "@mcp-apps-kit/testing";
+import { expectToolResult, startTestServer, createTestClient } from "@mcp-apps-kit/testing";
 import type { TestEnvironment } from "@mcp-apps-kit/testing";
 import { z } from "zod";
 import { app } from "../src/index.js";
@@ -17,9 +13,9 @@ describe("Greet Tool V2", () => {
 
   beforeAll(async () => {
     const testPort = 3002;
-    const server = await startTestServer(app as unknown, { port: testPort });
+    const server = await startTestServer(app, { port: testPort });
     await new Promise((resolve) => setTimeout(resolve, 100));
-    
+
     const client = await createTestClient(`http://localhost:${testPort}/v2/mcp`, {
       trackHistory: true,
     });
@@ -43,7 +39,7 @@ describe("Greet Tool V2", () => {
       const result = await env.client.callTool("greet", { name: "Alice" });
 
       expectToolResult(result).toHaveNoError();
-      
+
       const data = JSON.parse(result.content[0]?.text ?? "{}");
       expect(data.message).toContain("Alice");
       expect(data.fullName).toBe("Alice");
@@ -56,7 +52,7 @@ describe("Greet Tool V2", () => {
       });
 
       expectToolResult(result).toHaveNoError();
-      
+
       const data = JSON.parse(result.content[0]?.text ?? "{}");
       expect(data.message).toContain("Alice Smith");
       expect(data.fullName).toBe("Alice Smith");

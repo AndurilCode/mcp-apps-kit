@@ -13,15 +13,18 @@ describe("startTestServer", () => {
     // Handle uncaught exceptions from child process
     const uncaughtHandler = (error: Error) => {
       // Ignore EACCES errors from spawn - these are expected when testing invalid commands
-      if (error.message.includes("nonexistent-command-12345") || (error as NodeJS.ErrnoException).code === "EACCES") {
+      if (
+        error.message.includes("nonexistent-command-12345") ||
+        (error as NodeJS.ErrnoException).code === "EACCES"
+      ) {
         return;
       }
       // Re-throw other errors
       throw error;
     };
-    
+
     process.once("uncaughtException", uncaughtHandler);
-    
+
     try {
       await expect(
         startTestServer({

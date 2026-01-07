@@ -9,18 +9,16 @@ import { ConfigurationError } from "../../errors";
 import { propertyLogger } from "../../debug";
 
 // Lazy-loaded fast-check module
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let fastCheckModule: any = null;
+let fastCheckModule: typeof import("fast-check") | null = null;
 
 /**
  * Load fast-check module (lazy, throws if not available)
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getFastCheck(): any {
+function getFastCheck(): typeof import("fast-check") {
   if (!fastCheckModule) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      fastCheckModule = require("fast-check");
+      fastCheckModule = require("fast-check") as typeof import("fast-check");
     } catch {
       throw new ConfigurationError(
         "fast-check",
@@ -31,9 +29,8 @@ function getFastCheck(): any {
   return fastCheckModule;
 }
 
-// Type for fast-check Arbitrary
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
-type Arbitrary<_T> = any;
+// Type for fast-check Arbitrary - use proper import type
+type Arbitrary<T> = import("fast-check").Arbitrary<T>;
 
 /**
  * Built-in value generators for property testing
@@ -95,8 +92,10 @@ export const generators = {
   /**
    * Generate random arrays
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  array<T>(gen: Arbitrary<T>, options?: { minLength?: number; maxLength?: number }): Arbitrary<T[]> {
+  array<T>(
+    gen: Arbitrary<T>,
+    options?: { minLength?: number; maxLength?: number }
+  ): Arbitrary<T[]> {
     propertyLogger("Creating array generator with options: %o", options);
     const fc = getFastCheck();
     return fc.array(gen, {
@@ -108,8 +107,9 @@ export const generators = {
   /**
    * Generate random objects
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  object<T>(shape: { [K in keyof T]: Arbitrary<T[K]> }): Arbitrary<T> {
+  object<T extends Record<string, unknown>>(shape: {
+    [K in keyof T]: Arbitrary<T[K]>;
+  }): Arbitrary<T> {
     propertyLogger("Creating object generator");
     const fc = getFastCheck();
     return fc.record(shape);

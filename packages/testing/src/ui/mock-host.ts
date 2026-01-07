@@ -47,12 +47,20 @@ export function createMockHost(options: MockHostOptions = {}): MockHost {
   const cancelledHandlers: Array<(reason?: string) => void> = [];
 
   // Try to load MockAdapter from @mcp-apps-kit/ui if available
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let uiAdapter: any = null;
+  // Define interface for the UI adapter methods we use
+  interface UIAdapter {
+    emitToolResult?(result: unknown): void;
+    setHostContext?(context: { theme: string }): void;
+    emitToolCancelled?(reason?: string): void;
+    emitTeardown?(reason?: string): void;
+  }
+  let uiAdapter: UIAdapter | null = null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { MockAdapter } = require("@mcp-apps-kit/ui/adapters/mock");
-    uiAdapter = new MockAdapter();
+    const uiModule = require("@mcp-apps-kit/ui/adapters/mock") as {
+      MockAdapter: new () => UIAdapter;
+    };
+    uiAdapter = new uiModule.MockAdapter();
     uiLogger("Using MockAdapter from @mcp-apps-kit/ui");
   } catch {
     uiLogger("@mcp-apps-kit/ui not available, using standalone mock");
@@ -61,7 +69,7 @@ export function createMockHost(options: MockHostOptions = {}): MockHost {
   return {
     emitToolResult(result: unknown): void {
       uiLogger("Mock host emitting tool result: %o", result);
-      
+
       // Record in history
       toolCallHistory.push({
         name: "_result",
@@ -80,9 +88,7 @@ export function createMockHost(options: MockHostOptions = {}): MockHost {
       }
 
       // Forward to UI adapter if available
-      if (uiAdapter?.emitToolResult) {
-        uiAdapter.emitToolResult(result);
-      }
+      uiAdapter?.emitToolResult?.(result);
     },
 
     setTheme(theme: "light" | "dark"): void {
@@ -90,9 +96,7 @@ export function createMockHost(options: MockHostOptions = {}): MockHost {
       currentTheme = theme;
 
       // Forward to UI adapter if available
-      if (uiAdapter?.setHostContext) {
-        uiAdapter.setHostContext({ theme });
-      }
+      uiAdapter?.setHostContext?.({ theme });
     },
 
     getTheme(): "light" | "dark" {
@@ -108,9 +112,7 @@ export function createMockHost(options: MockHostOptions = {}): MockHost {
       }
 
       // Forward to UI adapter if available
-      if (uiAdapter?.emitToolCancelled) {
-        uiAdapter.emitToolCancelled(reason);
-      }
+      uiAdapter?.emitToolCancelled?.(reason);
     },
 
     emitTeardown(reason?: string): void {
@@ -122,9 +124,7 @@ export function createMockHost(options: MockHostOptions = {}): MockHost {
       }
 
       // Forward to UI adapter if available
-      if (uiAdapter?.emitTeardown) {
-        uiAdapter.emitTeardown(reason);
-      }
+      uiAdapter?.emitTeardown?.(reason);
     },
 
     getToolCallHistory(): ToolCall[] {

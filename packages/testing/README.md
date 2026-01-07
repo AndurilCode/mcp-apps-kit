@@ -118,7 +118,7 @@ describe("Greet Tool", () => {
 
   it("should greet by name", async () => {
     const result = await env.client.callTool("greet", { name: "Alice" });
-    
+
     expectToolResult(result).toHaveNoError();
     expectToolResult(result).toContainText("Alice");
   });
@@ -135,12 +135,12 @@ The simplest way to set up a test environment:
 import { createTestEnvironment } from "@mcp-apps-kit/testing";
 
 const env = await createTestEnvironment({
-  app,                              // Your MCP app instance
-  port: 3001,                       // Server port (default: 3000)
-  version: "v1",                    // API version for versioned apps
+  app, // Your MCP app instance
+  port: 3001, // Server port (default: 3000)
+  version: "v1", // API version for versioned apps
   clientOptions: {
-    trackHistory: true,             // Track tool call history
-    timeout: 5000,                  // Timeout in ms
+    trackHistory: true, // Track tool call history
+    timeout: 5000, // Timeout in ms
   },
 });
 
@@ -148,7 +148,7 @@ const env = await createTestEnvironment({
 const result = await env.client.callTool("greet", { name: "Test" });
 
 // Access the server
-console.log(env.server.url);  // http://localhost:3001
+console.log(env.server.url); // http://localhost:3001
 
 // Cleanup when done
 await env.cleanup();
@@ -180,7 +180,7 @@ import { startTestServer, createTestClient } from "@mcp-apps-kit/testing";
 const server = await startTestServer(app, { port: 3001 });
 
 // Wait for server to be ready
-await new Promise(resolve => setTimeout(resolve, 100));
+await new Promise((resolve) => setTimeout(resolve, 100));
 
 // Create client (for versioned apps, connect to version endpoint)
 const client = await createTestClient(`http://localhost:3001/v1/mcp`, {
@@ -252,13 +252,13 @@ expectToolResult(result).toMatchObject({
 
 ### Available Matchers
 
-| Matcher | Description |
-|---------|-------------|
-| `.toHaveNoError()` | Assert result has no error |
-| `.toHaveError(code?)` | Assert result has an error (optionally with code) |
-| `.toContainText(text)` | Assert result contains text |
-| `.toMatchSchema(zodSchema)` | Validate result against Zod schema |
-| `.toMatchObject(expected)` | Partial object matching |
+| Matcher                     | Description                                       |
+| --------------------------- | ------------------------------------------------- |
+| `.toHaveNoError()`          | Assert result has no error                        |
+| `.toHaveError(code?)`       | Assert result has an error (optionally with code) |
+| `.toContainText(text)`      | Assert result contains text                       |
+| `.toMatchSchema(zodSchema)` | Validate result against Zod schema                |
+| `.toMatchObject(expected)`  | Partial object matching                           |
 
 ## Test Suites
 
@@ -270,7 +270,7 @@ import { defineTestSuite, runTestSuite } from "@mcp-apps-kit/testing";
 const suite = defineTestSuite({
   name: "Greet Tool Suite",
   tool: "greet",
-  
+
   // Optional hooks
   beforeEach: async () => {
     console.log("Before each test");
@@ -278,7 +278,7 @@ const suite = defineTestSuite({
   afterEach: async () => {
     console.log("After each test");
   },
-  
+
   // Test cases
   cases: [
     {
@@ -294,7 +294,7 @@ const suite = defineTestSuite({
     {
       name: "skipped test",
       input: { name: "Skip" },
-      skip: true,  // Skip this test
+      skip: true, // Skip this test
     },
     {
       name: "handles empty name",
@@ -339,16 +339,16 @@ await forAllInputs(
 
 ### Available Generators
 
-| Generator | Description |
-|-----------|-------------|
-| `generators.string(options?)` | Random strings with length constraints |
-| `generators.integer(min?, max?)` | Random integers |
-| `generators.float(min?, max?)` | Random floating-point numbers |
-| `generators.boolean()` | Random booleans |
-| `generators.array(gen, options?)` | Arrays of generated values |
-| `generators.object(shape)` | Objects with generated properties |
-| `generators.oneOf(...values)` | One of the provided values |
-| `generators.optional(gen)` | Optional (possibly undefined) values |
+| Generator                         | Description                            |
+| --------------------------------- | -------------------------------------- |
+| `generators.string(options?)`     | Random strings with length constraints |
+| `generators.integer(min?, max?)`  | Random integers                        |
+| `generators.float(min?, max?)`    | Random floating-point numbers          |
+| `generators.boolean()`            | Random booleans                        |
+| `generators.array(gen, options?)` | Arrays of generated values             |
+| `generators.object(shape)`        | Objects with generated properties      |
+| `generators.oneOf(...values)`     | One of the provided values             |
+| `generators.optional(gen)`        | Optional (possibly undefined) values   |
 
 ## UI Widget Testing
 
@@ -475,8 +475,8 @@ import { createLLMEvaluator, criteria } from "@mcp-apps-kit/testing";
 
 // Create evaluator (requires OPENAI_API_KEY or ANTHROPIC_API_KEY)
 const evaluator = createLLMEvaluator({
-  provider: "openai",    // or "anthropic"
-  model: "gpt-4o-mini",  // or "claude-3-haiku-20240307"
+  provider: "openai", // or "anthropic"
+  model: "gpt-4o-mini", // or "claude-3-haiku-20240307"
 });
 
 // Evaluate with built-in criteria
@@ -504,13 +504,13 @@ const custom = await evaluator.evaluateWithPrompt(result, {
 
 ### Built-in Criteria
 
-| Criterion | Description |
-|-----------|-------------|
-| `criteria.accuracy(desc)` | Measures correctness (threshold: 0.7) |
-| `criteria.relevance(desc)` | Measures relevance to input (threshold: 0.7) |
-| `criteria.completeness(desc)` | Measures completeness (threshold: 0.7) |
-| `criteria.safety(desc?)` | Measures safety (threshold: 0.9) |
-| `criteria.custom(name, desc, opts?)` | Custom criterion |
+| Criterion                            | Description                                  |
+| ------------------------------------ | -------------------------------------------- |
+| `criteria.accuracy(desc)`            | Measures correctness (threshold: 0.7)        |
+| `criteria.relevance(desc)`           | Measures relevance to input (threshold: 0.7) |
+| `criteria.completeness(desc)`        | Measures completeness (threshold: 0.7)       |
+| `criteria.safety(desc?)`             | Measures safety (threshold: 0.9)             |
+| `criteria.custom(name, desc, opts?)` | Custom criterion                             |
 
 ## Framework Integration
 
@@ -552,60 +552,60 @@ expect(result).toContainToolText("Alice");
 
 ### Available Framework Matchers
 
-| Matcher | Description |
-|---------|-------------|
-| `.toBeSuccessfulToolResult()` | Assert result has no error |
-| `.toHaveToolError(code?)` | Assert result has an error |
-| `.toContainToolText(text)` | Assert result contains text |
-| `.toMatchToolSchema(schema)` | Validate against Zod schema |
-| `.toMatchToolObject(expected)` | Partial object matching |
+| Matcher                        | Description                 |
+| ------------------------------ | --------------------------- |
+| `.toBeSuccessfulToolResult()`  | Assert result has no error  |
+| `.toHaveToolError(code?)`      | Assert result has an error  |
+| `.toContainToolText(text)`     | Assert result contains text |
+| `.toMatchToolSchema(schema)`   | Validate against Zod schema |
+| `.toMatchToolObject(expected)` | Partial object matching     |
 
 ## API Reference
 
 ### Server Utilities
 
-| Function | Description |
-|----------|-------------|
-| `startTestServer(app, options?)` | Start server from App instance |
-| `startTestServer(options)` | Start external server process |
-| `createTestClient(url, options?)` | Create test client |
-| `createTestEnvironment(options)` | Create complete test environment |
-| `TestEnvironmentBuilder` | Fluent builder for environments |
+| Function                          | Description                      |
+| --------------------------------- | -------------------------------- |
+| `startTestServer(app, options?)`  | Start server from App instance   |
+| `startTestServer(options)`        | Start external server process    |
+| `createTestClient(url, options?)` | Create test client               |
+| `createTestEnvironment(options)`  | Create complete test environment |
+| `TestEnvironmentBuilder`          | Fluent builder for environments  |
 
 ### Behavior Testing
 
-| Function | Description |
-|----------|-------------|
-| `expectToolResult(result)` | Create assertion builder |
-| `defineTestSuite(config)` | Define test suite |
-| `runTestSuite(client, suite)` | Run test suite |
+| Function                      | Description              |
+| ----------------------------- | ------------------------ |
+| `expectToolResult(result)`    | Create assertion builder |
+| `defineTestSuite(config)`     | Define test suite        |
+| `runTestSuite(client, suite)` | Run test suite           |
 
 ### Property Testing
 
-| Function | Description |
-|----------|-------------|
-| `generators` | Value generators |
+| Function                              | Description        |
+| ------------------------------------- | ------------------ |
+| `generators`                          | Value generators   |
 | `forAllInputs(gen, predicate, opts?)` | Run property tests |
 
 ### UI Testing
 
-| Function | Description |
-|----------|-------------|
+| Function                   | Description                  |
+| -------------------------- | ---------------------------- |
 | `createMockHost(options?)` | Create mock host environment |
 
 ### LLM Evaluation
 
-| Function | Description |
-|----------|-------------|
-| `createLLMEvaluator(config)` | Create LLM evaluator |
-| `criteria` | Built-in evaluation criteria |
+| Function                     | Description                  |
+| ---------------------------- | ---------------------------- |
+| `createLLMEvaluator(config)` | Create LLM evaluator         |
+| `criteria`                   | Built-in evaluation criteria |
 
 ### Framework Adapters
 
-| Function | Import Path |
-|----------|-------------|
+| Function                | Import Path                    |
+| ----------------------- | ------------------------------ |
 | `setupVitestMatchers()` | `@mcp-apps-kit/testing/vitest` |
-| `setupJestMatchers()` | `@mcp-apps-kit/testing/jest` |
+| `setupJestMatchers()`   | `@mcp-apps-kit/testing/jest`   |
 
 ## Examples
 

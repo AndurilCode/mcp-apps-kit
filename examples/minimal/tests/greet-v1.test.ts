@@ -3,11 +3,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import {
-  expectToolResult,
-  startTestServer,
-  createTestClient,
-} from "@mcp-apps-kit/testing";
+import { expectToolResult, startTestServer, createTestClient } from "@mcp-apps-kit/testing";
 import type { TestEnvironment } from "@mcp-apps-kit/testing";
 import { z } from "zod";
 import { app } from "../src/index.js";
@@ -19,7 +15,7 @@ describe("Greet Tool V1", () => {
     const testPort = 3001;
     const server = await startTestServer(app, { port: testPort });
     await new Promise((resolve) => setTimeout(resolve, 100));
-    
+
     const client = await createTestClient(`http://localhost:${testPort}/v1/mcp`, {
       trackHistory: true,
     });
@@ -44,7 +40,7 @@ describe("Greet Tool V1", () => {
 
       expectToolResult(result).toHaveNoError();
       expectToolResult(result).toContainText("Alice");
-      
+
       // Parse structured content
       const data = JSON.parse(result.content[0]?.text ?? "{}");
       expect(data.message).toContain("Alice");
@@ -55,7 +51,7 @@ describe("Greet Tool V1", () => {
       const result = await env.client.callTool("greet", { name: "Bob" });
 
       expectToolResult(result).toHaveNoError();
-      
+
       const data = JSON.parse(result.content[0]?.text ?? "{}");
       expect(() => new Date(data.timestamp)).not.toThrow();
       expect(new Date(data.timestamp).toISOString()).toBe(data.timestamp);

@@ -4,7 +4,7 @@
  * Provides standalone assertion functions for validating tool outputs.
  */
 
-import type { ZodSchema } from "zod";
+import type { ZodType } from "zod";
 import type { ToolResult, ToolResultAssertion } from "../../types";
 import { AssertionError } from "../../errors";
 import { behaviorLogger } from "../../debug";
@@ -43,7 +43,7 @@ export function expectToolResult(result: ToolResult): ToolResultAssertion {
     /**
      * Match result against Zod schema
      */
-    toMatchSchema(schema: ZodSchema): void {
+    toMatchSchema(schema: ZodType): void {
       behaviorLogger("Asserting result matches schema");
       const actual = extractResultData(result);
       const parseResult = schema.safeParse(actual);
@@ -142,7 +142,7 @@ export function extractResultData(result: ToolResult): unknown {
 
   // Try to parse as JSON first
   try {
-    const parsed = JSON.parse(textContent);
+    const parsed: unknown = JSON.parse(textContent);
     // If it's a string that looks like JSON was stringified, try parsing again
     if (typeof parsed === "string") {
       try {
@@ -171,12 +171,12 @@ export function deepMatch(actual: unknown, expected: unknown): boolean {
   }
 
   // Both null or undefined
-  if (actual == null && expected == null) {
+  if ((actual === null || actual === undefined) && (expected === null || expected === undefined)) {
     return true;
   }
 
   // One is null/undefined, other isn't
-  if (actual == null || expected == null) {
+  if (actual === null || actual === undefined || expected === null || expected === undefined) {
     return false;
   }
 
@@ -196,9 +196,7 @@ export function deepMatch(actual: unknown, expected: unknown): boolean {
       return actual.length === 0;
     }
     // For arrays, check if all expected elements exist in actual
-    return expected.every((expItem) =>
-      actual.some((actItem) => deepMatch(actItem, expItem))
-    );
+    return expected.every((expItem) => actual.some((actItem) => deepMatch(actItem, expItem)));
   }
 
   // One is array, other isn't

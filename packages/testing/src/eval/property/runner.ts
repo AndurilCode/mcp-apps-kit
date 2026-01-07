@@ -9,18 +9,16 @@ import { PropertyFailureError } from "../../errors";
 import { propertyLogger } from "../../debug";
 
 // Lazy-loaded fast-check module
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let fastCheckModule: any = null;
+let fastCheckModule: typeof import("fast-check") | null = null;
 
 /**
  * Load fast-check module (lazy, throws if not available)
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getFastCheck(): any {
+function getFastCheck(): typeof import("fast-check") {
   if (!fastCheckModule) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      fastCheckModule = require("fast-check");
+      fastCheckModule = require("fast-check") as typeof import("fast-check");
     } catch {
       throw new Error(
         "fast-check is required for property testing. Install it with: npm install -D fast-check"
@@ -30,9 +28,8 @@ function getFastCheck(): any {
   return fastCheckModule;
 }
 
-// Type for fast-check Arbitrary
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
-type Arbitrary<_T> = any;
+// Type for fast-check Arbitrary - use proper import type
+type Arbitrary<T> = import("fast-check").Arbitrary<T>;
 
 /**
  * Run property-based tests
@@ -57,8 +54,7 @@ export async function forAllInputs<T>(
   });
 
   // Configure runner
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const runnerOptions: any = { numRuns };
+  const runnerOptions: Parameters<typeof fc.assert>[1] = { numRuns };
   if (seed !== undefined) runnerOptions.seed = seed;
   if (timeout !== undefined) runnerOptions.timeout = timeout;
 

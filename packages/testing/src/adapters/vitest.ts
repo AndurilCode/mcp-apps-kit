@@ -12,8 +12,8 @@ import {
 } from "../matchers/core";
 import type { ToolResult } from "../types";
 
-// ZodSchema type reference for type augmentation
-type ZodSchema = import("zod").ZodSchema;
+// ZodType is the modern replacement for ZodSchema in Zod v4+
+type ZodType = import("zod").ZodType;
 
 /**
  * Setup Vitest matchers for tool results
@@ -27,7 +27,7 @@ type ZodSchema = import("zod").ZodSchema;
  */
 export function setupVitestMatchers(): void {
   expect.extend({
-    toMatchToolSchema(received: ToolResult, schema: ZodSchema) {
+    toMatchToolSchema(received: ToolResult, schema: ZodType) {
       return matchesToolSchema(received, schema);
     },
     toBeSuccessfulToolResult(received: ToolResult) {
@@ -49,7 +49,7 @@ export function setupVitestMatchers(): void {
 declare module "vitest" {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface Assertion<T> {
-    toMatchToolSchema(schema: ZodSchema): void;
+    toMatchToolSchema(schema: ZodType): void;
     toBeSuccessfulToolResult(): void;
     toHaveToolError(code?: string): void;
     toContainToolText(text: string): void;
@@ -57,7 +57,7 @@ declare module "vitest" {
   }
 
   interface AsymmetricMatchersContaining {
-    toMatchToolSchema(schema: ZodSchema): void;
+    toMatchToolSchema(schema: ZodType): void;
     toBeSuccessfulToolResult(): void;
     toHaveToolError(code?: string): void;
     toContainToolText(text: string): void;

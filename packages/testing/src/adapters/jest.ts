@@ -12,9 +12,8 @@ import {
   matchesToolObject,
 } from "../matchers/core";
 import type { ToolResult } from "../types";
-// ZodSchema is a type from zod, but we need to reference it in type augmentation
-// Using a type alias to avoid direct dependency issues
-type ZodSchema = import("zod").ZodSchema;
+// ZodType is the modern replacement for ZodSchema in Zod v4+
+type ZodType = import("zod").ZodType;
 
 // Jest's expect is available globally, but we need to type it
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -37,8 +36,9 @@ export function setupJestMatchers(): void {
     );
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
   expect.extend({
-    toMatchToolSchema(received: ToolResult, schema: ZodSchema) {
+    toMatchToolSchema(received: ToolResult, schema: ZodType) {
       return matchesToolSchema(received, schema);
     },
     toBeSuccessfulToolResult(received: ToolResult) {
@@ -57,12 +57,15 @@ export function setupJestMatchers(): void {
 }
 
 // Type augmentation for Jest
-declare namespace jest {
-  interface Matchers<R> {
-    toMatchToolSchema(schema: ZodSchema): R;
-    toBeSuccessfulToolResult(): R;
-    toHaveToolError(code?: string): R;
-    toContainToolText(text: string): R;
-    toMatchToolObject(expected: unknown): R;
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace jest {
+    interface Matchers<R> {
+      toMatchToolSchema(schema: ZodType): R;
+      toBeSuccessfulToolResult(): R;
+      toHaveToolError(code?: string): R;
+      toContainToolText(text: string): R;
+      toMatchToolObject(expected: unknown): R;
+    }
   }
 }

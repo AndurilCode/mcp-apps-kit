@@ -23,7 +23,7 @@ let openaiModule: typeof import("openai") | null = null;
 function getOpenAI(): typeof import("openai") {
   if (!openaiModule) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
       openaiModule = require("openai");
     } catch {
       throw new ConfigurationError(
@@ -39,10 +39,7 @@ function getOpenAI(): typeof import("openai") {
 /**
  * Create OpenAI provider
  */
-export function createOpenAIProvider(
-  model: string,
-  apiKey?: string
-): LLMProvider {
+export function createOpenAIProvider(model: string, apiKey?: string): LLMProvider {
   llmLogger("Creating OpenAI provider with model: %s", model);
 
   const apiKeyValue = apiKey ?? process.env.OPENAI_API_KEY;
@@ -121,10 +118,7 @@ export function createOpenAIProvider(
       };
     },
 
-    async evaluateWithPrompt(
-      result: unknown,
-      options: CustomEvalOptions
-    ): Promise<unknown> {
+    async evaluateWithPrompt(result: unknown, options: CustomEvalOptions): Promise<unknown> {
       llmLogger("Evaluating result with custom prompt");
 
       const response = await client.chat.completions.create({
@@ -179,11 +173,11 @@ function buildEvaluationPrompt(result: unknown, options: EvalOptions): string {
 
   prompt +=
     "\nReturn a JSON object with this structure:\n" +
-    '{\n' +
+    "{\n" +
     '  "criteria": [\n' +
     '    { "name": "criterion_name", "score": 0.0-1.0, "explanation": "..." },\n' +
-    '    ...\n' +
-    '  ],\n' +
+    "    ...\n" +
+    "  ],\n" +
     '  "overall": { "score": 0.0-1.0 }\n' +
     "}\n";
 

@@ -21,10 +21,7 @@ import { behaviorLogger } from "../../debug";
  * console.log(`${results.passed}/${results.total} passed`);
  * ```
  */
-export async function runTestSuite(
-  client: TestClient,
-  suite: TestSuite
-): Promise<TestSuiteResult> {
+export async function runTestSuite(client: TestClient, suite: TestSuite): Promise<TestSuiteResult> {
   behaviorLogger("Running test suite: %s", suite.name);
 
   const startTime = Date.now();
@@ -57,7 +54,9 @@ export async function runTestSuite(
     }
 
     const caseStartTime = Date.now();
-    let caseResult: TestCaseResult | undefined;
+    let caseStatus: "passed" | "failed" = "passed";
+    let caseActual: unknown = undefined;
+    let caseError: Error | undefined = undefined;
 
     try {
       // Run beforeEach if provided
@@ -66,40 +65,30 @@ export async function runTestSuite(
       }
 
       // Execute the test case
-      const result = await runTestCase(client, suite.tool, testCase);
-
+      caseActual = await runTestCase(client, suite.tool, testCase);
       passed++;
-      caseResult = {
-        name: testCase.name,
-        status: "passed",
-        duration: 0, // Will be set in finally
-        actual: result,
-        expected: testCase.expected,
-      };
     } catch (error) {
+      caseStatus = "failed";
+      caseError = error instanceof Error ? error : new Error(String(error));
       failed++;
-      caseResult = {
-        name: testCase.name,
-        status: "failed",
-        duration: 0, // Will be set in finally
-        error: error instanceof Error ? error : new Error(String(error)),
-        actual: undefined,
-        expected: testCase.expected,
-      };
     } finally {
       // Run afterEach if provided (always runs)
       if (suite.afterEach) {
         await suite.afterEach();
       }
-
-      // Compute duration once and assign to caseResult
-      const duration = Date.now() - caseStartTime;
-      if (caseResult) {
-        caseResult.duration = duration;
-      }
     }
 
-    caseResults.push(caseResult!);
+    // Build the result after try/catch so it's always fully defined
+    const caseResult: TestCaseResult = {
+      name: testCase.name,
+      status: caseStatus,
+      duration: Date.now() - caseStartTime,
+      actual: caseActual,
+      expected: testCase.expected,
+      ...(caseError && { error: caseError }),
+    };
+
+    caseResults.push(caseResult);
   }
 
   const duration = Date.now() - startTime;
@@ -135,7 +124,7 @@ async function runTestCase(
 
   // Set up timeout if specified
   const timeout = testCase.timeout;
-  let timeoutId: NodeJS.Timeout | undefined;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
   const timeoutPromise = timeout
     ? new Promise<never>((_, reject) => {

@@ -5,12 +5,7 @@
  * with both server and UI testing capabilities.
  */
 
-import type {
-  TestEnvironment,
-  TestEnvironmentOptions,
-  TestClient,
-  TestServer,
-} from "../types";
+import type { TestEnvironment, TestEnvironmentOptions, TestClient, TestServer } from "../types";
 import { createTestClient, startTestServer } from "../server";
 import { uiLogger } from "../debug";
 
@@ -50,7 +45,7 @@ export async function createTestEnvironment(
   if (options.app) {
     const port = options.port ?? 3000;
     server = await startTestServer(options.app as App, { port });
-    
+
     // Wait a bit for server to be ready
     await new Promise((resolve) => setTimeout(resolve, 100));
   } else if (options.serverUrl) {
