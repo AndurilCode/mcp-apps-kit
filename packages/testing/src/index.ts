@@ -99,6 +99,9 @@ export type { TestSuiteConfig } from "./eval/behavior";
 // Property testing - Phase 6
 export { generators, forAllInputs } from "./eval/property";
 
+// UI testing - Phase 7
+export { createMockHost, createTestEnvironment, TestEnvironmentBuilder } from "./ui";
+
 // Framework adapters - Phase 5
 // Note: Vitest and Jest adapters are exported via subpath exports in package.json
 // They are available as @mcp-apps-kit/testing/vitest and @mcp-apps-kit/testing/jest
