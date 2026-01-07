@@ -68,7 +68,7 @@
   "peerDependencies": {
     "zod": "^4.0.0",
     "fast-check": "^3.0.0",
-    "zod-fast-check": "^1.0.0",
+    "zod-fast-check": "^0.10.1",
     "openai": "^4.0.0",
     "@anthropic-ai/sdk": "^0.20.0",
     "vitest": "^4.0.0",

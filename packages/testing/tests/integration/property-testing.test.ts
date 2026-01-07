@@ -6,8 +6,8 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { generators, forAllInputs } from "../../../src/eval/property";
-import { PropertyFailureError } from "../../../src/errors";
+import { generators, forAllInputs } from "../../src/eval/property";
+import { PropertyFailureError } from "../../src/errors";
 
 describe("Property Testing Integration", () => {
   it("should run property tests with generators", async () => {

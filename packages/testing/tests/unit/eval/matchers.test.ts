@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { expectToolResult } from "../../../src/eval/behavior/matchers";
+import { expectToolResult } from "../../../src/eval/behavior";
 import { AssertionError } from "../../../src/errors";
 import type { ToolResult } from "../../../src/types";
 

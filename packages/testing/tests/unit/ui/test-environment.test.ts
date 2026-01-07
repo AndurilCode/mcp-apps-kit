@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { createTestEnvironment, TestEnvironmentBuilder } from "../../../src/ui/test-environment";
+import { createTestEnvironment, TestEnvironmentBuilder } from "../../../src/ui";
 
 describe("createTestEnvironment", () => {
   it("should throw if neither app nor serverUrl is provided", async () => {

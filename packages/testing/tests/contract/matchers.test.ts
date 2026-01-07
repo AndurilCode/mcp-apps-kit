@@ -5,8 +5,8 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { expectToolResult } from "../../../src/eval/behavior/matchers";
-import type { ToolResult } from "../../../src/types";
+import { expectToolResult } from "../../src/eval/behavior";
+import type { ToolResult } from "../../src/types";
 
 describe("Behavior Matchers Contract", () => {
   it("should export expectToolResult function", () => {

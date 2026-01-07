@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { createTestClient, startTestServer } from "../../../src/server";
+import { createTestClient, startTestServer } from "../../src/server";
 
 describe("Server Utilities Contract", () => {
   it("should export createTestClient", () => {

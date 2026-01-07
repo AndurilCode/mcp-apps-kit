@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { defineTestSuite } from "../../../src/eval/behavior/test-case";
+import { defineTestSuite } from "../../../src/eval/behavior";
 
 describe("defineTestSuite", () => {
   it("should create a test suite with valid config", () => {

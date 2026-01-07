@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { createMockHost } from "../../../src/ui/mock-host";
+import { createMockHost } from "../../../src/ui";
 
 describe("createMockHost", () => {
   it("should create a mock host with default options", () => {

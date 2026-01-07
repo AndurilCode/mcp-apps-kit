@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { createTestClient } from "../../../src/server/test-client";
+import { createTestClient } from "../../../src/server";
 import { ConnectionError, TimeoutError } from "../../../src/errors";
 
 describe("createTestClient", () => {
