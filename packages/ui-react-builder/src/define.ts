@@ -86,7 +86,7 @@ export function defineReactUI(definition: ReactUIInput): ReactUIDef {
     __reactUI: true,
     __component: component,
     __defaultProps: defaultProps,
-    __autoResize: autoResize,
+    __autoResize: autoResize ?? true,
   };
 }
 
