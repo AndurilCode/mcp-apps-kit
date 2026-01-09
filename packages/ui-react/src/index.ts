@@ -19,11 +19,11 @@ export type {
   ListToolsHandler,
 } from "@mcp-apps-kit/ui";
 
-// Context (placeholder - will be implemented in Phase 6)
+// Context
 export { AppsProvider, useAppsContext } from "./context";
 export type { AppsProviderProps } from "./context";
 
-// Hooks (placeholder - will be implemented in Phase 6)
+// Hooks
 export {
   useAppsClient,
   useToolResult,

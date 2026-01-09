@@ -2,14 +2,8 @@
  * React context and provider for @mcp-apps-kit/ui-react
  */
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  type ReactNode,
-  type ComponentType,
-} from "react";
+import type { ReactNode, ComponentType, JSX } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 import type { AppsClient, ToolDefs } from "@mcp-apps-kit/ui";
 import { createClient } from "@mcp-apps-kit/ui";
 
@@ -101,7 +95,7 @@ export function AppsProvider<T extends ToolDefs = ToolDefs>({
   autoResize,
   fallback,
   errorFallback: ErrorFallback,
-}: AppsProviderProps<T>): React.JSX.Element {
+}: AppsProviderProps<T>): JSX.Element {
   const [client, setClient] = useState<AppsClient<T> | null>(providedClient ?? null);
   const [isConnecting, setIsConnecting] = useState(!providedClient);
   const [error, setError] = useState<Error | null>(null);
