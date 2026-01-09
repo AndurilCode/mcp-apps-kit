@@ -73,7 +73,7 @@ export interface UserLocation {
 /**
  * Context provided by the client during tool invocation
  *
- * Contains metadata hints from the host platform (ChatGPT, Claude Desktop, etc.).
+ * Contains metadata hints from the host platform (ChatGPT, MCP Apps hosts, etc.).
  * All fields are optional as availability depends on the client.
  *
  * @example

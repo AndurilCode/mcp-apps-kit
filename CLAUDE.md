@@ -1,6 +1,6 @@
 # MCP AppsKit Development Guidelines
 
-A TypeScript framework for building interactive MCP applications that work with both **MCP Apps (Claude Desktop)** and **ChatGPT (OpenAI Apps SDK)** from a single codebase.
+A TypeScript framework for building interactive MCP applications that work with both **MCP Apps** and **ChatGPT (OpenAI Apps SDK)** from a single codebase.
 
 ## Project Structure
 

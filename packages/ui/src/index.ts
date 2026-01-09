@@ -7,7 +7,7 @@
  * ```typescript
  * import { createClient } from "@mcp-apps-kit/ui";
  *
- * // Auto-detects platform (Claude Desktop vs ChatGPT)
+ * // Auto-detects platform (MCP Apps vs ChatGPT)
  * const client = await createClient();
  *
  * // Type-safe tool calls
@@ -148,7 +148,7 @@ function createAdapter(
 /**
  * Create a unified client for UI code
  *
- * Automatically detects the host platform (Claude Desktop vs ChatGPT)
+ * Automatically detects the host platform (MCP Apps vs ChatGPT)
  * and returns a client with the appropriate adapter.
  *
  * @param options - Optional configuration

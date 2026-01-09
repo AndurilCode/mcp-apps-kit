@@ -4,7 +4,7 @@
 
 Build tool for React-based MCP application UIs.
 
-`@mcp-apps-kit/ui-react-builder` allows you to define UI resources using React components instead of pre-built HTML files. The framework handles bundling React, ReactDOM, and `@mcp-apps-kit/ui-react` into self-contained HTML that works with both MCP Apps (Claude Desktop) and ChatGPT.
+`@mcp-apps-kit/ui-react-builder` allows you to define UI resources using React components instead of pre-built HTML files. The framework handles bundling React, ReactDOM, and `@mcp-apps-kit/ui-react` into self-contained HTML that works with both MCP Apps and ChatGPT.
 
 ## Table of Contents
 
@@ -193,14 +193,14 @@ If you need patterns not supported by auto-discovery, use `defineUI({ html: "...
 
 #### `defineReactUI` Options
 
-| Option          | Type            | Default    | Description                                                                                                  |
-| --------------- | --------------- | ---------- | ------------------------------------------------------------------------------------------------------------ |
-| `component`     | `ComponentType` | (required) | React component to render                                                                                    |
-| `name`          | `string`        | (required) | Display name for the UI                                                                                      |
-| `description`   | `string`        | -          | Description of the UI widget                                                                                 |
-| `prefersBorder` | `boolean`       | -          | Hint to the host whether a border should be drawn                                                            |
-| `autoResize`    | `boolean`       | `true`     | Enable automatic size change notifications. Only supported in MCP Apps (Claude Desktop); ignored in ChatGPT. |
-| `csp`           | `CSPConfig`     | -          | Content Security Policy configuration (ChatGPT only)                                                         |
+| Option          | Type            | Default    | Description                                                                                 |
+| --------------- | --------------- | ---------- | ------------------------------------------------------------------------------------------- |
+| `component`     | `ComponentType` | (required) | React component to render                                                                   |
+| `name`          | `string`        | (required) | Display name for the UI                                                                     |
+| `description`   | `string`        | -          | Description of the UI widget                                                                |
+| `prefersBorder` | `boolean`       | -          | Hint to the host whether a border should be drawn                                           |
+| `autoResize`    | `boolean`       | `true`     | Enable automatic size change notifications. Only supported in MCP Apps; ignored in ChatGPT. |
+| `csp`           | `CSPConfig`     | -          | Content Security Policy configuration (ChatGPT only)                                        |
 
 ### Types
 

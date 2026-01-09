@@ -2,7 +2,7 @@
  * Unit tests for protocol detection
  *
  * Tests the detectProtocol() function that auto-detects
- * whether the UI is running in Claude Desktop, ChatGPT, or development mode.
+ * whether the UI is running in an MCP Apps host, ChatGPT, or development mode.
  *
  * @vitest-environment jsdom
  */

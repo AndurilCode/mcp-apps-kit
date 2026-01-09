@@ -26,7 +26,7 @@ import type { LogEntry } from "../debug/logger";
  * Internal interface for protocol adapters
  *
  * Implemented by:
- * - McpAppsAdapter: For Claude Desktop (MCP Apps)
+ * - McpAppsAdapter: For MCP Apps hosts
  * - ChatGptAppsAdapter: For ChatGPT (OpenAI Apps SDK)
  * - MockAdapter: For development/testing
  *

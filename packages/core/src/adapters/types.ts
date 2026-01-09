@@ -40,7 +40,7 @@ export interface UIResourceMetaResult {
  * Protocol adapter interface
  *
  * Implementations handle protocol-specific metadata generation for:
- * - MCP Apps (Claude Desktop, etc.)
+ * - MCP Apps
  * - OpenAI/ChatGPT Apps
  *
  * This allows server/index.ts to remain protocol-agnostic.

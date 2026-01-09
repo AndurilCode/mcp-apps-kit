@@ -12,7 +12,7 @@ import { uiLogger } from "../debug";
  * Create a mock host environment for testing UI components
  *
  * This creates a standalone mock host that can be used to test UI widgets
- * without requiring an actual host platform (like Claude Desktop or ChatGPT).
+ * without requiring an actual host platform (like an MCP Apps host or ChatGPT).
  *
  * @param options - Mock host configuration
  * @returns Mock host instance

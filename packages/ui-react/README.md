@@ -119,7 +119,7 @@ export function App() {
 
 ### Automatic size notifications
 
-By default, the MCP adapter automatically reports UI size changes to the host using a ResizeObserver. This feature is **only supported in MCP Apps (Claude Desktop)** and is silently ignored in ChatGPT.
+By default, the MCP adapter automatically reports UI size changes to the host using a ResizeObserver. This feature is **only supported in MCP Apps** and is silently ignored in ChatGPT.
 
 To disable automatic resizing:
 
@@ -166,7 +166,7 @@ export type AppClientTools = ClientToolsFromCore<typeof app.tools>;
 - `AppsProvider` - Context wrapper for all hooks
   - `client?` - Pre-initialized client instance (optional)
   - `forceAdapter?` - Force a specific adapter ("mcp" | "openai" | "mock")
-  - `autoResize?` - Enable/disable automatic size change notifications (default: `true`). Only supported in MCP Apps (Claude Desktop); ignored in ChatGPT. Note: changing this prop after initial mount has no effect.
+  - `autoResize?` - Enable/disable automatic size change notifications (default: `true`). Only supported in MCP Apps; ignored in ChatGPT. Note: changing this prop after initial mount has no effect.
   - `fallback?` - Component to show while client initializes
   - `errorFallback?` - Component to show on initialization error
 
@@ -225,7 +225,7 @@ function Widget() {
   const hasFileUpload = !!capabilities?.fileUpload;
 
   // Host version (MCP Apps only)
-  // { name: "Claude Desktop", version: "1.0.0" }
+  // { name: "MCP Host", version: "1.0.0" }
   return <div>Host: {version?.name}</div>;
 }
 ```

@@ -44,7 +44,7 @@ export interface HostCapabilities {
   };
 
   // ===========================================================================
-  // MCP Apps specific capabilities (Claude Desktop)
+  // MCP Apps specific capabilities
   // ===========================================================================
 
   /** Host can proxy resource reads to MCP server (MCP Apps only) */
@@ -106,7 +106,7 @@ export interface HostCapabilities {
  * @internal
  */
 export interface HostVersion {
-  /** Host application name (e.g., "Claude Desktop") */
+  /** Host application name (e.g., "MCP Host") */
   name: string;
   /** Host application version */
   version: string;

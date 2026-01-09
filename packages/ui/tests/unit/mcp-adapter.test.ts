@@ -1,7 +1,7 @@
 /**
  * Unit tests for MCP adapter
  *
- * Tests the McpAdapter implementation for Claude Desktop (MCP Apps).
+ * Tests the McpAdapter implementation for MCP Apps hosts.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
