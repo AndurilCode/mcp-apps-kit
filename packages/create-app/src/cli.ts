@@ -35,17 +35,14 @@ export interface CLIOptions {
  * Validate a project name follows npm package naming conventions
  */
 export function validateProjectName(name: string): boolean {
-  if (!name || name.length === 0) {
+  if (!name) {
     return false;
   }
 
-  // Check for scoped packages
   if (name.startsWith("@")) {
     const parts = name.split("/");
     if (parts.length !== 2 || !parts[0] || !parts[1]) return false;
-    const scope = parts[0].slice(1);
-    const pkg = parts[1];
-    return validateSimpleName(scope) && validateSimpleName(pkg);
+    return validateSimpleName(parts[0].slice(1)) && validateSimpleName(parts[1]);
   }
 
   return validateSimpleName(name);
@@ -75,15 +72,6 @@ type Protocol = (typeof VALID_PROTOCOLS)[number];
  * Parse CLI arguments
  */
 export function parseArgs(args: string[]): CLIOptions {
-  let result: CLIOptions = {
-    template: "react",
-    protocol: "mcp",
-    skipInstall: false,
-    skipGit: false,
-    vercel: false,
-    interactive: false,
-  };
-
   const program = new Command()
     .name("create-mcp-apps-kit")
     .description("Scaffold a new MCP application")
@@ -132,7 +120,7 @@ export function parseArgs(args: string[]): CLIOptions {
   }>();
   const [name] = program.args;
 
-  result = {
+  return {
     name,
     template: options.template,
     protocol: options.protocol,
@@ -142,8 +130,6 @@ export function parseArgs(args: string[]): CLIOptions {
     vercel: options.vercel,
     interactive: !name,
   };
-
-  return result;
 }
 
 // =============================================================================

@@ -661,11 +661,9 @@ export class OpenAIAdapter implements ProtocolAdapter {
   }
 
   getToolOutput(): Record<string, unknown> | undefined {
-    // Wrap output with tool name so it matches what onToolResult handlers receive
     if (!this.currentToolOutput) return undefined;
     const toolName = this.getToolNameFromSDK();
-    const wrapped = toolName ? { [toolName]: this.currentToolOutput } : this.currentToolOutput;
-    return wrapped;
+    return toolName ? { [toolName]: this.currentToolOutput } : this.currentToolOutput;
   }
 
   getToolMeta(): Record<string, unknown> | undefined {
