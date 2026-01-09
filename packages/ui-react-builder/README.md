@@ -193,14 +193,14 @@ If you need patterns not supported by auto-discovery, use `defineUI({ html: "...
 
 #### `defineReactUI` Options
 
-| Option          | Type            | Default    | Description                                                |
-| --------------- | --------------- | ---------- | ---------------------------------------------------------- |
-| `component`     | `ComponentType` | (required) | React component to render                                  |
-| `name`          | `string`        | (required) | Display name for the UI                                    |
-| `description`   | `string`        | -          | Description of the UI widget                               |
-| `prefersBorder` | `boolean`       | -          | Hint to the host whether a border should be drawn          |
+| Option          | Type            | Default    | Description                                                                                                  |
+| --------------- | --------------- | ---------- | ------------------------------------------------------------------------------------------------------------ |
+| `component`     | `ComponentType` | (required) | React component to render                                                                                    |
+| `name`          | `string`        | (required) | Display name for the UI                                                                                      |
+| `description`   | `string`        | -          | Description of the UI widget                                                                                 |
+| `prefersBorder` | `boolean`       | -          | Hint to the host whether a border should be drawn                                                            |
 | `autoResize`    | `boolean`       | `true`     | Enable automatic size change notifications. Only supported in MCP Apps (Claude Desktop); ignored in ChatGPT. |
-| `csp`           | `CSPConfig`     | -          | Content Security Policy configuration (ChatGPT only)       |
+| `csp`           | `CSPConfig`     | -          | Content Security Policy configuration (ChatGPT only)                                                         |
 
 ### Types
 
