@@ -10,6 +10,9 @@ body {
   padding: 16px;
   background: #fff;
   color: #333;
+  /* Fix width to prevent auto-resize width changes */
+  width: 432px; /* 400px content + 32px padding */
+  min-width: 432px;
 }
 
 .container {

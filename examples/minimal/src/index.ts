@@ -39,7 +39,6 @@ const greetToolV1 = defineTool({
     name: "Greeting Widget V1",
     description: "Displays greeting messages (v1 - name only)",
     prefersBorder: true,
-    autoResize: false,
   }),
 
   handler: async (input, context) => {
@@ -81,7 +80,6 @@ const greetToolV2 = defineTool({
     name: "Greeting Widget V2",
     description: "Displays greeting messages (v2 - with surname support)",
     prefersBorder: true,
-    autoResize: false,
     // CSP configuration for ChatGPT - allow connections and resources
     csp: {
       // Allow fetch/XHR to your server (use your public URL or ngrok)
