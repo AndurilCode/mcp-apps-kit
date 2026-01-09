@@ -513,10 +513,10 @@ export class OpenAIAdapter implements ProtocolAdapter {
 
   async sendMessage(content: { type: string; text: string }): Promise<void> {
     const openai = this.getOpenAI();
-    if (openai && typeof openai.sendMessage === "function") {
-      await (openai.sendMessage as (content: { type: string; text: string }) => Promise<void>)(
-        content
-      );
+    if (openai && typeof openai.sendFollowUpMessage === "function") {
+      await (openai.sendFollowUpMessage as (opts: { prompt: string }) => Promise<void>)({
+        prompt: content.text,
+      });
     }
   }
 
@@ -524,8 +524,8 @@ export class OpenAIAdapter implements ProtocolAdapter {
 
   async openLink(url: string): Promise<void> {
     const openai = this.getOpenAI();
-    if (openai && typeof openai.openLink === "function") {
-      await (openai.openLink as (url: string) => Promise<void>)(url);
+    if (openai && typeof openai.openExternal === "function") {
+      await (openai.openExternal as (opts: { href: string }) => Promise<void>)({ href: url });
     } else {
       // Fallback
       window.open(url, "_blank");
@@ -566,8 +566,8 @@ export class OpenAIAdapter implements ProtocolAdapter {
   setState<S>(state: S): void {
     this.state = state;
     const openai = this.getOpenAI();
-    if (openai && typeof openai.setState === "function") {
-      (openai.setState as (state: S) => void)(state);
+    if (openai && typeof openai.setWidgetState === "function") {
+      (openai.setWidgetState as (state: S) => void)(state);
     }
   }
 
