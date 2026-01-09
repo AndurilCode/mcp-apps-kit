@@ -139,7 +139,6 @@ export function AppsProvider<T extends ToolDefs = ToolDefs>({
     // Note: autoResize is intentionally not in the dependency array.
     // It should only be set during initial mount. Changing it at runtime
     // would cause unnecessary client re-initialization.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [providedClient, _forceAdapter]);
 
   if (error && ErrorFallback) {
