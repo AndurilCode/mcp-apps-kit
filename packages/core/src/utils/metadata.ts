@@ -102,7 +102,6 @@ export function mapVisibilityToOpenAI(visibility?: Visibility): OpenAIVisibility
   }
 }
 
-
 // =============================================================================
 // TOOL ANNOTATIONS
 // =============================================================================
