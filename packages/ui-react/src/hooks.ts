@@ -2,7 +2,7 @@
  * React hooks for @mcp-apps-kit/ui-react
  */
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import type {
   AppsClient,
   HostContext,
@@ -491,7 +491,7 @@ export function useOnToolInputPartial(handler: (input: Record<string, unknown>) 
  */
 export function useHostCapabilities(): HostCapabilities | undefined {
   const { client } = useAppsContext();
-  return client?.getHostCapabilities();
+  return useMemo(() => client?.getHostCapabilities(), [client]);
 }
 
 /**
@@ -518,7 +518,7 @@ export function useHostCapabilities(): HostCapabilities | undefined {
  */
 export function useHostVersion(): HostVersion | undefined {
   const { client } = useAppsContext();
-  return client?.getHostVersion();
+  return useMemo(() => client?.getHostVersion(), [client]);
 }
 
 // =============================================================================
@@ -656,6 +656,14 @@ export function useFileUpload(): UseFileUploadState & {
     fileId: null,
   });
 
+  // Update isSupported when client changes
+  useEffect(() => {
+    setState((prev) => ({
+      ...prev,
+      isSupported: !!client?.uploadFile,
+    }));
+  }, [client]);
+
   const upload = useCallback(
     async (file: File): Promise<FileUploadResult | null> => {
       if (!client?.uploadFile) {
@@ -739,6 +747,14 @@ export function useFileDownload(): {
     error: null,
     downloadUrl: null,
   });
+
+  // Update isSupported when client changes
+  useEffect(() => {
+    setState((prev) => ({
+      ...prev,
+      isSupported: !!client?.getFileDownloadUrl,
+    }));
+  }, [client]);
 
   const getDownloadUrl = useCallback(
     async (fileId: string): Promise<string | null> => {
