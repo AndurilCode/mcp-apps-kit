@@ -16,6 +16,7 @@
 import { z } from "zod";
 import { createPlugin } from "../types";
 import type { ToolCallContext, PluginInitContext, PluginStartContext } from "../types";
+import { safeStringify } from "../../debug/logger";
 
 /**
  * Log level enumeration
@@ -57,37 +58,6 @@ function getLogLevel(level: string): number {
  */
 function timestamp(): string {
   return new Date().toISOString();
-}
-
-/**
- * Safely stringify objects, handling circular references
- */
-function safeStringify(obj: unknown): string {
-  try {
-    return JSON.stringify(obj, null, 2);
-  } catch {
-    try {
-      return JSON.stringify(obj, getCircularReplacer(), 2);
-    } catch {
-      return String(obj);
-    }
-  }
-}
-
-/**
- * JSON replacer function that handles circular references
- */
-function getCircularReplacer() {
-  const seen = new WeakSet();
-  return (_key: string, value: unknown): unknown => {
-    if (typeof value === "object" && value !== null) {
-      if (seen.has(value)) {
-        return "[Circular]";
-      }
-      seen.add(value);
-    }
-    return value;
-  };
 }
 
 /**
