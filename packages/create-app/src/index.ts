@@ -249,9 +249,11 @@ const app = createApp({
   },
 });
 
-// Start server
-await app.start({ port: 3000 });
-console.log("MCP server running on http://localhost:3000");
+// Start server (skip in test environment)
+if (process.env.NODE_ENV !== "test") {
+  await app.start({ port: 3000 });
+  console.log("MCP server running on http://localhost:3000");
+}
 
 // Export app for testing
 export { app };
@@ -801,9 +803,11 @@ const app = createApp({
   },
 });
 
-// Start server
-await app.start({ port: 3000 });
-console.log("MCP server running on http://localhost:3000");
+// Start server (skip in test environment)
+if (process.env.NODE_ENV !== "test") {
+  await app.start({ port: 3000 });
+  console.log("MCP server running on http://localhost:3000");
+}
 
 // Export app for testing
 export { app };

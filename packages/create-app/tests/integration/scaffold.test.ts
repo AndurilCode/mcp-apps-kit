@@ -258,6 +258,7 @@ describe("Project scaffolding", () => {
       expect(packageJson.devDependencies).toHaveProperty("@mcp-apps-kit/testing");
       expect(packageJson.devDependencies).toHaveProperty("vitest");
       expect(packageJson.scripts).toHaveProperty("test");
+      expect(packageJson.scripts).toHaveProperty("test:watch");
     });
   });
 
