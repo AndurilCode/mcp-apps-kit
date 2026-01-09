@@ -136,8 +136,10 @@ describe("createClient contract", () => {
       const proxyResult = await client.tools.callGreet({ name: "Alice" });
       const directResult = await client.callTool("greet", { name: "Alice" });
 
-      // Both should return the same mock result structure
-      expect(proxyResult).toEqual(directResult);
+      // Both should return the same mock result structure (ignoring timestamp which may differ by 1ms)
+      const { timestamp: _t1, ...proxyRest } = proxyResult as Record<string, unknown>;
+      const { timestamp: _t2, ...directRest } = directResult as Record<string, unknown>;
+      expect(proxyRest).toEqual(directRest);
     });
 
     it("should handle camelCase tool names correctly", async () => {
@@ -151,8 +153,10 @@ describe("createClient contract", () => {
       const proxyResult = await client.tools.callGetUserProfile({ userId: "123" });
       const directResult = await client.callTool("getUserProfile", { userId: "123" });
 
-      // Both should return the same mock result structure
-      expect(proxyResult).toEqual(directResult);
+      // Both should return the same mock result structure (ignoring timestamp which may differ by 1ms)
+      const { timestamp: _t1, ...proxyRest } = proxyResult as Record<string, unknown>;
+      const { timestamp: _t2, ...directRest } = directResult as Record<string, unknown>;
+      expect(proxyRest).toEqual(directRest);
     });
 
     it("should return undefined for non-call methods", async () => {

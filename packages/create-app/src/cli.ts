@@ -6,8 +6,9 @@
 /* eslint-disable no-console */
 
 import { Command, InvalidArgumentError } from "commander";
-import prompts from "prompts";
+import { input, select, confirm } from "@inquirer/prompts";
 import chalk from "chalk";
+import figlet from "figlet";
 import { scaffoldProject } from "./index.js";
 import type { CreateAppOptions } from "./index.js";
 
@@ -18,6 +19,7 @@ import type { CreateAppOptions } from "./index.js";
 export interface CLIOptions {
   name?: string;
   template: "react" | "vanilla";
+  protocol: "mcp" | "openai";
   directory?: string;
   skipInstall: boolean;
   skipGit: boolean;
@@ -33,17 +35,14 @@ export interface CLIOptions {
  * Validate a project name follows npm package naming conventions
  */
 export function validateProjectName(name: string): boolean {
-  if (!name || name.length === 0) {
+  if (!name) {
     return false;
   }
 
-  // Check for scoped packages
   if (name.startsWith("@")) {
     const parts = name.split("/");
     if (parts.length !== 2 || !parts[0] || !parts[1]) return false;
-    const scope = parts[0].slice(1);
-    const pkg = parts[1];
-    return validateSimpleName(scope) && validateSimpleName(pkg);
+    return validateSimpleName(parts[0].slice(1)) && validateSimpleName(parts[1]);
   }
 
   return validateSimpleName(name);
@@ -66,18 +65,13 @@ function validateSimpleName(name: string): boolean {
 const VALID_TEMPLATES = ["react", "vanilla"] as const;
 type Template = (typeof VALID_TEMPLATES)[number];
 
+const VALID_PROTOCOLS = ["mcp", "openai"] as const;
+type Protocol = (typeof VALID_PROTOCOLS)[number];
+
 /**
  * Parse CLI arguments
  */
 export function parseArgs(args: string[]): CLIOptions {
-  let result: CLIOptions = {
-    template: "react",
-    skipInstall: false,
-    skipGit: false,
-    vercel: false,
-    interactive: false,
-  };
-
   const program = new Command()
     .name("create-mcp-apps-kit")
     .description("Scaffold a new MCP application")
@@ -96,6 +90,19 @@ export function parseArgs(args: string[]): CLIOptions {
       },
       "react"
     )
+    .option(
+      "-p, --protocol <protocol>",
+      "Protocol to use (mcp, openai)",
+      (value) => {
+        if (!VALID_PROTOCOLS.includes(value as Protocol)) {
+          throw new InvalidArgumentError(
+            `Invalid protocol: ${value}. Must be one of: ${VALID_PROTOCOLS.join(", ")}`
+          );
+        }
+        return value as Protocol;
+      },
+      "mcp"
+    )
     .option("-d, --directory <path>", "Directory to create project in")
     .option("--skip-install", "Skip installing dependencies", false)
     .option("--skip-git", "Skip initializing git repository", false)
@@ -105,6 +112,7 @@ export function parseArgs(args: string[]): CLIOptions {
 
   const options = program.opts<{
     template: Template;
+    protocol: Protocol;
     directory?: string;
     skipInstall: boolean;
     skipGit: boolean;
@@ -112,32 +120,44 @@ export function parseArgs(args: string[]): CLIOptions {
   }>();
   const [name] = program.args;
 
-  result = {
+  return {
     name,
     template: options.template,
+    protocol: options.protocol,
     directory: options.directory,
     skipInstall: options.skipInstall,
     skipGit: options.skipGit,
     vercel: options.vercel,
     interactive: !name,
   };
-
-  return result;
 }
 
 // =============================================================================
 // Interactive Mode
 // =============================================================================
 
-async function runInteractive(): Promise<CreateAppOptions> {
+/**
+ * Print styled ASCII art header using figlet
+ */
+function printHeader(): void {
   console.log();
-  console.log(chalk.bold("🚀 Create a new MCP application"));
+  console.log(
+    chalk.cyan(
+      figlet.textSync("mcp-apps-kit", {
+        font: "Standard",
+        horizontalLayout: "default",
+      })
+    )
+  );
+  console.log(chalk.gray("  Build interactive MCP applications"));
   console.log();
+}
 
-  const response = await prompts<"name" | "template" | "vercel" | "skipInstall" | "skipGit">([
-    {
-      type: "text",
-      name: "name",
+async function runInteractive(): Promise<CreateAppOptions> {
+  printHeader();
+
+  try {
+    const name = await input({
       message: "Project name:",
       validate: (value: string) => {
         if (!validateProjectName(value)) {
@@ -145,49 +165,60 @@ async function runInteractive(): Promise<CreateAppOptions> {
         }
         return true;
       },
-    },
-    {
-      type: "select",
-      name: "template",
+    });
+
+    const template = await select({
       message: "Template:",
       choices: [
-        { title: "React", value: "react", description: "React + TypeScript with hooks" },
-        { title: "Vanilla", value: "vanilla", description: "Vanilla TypeScript" },
+        { name: "React", value: "react" as const, description: "React + TypeScript with hooks" },
+        { name: "Vanilla", value: "vanilla" as const, description: "Vanilla TypeScript" },
       ],
-      initial: 0,
-    },
-    {
-      type: "confirm",
-      name: "vercel",
+      default: "react",
+    });
+
+    const protocol = await select({
+      message: "Protocol:",
+      choices: [
+        {
+          name: "MCP Apps",
+          value: "mcp" as const,
+          description: "Model Context Protocol (Claude, etc.)",
+        },
+        { name: "OpenAI", value: "openai" as const, description: "OpenAI Apps SDK (ChatGPT)" },
+      ],
+      default: "mcp",
+    });
+
+    const vercel = await confirm({
       message: "Add Vercel deployment setup?",
-      initial: true,
-    },
-    {
-      type: "confirm",
-      name: "skipInstall",
+      default: true,
+    });
+
+    const skipInstall = await confirm({
       message: "Skip installing dependencies?",
-      initial: false,
-    },
-    {
-      type: "confirm",
-      name: "skipGit",
+      default: false,
+    });
+
+    const skipGit = await confirm({
       message: "Skip initializing git?",
-      initial: false,
-    },
-  ]);
+      default: false,
+    });
 
-  if (!response.name) {
-    console.log(chalk.yellow("Cancelled."));
-    process.exit(0);
+    return {
+      name,
+      template,
+      protocol,
+      vercel,
+      skipInstall,
+      skipGit,
+    };
+  } catch (error) {
+    if (error instanceof Error && error.name === "ExitPromptError") {
+      console.log(chalk.yellow("\nCancelled."));
+      process.exit(0);
+    }
+    throw error;
   }
-
-  return {
-    name: response.name as string,
-    template: response.template as "react" | "vanilla",
-    vercel: response.vercel as boolean,
-    skipInstall: response.skipInstall as boolean,
-    skipGit: response.skipGit as boolean,
-  };
 }
 
 // =============================================================================
@@ -216,6 +247,7 @@ async function main(): Promise<void> {
       options = {
         name: cliOptions.name,
         template: cliOptions.template,
+        protocol: cliOptions.protocol,
         directory: cliOptions.directory,
         skipInstall: cliOptions.skipInstall,
         skipGit: cliOptions.skipGit,
@@ -224,7 +256,11 @@ async function main(): Promise<void> {
     }
 
     console.log();
-    console.log(chalk.blue(`Creating ${options.name} with ${options.template} template...`));
+    console.log(
+      chalk.blue(
+        `Creating ${options.name} with ${options.template} template (${options.protocol} protocol)...`
+      )
+    );
     if (options.vercel) {
       console.log(chalk.blue("Setting up for Vercel deployment..."));
     }
@@ -232,18 +268,16 @@ async function main(): Promise<void> {
 
     await scaffoldProject(options);
 
-    const packageManager = options.vercel ? "npm" : "pnpm";
-
     console.log();
     console.log(chalk.green("✓ Project created successfully!"));
     console.log();
     console.log("Next steps:");
     console.log(chalk.cyan(`  cd ${options.directory ?? options.name}`));
     if (!options.skipInstall) {
-      console.log(chalk.cyan(`  ${packageManager} run dev`));
+      console.log(chalk.cyan("  npm run dev"));
     } else {
-      console.log(chalk.cyan(`  ${packageManager} install`));
-      console.log(chalk.cyan(`  ${packageManager} run dev`));
+      console.log(chalk.cyan("  npm install"));
+      console.log(chalk.cyan("  npm run dev"));
     }
     if (options.vercel) {
       console.log();

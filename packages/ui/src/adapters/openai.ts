@@ -512,11 +512,14 @@ export class OpenAIAdapter implements ProtocolAdapter {
   // === Messaging ===
 
   async sendMessage(content: { type: string; text: string }): Promise<void> {
+    if (content.type !== "text") {
+      throw new Error(`Unsupported message content type: ${content.type}`);
+    }
     const openai = this.getOpenAI();
-    if (openai && typeof openai.sendMessage === "function") {
-      await (openai.sendMessage as (content: { type: string; text: string }) => Promise<void>)(
-        content
-      );
+    if (openai && typeof openai.sendFollowUpMessage === "function") {
+      await (openai.sendFollowUpMessage as (opts: { prompt: string }) => Promise<void>)({
+        prompt: content.text,
+      });
     }
   }
 
@@ -524,8 +527,8 @@ export class OpenAIAdapter implements ProtocolAdapter {
 
   async openLink(url: string): Promise<void> {
     const openai = this.getOpenAI();
-    if (openai && typeof openai.openLink === "function") {
-      await (openai.openLink as (url: string) => Promise<void>)(url);
+    if (openai && typeof openai.openExternal === "function") {
+      await (openai.openExternal as (opts: { href: string }) => Promise<void>)({ href: url });
     } else {
       // Fallback
       window.open(url, "_blank");
@@ -566,8 +569,8 @@ export class OpenAIAdapter implements ProtocolAdapter {
   setState<S>(state: S): void {
     this.state = state;
     const openai = this.getOpenAI();
-    if (openai && typeof openai.setState === "function") {
-      (openai.setState as (state: S) => void)(state);
+    if (openai && typeof openai.setWidgetState === "function") {
+      (openai.setWidgetState as (state: S) => void)(state);
     }
   }
 
@@ -661,11 +664,9 @@ export class OpenAIAdapter implements ProtocolAdapter {
   }
 
   getToolOutput(): Record<string, unknown> | undefined {
-    // Wrap output with tool name so it matches what onToolResult handlers receive
     if (!this.currentToolOutput) return undefined;
     const toolName = this.getToolNameFromSDK();
-    const wrapped = toolName ? { [toolName]: this.currentToolOutput } : this.currentToolOutput;
-    return wrapped;
+    return toolName ? { [toolName]: this.currentToolOutput } : this.currentToolOutput;
   }
 
   getToolMeta(): Record<string, unknown> | undefined {

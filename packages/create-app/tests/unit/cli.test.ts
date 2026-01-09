@@ -67,6 +67,25 @@ describe("CLI argument parsing", () => {
       const result = parseArgs([]);
       expect(result.interactive).toBe(true);
     });
+
+    it("should default protocol to 'mcp' when not specified", () => {
+      const result = parseArgs(["my-app"]);
+      expect(result.protocol).toBe("mcp");
+    });
+
+    it("should parse --protocol option", () => {
+      const result = parseArgs(["my-app", "--protocol", "openai"]);
+      expect(result.protocol).toBe("openai");
+    });
+
+    it("should parse -p short option for protocol", () => {
+      const result = parseArgs(["my-app", "-p", "openai"]);
+      expect(result.protocol).toBe("openai");
+    });
+
+    it("should throw for invalid protocol", () => {
+      expect(() => parseArgs(["my-app", "-p", "invalid"])).toThrow();
+    });
   });
 
   describe("validateProjectName", () => {
