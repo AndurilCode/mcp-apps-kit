@@ -2,7 +2,8 @@
  * React hooks for @mcp-apps-kit/ui-react
  */
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import type { RefObject } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type {
   AppsClient,
   HostContext,
@@ -16,6 +17,46 @@ import type {
 } from "@mcp-apps-kit/ui";
 import { clientDebugLogger, type ClientDebugLogger } from "@mcp-apps-kit/ui";
 import { useAppsContext } from "./context";
+
+// =============================================================================
+// SHARED UTILITIES
+// =============================================================================
+
+/** Default host context for initial state */
+const DEFAULT_HOST_CONTEXT: HostContext = {
+  theme: "light",
+  displayMode: "inline",
+  availableDisplayModes: ["inline"],
+  viewport: { width: 0, height: 0 },
+  locale: "en-US",
+  platform: "web",
+};
+
+/** Default safe area insets */
+const DEFAULT_INSETS = { top: 0, right: 0, bottom: 0, left: 0 };
+
+/**
+ * Helper to create a ResizeObserver that reports size changes
+ */
+function createSizeObserver(
+  element: HTMLElement,
+  onResize: (width: number, height: number) => void
+): ResizeObserver {
+  const observer = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      const { width, height } = entry.contentRect;
+      onResize(Math.round(width), Math.round(height));
+    }
+  });
+
+  observer.observe(element);
+
+  // Report initial size
+  const rect = element.getBoundingClientRect();
+  onResize(Math.round(rect.width), Math.round(rect.height));
+
+  return observer;
+}
 
 // =============================================================================
 // CORE HOOKS
@@ -148,27 +189,13 @@ export function useToolInput(): Record<string, unknown> | undefined {
  */
 export function useHostContext(): HostContext {
   const { client } = useAppsContext();
-  const [context, setContext] = useState<HostContext>(
-    client?.hostContext ?? {
-      theme: "light",
-      displayMode: "inline",
-      availableDisplayModes: ["inline"],
-      viewport: { width: 0, height: 0 },
-      locale: "en-US",
-      platform: "web",
-    }
-  );
+  const [context, setContext] = useState<HostContext>(client?.hostContext ?? DEFAULT_HOST_CONTEXT);
 
   useEffect(() => {
     if (!client) return;
 
     setContext(client.hostContext);
-
-    const unsubscribe = client.onHostContextChange((newContext) => {
-      setContext(newContext);
-    });
-
-    return unsubscribe;
+    return client.onHostContextChange(setContext);
   }, [client]);
 
   return context;
@@ -351,22 +378,9 @@ export function useDisplayMode(): {
  * }
  * ```
  */
-export function useSafeAreaInsets(): {
-  top: number;
-  right: number;
-  bottom: number;
-  left: number;
-} {
+export function useSafeAreaInsets(): { top: number; right: number; bottom: number; left: number } {
   const context = useHostContext();
-
-  return (
-    context.safeAreaInsets ?? {
-      top: 0,
-      right: 0,
-      bottom: 0,
-      left: 0,
-    }
-  );
+  return context.safeAreaInsets ?? DEFAULT_INSETS;
 }
 
 // =============================================================================
@@ -397,9 +411,7 @@ export function useOnToolCancelled(handler: (reason?: string) => void): void {
 
   useEffect(() => {
     if (!client) return;
-
-    const unsubscribe = client.onToolCancelled(handler);
-    return unsubscribe;
+    return client.onToolCancelled(handler);
   }, [client, handler]);
 }
 
@@ -425,9 +437,7 @@ export function useOnTeardown(handler: (reason?: string) => void): void {
 
   useEffect(() => {
     if (!client) return;
-
-    const unsubscribe = client.onTeardown(handler);
-    return unsubscribe;
+    return client.onTeardown(handler);
   }, [client, handler]);
 }
 
@@ -457,9 +467,7 @@ export function useOnToolInputPartial(handler: (input: Record<string, unknown>) 
 
   useEffect(() => {
     if (!client) return;
-
-    const unsubscribe = client.onToolInputPartial(handler);
-    return unsubscribe;
+    return client.onToolInputPartial(handler);
   }, [client, handler]);
 }
 
@@ -491,7 +499,7 @@ export function useOnToolInputPartial(handler: (input: Record<string, unknown>) 
  */
 export function useHostCapabilities(): HostCapabilities | undefined {
   const { client } = useAppsContext();
-  const [capabilities, setCapabilities] = useState<HostCapabilities | undefined>(() =>
+  const [capabilities, setCapabilities] = useState<HostCapabilities | undefined>(
     client?.getHostCapabilities()
   );
 
@@ -501,15 +509,8 @@ export function useHostCapabilities(): HostCapabilities | undefined {
       return;
     }
 
-    // Update capabilities initially
     setCapabilities(client.getHostCapabilities());
-
-    // Subscribe to host context changes since capabilities can derive from context
-    const unsubscribe = client.onHostContextChange(() => {
-      setCapabilities(client.getHostCapabilities());
-    });
-
-    return unsubscribe;
+    return client.onHostContextChange(() => setCapabilities(client.getHostCapabilities()));
   }, [client]);
 
   return capabilities;
@@ -579,33 +580,16 @@ export function useHostVersion(): HostVersion | undefined {
  * }
  * ```
  */
-export function useSizeChangedNotifications(): React.RefObject<HTMLElement | null> {
+export function useSizeChangedNotifications(): RefObject<HTMLElement | null> {
   const { client } = useAppsContext();
   const containerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    if (!client || typeof ResizeObserver === "undefined") return;
-
     const element = containerRef.current;
-    if (!element) return;
+    if (!client || !element || typeof ResizeObserver === "undefined") return;
 
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        void client.sendSizeChanged({
-          width: Math.round(width),
-          height: Math.round(height),
-        });
-      }
-    });
-
-    observer.observe(element);
-
-    // Report initial size
-    const rect = element.getBoundingClientRect();
-    void client.sendSizeChanged({
-      width: Math.round(rect.width),
-      height: Math.round(rect.height),
+    const observer = createSizeObserver(element, (width, height) => {
+      void client.sendSizeChanged({ width, height });
     });
 
     return () => observer.disconnect();
@@ -682,55 +666,36 @@ export function useFileUpload(): UseFileUploadState & {
   upload: (file: File) => Promise<FileUploadResult | null>;
 } {
   const { client } = useAppsContext();
-  const [state, setState] = useState<UseFileUploadState>({
-    isSupported: !!client?.uploadFile,
-    isUploading: false,
-    error: null,
-    fileId: null,
-  });
-
-  // Update isSupported when client changes
-  useEffect(() => {
-    setState((prev) => ({
-      ...prev,
-      isSupported: !!client?.uploadFile,
-    }));
-  }, [client]);
+  const isSupported = !!client?.uploadFile;
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [fileId, setFileId] = useState<string | null>(null);
 
   const upload = useCallback(
     async (file: File): Promise<FileUploadResult | null> => {
       if (!client?.uploadFile) {
-        setState((prev) => ({
-          ...prev,
-          error: new Error("File upload not supported on this platform"),
-        }));
+        setError(new Error("File upload not supported on this platform"));
         return null;
       }
 
-      setState((prev) => ({ ...prev, isUploading: true, error: null }));
+      setIsUploading(true);
+      setError(null);
 
       try {
         const result = await client.uploadFile(file);
-        setState((prev) => ({
-          ...prev,
-          isUploading: false,
-          fileId: result.fileId,
-        }));
+        setFileId(result.fileId);
         return result;
       } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err));
-        setState((prev) => ({
-          ...prev,
-          isUploading: false,
-          error,
-        }));
+        setError(err instanceof Error ? err : new Error(String(err)));
         return null;
+      } finally {
+        setIsUploading(false);
       }
     },
     [client]
   );
 
-  return { ...state, upload };
+  return { isSupported, isUploading, error, fileId, upload };
 }
 
 /**
@@ -769,60 +734,36 @@ export function useFileDownload(): {
   getDownloadUrl: (fileId: string) => Promise<string | null>;
 } {
   const { client } = useAppsContext();
-  const [state, setState] = useState<{
-    isSupported: boolean;
-    isLoading: boolean;
-    error: Error | null;
-    downloadUrl: string | null;
-  }>({
-    isSupported: !!client?.getFileDownloadUrl,
-    isLoading: false,
-    error: null,
-    downloadUrl: null,
-  });
-
-  // Update isSupported when client changes
-  useEffect(() => {
-    setState((prev) => ({
-      ...prev,
-      isSupported: !!client?.getFileDownloadUrl,
-    }));
-  }, [client]);
+  const isSupported = !!client?.getFileDownloadUrl;
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
 
   const getDownloadUrl = useCallback(
     async (fileId: string): Promise<string | null> => {
       if (!client?.getFileDownloadUrl) {
-        setState((prev) => ({
-          ...prev,
-          error: new Error("File download not supported on this platform"),
-        }));
+        setError(new Error("File download not supported on this platform"));
         return null;
       }
 
-      setState((prev) => ({ ...prev, isLoading: true, error: null }));
+      setIsLoading(true);
+      setError(null);
 
       try {
         const result = await client.getFileDownloadUrl(fileId);
-        setState((prev) => ({
-          ...prev,
-          isLoading: false,
-          downloadUrl: result.downloadUrl,
-        }));
+        setDownloadUrl(result.downloadUrl);
         return result.downloadUrl;
       } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err));
-        setState((prev) => ({
-          ...prev,
-          isLoading: false,
-          error,
-        }));
+        setError(err instanceof Error ? err : new Error(String(err)));
         return null;
+      } finally {
+        setIsLoading(false);
       }
     },
     [client]
   );
 
-  return { ...state, getDownloadUrl };
+  return { isSupported, isLoading, error, downloadUrl, getDownloadUrl };
 }
 
 // =============================================================================
@@ -868,7 +809,7 @@ export function useIntrinsicHeight(): {
   /** Whether intrinsic height notification is supported */
   isSupported: boolean;
   /** Ref to attach to container for automatic height tracking */
-  containerRef: React.RefObject<HTMLElement | null>;
+  containerRef: RefObject<HTMLElement | null>;
   /** Manually notify host of height */
   notify: (height: number) => void;
 } {
@@ -876,7 +817,6 @@ export function useIntrinsicHeight(): {
   const containerRef = useRef<HTMLElement | null>(null);
   const isSupported = !!client?.notifyIntrinsicHeight;
 
-  // Manual notify function
   const notify = useCallback(
     (height: number) => {
       client?.notifyIntrinsicHeight?.(height);
@@ -884,22 +824,13 @@ export function useIntrinsicHeight(): {
     [client]
   );
 
-  // Auto-track height with ResizeObserver
   useEffect(() => {
-    if (!client?.notifyIntrinsicHeight || !containerRef.current) return;
-
     const element = containerRef.current;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const height = entry.contentRect.height;
-        client.notifyIntrinsicHeight?.(height);
-      }
+    if (!client?.notifyIntrinsicHeight || !element) return;
+
+    const observer = createSizeObserver(element, (_width, height) => {
+      client.notifyIntrinsicHeight?.(height);
     });
-
-    observer.observe(element);
-
-    // Report initial height
-    client.notifyIntrinsicHeight(element.offsetHeight);
 
     return () => observer.disconnect();
   }, [client]);
