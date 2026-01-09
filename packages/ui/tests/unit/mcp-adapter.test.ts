@@ -222,4 +222,33 @@ describe("McpAdapter", () => {
       expect(() => adapter.setListToolsHandler(handler)).not.toThrow();
     });
   });
+
+  describe("autoResize option", () => {
+    it("should accept autoResize option in constructor", () => {
+      const adapterWithAutoResize = new McpAdapter({ autoResize: false });
+      expect(adapterWithAutoResize).toBeInstanceOf(McpAdapter);
+    });
+
+    it("should work without autoResize option (default behavior)", () => {
+      const adapterWithDefaults = new McpAdapter();
+      expect(adapterWithDefaults).toBeInstanceOf(McpAdapter);
+    });
+
+    it("should accept autoResize: true explicitly", () => {
+      const adapterWithAutoResize = new McpAdapter({ autoResize: true });
+      expect(adapterWithAutoResize).toBeInstanceOf(McpAdapter);
+    });
+
+    it("should connect successfully with autoResize: false", async () => {
+      const adapterWithAutoResize = new McpAdapter({ autoResize: false });
+      await adapterWithAutoResize.connect();
+      expect(adapterWithAutoResize.isConnected()).toBe(true);
+    });
+
+    it("should connect successfully with autoResize: true", async () => {
+      const adapterWithAutoResize = new McpAdapter({ autoResize: true });
+      await adapterWithAutoResize.connect();
+      expect(adapterWithAutoResize.isConnected()).toBe(true);
+    });
+  });
 });

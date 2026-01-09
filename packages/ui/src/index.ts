@@ -181,12 +181,9 @@ export async function createClient<T extends ToolDefs = ToolDefs>(
     throw new Error(`Unknown adapter type: ${protocol}`);
   }
 
-  // Build adapter-specific options
-  const adapterOptions: AdapterOptions = {
-    mcp: {
-      autoResize: options?.autoResize,
-    },
-  };
+  // Build adapter-specific options (only include when explicitly provided)
+  const adapterOptions: AdapterOptions =
+    options?.autoResize !== undefined ? { mcp: { autoResize: options.autoResize } } : {};
 
   // Create and connect the adapter
   const adapter = createAdapter(protocol, adapterOptions);

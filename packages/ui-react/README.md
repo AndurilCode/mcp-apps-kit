@@ -117,6 +117,20 @@ export function App() {
 }
 ```
 
+### Automatic size notifications
+
+By default, the MCP adapter automatically reports UI size changes to the host. To disable this:
+
+```tsx
+export function App() {
+  return (
+    <AppsProvider autoResize={false}>
+      <Widget />
+    </AppsProvider>
+  );
+}
+```
+
 The `AppClientTools` type is generated in your server code:
 
 ```ts
@@ -146,6 +160,11 @@ export type AppClientTools = ClientToolsFromCore<typeof app.tools>;
 ### Provider
 
 - `AppsProvider` - Context wrapper for all hooks
+  - `client?` - Pre-initialized client instance (optional)
+  - `forceAdapter?` - Force a specific adapter ("mcp" | "openai" | "mock")
+  - `autoResize?` - Enable/disable automatic size change notifications (default: `true`, MCP only)
+  - `fallback?` - Component to show while client initializes
+  - `errorFallback?` - Component to show on initialization error
 
 ### Core Hooks
 
