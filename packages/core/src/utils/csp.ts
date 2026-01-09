@@ -8,7 +8,7 @@
  * @module utils/csp
  */
 
-import type { CSPConfig } from "../types/ui";
+import type { CSPConfig, UIDef } from "../types/ui";
 
 // =============================================================================
 // MCP CSP METADATA
@@ -104,8 +104,6 @@ export function generateOpenAICSPMetadata(csp: CSPConfig): OpenAICSPMetadata {
 // =============================================================================
 // UI RESOURCE METADATA GENERATION
 // =============================================================================
-
-import type { UIDef } from "../types/ui";
 
 /**
  * MCP UI resource metadata format

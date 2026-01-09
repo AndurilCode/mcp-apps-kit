@@ -4,7 +4,7 @@
  * @module events/types
  */
 
-import type { ToolContext, ToolDefs as _ToolDefs } from "../types/tools";
+import type { ToolContext } from "../types/tools";
 import type { AppConfig } from "../types/config";
 
 // =============================================================================

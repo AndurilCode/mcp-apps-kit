@@ -8,7 +8,7 @@
  * @module utils/metadata
  */
 
-import type { ToolDef, Visibility } from "../types/tools";
+import type { ToolDef, Visibility, ToolAnnotations } from "../types/tools";
 import { zodToJsonSchema } from "./schema";
 
 // =============================================================================
@@ -100,6 +100,46 @@ export function mapVisibilityToOpenAI(visibility?: Visibility): OpenAIVisibility
     default:
       return { "openai/visibility": "public", "openai/widgetAccessible": true };
   }
+}
+
+// =============================================================================
+// TOOL ANNOTATIONS
+// =============================================================================
+
+/**
+ * Build protocol-agnostic annotations from tool annotations.
+ *
+ * Both MCP and OpenAI use the same annotation property names,
+ * so this function is shared between adapters.
+ *
+ * @param annotations - Tool annotations from tool definition
+ * @returns Record of annotation properties, or undefined if no annotations
+ *
+ * @internal
+ */
+export function buildAnnotations(
+  annotations?: ToolAnnotations
+): Record<string, unknown> | undefined {
+  if (!annotations) {
+    return undefined;
+  }
+
+  const result: Record<string, unknown> = {};
+
+  if (annotations.readOnlyHint !== undefined) {
+    result.readOnlyHint = annotations.readOnlyHint;
+  }
+  if (annotations.destructiveHint !== undefined) {
+    result.destructiveHint = annotations.destructiveHint;
+  }
+  if (annotations.openWorldHint !== undefined) {
+    result.openWorldHint = annotations.openWorldHint;
+  }
+  if (annotations.idempotentHint !== undefined) {
+    result.idempotentHint = annotations.idempotentHint;
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
 }
 
 // =============================================================================

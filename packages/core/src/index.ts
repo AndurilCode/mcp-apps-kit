@@ -151,6 +151,7 @@ export type { ErrorCodeType } from "./utils/errors";
 export {
   mapVisibilityToMcp,
   mapVisibilityToOpenAI,
+  buildAnnotations,
   generateToolMetadata,
   generateAllToolsMetadata,
 } from "./utils/metadata";
