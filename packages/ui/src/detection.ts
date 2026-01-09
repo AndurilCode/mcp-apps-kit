@@ -7,30 +7,6 @@
 import type { DetectedProtocol } from "./types";
 
 /**
- * Check if we're in a ChatGPT sandbox environment
- */
-function isChatGPTSandbox(): boolean {
-  // Check URL patterns that indicate ChatGPT sandbox
-  const url = window.location.href;
-  if (url.includes("/api/apps/chatgpt/") || url.includes("chatgpt")) {
-    return true;
-  }
-
-  // Check for ChatGPT-specific sandbox proxy indicators
-  if (url.includes("sandbox-proxy") || url.includes("widget-content")) {
-    return true;
-  }
-
-  // Check referrer
-  const referrer = document.referrer;
-  if (referrer.includes("chatgpt") || referrer.includes("openai.com")) {
-    return true;
-  }
-
-  return false;
-}
-
-/**
  * Detect the current host protocol
  *
  * Detection order:
@@ -55,7 +31,17 @@ export function detectProtocol(): DetectedProtocol {
   }
 
   // Check for ChatGPT sandbox environment (SDK will be injected)
-  if (isChatGPTSandbox()) {
+  const url = window.location.href;
+  const referrer = document.referrer;
+  const isChatGPTSandbox =
+    url.includes("/api/apps/chatgpt/") ||
+    url.includes("chatgpt") ||
+    url.includes("sandbox-proxy") ||
+    url.includes("widget-content") ||
+    referrer.includes("chatgpt") ||
+    referrer.includes("openai.com");
+
+  if (isChatGPTSandbox) {
     return "openai";
   }
 

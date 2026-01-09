@@ -144,20 +144,10 @@ export function createAppsClient<T extends ToolDefs = ToolDefs>(
     // === Files (Optional) ===
 
     ...(adapter.uploadFile && {
-      uploadFile: (file: File) => {
-        if (adapter.uploadFile) {
-          return adapter.uploadFile(file);
-        }
-        throw new Error("uploadFile not supported");
-      },
+      uploadFile: adapter.uploadFile.bind(adapter),
     }),
     ...(adapter.getFileDownloadUrl && {
-      getFileDownloadUrl: (fileId: string) => {
-        if (adapter.getFileDownloadUrl) {
-          return adapter.getFileDownloadUrl(fileId);
-        }
-        throw new Error("getFileDownloadUrl not supported");
-      },
+      getFileDownloadUrl: adapter.getFileDownloadUrl.bind(adapter),
     }),
 
     // === Resources ===

@@ -608,14 +608,10 @@ export class OpenAIAdapter implements ProtocolAdapter {
   log(level: string, data: unknown): void {
     /* eslint-disable no-console */
     const logFn =
-      {
-        debug: console.debug,
-        info: console.info,
-        warning: console.warn,
-        error: console.error,
-      }[level] ?? console.log;
+      { debug: console.debug, info: console.info, warning: console.warn, error: console.error }[
+        level
+      ] ?? console.log;
     /* eslint-enable no-console */
-
     logFn("[ChatGPT Apps]", data);
   }
 

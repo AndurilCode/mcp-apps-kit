@@ -107,12 +107,6 @@ export { detectProtocol } from "./detection";
 // CLIENT FACTORY (INTERNAL)
 // =============================================================================
 
-export { createAppsClient } from "./client";
-
-// =============================================================================
-// CLIENT FACTORY
-// =============================================================================
-
 import type { AppsClient, CreateClientOptions, ToolDefs } from "./types";
 import type { ProtocolAdapter } from "./adapters/types";
 import { detectProtocol } from "./detection";
@@ -121,6 +115,8 @@ import { McpAdapter } from "./adapters/mcp";
 import { OpenAIAdapter } from "./adapters/openai";
 import { createAppsClient } from "./client";
 import { clientDebugLogger } from "./debug/logger";
+
+export { createAppsClient } from "./client";
 
 /**
  * Create an adapter based on detected or forced protocol

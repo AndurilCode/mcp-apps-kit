@@ -239,7 +239,10 @@ export class McpAdapter implements ProtocolAdapter {
     // Keep defaults, overlay with host values when present.
     const base = this.createDefaultContext();
 
-    const theme = ctx.theme === "dark" ? "dark" : ctx.theme === "light" ? "light" : base.theme;
+    let theme: "light" | "dark" = base.theme;
+    if (ctx.theme === "dark" || ctx.theme === "light") {
+      theme = ctx.theme;
+    }
     const displayMode =
       ctx.displayMode === "fullscreen" || ctx.displayMode === "pip" || ctx.displayMode === "inline"
         ? (ctx.displayMode as HostContext["displayMode"])
@@ -459,18 +462,12 @@ export class McpAdapter implements ProtocolAdapter {
     }
 
     // Fallback logging when MCP logging unavailable
-    const logMapping: Record<typeof level, typeof console.log> = {
-      // eslint-disable-next-line no-console
-      debug: console.debug,
-      // eslint-disable-next-line no-console
-      info: console.info,
-      // eslint-disable-next-line no-console
-      warning: console.warn,
-      // eslint-disable-next-line no-console
-      error: console.error,
-    };
-    // eslint-disable-next-line no-console
-    const logFn = logMapping[level] ?? console.log;
+    /* eslint-disable no-console */
+    const logFn =
+      { debug: console.debug, info: console.info, warning: console.warn, error: console.error }[
+        level
+      ] ?? console.log;
+    /* eslint-enable no-console */
     logFn("[MCP Apps]", data);
   }
 
