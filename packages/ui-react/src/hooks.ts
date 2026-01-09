@@ -491,13 +491,25 @@ export function useOnToolInputPartial(handler: (input: Record<string, unknown>) 
  */
 export function useHostCapabilities(): HostCapabilities | undefined {
   const { client } = useAppsContext();
-  const [capabilities, setCapabilities] = useState<HostCapabilities | undefined>(
+  const [capabilities, setCapabilities] = useState<HostCapabilities | undefined>(() =>
     client?.getHostCapabilities()
   );
 
   useEffect(() => {
-    if (!client) return;
+    if (!client) {
+      setCapabilities(undefined);
+      return;
+    }
+
+    // Update capabilities initially
     setCapabilities(client.getHostCapabilities());
+
+    // Subscribe to host context changes since capabilities can derive from context
+    const unsubscribe = client.onHostContextChange(() => {
+      setCapabilities(client.getHostCapabilities());
+    });
+
+    return unsubscribe;
   }, [client]);
 
   return capabilities;
@@ -527,10 +539,15 @@ export function useHostCapabilities(): HostCapabilities | undefined {
  */
 export function useHostVersion(): HostVersion | undefined {
   const { client } = useAppsContext();
-  const [version, setVersion] = useState<HostVersion | undefined>(client?.getHostVersion());
+  const [version, setVersion] = useState<HostVersion | undefined>(() => client?.getHostVersion());
 
   useEffect(() => {
-    if (!client) return;
+    if (!client) {
+      setVersion(undefined);
+      return;
+    }
+
+    // Update version when client changes
     setVersion(client.getHostVersion());
   }, [client]);
 
@@ -666,13 +683,13 @@ export function useFileUpload(): UseFileUploadState & {
 } {
   const { client } = useAppsContext();
   const [state, setState] = useState<UseFileUploadState>({
-    isSupported: false,
+    isSupported: !!client?.uploadFile,
     isUploading: false,
     error: null,
     fileId: null,
   });
 
-  // Check if upload is supported
+  // Update isSupported when client changes
   useEffect(() => {
     setState((prev) => ({
       ...prev,
@@ -758,13 +775,13 @@ export function useFileDownload(): {
     error: Error | null;
     downloadUrl: string | null;
   }>({
-    isSupported: false,
+    isSupported: !!client?.getFileDownloadUrl,
     isLoading: false,
     error: null,
     downloadUrl: null,
   });
 
-  // Check if download URL is supported
+  // Update isSupported when client changes
   useEffect(() => {
     setState((prev) => ({
       ...prev,
@@ -857,12 +874,7 @@ export function useIntrinsicHeight(): {
 } {
   const { client } = useAppsContext();
   const containerRef = useRef<HTMLElement | null>(null);
-  const [isSupported, setIsSupported] = useState(false);
-
-  // Check if supported
-  useEffect(() => {
-    setIsSupported(!!client?.notifyIntrinsicHeight);
-  }, [client]);
+  const isSupported = !!client?.notifyIntrinsicHeight;
 
   // Manual notify function
   const notify = useCallback(
@@ -1002,13 +1014,8 @@ export function useModal(): {
   showModal: (options: ModalOptions) => Promise<ModalResult | null>;
 } {
   const { client } = useAppsContext();
-  const [isSupported, setIsSupported] = useState(false);
+  const isSupported = !!client?.requestModal;
   const [isOpen, setIsOpen] = useState(false);
-
-  // Check if supported
-  useEffect(() => {
-    setIsSupported(!!client?.requestModal);
-  }, [client]);
 
   const showModal = useCallback(
     async (options: ModalOptions): Promise<ModalResult | null> => {

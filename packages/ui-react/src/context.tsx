@@ -25,13 +25,6 @@ interface AppsContextValueInternal {
   error: Error | null;
 }
 
-// Public interface with generic type parameter for typed access
-interface AppsContextValue<T extends ToolDefs = ToolDefs> {
-  client: AppsClient<T> | null;
-  isConnecting: boolean;
-  error: Error | null;
-}
-
 const AppsContext = createContext<AppsContextValueInternal | null>(null);
 
 // =============================================================================
@@ -165,6 +158,15 @@ export function AppsProvider<T extends ToolDefs = ToolDefs>({
 // =============================================================================
 // INTERNAL HOOK
 // =============================================================================
+
+/**
+ * Context value exposed by useAppsContext
+ */
+export interface AppsContextValue<T extends ToolDefs = ToolDefs> {
+  client: AppsClient<T> | null;
+  isConnecting: boolean;
+  error: Error | null;
+}
 
 /**
  * Internal hook to access the context
