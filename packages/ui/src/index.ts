@@ -182,8 +182,8 @@ export async function createClient<T extends ToolDefs = ToolDefs>(
   }
 
   // Build adapter-specific options (only include when explicitly provided)
-  const adapterOptions: AdapterOptions =
-    options?.autoResize !== undefined ? { mcp: { autoResize: options.autoResize } } : {};
+  const adapterOptions: AdapterOptions | undefined =
+    options?.autoResize !== undefined ? { mcp: { autoResize: options.autoResize } } : undefined;
 
   // Create and connect the adapter
   const adapter = createAdapter(protocol, adapterOptions);

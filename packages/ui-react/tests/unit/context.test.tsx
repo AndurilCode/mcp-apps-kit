@@ -163,17 +163,17 @@ describe("AppsProvider", () => {
       });
 
       // Re-render with different autoResize value
-      // Note: This will actually re-initialize the client since autoResize is in the dependency array
+      // autoResize is NOT in the dependency array, so this should NOT cause re-initialization
       rerender(
         <AppsProvider forceAdapter="mock" autoResize={false} fallback={<div>Loading...</div>}>
           <div data-testid="child">Ready</div>
         </AppsProvider>
       );
 
-      // Component should still render
-      await waitFor(() => {
-        expect(screen.getByTestId("child")).toBeInTheDocument();
-      });
+      // Component should still render without going back to loading state
+      expect(screen.getByTestId("child")).toBeInTheDocument();
+      // Fallback should never appear since we're not re-initializing
+      expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
     });
   });
 });

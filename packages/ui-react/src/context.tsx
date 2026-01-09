@@ -63,6 +63,9 @@ export interface AppsProviderProps<T extends ToolDefs = ToolDefs> {
    * using a ResizeObserver on document.body and document.documentElement.
    * The host can then resize the UI container accordingly.
    *
+   * Note: This option is only applied during initial mount. Changing it
+   * at runtime will have no effect.
+   *
    * @default true
    */
   autoResize?: boolean;
@@ -133,7 +136,11 @@ export function AppsProvider<T extends ToolDefs = ToolDefs>({
     };
 
     void initClient();
-  }, [providedClient, _forceAdapter, autoResize]);
+    // Note: autoResize is intentionally not in the dependency array.
+    // It should only be set during initial mount. Changing it at runtime
+    // would cause unnecessary client re-initialization.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [providedClient, _forceAdapter]);
 
   if (error && ErrorFallback) {
     return <ErrorFallback error={error} reset={() => setError(null)} />;
