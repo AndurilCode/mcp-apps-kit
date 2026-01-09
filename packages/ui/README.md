@@ -203,7 +203,7 @@ capabilities?.views; // {} if supported
 
 ```ts
 const version = client.getHostVersion();
-// { name: "Claude Desktop", version: "1.0.0" } (MCP Apps only)
+// { name: "MCP Host", version: "1.0.0" } (MCP Apps only)
 ```
 
 ### Theme & Style Utilities

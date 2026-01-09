@@ -6,7 +6,7 @@
  *
  * This version demonstrates the debug logging via MCP tool transport:
  * - Logs are sent via the log_debug MCP tool
- * - Default behavior for MCP adapter (Claude Desktop, etc.)
+ * - Default behavior for MCP adapter
  */
 
 import { useEffect, useState } from "react";

@@ -1,6 +1,6 @@
 # Quickstart
 
-Build interactive MCP applications with rich UIs that work on both **Claude Desktop** and **ChatGPT** from a single codebase.
+Build interactive MCP applications with rich UIs that work on both **MCP Apps** and **ChatGPT** from a single codebase.
 
 ## Installation
 
@@ -321,8 +321,8 @@ tools: {
 
 MCP Apps Kit automatically handles protocol differences:
 
-| Feature | Claude Desktop | ChatGPT |
-|---------|---------------|---------|
+| Feature | MCP Apps | ChatGPT |
+|---------|----------|---------|
 | Tool execution | MCP protocol | OpenAI Apps SDK |
 | UI rendering | iframe | Widget runtime |
 | Theme support | Auto-detected | Auto-detected |

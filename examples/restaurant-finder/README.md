@@ -69,17 +69,14 @@ Get mood-based restaurant recommendations.
 
 - `mood`: One of "quick", "romantic", "family", "business"
 
-## Connecting to Claude Desktop
+## Connecting to an MCP Apps Host
 
-Add to your Claude Desktop config:
+Configure your MCP Apps-compatible host to connect to the server:
 
-```json
-{
-  "mcpServers": {
-    "restaurant-finder": {
-      "command": "npx",
-      "args": ["tsx", "path/to/examples/restaurant-finder/src/index.ts"]
-    }
-  }
-}
+**HTTP mode (default):**
+- Endpoint: `http://localhost:3000/mcp`
+
+**Stdio mode (for hosts that support it):**
+```bash
+npx tsx path/to/examples/restaurant-finder/src/index.ts
 ```

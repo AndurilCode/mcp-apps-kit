@@ -1,7 +1,7 @@
 /**
  * MCP Protocol Adapter
  *
- * Handles metadata generation for MCP Apps protocol (Claude Desktop, etc.).
+ * Handles metadata generation for MCP Apps protocol.
  * Uses camelCase naming and _meta.ui.* namespace.
  */
 

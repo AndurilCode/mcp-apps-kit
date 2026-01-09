@@ -1,7 +1,7 @@
 /**
- * MCP Apps adapter for Claude Desktop
+ * MCP Apps adapter
  *
- * Implements the ProtocolAdapter interface for MCP Apps running in Claude Desktop.
+ * Implements the ProtocolAdapter interface for MCP Apps hosts.
  * Uses @modelcontextprotocol/ext-apps (JSON-RPC over postMessage + ui/initialize).
  *
  * @internal
@@ -63,7 +63,7 @@ export type McpAdapterOptions = {
 };
 
 /**
- * Adapter for MCP Apps (Claude Desktop)
+ * Adapter for MCP Apps hosts
  *
  * @internal
  *

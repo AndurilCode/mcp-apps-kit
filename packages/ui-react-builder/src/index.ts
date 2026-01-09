@@ -6,7 +6,7 @@
  * This package allows you to define UI resources using React components
  * instead of pre-built HTML files. The framework handles bundling React,
  * ReactDOM, and @mcp-apps-kit/ui-react into self-contained HTML that works
- * with both MCP Apps (Claude Desktop) and ChatGPT.
+ * with both MCP Apps and ChatGPT.
  *
  * @example Basic usage
  * ```typescript

@@ -49,22 +49,12 @@ curl -X POST http://localhost:3000/v2/mcp \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"greet","arguments":{"name":"John","surname":"Doe"}},"id":1}'
 ```
 
-## Connecting to Claude Desktop
+## Connecting to an MCP Apps Host
 
-Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+Configure your MCP Apps-compatible host to connect to one or both API versions:
 
-```json
-{
-  "mcpServers": {
-    "minimal-app-v1": {
-      "url": "http://localhost:3000/v1/mcp"
-    },
-    "minimal-app-v2": {
-      "url": "http://localhost:3000/v2/mcp"
-    }
-  }
-}
-```
+- **v1 endpoint**: `http://localhost:3000/v1/mcp`
+- **v2 endpoint**: `http://localhost:3000/v2/mcp`
 
 ## Testing
 

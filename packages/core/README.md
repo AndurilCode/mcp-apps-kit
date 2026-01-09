@@ -4,7 +4,7 @@
 
 Server-side framework for building MCP applications.
 
-MCP AppsKit Core is the server runtime for defining tools, validating inputs and outputs with Zod, and binding UI resources. It targets both MCP Apps (Claude Desktop) and ChatGPT (OpenAI Apps SDK) from the same definitions.
+MCP AppsKit Core is the server runtime for defining tools, validating inputs and outputs with Zod, and binding UI resources. It targets both MCP Apps and ChatGPT (OpenAI Apps SDK) from the same definitions.
 
 ## Table of Contents
 

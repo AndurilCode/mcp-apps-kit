@@ -417,19 +417,16 @@ ${packageManager} run dev
 ${packageManager} run build
 \`\`\`
 
-## Connecting to Claude Desktop
+## Connecting to an MCP Apps Host
 
-Add to your Claude Desktop config:
+Configure your MCP Apps-compatible host to connect to the server:
 
-\`\`\`json
-{
-  "mcpServers": {
-    "${name}": {
-      "command": "npx",
-      "args": ["tsx", "path/to/${name}/server/index.ts"]
-    }
-  }
-}
+**HTTP mode (default):**
+- Endpoint: \`http://localhost:3000/mcp\`
+
+**Stdio mode (for hosts that support it):**
+\`\`\`bash
+npx tsx path/to/${name}/server/index.ts
 \`\`\`
 ${
   vercel
@@ -804,19 +801,16 @@ ${packageManager} run dev
 ${packageManager} run build
 \`\`\`
 
-## Connecting to Claude Desktop
+## Connecting to an MCP Apps Host
 
-Add to your Claude Desktop config:
+Configure your MCP Apps-compatible host to connect to the server:
 
-\`\`\`json
-{
-  "mcpServers": {
-    "${name}": {
-      "command": "npx",
-      "args": ["tsx", "path/to/${name}/server/index.ts"]
-    }
-  }
-}
+**HTTP mode (default):**
+- Endpoint: \`http://localhost:3000/mcp\`
+
+**Stdio mode (for hosts that support it):**
+\`\`\`bash
+npx tsx path/to/${name}/server/index.ts
 \`\`\`
 ${
   vercel

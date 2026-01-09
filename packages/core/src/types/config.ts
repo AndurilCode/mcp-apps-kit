@@ -14,7 +14,7 @@ import type { UIDefs } from "./ui";
 /**
  * Target protocol for metadata generation
  *
- * - `"mcp"`: MCP Apps protocol (Claude Desktop, etc.) - uses camelCase metadata
+ * - `"mcp"`: MCP Apps protocol - uses camelCase metadata
  * - `"openai"`: OpenAI/ChatGPT Apps protocol - uses snake_case metadata with openai/ prefixes
  *
  * @internal
@@ -239,7 +239,7 @@ export interface GlobalConfig {
   /**
    * Target protocol for metadata generation.
    *
-   * - `"mcp"` (default): MCP Apps protocol for Claude Desktop, etc.
+   * - `"mcp"` (default): MCP Apps protocol.
    *   Uses camelCase metadata format (e.g., `_meta.ui.csp.connectDomains`)
    *
    * - `"openai"`: OpenAI/ChatGPT Apps protocol.

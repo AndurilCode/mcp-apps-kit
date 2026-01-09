@@ -166,11 +166,11 @@ describe("ToolContext", () => {
 
     it("should have correct type for userAgent", () => {
       const context: ToolContext = {
-        userAgent: "Claude Desktop/1.0",
+        userAgent: "MCP Host/1.0",
         raw: {},
       };
 
-      expect(context.userAgent).toBe("Claude Desktop/1.0");
+      expect(context.userAgent).toBe("MCP Host/1.0");
     });
 
     it("should have correct type for userLocation", () => {
