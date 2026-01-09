@@ -74,9 +74,11 @@ Get mood-based restaurant recommendations.
 Configure your MCP Apps-compatible host to connect to the server:
 
 **HTTP mode (default):**
+
 - Endpoint: `http://localhost:3000/mcp`
 
 **Stdio mode (for hosts that support it):**
+
 ```bash
 npx tsx path/to/examples/restaurant-finder/src/index.ts
 ```
