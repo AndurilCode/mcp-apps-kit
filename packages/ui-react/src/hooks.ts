@@ -491,8 +491,8 @@ export function useOnToolInputPartial(handler: (input: Record<string, unknown>) 
  */
 export function useHostCapabilities(): HostCapabilities | undefined {
   const { client } = useAppsContext();
-  const [capabilities, setCapabilities] = useState<HostCapabilities | undefined>(
-    () => client?.getHostCapabilities()
+  const [capabilities, setCapabilities] = useState<HostCapabilities | undefined>(() =>
+    client?.getHostCapabilities()
   );
 
   useEffect(() => {
@@ -539,9 +539,7 @@ export function useHostCapabilities(): HostCapabilities | undefined {
  */
 export function useHostVersion(): HostVersion | undefined {
   const { client } = useAppsContext();
-  const [version, setVersion] = useState<HostVersion | undefined>(
-    () => client?.getHostVersion()
-  );
+  const [version, setVersion] = useState<HostVersion | undefined>(() => client?.getHostVersion());
 
   useEffect(() => {
     if (!client) {
