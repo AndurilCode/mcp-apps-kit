@@ -6,8 +6,9 @@
 /* eslint-disable no-console */
 
 import { Command, InvalidArgumentError } from "commander";
-import prompts from "prompts";
+import { input, select, confirm } from "@inquirer/prompts";
 import chalk from "chalk";
+import figlet from "figlet";
 import { scaffoldProject } from "./index.js";
 import type { CreateAppOptions } from "./index.js";
 
@@ -129,15 +130,28 @@ export function parseArgs(args: string[]): CLIOptions {
 // Interactive Mode
 // =============================================================================
 
-async function runInteractive(): Promise<CreateAppOptions> {
+/**
+ * Print styled ASCII art header using figlet
+ */
+function printHeader(): void {
   console.log();
-  console.log(chalk.bold("🚀 Create a new MCP application"));
+  console.log(
+    chalk.cyan(
+      figlet.textSync("mcp-apps-kit", {
+        font: "Standard",
+        horizontalLayout: "default",
+      })
+    )
+  );
+  console.log(chalk.gray("  Build interactive MCP applications"));
   console.log();
+}
 
-  const response = await prompts<"name" | "template" | "vercel" | "skipInstall" | "skipGit">([
-    {
-      type: "text",
-      name: "name",
+async function runInteractive(): Promise<CreateAppOptions> {
+  printHeader();
+
+  try {
+    const name = await input({
       message: "Project name:",
       validate: (value: string) => {
         if (!validateProjectName(value)) {
@@ -145,49 +159,46 @@ async function runInteractive(): Promise<CreateAppOptions> {
         }
         return true;
       },
-    },
-    {
-      type: "select",
-      name: "template",
+    });
+
+    const template = await select({
       message: "Template:",
       choices: [
-        { title: "React", value: "react", description: "React + TypeScript with hooks" },
-        { title: "Vanilla", value: "vanilla", description: "Vanilla TypeScript" },
+        { name: "React", value: "react" as const, description: "React + TypeScript with hooks" },
+        { name: "Vanilla", value: "vanilla" as const, description: "Vanilla TypeScript" },
       ],
-      initial: 0,
-    },
-    {
-      type: "confirm",
-      name: "vercel",
+      default: "react",
+    });
+
+    const vercel = await confirm({
       message: "Add Vercel deployment setup?",
-      initial: true,
-    },
-    {
-      type: "confirm",
-      name: "skipInstall",
+      default: true,
+    });
+
+    const skipInstall = await confirm({
       message: "Skip installing dependencies?",
-      initial: false,
-    },
-    {
-      type: "confirm",
-      name: "skipGit",
+      default: false,
+    });
+
+    const skipGit = await confirm({
       message: "Skip initializing git?",
-      initial: false,
-    },
-  ]);
+      default: false,
+    });
 
-  if (!response.name) {
-    console.log(chalk.yellow("Cancelled."));
-    process.exit(0);
+    return {
+      name,
+      template,
+      vercel,
+      skipInstall,
+      skipGit,
+    };
+  } catch (error) {
+    if (error instanceof Error && error.name === "ExitPromptError") {
+      console.log(chalk.yellow("\nCancelled."));
+      process.exit(0);
+    }
+    throw error;
   }
-
-  return {
-    name: response.name as string,
-    template: response.template as "react" | "vanilla",
-    vercel: response.vercel as boolean,
-    skipInstall: response.skipInstall as boolean,
-    skipGit: response.skipGit as boolean,
-  };
 }
 
 // =============================================================================
@@ -232,18 +243,16 @@ async function main(): Promise<void> {
 
     await scaffoldProject(options);
 
-    const packageManager = options.vercel ? "npm" : "pnpm";
-
     console.log();
     console.log(chalk.green("✓ Project created successfully!"));
     console.log();
     console.log("Next steps:");
     console.log(chalk.cyan(`  cd ${options.directory ?? options.name}`));
     if (!options.skipInstall) {
-      console.log(chalk.cyan(`  ${packageManager} run dev`));
+      console.log(chalk.cyan("  npm run dev"));
     } else {
-      console.log(chalk.cyan(`  ${packageManager} install`));
-      console.log(chalk.cyan(`  ${packageManager} run dev`));
+      console.log(chalk.cyan("  npm install"));
+      console.log(chalk.cyan("  npm run dev"));
     }
     if (options.vercel) {
       console.log();

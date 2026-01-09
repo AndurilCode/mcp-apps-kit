@@ -120,6 +120,59 @@ describe("Project scaffolding", () => {
 
       expect(fs.existsSync(path.join(projectDir, "tsconfig.json"))).toBe(true);
     });
+
+    it("should create test setup files", async () => {
+      const projectDir = path.join(tempDir, "my-react-app");
+
+      await scaffoldProject({
+        name: "my-react-app",
+        template: "react",
+        directory: projectDir,
+        skipInstall: true,
+        skipGit: true,
+      });
+
+      expect(fs.existsSync(path.join(projectDir, "vitest.config.ts"))).toBe(true);
+      expect(fs.existsSync(path.join(projectDir, "tests", "setup.ts"))).toBe(true);
+      expect(fs.existsSync(path.join(projectDir, "tests", "integration", "server.test.ts"))).toBe(
+        true
+      );
+    });
+
+    it("should include testing dependencies", async () => {
+      const projectDir = path.join(tempDir, "my-react-app");
+
+      await scaffoldProject({
+        name: "my-react-app",
+        template: "react",
+        directory: projectDir,
+        skipInstall: true,
+        skipGit: true,
+      });
+
+      const packageJson = JSON.parse(
+        fs.readFileSync(path.join(projectDir, "package.json"), "utf-8")
+      );
+      expect(packageJson.devDependencies).toHaveProperty("@mcp-apps-kit/testing");
+      expect(packageJson.devDependencies).toHaveProperty("vitest");
+      expect(packageJson.scripts).toHaveProperty("test");
+      expect(packageJson.scripts).toHaveProperty("test:watch");
+    });
+
+    it("should export app from server for testing", async () => {
+      const projectDir = path.join(tempDir, "my-react-app");
+
+      await scaffoldProject({
+        name: "my-react-app",
+        template: "react",
+        directory: projectDir,
+        skipInstall: true,
+        skipGit: true,
+      });
+
+      const serverContent = fs.readFileSync(path.join(projectDir, "server", "index.ts"), "utf-8");
+      expect(serverContent).toContain("export { app }");
+    });
   });
 
   describe("Vanilla template", () => {
@@ -168,6 +221,43 @@ describe("Project scaffolding", () => {
       });
 
       expect(fs.existsSync(path.join(projectDir, "ui", "src", "main.ts"))).toBe(true);
+    });
+
+    it("should create test setup files", async () => {
+      const projectDir = path.join(tempDir, "my-vanilla-app");
+
+      await scaffoldProject({
+        name: "my-vanilla-app",
+        template: "vanilla",
+        directory: projectDir,
+        skipInstall: true,
+        skipGit: true,
+      });
+
+      expect(fs.existsSync(path.join(projectDir, "vitest.config.ts"))).toBe(true);
+      expect(fs.existsSync(path.join(projectDir, "tests", "setup.ts"))).toBe(true);
+      expect(fs.existsSync(path.join(projectDir, "tests", "integration", "server.test.ts"))).toBe(
+        true
+      );
+    });
+
+    it("should include testing dependencies", async () => {
+      const projectDir = path.join(tempDir, "my-vanilla-app");
+
+      await scaffoldProject({
+        name: "my-vanilla-app",
+        template: "vanilla",
+        directory: projectDir,
+        skipInstall: true,
+        skipGit: true,
+      });
+
+      const packageJson = JSON.parse(
+        fs.readFileSync(path.join(projectDir, "package.json"), "utf-8")
+      );
+      expect(packageJson.devDependencies).toHaveProperty("@mcp-apps-kit/testing");
+      expect(packageJson.devDependencies).toHaveProperty("vitest");
+      expect(packageJson.scripts).toHaveProperty("test");
     });
   });
 

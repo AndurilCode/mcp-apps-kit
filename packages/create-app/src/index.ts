@@ -29,6 +29,7 @@ interface PackageVersions {
   core: string;
   ui: string;
   uiReact: string;
+  testing: string;
 }
 
 // Cache for fetched versions
@@ -62,6 +63,7 @@ function getPackageVersions(): PackageVersions {
     core: fetchLatestVersion("@mcp-apps-kit/core"),
     ui: fetchLatestVersion("@mcp-apps-kit/ui"),
     uiReact: fetchLatestVersion("@mcp-apps-kit/ui-react"),
+    testing: fetchLatestVersion("@mcp-apps-kit/testing"),
   };
 
   return cachedVersions;
@@ -73,7 +75,7 @@ function getPackageVersions(): PackageVersions {
 
 function getReactTemplate(name: string, vercel = false): Record<string, string> {
   const uiOutputDir = vercel ? "public" : "dist";
-  const packageManager = vercel ? "npm" : "pnpm";
+  const packageManager = "npm"; // Always use npm for standalone projects
   const versions = getPackageVersions();
 
   const files: Record<string, string> = {
@@ -83,12 +85,14 @@ function getReactTemplate(name: string, vercel = false): Record<string, string> 
         version: "0.1.0",
         type: "module",
         scripts: {
-          dev: `concurrently "${packageManager} run dev:server" "${packageManager} run dev:ui"`,
+          dev: `${packageManager} run build:ui && concurrently "${packageManager} run dev:server" "${packageManager} run dev:ui"`,
           "dev:server": "tsx watch server/index.ts",
           "dev:ui": "vite --config ui/vite.config.ts",
           build: `${packageManager} run build:ui && tsc`,
           "build:ui": "vite build --config ui/vite.config.ts",
           start: "node dist/server/index.js",
+          test: "vitest run",
+          "test:watch": "vitest",
         },
         dependencies: {
           "@mcp-apps-kit/core": versions.core,
@@ -96,10 +100,11 @@ function getReactTemplate(name: string, vercel = false): Record<string, string> 
           "@mcp-apps-kit/ui-react": versions.uiReact,
           react: "^18.2.0",
           "react-dom": "^18.2.0",
-          zod: "^3.22.0",
+          zod: "^4.0.0",
           ...(vercel ? { express: "^4.21.0" } : {}),
         },
         devDependencies: {
+          "@mcp-apps-kit/testing": versions.testing,
           "@types/react": "^18.2.0",
           "@types/react-dom": "^18.2.0",
           "@vitejs/plugin-react": "^4.2.0",
@@ -107,6 +112,7 @@ function getReactTemplate(name: string, vercel = false): Record<string, string> 
           tsx: "^4.7.0",
           typescript: "^5.3.0",
           vite: "^5.0.0",
+          vitest: "^4.0.0",
           "vite-plugin-singlefile": "^2.0.0",
         },
       },
@@ -183,6 +189,9 @@ if (!process.env.VERCEL) {
   console.log("MCP server running on http://localhost:3000");
 }
 
+// Export app for testing
+export { app };
+
 // Export Express app for Vercel
 export default app.expressApp;
 `
@@ -230,6 +239,9 @@ const app = createApp({
 // Start server
 await app.start({ port: 3000 });
 console.log("MCP server running on http://localhost:3000");
+
+// Export app for testing
+export { app };
 `,
     "ui/src/App.tsx": `/**
  * ${name} - UI Component
@@ -237,28 +249,41 @@ console.log("MCP server running on http://localhost:3000");
 
 import {
   useAppsClient,
+  useToolResult,
   useHostContext,
   useDocumentTheme,
   useHostStyleVariables,
 } from "@mcp-apps-kit/ui-react";
 
+// Type for the hello tool output
+type HelloOutput = { message: string; timestamp: string };
+
+// Type for all tool outputs (keyed by tool name)
+type ToolOutputs = { hello: HelloOutput };
+
 export function App() {
   const client = useAppsClient();
+  const result = useToolResult<ToolOutputs>();
   const context = useHostContext();
 
   // Apply theme and host styles
   useDocumentTheme("light", "dark");
   useHostStyleVariables();
 
-  // Get tool output from client
-  const output = client.toolOutput as { message?: string; timestamp?: string } | undefined;
+  // Handle both wrapped ({ hello: {...} }) and unwrapped ({...}) result formats
+  // Wrapped: when toolResponseMetadata.toolName is available
+  // Unwrapped: direct result format
+  const rawResult = result?.hello ?? result;
+  const output = rawResult && "message" in rawResult
+    ? (rawResult as HelloOutput)
+    : undefined;
 
   return (
     <div className="container">
       {output?.message ? (
         <div className="greeting">
           <h1>{output.message}</h1>
-          <p className="timestamp">Sent at: {output.timestamp}</p>
+          <p className="timestamp">Sent at: {new Date(output.timestamp).toLocaleTimeString()}</p>
         </div>
       ) : (
         <p className="waiting">Waiting for greeting...</p>
@@ -444,6 +469,93 @@ Then use the deployed URL as your MCP server endpoint.
     : ""
 }
 `,
+    "vitest.config.ts": `import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    globals: true,
+    environment: "node",
+    include: ["tests/**/*.{test,spec}.ts"],
+    testTimeout: 30000,
+    hookTimeout: 30000,
+    setupFiles: ["./tests/setup.ts"],
+  },
+});
+`,
+    "tests/setup.ts": `/**
+ * Test setup for ${name}
+ */
+
+import { setupVitestMatchers } from "@mcp-apps-kit/testing/vitest";
+
+setupVitestMatchers();
+`,
+    "tests/integration/server.test.ts": `/**
+ * Integration tests for ${name} MCP server
+ */
+
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { startTestServer, createTestClient, expectToolResult } from "@mcp-apps-kit/testing";
+import type { TestEnvironment } from "@mcp-apps-kit/testing";
+import { app } from "../../server/index.js";
+
+describe("${name} MCP Server", () => {
+  let env: TestEnvironment;
+
+  beforeAll(async () => {
+    const server = await startTestServer(app, { port: 0 });
+    await new Promise((r) => setTimeout(r, 100));
+
+    const client = await createTestClient(server.mcpUrl, {
+      trackHistory: true,
+      timeout: 10000,
+    });
+
+    env = {
+      server,
+      client,
+      cleanup: async () => {
+        await client.disconnect();
+        await server.stop();
+      },
+    };
+  });
+
+  afterAll(async () => {
+    await env.cleanup();
+  });
+
+  it("should start server and connect client", () => {
+    expect(env.server).toBeDefined();
+    expect(env.client).toBeDefined();
+    expect(env.server.url).toBeTruthy();
+  });
+
+  it("should list available tools", async () => {
+    const tools = await env.client.listTools();
+    expect(tools.length).toBeGreaterThan(0);
+    expect(tools.some((t) => t.name === "hello")).toBe(true);
+  });
+
+  it("should call hello tool successfully", async () => {
+    const result = await env.client.callTool("hello", { name: "World" });
+
+    expectToolResult(result).toHaveNoError();
+    expectToolResult(result).toMatchObject({
+      message: "Hello, World!",
+    });
+  });
+
+  it("should include timestamp in response", async () => {
+    const result = await env.client.callTool("hello", { name: "Test" });
+
+    expectToolResult(result).toHaveNoError();
+    const content = result.structuredContent as { timestamp?: string };
+    expect(content.timestamp).toBeDefined();
+    expect(new Date(content.timestamp!).getTime()).not.toBeNaN();
+  });
+});
+`,
   };
 
   // Add vercel.json if Vercel setup is enabled
@@ -475,7 +587,7 @@ Then use the deployed URL as your MCP server endpoint.
 
 function getVanillaTemplate(name: string, vercel = false): Record<string, string> {
   const uiOutputDir = vercel ? "public" : "dist";
-  const packageManager = vercel ? "npm" : "pnpm";
+  const packageManager = "npm"; // Always use npm for standalone projects
   const versions = getPackageVersions();
 
   const files: Record<string, string> = {
@@ -485,24 +597,28 @@ function getVanillaTemplate(name: string, vercel = false): Record<string, string
         version: "0.1.0",
         type: "module",
         scripts: {
-          dev: `concurrently "${packageManager} run dev:server" "${packageManager} run dev:ui"`,
+          dev: `${packageManager} run build:ui && concurrently "${packageManager} run dev:server" "${packageManager} run dev:ui"`,
           "dev:server": "tsx watch server/index.ts",
           "dev:ui": "vite --config ui/vite.config.ts",
           build: `${packageManager} run build:ui && tsc`,
           "build:ui": "vite build --config ui/vite.config.ts",
           start: "node dist/server/index.js",
+          test: "vitest run",
+          "test:watch": "vitest",
         },
         dependencies: {
           "@mcp-apps-kit/core": versions.core,
           "@mcp-apps-kit/ui": versions.ui,
-          zod: "^3.22.0",
+          zod: "^4.0.0",
           ...(vercel ? { express: "^4.21.0" } : {}),
         },
         devDependencies: {
+          "@mcp-apps-kit/testing": versions.testing,
           concurrently: "^8.2.0",
           tsx: "^4.7.0",
           typescript: "^5.3.0",
           vite: "^5.0.0",
+          vitest: "^4.0.0",
           "vite-plugin-singlefile": "^2.0.0",
         },
       },
@@ -578,6 +694,9 @@ if (!process.env.VERCEL) {
   console.log("MCP server running on http://localhost:3000");
 }
 
+// Export app for testing
+export { app };
+
 // Export Express app for Vercel
 export default app.expressApp;
 `
@@ -625,6 +744,9 @@ const app = createApp({
 // Start server
 await app.start({ port: 3000 });
 console.log("MCP server running on http://localhost:3000");
+
+// Export app for testing
+export { app };
 `,
     "ui/src/main.ts": `/**
  * ${name} - UI Entry Point
@@ -633,8 +755,17 @@ console.log("MCP server running on http://localhost:3000");
 import { createClient } from "@mcp-apps-kit/ui";
 import "./styles.css";
 
+// Type for the hello tool output
+type HelloOutput = { message: string; timestamp: string };
+
+// Type for all tool outputs (keyed by tool name)
+type ToolOutputs = { hello: HelloOutput };
+
+// Store latest tool result
+let latestToolResult: ToolOutputs | HelloOutput | undefined;
+
 async function main() {
-  const client = await createClient();
+  const client = await createClient<ToolOutputs>();
 
   // Get container
   const container = document.getElementById("app");
@@ -648,18 +779,29 @@ async function main() {
     document.documentElement.className = context.theme;
     render(container, client);
   });
+
+  // Subscribe to tool result changes
+  client.onToolResult((result) => {
+    latestToolResult = result as ToolOutputs | HelloOutput;
+    render(container, client);
+  });
 }
 
-function render(container: HTMLElement, client: ReturnType<typeof createClient> extends Promise<infer T> ? T : never) {
-  const output = client.toolOutput as { message?: string; timestamp?: string } | undefined;
+function render(container: HTMLElement, client: Awaited<ReturnType<typeof createClient>>) {
   const context = client.hostContext;
+
+  // Handle both wrapped ({ hello: {...} }) and unwrapped ({...}) result formats
+  const rawResult = (latestToolResult as ToolOutputs)?.hello ?? latestToolResult;
+  const output = rawResult && "message" in rawResult
+    ? (rawResult as HelloOutput)
+    : undefined;
 
   container.innerHTML = \`
     <div class="container">
       \${output?.message ? \`
         <div class="greeting">
           <h1>\${output.message}</h1>
-          <p class="timestamp">Sent at: \${output.timestamp}</p>
+          <p class="timestamp">Sent at: \${new Date(output.timestamp).toLocaleTimeString()}</p>
         </div>
       \` : \`
         <p class="waiting">Waiting for greeting...</p>
@@ -828,6 +970,93 @@ Then use the deployed URL as your MCP server endpoint.
     : ""
 }
 `,
+    "vitest.config.ts": `import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    globals: true,
+    environment: "node",
+    include: ["tests/**/*.{test,spec}.ts"],
+    testTimeout: 30000,
+    hookTimeout: 30000,
+    setupFiles: ["./tests/setup.ts"],
+  },
+});
+`,
+    "tests/setup.ts": `/**
+ * Test setup for ${name}
+ */
+
+import { setupVitestMatchers } from "@mcp-apps-kit/testing/vitest";
+
+setupVitestMatchers();
+`,
+    "tests/integration/server.test.ts": `/**
+ * Integration tests for ${name} MCP server
+ */
+
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { startTestServer, createTestClient, expectToolResult } from "@mcp-apps-kit/testing";
+import type { TestEnvironment } from "@mcp-apps-kit/testing";
+import { app } from "../../server/index.js";
+
+describe("${name} MCP Server", () => {
+  let env: TestEnvironment;
+
+  beforeAll(async () => {
+    const server = await startTestServer(app, { port: 0 });
+    await new Promise((r) => setTimeout(r, 100));
+
+    const client = await createTestClient(server.mcpUrl, {
+      trackHistory: true,
+      timeout: 10000,
+    });
+
+    env = {
+      server,
+      client,
+      cleanup: async () => {
+        await client.disconnect();
+        await server.stop();
+      },
+    };
+  });
+
+  afterAll(async () => {
+    await env.cleanup();
+  });
+
+  it("should start server and connect client", () => {
+    expect(env.server).toBeDefined();
+    expect(env.client).toBeDefined();
+    expect(env.server.url).toBeTruthy();
+  });
+
+  it("should list available tools", async () => {
+    const tools = await env.client.listTools();
+    expect(tools.length).toBeGreaterThan(0);
+    expect(tools.some((t) => t.name === "hello")).toBe(true);
+  });
+
+  it("should call hello tool successfully", async () => {
+    const result = await env.client.callTool("hello", { name: "World" });
+
+    expectToolResult(result).toHaveNoError();
+    expectToolResult(result).toMatchObject({
+      message: "Hello, World!",
+    });
+  });
+
+  it("should include timestamp in response", async () => {
+    const result = await env.client.callTool("hello", { name: "Test" });
+
+    expectToolResult(result).toHaveNoError();
+    const content = result.structuredContent as { timestamp?: string };
+    expect(content.timestamp).toBeDefined();
+    expect(new Date(content.timestamp!).getTime()).not.toBeNaN();
+  });
+});
+`,
   };
 
   // Add vercel.json if Vercel setup is enabled
@@ -917,17 +1146,8 @@ export async function scaffoldProject(options: CreateAppOptions): Promise<void> 
   // Install dependencies
   if (!skipInstall) {
     try {
-      if (vercel) {
-        // Use npm for Vercel projects (better compatibility)
-        execSync("npm install", { cwd: projectDir, stdio: "inherit" });
-      } else {
-        // Try pnpm first, fall back to npm
-        try {
-          execSync("pnpm install", { cwd: projectDir, stdio: "inherit" });
-        } catch {
-          execSync("npm install", { cwd: projectDir, stdio: "inherit" });
-        }
-      }
+      // Always use npm for standalone projects (avoids workspace conflicts)
+      execSync("npm install", { cwd: projectDir, stdio: "inherit" });
     } catch {
       // eslint-disable-next-line no-console
       console.warn("Warning: Could not install dependencies automatically.");
