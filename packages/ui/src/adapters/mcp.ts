@@ -49,7 +49,7 @@ import type {
 /**
  * Options for configuring the MCP adapter
  */
-export interface McpAdapterOptions {
+export type McpAdapterOptions = {
   /**
    * Enable automatic size change notifications
    *
@@ -60,7 +60,7 @@ export interface McpAdapterOptions {
    * @default true
    */
   autoResize?: boolean;
-}
+};
 
 /**
  * Adapter for MCP Apps (Claude Desktop)
