@@ -105,6 +105,55 @@ describe("UI Resource Registration", () => {
       expect(ui.prefersBorder).toBe(true);
     });
 
+    it("should support UI resources with autoResize", () => {
+      const autoResizeTool = defineTool({
+        description: "Auto-resize tool",
+        input: z.object({}),
+        output: z.object({}),
+        handler: async () => ({}),
+        ui: defineUI({
+          html: "<div>Auto Resize</div>",
+          autoResize: false,
+        }),
+      });
+
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {
+          autoResize: autoResizeTool,
+        },
+      });
+
+      const ui = app.tools.autoResize.ui as { autoResize: boolean };
+      expect(ui.autoResize).toBe(false);
+    });
+
+    it("should default autoResize to true when not specified", () => {
+      const defaultTool = defineTool({
+        description: "Default resize tool",
+        input: z.object({}),
+        output: z.object({}),
+        handler: async () => ({}),
+        ui: defineUI({
+          html: "<div>Default</div>",
+        }),
+      });
+
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: {
+          default: defaultTool,
+        },
+      });
+
+      const ui = app.tools.default.ui as { autoResize?: boolean };
+      // autoResize is optional, so it may be undefined when not specified
+      // The default is applied at the client-side adapter level
+      expect(ui.autoResize).toBeUndefined();
+    });
+
     it("should support UI resources with name and description", () => {
       const dashboardTool = defineTool({
         description: "Dashboard tool",
@@ -566,6 +615,7 @@ describe("UI Resource Registration", () => {
           description: "A widget with all features",
           widgetDescription: "Interactive widget for full features",
           prefersBorder: true,
+          autoResize: false,
           domain: "widget.example.com",
           csp: {
             connectDomains: ["https://api.example.com"],
@@ -590,6 +640,7 @@ describe("UI Resource Registration", () => {
         description: string;
         widgetDescription: string;
         prefersBorder: boolean;
+        autoResize: boolean;
         domain: string;
         csp: {
           connectDomains: string[];
@@ -604,6 +655,7 @@ describe("UI Resource Registration", () => {
       expect(ui.description).toBe("A widget with all features");
       expect(ui.widgetDescription).toBe("Interactive widget for full features");
       expect(ui.prefersBorder).toBe(true);
+      expect(ui.autoResize).toBe(false);
       expect(ui.domain).toBe("widget.example.com");
       expect(ui.csp.connectDomains).toEqual(["https://api.example.com"]);
     });

@@ -92,6 +92,7 @@ const restaurantListUI = defineUI({
   description: "Displays restaurant search results",
   html: "./dist/widget.html",
   prefersBorder: true,
+  autoResize: true, // Enable automatic size notifications (default: true, MCP Apps only)
 });
 
 const app = createApp({
