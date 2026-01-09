@@ -512,6 +512,9 @@ export class OpenAIAdapter implements ProtocolAdapter {
   // === Messaging ===
 
   async sendMessage(content: { type: string; text: string }): Promise<void> {
+    if (content.type !== "text") {
+      throw new Error(`Unsupported message content type: ${content.type}`);
+    }
     const openai = this.getOpenAI();
     if (openai && typeof openai.sendFollowUpMessage === "function") {
       await (openai.sendFollowUpMessage as (opts: { prompt: string }) => Promise<void>)({
