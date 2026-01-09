@@ -72,7 +72,7 @@ function toKebabCase(name: string): string {
  * ```
  */
 export function defineReactUI(definition: ReactUIInput): ReactUIDef {
-  const { component, defaultProps, outDir, ...rest } = definition;
+  const { component, defaultProps, outDir, autoResize, ...rest } = definition;
 
   // Generate the output path from component name
   const componentName = component.name ?? "component";
@@ -86,6 +86,7 @@ export function defineReactUI(definition: ReactUIInput): ReactUIDef {
     __reactUI: true,
     __component: component,
     __defaultProps: defaultProps,
+    __autoResize: autoResize,
   };
 }
 

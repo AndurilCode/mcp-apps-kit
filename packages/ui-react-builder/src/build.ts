@@ -151,11 +151,16 @@ async function compileComponent(
   const component = def.__component;
   const componentName = component.name || "Component";
   const defaultProps = def.__defaultProps;
+  const autoResize = def.__autoResize;
 
   // Create the entry point using function serialization
   // Note: The Vite plugin uses file paths for proper import resolution
   // This build function falls back to function serialization (limited - doesn't capture imports)
-  const entryPoint = generateEntryPoint(`__COMPONENT_PLACEHOLDER__`, defaultProps);
+  const entryPoint = generateEntryPoint({
+    componentPath: `__COMPONENT_PLACEHOLDER__`,
+    defaultProps,
+    autoResize,
+  });
 
   // Configure plugins
   const plugins: esbuild.Plugin[] = [

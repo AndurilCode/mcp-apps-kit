@@ -59,6 +59,17 @@ export interface ReactUIInput extends Omit<UIDef, "html"> {
    * @example "./dist/ui"
    */
   outDir?: string;
+
+  /**
+   * Enable automatic size change notifications (MCP adapter only).
+   *
+   * When enabled, the UI automatically reports its size changes to the host
+   * using a ResizeObserver on document.body and document.documentElement.
+   * The host can then resize the UI container accordingly.
+   *
+   * @default true
+   */
+  autoResize?: boolean;
 }
 
 // =============================================================================
@@ -91,6 +102,12 @@ export interface ReactUIDef extends UIDef {
    * @internal
    */
   __defaultProps?: Record<string, unknown>;
+
+  /**
+   * Whether to enable automatic size change notifications.
+   * @internal
+   */
+  __autoResize?: boolean;
 }
 
 // =============================================================================

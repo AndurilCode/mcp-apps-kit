@@ -727,6 +727,17 @@ export interface CreateClientOptions {
    * Useful for testing or development
    */
   forceAdapter?: "mcp" | "openai" | "mock";
+
+  /**
+   * Enable automatic size change notifications (MCP adapter only)
+   *
+   * When enabled, the UI automatically reports its size changes to the host
+   * using a ResizeObserver on document.body and document.documentElement.
+   * The host can then resize the UI container accordingly.
+   *
+   * @default true
+   */
+  autoResize?: boolean;
 }
 
 /**

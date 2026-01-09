@@ -187,6 +187,8 @@ interface DiscoveredUI {
   name: string;
   /** Generated key for output file */
   key: string;
+  /** Whether auto-resize is enabled (undefined means default/true) */
+  autoResize?: boolean;
 }
 
 /**
@@ -319,6 +321,7 @@ async function discoverReactUIs(
       componentPath,
       name: ui.name,
       key,
+      autoResize: ui.autoResize,
     });
   }
 
@@ -358,6 +361,10 @@ async function buildDiscoveredUIs(
   for (const ui of discovered) {
     const importPath = toEsbuildImportSpecifier(ui.componentPath);
 
+    // Generate AppsProvider props based on autoResize setting
+    const providerProps =
+      ui.autoResize === undefined ? "" : ` autoResize={${ui.autoResize}}`;
+
     // Generate entry point code
     const entryCode = `
 import React from "react";
@@ -370,7 +377,7 @@ if (rootElement) {
   const root = createRoot(rootElement);
   root.render(
     <React.StrictMode>
-      <AppsProvider>
+      <AppsProvider${providerProps}>
         <Component />
       </AppsProvider>
     </React.StrictMode>

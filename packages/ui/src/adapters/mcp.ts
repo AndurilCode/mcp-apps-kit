@@ -47,6 +47,22 @@ import type {
 } from "../types";
 
 /**
+ * Options for configuring the MCP adapter
+ */
+export interface McpAdapterOptions {
+  /**
+   * Enable automatic size change notifications
+   *
+   * When enabled, the UI automatically reports its size changes to the host
+   * using a ResizeObserver on document.body and document.documentElement.
+   * The host can then resize the UI container accordingly.
+   *
+   * @default true
+   */
+  autoResize?: boolean;
+}
+
+/**
  * Adapter for MCP Apps (Claude Desktop)
  *
  * @internal
@@ -69,9 +85,11 @@ export class McpAdapter implements ProtocolAdapter {
   private app?: App;
   private callToolHandler?: CallToolHandler;
   private listToolsHandler?: ListToolsHandler;
+  private readonly autoResize: boolean;
 
-  constructor() {
+  constructor(options?: McpAdapterOptions) {
     this.context = this.createDefaultContext();
+    this.autoResize = options?.autoResize ?? true;
   }
 
   private createDefaultContext(): HostContext {
@@ -104,7 +122,11 @@ export class McpAdapter implements ProtocolAdapter {
 
     // Instantiate App and register handlers BEFORE connecting.
     // Declare tools capability to enable calling server tools and registering bidirectional tool handlers.
-    this.app = new App({ name: "@mcp-apps-kit/ui", version: "0.0.0" }, { tools: {} });
+    this.app = new App(
+      { name: "@mcp-apps-kit/ui", version: "0.0.0" },
+      { tools: {} },
+      { autoResize: this.autoResize }
+    );
 
     this.app.onerror = (err) => {
       this.log("error", err);
