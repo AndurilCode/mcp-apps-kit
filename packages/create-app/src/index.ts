@@ -15,6 +15,7 @@ import { execSync } from "node:child_process";
 export interface CreateAppOptions {
   name: string;
   template: "react" | "vanilla";
+  protocol?: "mcp" | "openai";
   directory?: string;
   vercel?: boolean;
   skipInstall?: boolean;
@@ -73,7 +74,11 @@ function getPackageVersions(): PackageVersions {
 // Template Content
 // =============================================================================
 
-function getReactTemplate(name: string, vercel = false): Record<string, string> {
+function getReactTemplate(
+  name: string,
+  vercel = false,
+  protocol: "mcp" | "openai" = "mcp"
+): Record<string, string> {
   const uiOutputDir = vercel ? "public" : "dist";
   const packageManager = "npm"; // Always use npm for standalone projects
   const versions = getPackageVersions();
@@ -161,6 +166,10 @@ const app = createApp({
   name: "${name}",
   version: "0.1.0",
 
+  config: {
+    protocol: "${protocol}",
+  },
+
   tools: {
     hello: defineTool({
       title: "Hello",
@@ -213,6 +222,10 @@ const greetingUI = defineUI({
 const app = createApp({
   name: "${name}",
   version: "0.1.0",
+
+  config: {
+    protocol: "${protocol}",
+  },
 
   tools: {
     hello: defineTool({
@@ -324,7 +337,8 @@ createRoot(root).render(
   </React.StrictMode>
 );
 `,
-    "ui/src/styles.css": `* {
+    "ui/src/styles.css": `/* Base styles */
+* {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -333,11 +347,24 @@ createRoot(root).render(
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   padding: 16px;
+  background: #fff;
+  color: #333;
+  transition: background-color 0.2s, color 0.2s;
 }
 
 .container {
   max-width: 400px;
   margin: 0 auto;
+}
+
+/* Greeting card */
+.greeting {
+  text-align: center;
+  padding: 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
 .greeting h1 {
@@ -346,50 +373,71 @@ body {
 }
 
 .timestamp {
-  color: #666;
   font-size: 0.875rem;
+  opacity: 0.8;
 }
 
+/* Waiting state */
 .waiting {
-  color: #999;
+  text-align: center;
+  padding: 24px;
+  color: #666;
   font-style: italic;
 }
 
+/* Button */
 .button {
   margin-top: 16px;
-  padding: 8px 16px;
-  background: #0066cc;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
+  font-size: 0.875rem;
+  transition: opacity 0.2s, transform 0.1s;
 }
 
 .button:hover {
-  background: #0052a3;
+  opacity: 0.9;
 }
 
+.button:active {
+  transform: scale(0.98);
+}
+
+/* Footer meta */
 .meta {
   margin-top: 24px;
   padding-top: 16px;
   border-top: 1px solid #eee;
   font-size: 0.75rem;
   color: #999;
+  text-align: center;
 }
 
 /* Dark mode support */
-.dark body {
+.dark body,
+body.dark {
   background: #1a1a1a;
   color: #fff;
 }
 
-.dark .timestamp {
+.dark .waiting,
+body.dark .waiting {
   color: #aaa;
 }
 
-.dark .meta {
+.dark .meta,
+body.dark .meta {
   border-color: #333;
   color: #666;
+}
+
+/* Additional dark mode adjustments */
+.dark .greeting,
+body.dark .greeting {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 `,
     "ui/index.html": `<!DOCTYPE html>
@@ -585,7 +633,11 @@ describe("${name} MCP Server", () => {
   return files;
 }
 
-function getVanillaTemplate(name: string, vercel = false): Record<string, string> {
+function getVanillaTemplate(
+  name: string,
+  vercel = false,
+  protocol: "mcp" | "openai" = "mcp"
+): Record<string, string> {
   const uiOutputDir = vercel ? "public" : "dist";
   const packageManager = "npm"; // Always use npm for standalone projects
   const versions = getPackageVersions();
@@ -666,6 +718,10 @@ const app = createApp({
   name: "${name}",
   version: "0.1.0",
 
+  config: {
+    protocol: "${protocol}",
+  },
+
   tools: {
     hello: defineTool({
       title: "Hello",
@@ -718,6 +774,10 @@ const greetingUI = defineUI({
 const app = createApp({
   name: "${name}",
   version: "0.1.0",
+
+  config: {
+    protocol: "${protocol}",
+  },
 
   tools: {
     hello: defineTool({
@@ -826,7 +886,8 @@ function render(container: HTMLElement, client: Awaited<ReturnType<typeof create
 
 main();
 `,
-    "ui/src/styles.css": `* {
+    "ui/src/styles.css": `/* Base styles */
+* {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -835,11 +896,24 @@ main();
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   padding: 16px;
+  background: #fff;
+  color: #333;
+  transition: background-color 0.2s, color 0.2s;
 }
 
 .container {
   max-width: 400px;
   margin: 0 auto;
+}
+
+/* Greeting card */
+.greeting {
+  text-align: center;
+  padding: 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
 .greeting h1 {
@@ -848,50 +922,71 @@ body {
 }
 
 .timestamp {
-  color: #666;
   font-size: 0.875rem;
+  opacity: 0.8;
 }
 
+/* Waiting state */
 .waiting {
-  color: #999;
+  text-align: center;
+  padding: 24px;
+  color: #666;
   font-style: italic;
 }
 
+/* Button */
 .button {
   margin-top: 16px;
-  padding: 8px 16px;
-  background: #0066cc;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
+  font-size: 0.875rem;
+  transition: opacity 0.2s, transform 0.1s;
 }
 
 .button:hover {
-  background: #0052a3;
+  opacity: 0.9;
 }
 
+.button:active {
+  transform: scale(0.98);
+}
+
+/* Footer meta */
 .meta {
   margin-top: 24px;
   padding-top: 16px;
   border-top: 1px solid #eee;
   font-size: 0.75rem;
   color: #999;
+  text-align: center;
 }
 
 /* Dark mode support */
-.dark body {
+.dark body,
+body.dark {
   background: #1a1a1a;
   color: #fff;
 }
 
-.dark .timestamp {
+.dark .waiting,
+body.dark .waiting {
   color: #aaa;
 }
 
-.dark .meta {
+.dark .meta,
+body.dark .meta {
   border-color: #333;
   color: #666;
+}
+
+/* Additional dark mode adjustments */
+.dark .greeting,
+body.dark .greeting {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 `,
     "ui/index.html": `<!DOCTYPE html>
@@ -1097,6 +1192,7 @@ export async function scaffoldProject(options: CreateAppOptions): Promise<void> 
   const {
     name,
     template,
+    protocol = "mcp",
     directory,
     vercel = false,
     skipInstall = false,
@@ -1118,7 +1214,9 @@ export async function scaffoldProject(options: CreateAppOptions): Promise<void> 
 
   // Get template files
   const templateFiles =
-    template === "react" ? getReactTemplate(name, vercel) : getVanillaTemplate(name, vercel);
+    template === "react"
+      ? getReactTemplate(name, vercel, protocol)
+      : getVanillaTemplate(name, vercel, protocol);
 
   // Write all files
   for (const [filePath, content] of Object.entries(templateFiles)) {

@@ -19,6 +19,7 @@ import type { CreateAppOptions } from "./index.js";
 export interface CLIOptions {
   name?: string;
   template: "react" | "vanilla";
+  protocol: "mcp" | "openai";
   directory?: string;
   skipInstall: boolean;
   skipGit: boolean;
@@ -67,12 +68,16 @@ function validateSimpleName(name: string): boolean {
 const VALID_TEMPLATES = ["react", "vanilla"] as const;
 type Template = (typeof VALID_TEMPLATES)[number];
 
+const VALID_PROTOCOLS = ["mcp", "openai"] as const;
+type Protocol = (typeof VALID_PROTOCOLS)[number];
+
 /**
  * Parse CLI arguments
  */
 export function parseArgs(args: string[]): CLIOptions {
   let result: CLIOptions = {
     template: "react",
+    protocol: "mcp",
     skipInstall: false,
     skipGit: false,
     vercel: false,
@@ -97,6 +102,19 @@ export function parseArgs(args: string[]): CLIOptions {
       },
       "react"
     )
+    .option(
+      "-p, --protocol <protocol>",
+      "Protocol to use (mcp, openai)",
+      (value) => {
+        if (!VALID_PROTOCOLS.includes(value as Protocol)) {
+          throw new InvalidArgumentError(
+            `Invalid protocol: ${value}. Must be one of: ${VALID_PROTOCOLS.join(", ")}`
+          );
+        }
+        return value as Protocol;
+      },
+      "mcp"
+    )
     .option("-d, --directory <path>", "Directory to create project in")
     .option("--skip-install", "Skip installing dependencies", false)
     .option("--skip-git", "Skip initializing git repository", false)
@@ -106,6 +124,7 @@ export function parseArgs(args: string[]): CLIOptions {
 
   const options = program.opts<{
     template: Template;
+    protocol: Protocol;
     directory?: string;
     skipInstall: boolean;
     skipGit: boolean;
@@ -116,6 +135,7 @@ export function parseArgs(args: string[]): CLIOptions {
   result = {
     name,
     template: options.template,
+    protocol: options.protocol,
     directory: options.directory,
     skipInstall: options.skipInstall,
     skipGit: options.skipGit,
@@ -170,6 +190,19 @@ async function runInteractive(): Promise<CreateAppOptions> {
       default: "react",
     });
 
+    const protocol = await select({
+      message: "Protocol:",
+      choices: [
+        {
+          name: "MCP Apps",
+          value: "mcp" as const,
+          description: "Model Context Protocol (Claude, etc.)",
+        },
+        { name: "OpenAI", value: "openai" as const, description: "OpenAI Apps SDK (ChatGPT)" },
+      ],
+      default: "mcp",
+    });
+
     const vercel = await confirm({
       message: "Add Vercel deployment setup?",
       default: true,
@@ -188,6 +221,7 @@ async function runInteractive(): Promise<CreateAppOptions> {
     return {
       name,
       template,
+      protocol,
       vercel,
       skipInstall,
       skipGit,
@@ -227,6 +261,7 @@ async function main(): Promise<void> {
       options = {
         name: cliOptions.name,
         template: cliOptions.template,
+        protocol: cliOptions.protocol,
         directory: cliOptions.directory,
         skipInstall: cliOptions.skipInstall,
         skipGit: cliOptions.skipGit,
@@ -235,7 +270,11 @@ async function main(): Promise<void> {
     }
 
     console.log();
-    console.log(chalk.blue(`Creating ${options.name} with ${options.template} template...`));
+    console.log(
+      chalk.blue(
+        `Creating ${options.name} with ${options.template} template (${options.protocol} protocol)...`
+      )
+    );
     if (options.vercel) {
       console.log(chalk.blue("Setting up for Vercel deployment..."));
     }
