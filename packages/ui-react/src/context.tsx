@@ -162,7 +162,7 @@ export function AppsProvider<T extends ToolDefs = ToolDefs>({
 /**
  * Context value exposed by useAppsContext
  */
-interface AppsContextValue<T extends ToolDefs = ToolDefs> {
+export interface AppsContextValue<T extends ToolDefs = ToolDefs> {
   client: AppsClient<T> | null;
   isConnecting: boolean;
   error: Error | null;
