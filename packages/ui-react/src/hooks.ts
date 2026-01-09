@@ -408,11 +408,16 @@ export function useSafeAreaInsets(): { top: number; right: number; bottom: numbe
  */
 export function useOnToolCancelled(handler: (reason?: string) => void): void {
   const { client } = useAppsContext();
+  const handlerRef = useRef(handler);
+
+  useEffect(() => {
+    handlerRef.current = handler;
+  }, [handler]);
 
   useEffect(() => {
     if (!client) return;
-    return client.onToolCancelled(handler);
-  }, [client, handler]);
+    return client.onToolCancelled((reason) => handlerRef.current(reason));
+  }, [client]);
 }
 
 /**
@@ -434,11 +439,16 @@ export function useOnToolCancelled(handler: (reason?: string) => void): void {
  */
 export function useOnTeardown(handler: (reason?: string) => void): void {
   const { client } = useAppsContext();
+  const handlerRef = useRef(handler);
+
+  useEffect(() => {
+    handlerRef.current = handler;
+  }, [handler]);
 
   useEffect(() => {
     if (!client) return;
-    return client.onTeardown(handler);
-  }, [client, handler]);
+    return client.onTeardown((reason) => handlerRef.current(reason));
+  }, [client]);
 }
 
 /**
@@ -464,11 +474,16 @@ export function useOnTeardown(handler: (reason?: string) => void): void {
  */
 export function useOnToolInputPartial(handler: (input: Record<string, unknown>) => void): void {
   const { client } = useAppsContext();
+  const handlerRef = useRef(handler);
+
+  useEffect(() => {
+    handlerRef.current = handler;
+  }, [handler]);
 
   useEffect(() => {
     if (!client) return;
-    return client.onToolInputPartial(handler);
-  }, [client, handler]);
+    return client.onToolInputPartial((input) => handlerRef.current(input));
+  }, [client]);
 }
 
 // =============================================================================
@@ -826,7 +841,7 @@ export function useIntrinsicHeight(): {
 
   useEffect(() => {
     const element = containerRef.current;
-    if (!client?.notifyIntrinsicHeight || !element) return;
+    if (!client?.notifyIntrinsicHeight || !element || typeof ResizeObserver === "undefined") return;
 
     const observer = createSizeObserver(element, (_width, height) => {
       client.notifyIntrinsicHeight?.(height);
