@@ -119,7 +119,9 @@ export function App() {
 
 ### Automatic size notifications
 
-By default, the MCP adapter automatically reports UI size changes to the host. To disable this:
+By default, the MCP adapter automatically reports UI size changes to the host using a ResizeObserver. This feature is **only supported in MCP Apps (Claude Desktop)** and is silently ignored in ChatGPT.
+
+To disable automatic resizing:
 
 ```tsx
 export function App() {
@@ -130,6 +132,8 @@ export function App() {
   );
 }
 ```
+
+**Note:** The `autoResize` option is only applied during initial mount. Changing it at runtime has no effect.
 
 The `AppClientTools` type is generated in your server code:
 
@@ -162,7 +166,7 @@ export type AppClientTools = ClientToolsFromCore<typeof app.tools>;
 - `AppsProvider` - Context wrapper for all hooks
   - `client?` - Pre-initialized client instance (optional)
   - `forceAdapter?` - Force a specific adapter ("mcp" | "openai" | "mock")
-  - `autoResize?` - Enable/disable automatic size change notifications (default: `true`, MCP only)
+  - `autoResize?` - Enable/disable automatic size change notifications (default: `true`). Only supported in MCP Apps (Claude Desktop); ignored in ChatGPT. Note: changing this prop after initial mount has no effect.
   - `fallback?` - Component to show while client initializes
   - `errorFallback?` - Component to show on initialization error
 
