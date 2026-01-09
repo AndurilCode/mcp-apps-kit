@@ -362,8 +362,7 @@ async function buildDiscoveredUIs(
     const importPath = toEsbuildImportSpecifier(ui.componentPath);
 
     // Generate AppsProvider props based on autoResize setting
-    const providerProps =
-      ui.autoResize === undefined ? "" : ` autoResize={${ui.autoResize}}`;
+    const providerProps = ui.autoResize === undefined ? "" : ` autoResize={${ui.autoResize}}`;
 
     // Generate entry point code
     const entryCode = `

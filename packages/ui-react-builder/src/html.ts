@@ -158,12 +158,7 @@ export function generateEntryPoint(
       ? { componentPath: componentPathOrOptions, defaultProps }
       : componentPathOrOptions;
 
-  const {
-    componentPath,
-    componentExport = "default",
-    defaultProps: props,
-    autoResize,
-  } = options;
+  const { componentPath, componentExport = "default", defaultProps: props, autoResize } = options;
   const propsJson = props ? JSON.stringify(props) : "{}";
 
   // Generate appropriate import statement based on export type
@@ -173,8 +168,7 @@ export function generateEntryPoint(
       : `import { ${componentExport} as Component } from "${componentPath}";`;
 
   // Generate AppsProvider props
-  const providerProps =
-    autoResize === undefined ? "" : ` autoResize={${autoResize}}`;
+  const providerProps = autoResize === undefined ? "" : ` autoResize={${autoResize}}`;
 
   return `
 import React from "react";
