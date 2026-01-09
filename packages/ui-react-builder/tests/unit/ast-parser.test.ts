@@ -803,5 +803,63 @@ defineReactUI({
 
       await expect(parseReactUIDefinitions(content)).rejects.toThrow();
     });
+
+    it("should extract autoResize property from defineReactUI", async () => {
+      const content = `
+import { defineReactUI } from "@mcp-apps-kit/ui-react-builder";
+import { Widget } from "./Widget";
+
+defineReactUI({
+  component: Widget,
+  name: "Widget with autoResize",
+  autoResize: false,
+});
+`;
+
+      const results = await parseReactUIDefinitions(content);
+
+      expect(results).toHaveLength(1);
+      expect(results[0]).toEqual({
+        componentName: "Widget",
+        importPath: "./Widget",
+        name: "Widget with autoResize",
+        autoResize: false,
+      });
+    });
+
+    it("should extract autoResize: true property", async () => {
+      const content = `
+import { defineReactUI } from "@mcp-apps-kit/ui-react-builder";
+import { Widget } from "./Widget";
+
+defineReactUI({
+  component: Widget,
+  name: "Widget",
+  autoResize: true,
+});
+`;
+
+      const results = await parseReactUIDefinitions(content);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].autoResize).toBe(true);
+    });
+
+    it("should handle defineReactUI without autoResize property", async () => {
+      const content = `
+import { defineReactUI } from "@mcp-apps-kit/ui-react-builder";
+import { Widget } from "./Widget";
+
+defineReactUI({
+  component: Widget,
+  name: "Widget without autoResize",
+});
+`;
+
+      const results = await parseReactUIDefinitions(content);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].autoResize).toBeUndefined();
+    });
   });
 });

@@ -57,6 +57,20 @@ export interface AppsProviderProps<T extends ToolDefs = ToolDefs> {
   forceAdapter?: "mcp" | "openai" | "mock";
 
   /**
+   * Enable automatic size change notifications (MCP adapter only)
+   *
+   * When enabled, the UI automatically reports its size changes to the host
+   * using a ResizeObserver on document.body and document.documentElement.
+   * The host can then resize the UI container accordingly.
+   *
+   * Note: This option is only applied during initial mount. Changing it
+   * at runtime will have no effect.
+   *
+   * @default true
+   */
+  autoResize?: boolean;
+
+  /**
    * Fallback UI while client is connecting
    */
   fallback?: ReactNode;
@@ -91,6 +105,7 @@ export function AppsProvider<T extends ToolDefs = ToolDefs>({
   children,
   client: providedClient,
   forceAdapter: _forceAdapter,
+  autoResize,
   fallback,
   errorFallback: ErrorFallback,
 }: AppsProviderProps<T>): React.JSX.Element {
@@ -110,6 +125,7 @@ export function AppsProvider<T extends ToolDefs = ToolDefs>({
       try {
         const newClient = await createClient<T>({
           forceAdapter: _forceAdapter,
+          autoResize,
         });
         setClient(newClient);
         setIsConnecting(false);
@@ -120,6 +136,9 @@ export function AppsProvider<T extends ToolDefs = ToolDefs>({
     };
 
     void initClient();
+    // Note: autoResize is intentionally not in the dependency array.
+    // It should only be set during initial mount. Changing it at runtime
+    // would cause unnecessary client re-initialization.
   }, [providedClient, _forceAdapter]);
 
   if (error && ErrorFallback) {

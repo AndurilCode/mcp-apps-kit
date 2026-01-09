@@ -110,6 +110,12 @@ export interface EntryPointOptions {
    * Default props to pass to the component.
    */
   defaultProps?: Record<string, unknown>;
+
+  /**
+   * Whether to enable automatic size change notifications.
+   * When undefined, uses the default (true).
+   */
+  autoResize?: boolean;
 }
 
 /**
@@ -152,7 +158,7 @@ export function generateEntryPoint(
       ? { componentPath: componentPathOrOptions, defaultProps }
       : componentPathOrOptions;
 
-  const { componentPath, componentExport = "default", defaultProps: props } = options;
+  const { componentPath, componentExport = "default", defaultProps: props, autoResize } = options;
   const propsJson = props ? JSON.stringify(props) : "{}";
 
   // Generate appropriate import statement based on export type
@@ -160,6 +166,9 @@ export function generateEntryPoint(
     componentExport === "default"
       ? `import Component from "${componentPath}";`
       : `import { ${componentExport} as Component } from "${componentPath}";`;
+
+  // Generate AppsProvider props
+  const providerProps = autoResize === undefined ? "" : ` autoResize={${autoResize}}`;
 
   return `
 import React from "react";
@@ -172,7 +181,7 @@ if (rootElement) {
   const root = createRoot(rootElement);
   root.render(
     <React.StrictMode>
-      <AppsProvider>
+      <AppsProvider${providerProps}>
         <Component {...${propsJson}} />
       </AppsProvider>
     </React.StrictMode>

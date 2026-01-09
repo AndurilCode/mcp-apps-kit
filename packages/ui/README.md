@@ -88,6 +88,32 @@ import { createClient } from "@mcp-apps-kit/ui";
 const client = await createClient({ forceAdapter: "mock" });
 ```
 
+### Automatic size notifications
+
+By default, the MCP adapter automatically reports UI size changes to the host using a `ResizeObserver`. This allows the host to resize the UI container accordingly.
+
+To disable automatic size change notifications:
+
+```ts
+import { createClient } from "@mcp-apps-kit/ui";
+
+const client = await createClient({ autoResize: false });
+```
+
+When disabled, you can manually send size notifications:
+
+```ts
+await client.sendSizeChanged({ width: 800, height: 600 });
+```
+
+**When to disable `autoResize`:**
+
+- When you want manual control over size notifications
+- When your UI has a fixed size that never changes
+- When implementing custom resize behavior
+
+**Default:** `true` (auto-resize enabled)
+
 ## Debug Logging
 
 Send structured logs from the UI to the server via MCP:
@@ -127,6 +153,8 @@ const app = createApp({
 ### Client Factory
 
 - `createClient(options?)` - Create a connected client with auto-detection
+  - `options.forceAdapter` - Force a specific adapter ("mcp" | "openai" | "mock")
+  - `options.autoResize` - Enable/disable automatic size change notifications (default: `true`, MCP only)
 - `detectProtocol()` - Detect the host platform ("mcp" | "openai" | "mock")
 
 ### Typed Tools Proxy

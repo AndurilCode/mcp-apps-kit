@@ -117,6 +117,19 @@ export interface UIDef {
   prefersBorder?: boolean;
 
   /**
+   * Enable automatic size change notifications.
+   *
+   * When enabled, the UI automatically reports its size changes to the host
+   * using a ResizeObserver on document.body and document.documentElement.
+   * The host can then resize the UI container accordingly.
+   *
+   * MCP Apps only - ignored in ChatGPT.
+   *
+   * @default true
+   */
+  autoResize?: boolean;
+
+  /**
    * Dedicated domain for widget isolation.
    * Advanced feature for security-sensitive applications.
    *

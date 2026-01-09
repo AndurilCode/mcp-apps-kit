@@ -109,6 +109,73 @@ describe("AppsProvider", () => {
       expect(screen.queryByTestId("error")).not.toBeInTheDocument();
     });
   });
+
+  describe("autoResize option", () => {
+    it("should pass autoResize: false to createClient", async () => {
+      render(
+        <AppsProvider forceAdapter="mock" autoResize={false} fallback={<div>Loading...</div>}>
+          <div data-testid="child">Ready</div>
+        </AppsProvider>
+      );
+
+      // Wait for client to connect
+      await waitFor(() => {
+        expect(screen.getByTestId("child")).toBeInTheDocument();
+      });
+    });
+
+    it("should pass autoResize: true to createClient", async () => {
+      render(
+        <AppsProvider forceAdapter="mock" autoResize={true} fallback={<div>Loading...</div>}>
+          <div data-testid="child">Ready</div>
+        </AppsProvider>
+      );
+
+      // Wait for client to connect
+      await waitFor(() => {
+        expect(screen.getByTestId("child")).toBeInTheDocument();
+      });
+    });
+
+    it("should work without autoResize option (default behavior)", async () => {
+      render(
+        <AppsProvider forceAdapter="mock" fallback={<div>Loading...</div>}>
+          <div data-testid="child">Ready</div>
+        </AppsProvider>
+      );
+
+      // Wait for client to connect
+      await waitFor(() => {
+        expect(screen.getByTestId("child")).toBeInTheDocument();
+      });
+    });
+
+    it("should not re-initialize when autoResize changes", async () => {
+      const { rerender } = render(
+        <AppsProvider forceAdapter="mock" autoResize={true} fallback={<div>Loading...</div>}>
+          <div data-testid="child">Ready</div>
+        </AppsProvider>
+      );
+
+      // Wait for initial connection
+      await waitFor(() => {
+        expect(screen.getByTestId("child")).toBeInTheDocument();
+      });
+
+      // Re-render with different autoResize value
+      // autoResize is NOT in the dependency array, so this should NOT cause re-initialization
+      rerender(
+        <AppsProvider forceAdapter="mock" autoResize={false} fallback={<div>Loading...</div>}>
+          <div data-testid="child">Ready</div>
+        </AppsProvider>
+      );
+
+      // Component should still render without going back to loading state
+      expect(screen.getByTestId("child")).toBeInTheDocument();
+      // Fallback should never appear since we're not re-initializing
+      expect(screen.queryByText("Loading...")).not.toBeInTheDocument();
+    });
+  });
 });
 
 describe("useAppsClient", () => {

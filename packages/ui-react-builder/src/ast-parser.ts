@@ -17,6 +17,8 @@ export interface ParsedReactUI {
   importPath: string;
   /** UI name from the defineReactUI call */
   name: string;
+  /** Whether auto-resize is enabled (undefined means default/true) */
+  autoResize?: boolean;
 }
 
 /**
@@ -88,6 +90,7 @@ function parseDefineReactUICall(
 
   let componentName: string | null = null;
   let uiName: string | null = null;
+  let autoResize: boolean | undefined = undefined;
 
   for (const prop of arg.properties) {
     if (prop.type !== AST_NODE_TYPES.Property) continue;
@@ -106,6 +109,11 @@ function parseDefineReactUICall(
       if (prop.value.type === AST_NODE_TYPES.Literal && typeof prop.value.value === "string") {
         uiName = prop.value.value;
       }
+    } else if (keyName === "autoResize") {
+      // Extract autoResize boolean
+      if (prop.value.type === AST_NODE_TYPES.Literal && typeof prop.value.value === "boolean") {
+        autoResize = prop.value.value;
+      }
     }
   }
 
@@ -122,6 +130,7 @@ function parseDefineReactUICall(
     componentName,
     importPath,
     name: uiName,
+    autoResize,
   };
 }
 

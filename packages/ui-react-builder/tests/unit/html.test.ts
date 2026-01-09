@@ -166,6 +166,33 @@ describe("generateEntryPoint", () => {
 
     expect(code).toContain("<Component {...{}}");
   });
+
+  it("should pass autoResize={false} when specified", () => {
+    const code = generateEntryPoint({
+      componentPath: "./MyComponent.tsx",
+      autoResize: false,
+    });
+
+    expect(code).toContain("<AppsProvider autoResize={false}>");
+  });
+
+  it("should pass autoResize={true} when specified", () => {
+    const code = generateEntryPoint({
+      componentPath: "./MyComponent.tsx",
+      autoResize: true,
+    });
+
+    expect(code).toContain("<AppsProvider autoResize={true}>");
+  });
+
+  it("should not include autoResize prop when undefined", () => {
+    const code = generateEntryPoint({
+      componentPath: "./MyComponent.tsx",
+    });
+
+    expect(code).toContain("<AppsProvider>");
+    expect(code).not.toContain("autoResize");
+  });
 });
 
 describe("extractInlineCSS", () => {

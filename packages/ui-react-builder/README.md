@@ -92,6 +92,8 @@ const app = createApp({
         component: GreetingWidget,
         name: "Greeting Widget",
         prefersBorder: true,
+        // Optional: Disable automatic size notifications (default: true)
+        // autoResize: false,
       }),
       handler: async ({ name }) => ({
         message: `Hello, ${name}!`,
@@ -188,6 +190,17 @@ If you need patterns not supported by auto-discovery, use `defineUI({ html: "...
 | --------------- | ---------------------------------------------- |
 | `defineReactUI` | Define a UI using a React component            |
 | `isReactUIDef`  | Type guard to check if a value is a ReactUIDef |
+
+#### `defineReactUI` Options
+
+| Option          | Type            | Default    | Description                                                                                                  |
+| --------------- | --------------- | ---------- | ------------------------------------------------------------------------------------------------------------ |
+| `component`     | `ComponentType` | (required) | React component to render                                                                                    |
+| `name`          | `string`        | (required) | Display name for the UI                                                                                      |
+| `description`   | `string`        | -          | Description of the UI widget                                                                                 |
+| `prefersBorder` | `boolean`       | -          | Hint to the host whether a border should be drawn                                                            |
+| `autoResize`    | `boolean`       | `true`     | Enable automatic size change notifications. Only supported in MCP Apps (Claude Desktop); ignored in ChatGPT. |
+| `csp`           | `CSPConfig`     | -          | Content Security Policy configuration (ChatGPT only)                                                         |
 
 ### Types
 
