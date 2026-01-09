@@ -18,7 +18,8 @@
     "release:version:major:dry": "nx release version major -p @mcp-apps-kit/core,@mcp-apps-kit/ui,@mcp-apps-kit/ui-react,@mcp-apps-kit/ui-react-builder,@mcp-apps-kit/create-app,@mcp-apps-kit/testing --dry-run",
     "release:version:major": "nx release version major -p @mcp-apps-kit/core,@mcp-apps-kit/ui,@mcp-apps-kit/ui-react,@mcp-apps-kit/ui-react-builder,@mcp-apps-kit/create-app,@mcp-apps-kit/testing && pnpm version major --no-git-tag-version && git add package.json",
     "docs": "typedoc",
-    "docs:watch": "typedoc --watch"
+    "docs:watch": "typedoc --watch",
+    "prepare": "husky"
   },
   "keywords": [
     "mcp",
@@ -35,8 +36,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
-    "typedoc": "^0.28.15",
-    "typedoc-plugin-markdown": "^4.9.0",
     "@nx/js": "^22.3.3",
     "@nx/workspace": "^22.3.3",
     "@testing-library/jest-dom": "^6.9.1",
@@ -48,11 +47,18 @@
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^16.5.0",
+    "husky": "^9.1.7",
     "jsdom": "^27.3.0",
+    "lint-staged": "^16.2.7",
     "nx": "^22.3.3",
     "prettier": "^3.7.4",
     "tsup": "^8.5.1",
+    "typedoc": "^0.28.15",
+    "typedoc-plugin-markdown": "^4.9.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.16"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,json,md,yml,yaml}": "prettier --write"
   }
 }
