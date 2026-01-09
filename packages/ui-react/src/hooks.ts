@@ -2,7 +2,7 @@
  * React hooks for @mcp-apps-kit/ui-react
  */
 
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import type {
   AppsClient,
   HostContext,
@@ -491,7 +491,28 @@ export function useOnToolInputPartial(handler: (input: Record<string, unknown>) 
  */
 export function useHostCapabilities(): HostCapabilities | undefined {
   const { client } = useAppsContext();
-  return useMemo(() => client?.getHostCapabilities(), [client]);
+  const [capabilities, setCapabilities] = useState<HostCapabilities | undefined>(
+    () => client?.getHostCapabilities()
+  );
+
+  useEffect(() => {
+    if (!client) {
+      setCapabilities(undefined);
+      return;
+    }
+
+    // Update capabilities initially
+    setCapabilities(client.getHostCapabilities());
+
+    // Subscribe to host context changes since capabilities can derive from context
+    const unsubscribe = client.onHostContextChange(() => {
+      setCapabilities(client.getHostCapabilities());
+    });
+
+    return unsubscribe;
+  }, [client]);
+
+  return capabilities;
 }
 
 /**
@@ -518,7 +539,21 @@ export function useHostCapabilities(): HostCapabilities | undefined {
  */
 export function useHostVersion(): HostVersion | undefined {
   const { client } = useAppsContext();
-  return useMemo(() => client?.getHostVersion(), [client]);
+  const [version, setVersion] = useState<HostVersion | undefined>(
+    () => client?.getHostVersion()
+  );
+
+  useEffect(() => {
+    if (!client) {
+      setVersion(undefined);
+      return;
+    }
+
+    // Update version when client changes
+    setVersion(client.getHostVersion());
+  }, [client]);
+
+  return version;
 }
 
 // =============================================================================
