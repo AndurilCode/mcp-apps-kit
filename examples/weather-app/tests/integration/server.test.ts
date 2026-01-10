@@ -14,8 +14,13 @@ describe("@mcp-apps-kit/example-weather-app MCP Server", () => {
   beforeAll(async () => {
     originalFetch = globalThis.fetch;
 
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input.toString();
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : (input as Request).url;
 
       if (url.startsWith("https://geocoding-api.open-meteo.com/v1/search")) {
         const u = new URL(url);
@@ -61,7 +66,10 @@ describe("@mcp-apps-kit/example-weather-app MCP Server", () => {
         );
       }
 
-      return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+      if (!originalFetch) {
+        throw new Error("original fetch was not available");
+      }
+      return await originalFetch(input as RequestInfo, init);
     }) as unknown as typeof fetch;
 
     const server = await startTestServer(app, { port: 0 });
@@ -83,7 +91,9 @@ describe("@mcp-apps-kit/example-weather-app MCP Server", () => {
   });
 
   afterAll(async () => {
-    await env.cleanup();
+    if (env) {
+      await env.cleanup();
+    }
     globalThis.fetch = originalFetch as typeof fetch;
   });
 
@@ -105,10 +115,10 @@ describe("@mcp-apps-kit/example-weather-app MCP Server", () => {
     expectToolResult(result).toHaveNoError();
     expectToolResult(result).toMatchObject({
       source: "open-meteo",
-      location: expect.objectContaining({
+      location: {
         latitude: 52.52,
         longitude: 13.41,
-      }),
+      },
     });
   });
 
@@ -126,6 +136,7 @@ describe("@mcp-apps-kit/example-weather-app MCP Server", () => {
 
   it("should return INVALID_INPUT for unknown locations", async () => {
     const result = await env.client.callTool("get_weather", { location: "Nowhere" });
-    expectToolResult(result).toHaveError("INVALID_INPUT");
+    expectToolResult(result).toHaveError();
+    expectToolResult(result).toContainText('Location not found: "Nowhere"');
   });
 });
