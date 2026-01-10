@@ -3,6 +3,9 @@
  * Falls back to mock data if API is unavailable
  */
 
+import { randomUUID } from "crypto";
+import { z } from "zod";
+
 // Weather code descriptions from Open-Meteo
 const WEATHER_CODES: Record<number, { description: string; icon: string }> = {
   0: { description: "Clear sky", icon: "☀️" },
@@ -32,6 +35,45 @@ const WEATHER_CODES: Record<number, { description: string; icon: string }> = {
   96: { description: "Thunderstorm with slight hail", icon: "⛈️" },
   99: { description: "Thunderstorm with heavy hail", icon: "⛈️" },
 };
+
+// Zod schemas for API response validation
+const GeocodingResultSchema = z.object({
+  name: z.string(),
+  latitude: z.number(),
+  longitude: z.number(),
+  country: z.string().optional(),
+  timezone: z.string().optional(),
+});
+
+const GeocodingResponseSchema = z.object({
+  results: z.array(GeocodingResultSchema).optional(),
+});
+
+const CurrentWeatherApiSchema = z.object({
+  current: z.object({
+    time: z.string(),
+    temperature_2m: z.number(),
+    relative_humidity_2m: z.number(),
+    apparent_temperature: z.number(),
+    weather_code: z.number(),
+    wind_speed_10m: z.number(),
+    wind_direction_10m: z.number(),
+    is_day: z.number(),
+  }),
+});
+
+const ForecastApiSchema = z.object({
+  daily: z.object({
+    time: z.array(z.string()),
+    weather_code: z.array(z.number()),
+    temperature_2m_max: z.array(z.number()),
+    temperature_2m_min: z.array(z.number()),
+    precipitation_probability_max: z.array(z.number()),
+    wind_speed_10m_max: z.array(z.number()),
+    sunrise: z.array(z.string()),
+    sunset: z.array(z.string()),
+  }),
+});
 
 export interface Location {
   name: string;
@@ -90,31 +132,31 @@ export interface WeatherAlertsResponse {
   lastChecked: string;
 }
 
-// Geocoding using Open-Meteo Geocoding API
+/**
+ * Geocode a location query to coordinates using Open-Meteo Geocoding API
+ */
 async function geocodeLocation(query: string): Promise<Location | null> {
   try {
-    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`;
-    const response = await fetch(url);
+    const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
+    url.searchParams.set("name", query);
+    url.searchParams.set("count", "1");
+    url.searchParams.set("language", "en");
+    url.searchParams.set("format", "json");
+
+    const response = await fetch(url.toString());
 
     if (!response.ok) {
       return null;
     }
 
-    const data = (await response.json()) as {
-      results?: Array<{
-        name: string;
-        latitude: number;
-        longitude: number;
-        country?: string;
-        timezone?: string;
-      }>;
-    };
+    const rawData: unknown = await response.json();
+    const parseResult = GeocodingResponseSchema.safeParse(rawData);
 
-    if (!data.results || data.results.length === 0) {
+    if (!parseResult.success || !parseResult.data.results?.length) {
       return null;
     }
 
-    const result = data.results[0];
+    const result = parseResult.data.results[0];
     return {
       name: result.name,
       latitude: result.latitude,
@@ -127,30 +169,34 @@ async function geocodeLocation(query: string): Promise<Location | null> {
   }
 }
 
-// Get current weather from Open-Meteo
+/**
+ * Fetch current weather from Open-Meteo API
+ */
 async function fetchCurrentWeather(location: Location): Promise<CurrentWeather | null> {
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${location.latitude}&longitude=${location.longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,is_day&timezone=auto`;
-    const response = await fetch(url);
+    const url = new URL("https://api.open-meteo.com/v1/forecast");
+    url.searchParams.set("latitude", String(location.latitude));
+    url.searchParams.set("longitude", String(location.longitude));
+    url.searchParams.set(
+      "current",
+      "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,is_day"
+    );
+    url.searchParams.set("timezone", "auto");
+
+    const response = await fetch(url.toString());
 
     if (!response.ok) {
       return null;
     }
 
-    const data = (await response.json()) as {
-      current: {
-        time: string;
-        temperature_2m: number;
-        relative_humidity_2m: number;
-        apparent_temperature: number;
-        weather_code: number;
-        wind_speed_10m: number;
-        wind_direction_10m: number;
-        is_day: number;
-      };
-    };
+    const rawData: unknown = await response.json();
+    const parseResult = CurrentWeatherApiSchema.safeParse(rawData);
 
-    const { current } = data;
+    if (!parseResult.success) {
+      return null;
+    }
+
+    const { current } = parseResult.data;
     const weatherInfo = WEATHER_CODES[current.weather_code] || {
       description: "Unknown",
       icon: "❓",
@@ -174,30 +220,35 @@ async function fetchCurrentWeather(location: Location): Promise<CurrentWeather |
   }
 }
 
-// Get forecast from Open-Meteo
+/**
+ * Fetch forecast from Open-Meteo API
+ */
 async function fetchForecast(location: Location, days: number): Promise<WeatherForecast | null> {
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${location.latitude}&longitude=${location.longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset&timezone=auto&forecast_days=${days}`;
-    const response = await fetch(url);
+    const url = new URL("https://api.open-meteo.com/v1/forecast");
+    url.searchParams.set("latitude", String(location.latitude));
+    url.searchParams.set("longitude", String(location.longitude));
+    url.searchParams.set(
+      "daily",
+      "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset"
+    );
+    url.searchParams.set("timezone", "auto");
+    url.searchParams.set("forecast_days", String(days));
+
+    const response = await fetch(url.toString());
 
     if (!response.ok) {
       return null;
     }
 
-    const data = (await response.json()) as {
-      daily: {
-        time: string[];
-        weather_code: number[];
-        temperature_2m_max: number[];
-        temperature_2m_min: number[];
-        precipitation_probability_max: number[];
-        wind_speed_10m_max: number[];
-        sunrise: string[];
-        sunset: string[];
-      };
-    };
+    const rawData: unknown = await response.json();
+    const parseResult = ForecastApiSchema.safeParse(rawData);
 
-    const { daily } = data;
+    if (!parseResult.success) {
+      return null;
+    }
+
+    const { daily } = parseResult.data;
     const forecasts: DailyForecast[] = daily.time.map((date, i) => {
       const weatherInfo = WEATHER_CODES[daily.weather_code[i]] || {
         description: "Unknown",
@@ -228,17 +279,69 @@ async function fetchForecast(location: Location, days: number): Promise<WeatherF
   }
 }
 
-// Mock data generators for fallback/testing
+// Mock location lookup table for varied coordinates
+const MOCK_LOCATIONS: Record<string, { lat: number; lon: number; country: string; tz: string }> = {
+  "new york": { lat: 40.7128, lon: -74.006, country: "United States", tz: "America/New_York" },
+  london: { lat: 51.5074, lon: -0.1278, country: "United Kingdom", tz: "Europe/London" },
+  tokyo: { lat: 35.6762, lon: 139.6503, country: "Japan", tz: "Asia/Tokyo" },
+  paris: { lat: 48.8566, lon: 2.3522, country: "France", tz: "Europe/Paris" },
+  sydney: { lat: -33.8688, lon: 151.2093, country: "Australia", tz: "Australia/Sydney" },
+  berlin: { lat: 52.52, lon: 13.405, country: "Germany", tz: "Europe/Berlin" },
+  chicago: { lat: 41.8781, lon: -87.6298, country: "United States", tz: "America/Chicago" },
+  miami: { lat: 25.7617, lon: -80.1918, country: "United States", tz: "America/New_York" },
+  seattle: { lat: 47.6062, lon: -122.3321, country: "United States", tz: "America/Los_Angeles" },
+  madrid: { lat: 40.4168, lon: -3.7038, country: "Spain", tz: "Europe/Madrid" },
+  rome: { lat: 41.9028, lon: 12.4964, country: "Italy", tz: "Europe/Rome" },
+};
+
+/**
+ * Generate a hash code from a string for consistent mock data
+ */
+function hashCode(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash);
+}
+
+/**
+ * Generate mock location with varied coordinates based on query
+ */
 function generateMockLocation(query: string): Location {
+  const normalizedQuery = query.toLowerCase().trim();
+
+  // Check lookup table first
+  const knownLocation = MOCK_LOCATIONS[normalizedQuery];
+  if (knownLocation) {
+    return {
+      name: query,
+      latitude: knownLocation.lat,
+      longitude: knownLocation.lon,
+      country: knownLocation.country,
+      timezone: knownLocation.tz,
+    };
+  }
+
+  // Generate varied coordinates based on location name hash
+  const hash = hashCode(normalizedQuery);
+  const latRange = 140; // -70 to 70
+  const lonRange = 360; // -180 to 180
+
   return {
     name: query,
-    latitude: 40.7128,
-    longitude: -74.006,
-    country: "United States",
-    timezone: "America/New_York",
+    latitude: (hash % latRange) - 70 + (hash % 100) / 100,
+    longitude: ((hash >> 8) % lonRange) - 180 + ((hash >> 4) % 100) / 100,
+    country: "Unknown",
+    timezone: "UTC",
   };
 }
 
+/**
+ * Generate mock current weather data
+ */
 function generateMockCurrentWeather(location: Location): CurrentWeather {
   const codes = [0, 1, 2, 3, 61, 80];
   const weatherCode = codes[Math.floor(Math.random() * codes.length)];
@@ -259,6 +362,9 @@ function generateMockCurrentWeather(location: Location): CurrentWeather {
   };
 }
 
+/**
+ * Generate mock forecast data
+ */
 function generateMockForecast(location: Location, days: number): WeatherForecast {
   const forecasts: DailyForecast[] = [];
   const now = new Date();
@@ -295,6 +401,9 @@ function generateMockForecast(location: Location, days: number): WeatherForecast
   };
 }
 
+/**
+ * Generate mock weather alerts
+ */
 function generateMockAlerts(location: Location): WeatherAlertsResponse {
   // Randomly generate 0-2 alerts for demo purposes
   const alertCount = Math.floor(Math.random() * 3);
@@ -318,7 +427,7 @@ function generateMockAlerts(location: Location): WeatherAlertsResponse {
     endTime.setHours(endTime.getHours() + Math.floor(Math.random() * 24) + 6);
 
     alerts.push({
-      id: `alert-${Date.now()}-${i}`,
+      id: randomUUID(),
       type: alertInfo.type,
       severity: alertInfo.severity,
       headline: alertInfo.headline,
@@ -335,12 +444,15 @@ function generateMockAlerts(location: Location): WeatherAlertsResponse {
   };
 }
 
-// Weather Service Configuration
+/** Weather Service Configuration */
 export interface WeatherServiceConfig {
   useMock?: boolean;
 }
 
-// Main Weather Service class
+/**
+ * Weather Service class providing weather data from Open-Meteo API
+ * with automatic fallback to mock data on failure
+ */
 export class WeatherService {
   private useMock: boolean;
 
@@ -348,18 +460,28 @@ export class WeatherService {
     this.useMock = config.useMock ?? false;
   }
 
+  /**
+   * Get current weather for a location
+   * @param locationQuery - City name, address, or location query
+   * @throws Error if location query is empty
+   */
   async getCurrentWeather(locationQuery: string): Promise<CurrentWeather> {
+    const trimmedQuery = locationQuery?.trim();
+    if (!trimmedQuery) {
+      throw new Error("Location query cannot be empty");
+    }
+
     if (this.useMock) {
-      const location = generateMockLocation(locationQuery);
+      const location = generateMockLocation(trimmedQuery);
       return generateMockCurrentWeather(location);
     }
 
     // Try to geocode the location
-    const location = await geocodeLocation(locationQuery);
+    const location = await geocodeLocation(trimmedQuery);
 
     if (!location) {
       // Fallback to mock if geocoding fails
-      const mockLocation = generateMockLocation(locationQuery);
+      const mockLocation = generateMockLocation(trimmedQuery);
       return generateMockCurrentWeather(mockLocation);
     }
 
@@ -374,19 +496,30 @@ export class WeatherService {
     return weather;
   }
 
+  /**
+   * Get weather forecast for a location
+   * @param locationQuery - City name, address, or location query
+   * @param days - Number of days to forecast (1-16)
+   * @throws Error if location query is empty
+   */
   async getForecast(locationQuery: string, days: number = 7): Promise<WeatherForecast> {
+    const trimmedQuery = locationQuery?.trim();
+    if (!trimmedQuery) {
+      throw new Error("Location query cannot be empty");
+    }
+
     const safeDays = Math.min(Math.max(days, 1), 16); // Open-Meteo supports up to 16 days
 
     if (this.useMock) {
-      const location = generateMockLocation(locationQuery);
+      const location = generateMockLocation(trimmedQuery);
       return generateMockForecast(location, safeDays);
     }
 
     // Try to geocode the location
-    const location = await geocodeLocation(locationQuery);
+    const location = await geocodeLocation(trimmedQuery);
 
     if (!location) {
-      const mockLocation = generateMockLocation(locationQuery);
+      const mockLocation = generateMockLocation(trimmedQuery);
       return generateMockForecast(mockLocation, safeDays);
     }
 
@@ -400,23 +533,33 @@ export class WeatherService {
     return forecast;
   }
 
+  /**
+   * Get weather alerts for a location
+   * @param locationQuery - City name, address, or location query
+   * @throws Error if location query is empty
+   */
   async getAlerts(locationQuery: string): Promise<WeatherAlertsResponse> {
+    const trimmedQuery = locationQuery?.trim();
+    if (!trimmedQuery) {
+      throw new Error("Location query cannot be empty");
+    }
+
     // Open-Meteo doesn't provide alerts, so we always use mock data
     // In a real app, you'd integrate with a service like NWS or weather.gov
     if (this.useMock) {
-      const location = generateMockLocation(locationQuery);
+      const location = generateMockLocation(trimmedQuery);
       return generateMockAlerts(location);
     }
 
-    const location = await geocodeLocation(locationQuery);
-    const resolvedLocation = location || generateMockLocation(locationQuery);
+    const location = await geocodeLocation(trimmedQuery);
+    const resolvedLocation = location || generateMockLocation(trimmedQuery);
 
     return generateMockAlerts(resolvedLocation);
   }
 }
 
-// Export a default instance
+/** Default weather service instance */
 export const weatherService = new WeatherService();
 
-// Export mock service for testing
+/** Mock weather service for testing */
 export const mockWeatherService = new WeatherService({ useMock: true });

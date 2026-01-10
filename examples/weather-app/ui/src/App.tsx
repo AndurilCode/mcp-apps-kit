@@ -13,71 +13,11 @@ import {
   useHostStyleVariables,
 } from "@mcp-apps-kit/ui-react";
 import type { AppTools } from "../../server/index.js";
-
-// Types for weather data
-interface Location {
-  name: string;
-  latitude: number;
-  longitude: number;
-  country?: string;
-  timezone?: string;
-}
-
-interface CurrentWeather {
-  location: Location;
-  temperature: number;
-  feelsLike: number;
-  humidity: number;
-  windSpeed: number;
-  windDirection: number;
-  weatherCode: number;
-  description: string;
-  icon: string;
-  isDay: boolean;
-  timestamp: string;
-}
-
-interface DailyForecast {
-  date: string;
-  temperatureMax: number;
-  temperatureMin: number;
-  weatherCode: number;
-  description: string;
-  icon: string;
-  precipitationProbability: number;
-  windSpeedMax: number;
-  sunrise: string;
-  sunset: string;
-}
-
-interface WeatherForecast {
-  location: Location;
-  daily: DailyForecast[];
-  generatedAt: string;
-}
-
-interface WeatherAlert {
-  id: string;
-  type: "warning" | "watch" | "advisory";
-  severity: "minor" | "moderate" | "severe" | "extreme";
-  headline: string;
-  description: string;
-  startTime: string;
-  endTime: string;
-}
-
-interface WeatherAlertsResponse {
-  location: Location;
-  alerts: WeatherAlert[];
-  lastChecked: string;
-}
-
-// Type for all possible tool outputs
-type ToolOutputs = {
-  getCurrentWeather: CurrentWeather;
-  getForecast: WeatherForecast;
-  getWeatherAlerts: WeatherAlertsResponse;
-};
+import type {
+  CurrentWeather,
+  WeatherForecast,
+  WeatherAlertsResponse,
+} from "../../server/services/weatherService.js";
 
 // Component for displaying current weather
 function CurrentWeatherDisplay({ data }: { data: CurrentWeather }) {

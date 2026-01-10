@@ -25,13 +25,35 @@ describe("WeatherService", () => {
         expect(result.timestamp).toBeTruthy();
       });
 
-      it("should return mock location coordinates", async () => {
-        const result = await service.getCurrentWeather("Test City");
+      it("should return known location coordinates from lookup table", async () => {
+        // Using a known city from the lookup table
+        const result = await service.getCurrentWeather("New York");
 
         expect(result.location.latitude).toBe(40.7128);
         expect(result.location.longitude).toBe(-74.006);
         expect(result.location.country).toBe("United States");
         expect(result.location.timezone).toBe("America/New_York");
+      });
+
+      it("should return varied coordinates for unknown locations", async () => {
+        // Unknown locations get hash-based coordinates
+        const result1 = await service.getCurrentWeather("Atlantis");
+        const result2 = await service.getCurrentWeather("Wakanda");
+        const result3 = await service.getCurrentWeather("Mordor");
+
+        // Different locations should have different latitudes (at minimum)
+        const latitudes = [
+          result1.location.latitude,
+          result2.location.latitude,
+          result3.location.latitude,
+        ];
+        const uniqueLatitudes = new Set(latitudes);
+        expect(uniqueLatitudes.size).toBeGreaterThan(1);
+
+        // Same location should return consistent coordinates
+        const result1Again = await service.getCurrentWeather("Atlantis");
+        expect(result1.location.latitude).toBe(result1Again.location.latitude);
+        expect(result1.location.longitude).toBe(result1Again.location.longitude);
       });
 
       it("should return valid humidity range", async () => {
@@ -166,11 +188,13 @@ describe("WeatherService", () => {
 
   describe("Exported mockWeatherService", () => {
     it("should be a WeatherService instance in mock mode", async () => {
-      const result = await mockWeatherService.getCurrentWeather("Test");
+      // Use a known location from lookup table
+      const result = await mockWeatherService.getCurrentWeather("London");
 
-      // Mock data always returns same coordinates
-      expect(result.location.latitude).toBe(40.7128);
-      expect(result.location.longitude).toBe(-74.006);
+      // Should return London coordinates from lookup
+      expect(result.location.latitude).toBe(51.5074);
+      expect(result.location.longitude).toBe(-0.1278);
+      expect(result.location.country).toBe("United Kingdom");
     });
   });
 

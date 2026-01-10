@@ -185,23 +185,19 @@ const app = createApp({
   },
 });
 
-// Define tool types for export
-const getCurrentWeatherTool = app.tools.getCurrentWeather;
-const getForecastTool = app.tools.getForecast;
-const getWeatherAlertsTool = app.tools.getWeatherAlerts;
-
 // Export types for UI components
 export type AppToolsDef = {
-  getCurrentWeather: typeof getCurrentWeatherTool;
-  getForecast: typeof getForecastTool;
-  getWeatherAlerts: typeof getWeatherAlertsTool;
+  getCurrentWeather: typeof app.tools.getCurrentWeather;
+  getForecast: typeof app.tools.getForecast;
+  getWeatherAlerts: typeof app.tools.getWeatherAlerts;
 };
 export type AppTools = ClientToolsFromCore<AppToolsDef>;
 
 // Start server (skip in test environment)
 if (process.env.NODE_ENV !== "test") {
-  await app.start({ port: 3005 });
-  console.log("Weather App MCP server running on http://localhost:3005");
+  const port = parseInt(process.env.PORT || "3005", 10);
+  await app.start({ port });
+  console.log(`Weather App MCP server running on http://localhost:${port}`);
 }
 
 // Export app for testing
