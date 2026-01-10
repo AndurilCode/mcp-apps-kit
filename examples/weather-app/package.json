@@ -1,14 +1,16 @@
 {
   "name": "@mcp-apps-kit/example-weather-app",
   "version": "0.1.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "concurrently \"pnpm dev:server\" \"pnpm dev:ui\"",
-    "dev:server": "tsx watch server/index.ts",
+    "dev:server": "tsx watch src/index.ts",
     "dev:ui": "vite build --watch --config ui/vite.config.ts",
     "build": "pnpm build:ui && tsc",
     "build:ui": "vite build --config ui/vite.config.ts",
-    "start": "node dist/server/index.js",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },

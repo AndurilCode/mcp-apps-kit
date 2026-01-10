@@ -51,3 +51,4 @@ specs/
 .claude
 .vercel/
 .cursor/
+.memory/

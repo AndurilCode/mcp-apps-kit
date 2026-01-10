@@ -36,5 +36,5 @@ Configure your MCP Apps-compatible host to connect to the server:
 **Stdio mode (for hosts that support it):**
 
 ```bash
-npx tsx path/to/@mcp-apps-kit/example-weather-app/server/index.ts
+npx tsx path/to/@mcp-apps-kit/example-weather-app/src/index.ts
 ```

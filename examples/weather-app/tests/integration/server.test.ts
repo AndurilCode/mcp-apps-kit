@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { startTestServer, createTestClient, expectToolResult } from "@mcp-apps-kit/testing";
 import type { TestEnvironment } from "@mcp-apps-kit/testing";
-import { app } from "../../server/index.js";
+import { app } from "../../src/index.js";
 
 describe("@mcp-apps-kit/example-weather-app MCP Server", () => {
   let env: TestEnvironment;
