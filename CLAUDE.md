@@ -42,11 +42,12 @@ Exports only through `index.ts` - keeps the public API clean and refactoring saf
 ## Project Map
 
 ```
-packages/core      → Server framework (createApp, adapters, middleware)
-packages/ui        → Client SDK (vanilla JS, protocol detection)
-packages/ui-react  → React hooks (useAppsClient, useToolResult, useHostContext...)
+packages/core       → Server framework (createApp, adapters, middleware)
+packages/ui         → Client SDK (vanilla JS, protocol detection)
+packages/ui-react   → React hooks (useAppsClient, useToolResult, useHostContext...)
+packages/testing    → Test utilities (mocks, matchers for vitest/jest)
 packages/create-app → CLI scaffolder
-examples/          → Working examples to test against
+examples/           → Working examples to test against
 ```
 
 Each package README has the detailed API. Don't duplicate here.
