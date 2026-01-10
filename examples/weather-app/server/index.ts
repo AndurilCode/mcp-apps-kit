@@ -115,7 +115,7 @@ const app = createApp({
   version: "0.1.0",
 
   config: {
-    protocol: "mcp",
+    protocol: "openai",
   },
 
   tools: {
