@@ -33,11 +33,23 @@ type WeatherOutput = {
   }>;
 };
 
-type ToolOutputs = { get_weather: WeatherOutput };
+type GetWeatherInput = {
+  location?: string;
+  latitude?: number;
+  longitude?: number;
+  days?: number;
+};
+
+type AppToolDefs = {
+  get_weather: {
+    input: GetWeatherInput;
+    output: WeatherOutput;
+  };
+};
 
 export function App() {
-  const client = useAppsClient();
-  const result = useToolResult<ToolOutputs>();
+  const client = useAppsClient<AppToolDefs>();
+  const result = useToolResult<AppToolDefs>();
   const context = useHostContext();
   const [query, setQuery] = useState("San Francisco");
   const [error, setError] = useState<string | null>(null);
