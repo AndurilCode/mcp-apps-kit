@@ -1,0 +1,230 @@
+/* Base styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  padding: 16px;
+  background: #fff;
+  color: #333;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.container {
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+/* Header */
+.header {
+  margin-bottom: 12px;
+}
+
+.title {
+  font-size: 1.4rem;
+  line-height: 1.2;
+}
+
+.subtitle {
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+/* Controls */
+.controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 12px 0 8px;
+}
+
+.input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  outline: none;
+  font-size: 0.9rem;
+  background: #fff;
+  color: #222;
+}
+
+.input:focus {
+  border-color: rgba(102, 126, 234, 0.9);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.18);
+}
+
+/* Waiting state */
+.waiting {
+  text-align: center;
+  padding: 24px;
+  color: #666;
+  font-style: italic;
+}
+
+/* Button */
+.button {
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: opacity 0.2s, transform 0.1s;
+  white-space: nowrap;
+}
+
+.button:hover {
+  opacity: 0.9;
+}
+
+.button:active {
+  transform: scale(0.98);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Card */
+.card {
+  margin-top: 12px;
+  padding: 16px;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+.locationName {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.locationMeta {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.current {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #eee;
+}
+
+.temp {
+  font-size: 2.2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.currentMeta {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.forecast {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.day {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(102, 126, 234, 0.06), rgba(118, 75, 162, 0.04));
+}
+
+.dayDate {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.dayTemps {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+}
+
+.min {
+  color: #3b82f6;
+}
+
+.max {
+  color: #ef4444;
+}
+
+.sep {
+  margin: 0 6px;
+  color: #777;
+}
+
+.error {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+  color: #991b1b;
+  border-radius: 10px;
+  font-size: 0.85rem;
+}
+
+/* Footer meta */
+.meta {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #eee;
+  font-size: 0.75rem;
+  color: #999;
+  text-align: center;
+}
+
+/* Dark mode support */
+body.dark {
+  background: #1a1a1a;
+  color: #fff;
+}
+
+body.dark .subtitle,
+body.dark .locationMeta,
+body.dark .currentMeta {
+  color: #aaa;
+}
+
+body.dark .waiting {
+  color: #aaa;
+}
+
+body.dark .meta {
+  border-color: #333;
+  color: #666;
+}
+
+body.dark .input {
+  background: #0f0f0f;
+  color: #eee;
+  border-color: #333;
+}
+
+body.dark .card {
+  background: #0f0f0f;
+  border-color: #333;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+body.dark .day {
+  border-color: #333;
+}
+

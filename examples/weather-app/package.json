@@ -1,0 +1,35 @@
+{
+  "name": "@mcp-apps-kit/example-weather-app",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"pnpm dev:server\" \"pnpm dev:ui\"",
+    "dev:server": "tsx watch server/index.ts",
+    "dev:ui": "vite build --watch --config ui/vite.config.ts",
+    "build": "pnpm build:ui && tsc",
+    "build:ui": "vite build --config ui/vite.config.ts",
+    "start": "node dist/server/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@mcp-apps-kit/core": "workspace:*",
+    "@mcp-apps-kit/ui": "workspace:*",
+    "@mcp-apps-kit/ui-react": "workspace:*",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@mcp-apps-kit/testing": "workspace:*",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.2",
+    "concurrently": "^9.2.1",
+    "tsx": "^4.0.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.0",
+    "vitest": "^4.0.16",
+    "vite-plugin-singlefile": "^2.3.0"
+  }
+}
