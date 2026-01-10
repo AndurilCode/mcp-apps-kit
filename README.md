@@ -1,6 +1,12 @@
-# MCP AppsKit
+<p align="center">
+  <img src=".github/assets/logo-light.svg#gh-light-mode-only" alt="MCP AppsKit Logo" width="500">
+  <img src=".github/assets/logo-dark.svg#gh-dark-mode-only" alt="MCP AppsKit Logo" width="500">
+</p>
 
-[![Publish to npm](https://github.com/AndurilCode/mcp-apps-kit/actions/workflows/publish.yml/badge.svg?branch=main)](https://github.com/AndurilCode/mcp-apps-kit/actions/workflows/publish.yml)
+<p align="center">
+  <a href="https://github.com/AndurilCode/mcp-apps-kit/actions/workflows/publish.yml">
+    <img src="https://github.com/AndurilCode/mcp-apps-kit/actions/workflows/publish.yml/badge.svg?branch=main" alt="Publish to npm">
+  </a>
 [![Node >=18](https://img.shields.io/node/v/%40mcp-apps-kit%2Fcore?label=node&logo=node.js&logoColor=white)](https://www.npmjs.com/package/@mcp-apps-kit/core)
 [![License MIT](https://img.shields.io/npm/l/%40mcp-apps-kit%2Fcore?label=license)](https://github.com/AndurilCode/mcp-apps-kit/blob/main/LICENSE)
 
