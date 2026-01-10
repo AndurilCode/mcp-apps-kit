@@ -7,15 +7,34 @@
   <a href="https://github.com/AndurilCode/mcp-apps-kit/actions/workflows/publish.yml">
     <img src="https://github.com/AndurilCode/mcp-apps-kit/actions/workflows/publish.yml/badge.svg?branch=main" alt="Publish to npm">
   </a>
-[![Node >=18](https://img.shields.io/node/v/%40mcp-apps-kit%2Fcore?label=node&logo=node.js&logoColor=white)](https://www.npmjs.com/package/@mcp-apps-kit/core)
-[![License MIT](https://img.shields.io/npm/l/%40mcp-apps-kit%2Fcore?label=license)](https://github.com/AndurilCode/mcp-apps-kit/blob/main/LICENSE)
+  <a href="https://www.npmjs.com/package/@mcp-apps-kit/core">
+    <img src="https://img.shields.io/node/v/%40mcp-apps-kit%2Fcore?label=node&logo=node.js&logoColor=white" alt="Node >=18">
+  </a>
+  <a href="https://github.com/AndurilCode/mcp-apps-kit/blob/main/LICENSE">
+    <img src="https://img.shields.io/npm/l/%40mcp-apps-kit%2Fcore?label=license" alt="License MIT">
+  </a>
+</p>
 
-[![npm @mcp-apps-kit/core](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fcore?label=%40mcp-apps-kit%2Fcore&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/core)
-[![npm @mcp-apps-kit/ui](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fui?label=%40mcp-apps-kit%2Fui&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/ui)
-[![npm @mcp-apps-kit/ui-react](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fui-react?label=%40mcp-apps-kit%2Fui-react&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/ui-react)
-[![npm @mcp-apps-kit/ui-react-builder](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fui-react-builder?label=%40mcp-apps-kit%2Fui-react-builder&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/ui-react-builder)
-[![npm @mcp-apps-kit/create-app](https://img.shields.io/npm/v/%40mcp-apps-kit%2Fcreate-app?label=%40mcp-apps-kit%2Fcreate-app&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/create-app)
-[![npm @mcp-apps-kit/testing](https://img.shields.io/npm/v/%40mcp-apps-kit%2Ftesting?label=%40mcp-apps-kit%2Ftesting&logo=npm)](https://www.npmjs.com/package/@mcp-apps-kit/testing)
+<p align="center">
+  <a href="https://www.npmjs.com/package/@mcp-apps-kit/core">
+    <img src="https://img.shields.io/npm/v/%40mcp-apps-kit%2Fcore?label=%40mcp-apps-kit%2Fcore&logo=npm" alt="npm @mcp-apps-kit/core">
+  </a>
+  <a href="https://www.npmjs.com/package/@mcp-apps-kit/ui">
+    <img src="https://img.shields.io/npm/v/%40mcp-apps-kit%2Fui?label=%40mcp-apps-kit%2Fui&logo=npm" alt="npm @mcp-apps-kit/ui">
+  </a>
+  <a href="https://www.npmjs.com/package/@mcp-apps-kit/ui-react">
+    <img src="https://img.shields.io/npm/v/%40mcp-apps-kit%2Fui-react?label=%40mcp-apps-kit%2Fui-react&logo=npm" alt="npm @mcp-apps-kit/ui-react">
+  </a>
+  <a href="https://www.npmjs.com/package/@mcp-apps-kit/ui-react-builder">
+    <img src="https://img.shields.io/npm/v/%40mcp-apps-kit%2Fui-react-builder?label=%40mcp-apps-kit%2Fui-react-builder&logo=npm" alt="npm @mcp-apps-kit/ui-react-builder">
+  </a>
+  <a href="https://www.npmjs.com/package/@mcp-apps-kit/create-app">
+    <img src="https://img.shields.io/npm/v/%40mcp-apps-kit%2Fcreate-app?label=%40mcp-apps-kit%2Fcreate-app&logo=npm" alt="npm @mcp-apps-kit/create-app">
+  </a>
+  <a href="https://www.npmjs.com/package/@mcp-apps-kit/testing">
+    <img src="https://img.shields.io/npm/v/%40mcp-apps-kit%2Ftesting?label=%40mcp-apps-kit%2Ftesting&logo=npm" alt="npm @mcp-apps-kit/testing">
+  </a>
+</p>
 
 Build interactive AI apps for [MCP Apps](https://blog.modelcontextprotocol.io/posts/2025-11-21-mcp-apps/) and [ChatGPT](https://developers.openai.com/apps-sdk) from a single codebase.
 
