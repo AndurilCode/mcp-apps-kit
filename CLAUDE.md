@@ -27,7 +27,7 @@ pnpm release:version:patch     # Also: minor, major
 
 ## Patterns to Follow
 
-Use `defineTool` and `defineUI` - they provide type inference. See `packages/core/src/tools/` for examples.
+Use `defineTool` and `defineUI` - they provide type inference. See `examples/minimal/src/index.ts` for usage.
 
 Middleware is Koa-style: always `await next()` or the chain breaks.
 
@@ -41,7 +41,7 @@ Exports only through `index.ts` - keeps the public API clean and refactoring saf
 
 ## Project Map
 
-```
+```text
 packages/core       → Server framework (createApp, adapters, middleware)
 packages/ui         → Client SDK (vanilla JS, protocol detection)
 packages/ui-react   → React hooks (useAppsClient, useToolResult, useHostContext...)
@@ -54,8 +54,8 @@ Each package README has the detailed API. Don't duplicate here.
 
 ## External Docs
 
-- MCP Spec: https://modelcontextprotocol.io/specification/2025-11-25
-- OpenAI Apps SDK: https://developers.openai.com/apps-sdk
+- [MCP Spec](https://modelcontextprotocol.io/specification/2025-11-25) - Protocol details, message formats
+- [OpenAI Apps SDK](https://developers.openai.com/apps-sdk) - ChatGPT integration specifics
 
 ---
 
