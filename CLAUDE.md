@@ -27,7 +27,7 @@ pnpm release:version:patch     # Also: minor, major
 
 ## Patterns to Follow
 
-Use `defineTool` and `defineUI` - they provide type inference. See `examples/minimal/src/index.ts` for usage.
+Use `defineTool` and `defineUI` (or `defineReactUI` for React components) - they provide type inference. See `examples/minimal/src/index.ts` for usage.
 
 Middleware is Koa-style: always `await next()` or the chain breaks.
 
@@ -42,12 +42,13 @@ Exports only through `index.ts` - keeps the public API clean and refactoring saf
 ## Project Map
 
 ```text
-packages/core       → Server framework (createApp, adapters, middleware)
-packages/ui         → Client SDK (vanilla JS, protocol detection)
-packages/ui-react   → React hooks (useAppsClient, useToolResult, useHostContext...)
-packages/testing    → Test utilities (mocks, matchers for vitest/jest)
-packages/create-app → CLI scaffolder
-examples/           → Working examples to test against
+packages/core            → Server framework (createApp, adapters, middleware)
+packages/ui              → Client SDK (vanilla JS, protocol detection)
+packages/ui-react        → React hooks (useAppsClient, useToolResult, useHostContext...)
+packages/ui-react-builder → React UI builder (defineReactUI, vite plugin)
+packages/testing         → Test utilities (mocks, matchers for vitest/jest)
+packages/create-app      → CLI scaffolder
+examples/                → Working examples to test against
 ```
 
 Each package README has the detailed API. Don't duplicate here.
