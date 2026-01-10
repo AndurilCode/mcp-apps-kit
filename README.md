@@ -36,39 +36,41 @@
   </a>
 </p>
 
-Build interactive AI apps for [MCP Apps](https://blog.modelcontextprotocol.io/posts/2025-11-21-mcp-apps/) and [ChatGPT](https://developers.openai.com/apps-sdk) from a single codebase.
+<p align="center">
+  <strong>Build interactive AI apps for <a href="https://blog.modelcontextprotocol.io/posts/2025-11-21-mcp-apps/">MCP Apps</a> and <a href="https://developers.openai.com/apps-sdk">ChatGPT</a> from a single codebase.</strong>
+</p>
 
-MCP AppsKit is a TypeScript framework for building interactive applications with shared tool and UI definitions. [MCP Apps](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/1865) is an official extension to the Model Context Protocol that enables servers to deliver interactive UIs to hosts. [OpenAI Apps SDK](https://openai.com/index/introducing-apps-in-chatgpt/) is the developer toolkit for building apps that run inside ChatGPT. This framework abstracts both protocols, providing a server runtime, vanilla JS UI client, React bindings, and a scaffolding CLI.
+## Quick Start
+
+```bash
+npx @mcp-apps-kit/create-app@latest my-app
+cd my-app && npm run dev
+```
+
+## Features
+
+- 🔌 **Single codebase** — Define tools and UI once, deploy to MCP Apps & ChatGPT
+- 🎯 **Type-safe** — Full TypeScript inference for inputs, outputs, and UI access
+- ⚛️ **React bindings** — First-class hooks, context, and component UIs
+- 🔐 **OAuth 2.1** — JWT validation and JWKS discovery built-in
+- 🧪 **Testing utilities** — Property-based testing, UI mocks, and LLM evaluation
+- 📦 **Flexible deployment** — Express server, serverless, or stdio
+- 🔀 **API versioning** — Expose multiple versions from a single app
 
 ## Table of Contents
 
-- [Background](#background)
-- [Features](#features)
-- [Packages](#packages)
-- [Compatibility](#compatibility)
 - [Install](#install)
 - [Usage](#usage)
-  - [React Component UIs](#react-component-uis)
-- [Type-Safe Tool Definitions](#type-safe-tool-definitions)
-- [How It Works](#how-it-works)
-- [Deployment Options](#deployment-options)
-- [Platform Support](#platform-support)
+- [Packages](#packages)
 - [Examples](#examples)
-- [API](#api)
+- [API Reference](#api)
 - [Contributing](#contributing)
-- [License](#license)
+
+---
 
 ## Background
 
-Building interactive MCP apps today requires:
-
-- Different codebases for MCP Apps vs ChatGPT Apps
-- Different APIs (`@modelcontextprotocol/ext-apps` vs `window.openai`)
-- Different metadata schemas (`_meta.ui` vs `_meta["openai/..."]`)
-- Different MIME types (`text/html;profile=mcp-app` vs `text/html+skybridge`)
-- No type safety between tool definitions and UI code
-
-This framework solves all of that.
+MCP AppsKit is a TypeScript framework for building interactive applications with shared tool and UI definitions. [MCP Apps](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/1865) is an official extension to the Model Context Protocol that enables servers to deliver interactive UIs to hosts. [OpenAI Apps SDK](https://openai.com/index/introducing-apps-in-chatgpt/) is the developer toolkit for building apps that run inside ChatGPT. This framework abstracts both protocols, providing a server runtime, vanilla JS UI client, React bindings, and a scaffolding CLI.
 
 ### Who Is This For?
 
@@ -84,19 +86,6 @@ This project may be a poor fit if you:
 
 - Only target a single host/protocol and want direct, low-level control
 - Need custom transport/session behavior that does not fit the built-in server (you can still use `app.handler()` and `app.getServer()`, but you will be closer to the metal)
-
-## Features
-
-- Single `createApp()` entry point to define tools and UI once
-- **API Versioning**: Expose multiple API versions from a single app (e.g., `/v1/mcp`, `/v2/mcp`)
-- Type-safe tool bindings with full TypeScript inference for inputs, outputs, and UI access
-- Protocol abstraction so UI code works identically on both platforms
-- OAuth 2.1 security with JWT validation and JWKS discovery (RFC 6750, RFC 8414)
-- Flexible deployment: Express server, custom transport, or serverless
-- Framework agnostic UI: React, Vue, Svelte, or vanilla JS
-- Plugins, middleware, and events for logging, authentication, and analytics
-- Debug logging from UI to server via MCP protocol (optional `log_debug` tool)
-- **Testing utilities**: Behavior testing, property-based testing, UI mocks, and LLM-powered evaluation
 
 ## Packages
 
