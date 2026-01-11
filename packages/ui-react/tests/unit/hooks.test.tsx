@@ -306,3 +306,210 @@ describe("useOnTeardown", () => {
     expect(handler).toHaveBeenCalledWith("session ended");
   });
 });
+
+describe("useOnToolInputPartial", () => {
+  it("should call handler when partial input is received", async () => {
+    const { client, adapter } = await createMockClient();
+    const handler = vi.fn();
+
+    const { useOnToolInputPartial } = await import("../../src");
+
+    renderHook(() => useOnToolInputPartial(handler), {
+      wrapper: createWrapper(client),
+    });
+
+    act(() => {
+      adapter.emitToolInputPartial({ partial: "data" });
+    });
+
+    expect(handler).toHaveBeenCalledWith({ partial: "data" });
+  });
+});
+
+describe("useHostCapabilities", () => {
+  it("should return host capabilities", async () => {
+    const { client } = await createMockClient();
+    const { useHostCapabilities } = await import("../../src");
+
+    const { result } = renderHook(() => useHostCapabilities(), {
+      wrapper: createWrapper(client),
+    });
+
+    expect(result.current).toBeDefined();
+    expect(result.current?.logging).toBeDefined();
+  });
+});
+
+describe("useHostVersion", () => {
+  it("should return host version", async () => {
+    const { client } = await createMockClient();
+    const { useHostVersion } = await import("../../src");
+
+    const { result } = renderHook(() => useHostVersion(), {
+      wrapper: createWrapper(client),
+    });
+
+    expect(result.current).toBeDefined();
+    expect(result.current?.name).toBe("MockHost");
+    expect(result.current?.version).toBe("1.0.0");
+  });
+});
+
+describe("useFileUpload", () => {
+  it("should return upload state", async () => {
+    const { client } = await createMockClient();
+    const { useFileUpload } = await import("../../src");
+
+    const { result } = renderHook(() => useFileUpload(), {
+      wrapper: createWrapper(client),
+    });
+
+    expect(result.current.isUploading).toBe(false);
+    expect(result.current.error).toBeNull();
+    expect(result.current.fileId).toBeNull();
+    expect(typeof result.current.upload).toBe("function");
+  });
+
+  it("should handle upload when not supported", async () => {
+    const { client } = await createMockClient();
+    const { useFileUpload } = await import("../../src");
+
+    const { result } = renderHook(() => useFileUpload(), {
+      wrapper: createWrapper(client),
+    });
+
+    const file = new File(["test"], "test.txt", { type: "text/plain" });
+    let uploadResult: unknown;
+
+    await act(async () => {
+      uploadResult = await result.current.upload(file);
+    });
+
+    expect(uploadResult).toBeNull();
+    expect(result.current.error).toBeDefined();
+  });
+});
+
+describe("useFileDownload", () => {
+  it("should return download state", async () => {
+    const { client } = await createMockClient();
+    const { useFileDownload } = await import("../../src");
+
+    const { result } = renderHook(() => useFileDownload(), {
+      wrapper: createWrapper(client),
+    });
+
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.error).toBeNull();
+    expect(result.current.downloadUrl).toBeNull();
+    expect(typeof result.current.getDownloadUrl).toBe("function");
+  });
+
+  it("should handle getDownloadUrl when not supported", async () => {
+    const { client } = await createMockClient();
+    const { useFileDownload } = await import("../../src");
+
+    const { result } = renderHook(() => useFileDownload(), {
+      wrapper: createWrapper(client),
+    });
+
+    let downloadResult: unknown;
+
+    await act(async () => {
+      downloadResult = await result.current.getDownloadUrl("file-id");
+    });
+
+    expect(downloadResult).toBeNull();
+    expect(result.current.error).toBeDefined();
+  });
+});
+
+describe("useModal", () => {
+  it("should return modal state", async () => {
+    const { client } = await createMockClient();
+    const { useModal } = await import("../../src");
+
+    const { result } = renderHook(() => useModal(), {
+      wrapper: createWrapper(client),
+    });
+
+    expect(result.current.isOpen).toBe(false);
+    expect(typeof result.current.showModal).toBe("function");
+  });
+
+  it("should return null when modal not supported", async () => {
+    const { client } = await createMockClient();
+    const { useModal } = await import("../../src");
+
+    const { result } = renderHook(() => useModal(), {
+      wrapper: createWrapper(client),
+    });
+
+    let modalResult: unknown;
+
+    await act(async () => {
+      modalResult = await result.current.showModal({
+        title: "Test",
+        body: "Test body",
+        buttons: [],
+      });
+    });
+
+    expect(modalResult).toBeNull();
+  });
+});
+
+describe("useView", () => {
+  it("should return view from host context", async () => {
+    const { client, adapter } = await createMockClient();
+    const { useView } = await import("../../src");
+
+    adapter.setHostContext({ view: "settings" });
+
+    const { result } = renderHook(() => useView(), {
+      wrapper: createWrapper(client),
+    });
+
+    expect(result.current).toBe("settings");
+  });
+});
+
+describe("useIntrinsicHeight", () => {
+  it("should return intrinsic height state", async () => {
+    const { client } = await createMockClient();
+    const { useIntrinsicHeight } = await import("../../src");
+
+    const { result } = renderHook(() => useIntrinsicHeight(), {
+      wrapper: createWrapper(client),
+    });
+
+    expect(result.current.containerRef).toBeDefined();
+    expect(typeof result.current.notify).toBe("function");
+  });
+});
+
+describe("useDebugLogger", () => {
+  it("should return debug logger", async () => {
+    const { client } = await createMockClient();
+    const { useDebugLogger } = await import("../../src");
+
+    const { result } = renderHook(() => useDebugLogger(), {
+      wrapper: createWrapper(client),
+    });
+
+    expect(result.current).toBeDefined();
+    expect(typeof result.current.info).toBe("function");
+    expect(typeof result.current.error).toBe("function");
+  });
+
+  it("should accept configuration", async () => {
+    const { client } = await createMockClient();
+    const { useDebugLogger } = await import("../../src");
+
+    const { result } = renderHook(() => useDebugLogger({ enabled: true, level: "debug" }), {
+      wrapper: createWrapper(client),
+    });
+
+    expect(result.current).toBeDefined();
+  });
+});
