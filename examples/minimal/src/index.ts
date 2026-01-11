@@ -171,6 +171,10 @@ const echoToolV3 = defineTool({
 const app = createApp({
   name: "minimal-app",
 
+  // Server icon - displayed in MCP client UIs
+  // Can be a URL or base64 data URI
+  icon: "https://raw.githubusercontent.com/anthropics/claude-code/main/assets/icon.svg",
+
   // Shared config across all versions
   config: {
     cors: {

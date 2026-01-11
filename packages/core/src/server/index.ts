@@ -24,7 +24,7 @@ import type {
   ToolContext,
   UserLocation,
 } from "../types/tools";
-import type { AppConfig, CORSConfig, DebugConfig } from "../types/config";
+import type { AppConfig, CORSConfig, DebugConfig, Icon } from "../types/config";
 import type { UIDefs, UIDef } from "../types/ui";
 import type { MiddlewareContext } from "../middleware/types";
 import type { EventMap } from "../events/types";
@@ -37,6 +37,30 @@ import { debugLogger, type LogEntry } from "../debug/logger";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
+
+// =============================================================================
+// ICON HELPERS
+// =============================================================================
+
+/**
+ * Normalize icon configuration into an icons array.
+ *
+ * Handles both the shorthand `icon` string and the full `icons` array.
+ * If both are provided, `icons` takes precedence.
+ */
+function normalizeIcons(icon: string | undefined, icons: Icon[] | undefined): Icon[] | undefined {
+  // icons array takes precedence
+  if (icons && icons.length > 0) {
+    return icons;
+  }
+
+  // Convert shorthand icon string to icons array
+  if (icon) {
+    return [{ src: icon }];
+  }
+
+  return undefined;
+}
 
 // =============================================================================
 // SERVER WRAPPER
@@ -83,10 +107,14 @@ export function createServerInstance<T extends ToolDefs>(
   // Create protocol adapter
   const adapter = createAdapter(config.config?.protocol ?? "mcp");
 
-  // Create MCP server
+  // Normalize icons from shorthand or array format
+  const icons = normalizeIcons(config.icon, config.icons);
+
+  // Create MCP server with icons if provided
   const mcpServer = new McpServer({
     name: config.name,
     version: config.version,
+    ...(icons && { icons }),
   });
 
   // Compute UI resource URIs with content hashes for cache busting

@@ -62,6 +62,8 @@ export type {
   ServerConfig,
   VersionSpecificConfig,
   DeepPartialWithNull,
+  Icon,
+  IconTheme,
 } from "./types/config";
 
 // OAuth types
