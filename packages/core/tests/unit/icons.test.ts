@@ -234,6 +234,32 @@ describe("iconFromFile", () => {
     expect(() => iconFromFile("/path/to/icon.xyz")).toThrow("Unsupported image format: .xyz");
   });
 
+  it("should throw for files exceeding size limit", () => {
+    // Create buffer larger than 1MB
+    const largeBuffer = Buffer.alloc(1024 * 1024 + 1);
+    mockReadFileSync.mockReturnValue(largeBuffer);
+
+    expect(() => iconFromFile("/path/to/large.png")).toThrow(/Icon file too large/);
+  });
+
+  it("should accept files at exactly 1MB", () => {
+    const exactlyOneMB = Buffer.alloc(1024 * 1024);
+    mockReadFileSync.mockReturnValue(exactlyOneMB);
+
+    const icon = iconFromFile("/path/to/exact.png");
+    expect(icon.src).toMatch(/^data:image\/png;base64,/);
+  });
+
+  it("should wrap file read errors with helpful message", () => {
+    mockReadFileSync.mockImplementation(() => {
+      throw new Error("ENOENT: no such file or directory");
+    });
+
+    expect(() => iconFromFile("./missing.png")).toThrow(
+      'Failed to read icon file "./missing.png": ENOENT: no such file or directory'
+    );
+  });
+
   it("should correctly encode file content as base64", () => {
     const testContent = Buffer.from("Hello, World!");
     mockReadFileSync.mockReturnValue(testContent);

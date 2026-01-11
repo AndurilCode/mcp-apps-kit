@@ -43,19 +43,40 @@ import * as crypto from "node:crypto";
 // =============================================================================
 
 /**
+ * Validate an icon object has required fields.
+ */
+function validateIcon(icon: Icon, index: number): void {
+  if (!icon.src || typeof icon.src !== "string" || icon.src.trim() === "") {
+    throw new Error(`Invalid icon at index ${index}: 'src' must be a non-empty string`);
+  }
+}
+
+/**
  * Normalize icon configuration into an icons array.
  *
  * Handles both the shorthand `icon` string and the full `icons` array.
  * If both are provided, `icons` takes precedence.
+ *
+ * @throws Error if any icon has an invalid or empty src
  */
 function normalizeIcons(icon: string | undefined, icons: Icon[] | undefined): Icon[] | undefined {
   // icons array takes precedence
   if (icons && icons.length > 0) {
+    // Validate each icon
+    for (let i = 0; i < icons.length; i++) {
+      const icon = icons[i];
+      if (icon) {
+        validateIcon(icon, i);
+      }
+    }
     return icons;
   }
 
   // Convert shorthand icon string to icons array
   if (icon) {
+    if (typeof icon !== "string" || icon.trim() === "") {
+      throw new Error("Icon must be a non-empty string URL or data URI");
+    }
     return [{ src: icon }];
   }
 

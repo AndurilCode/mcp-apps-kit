@@ -7,6 +7,12 @@ import * as path from "node:path";
 import type { Icon, IconTheme } from "../types/config";
 
 /**
+ * Maximum allowed icon file size (1MB).
+ * Base64 encoding increases size by ~33%, so this limits data URIs to ~1.33MB.
+ */
+const MAX_ICON_SIZE = 1024 * 1024;
+
+/**
  * MIME type mappings for common image formats
  */
 const MIME_TYPES: Record<string, string> = {
@@ -48,6 +54,10 @@ export interface IconFromFileOptions {
  * Reads the file, converts it to a base64 data URI, and returns
  * an Icon object ready for use in createApp configuration.
  *
+ * **Size limit:** Files must be under 1MB. For larger images, host them
+ * externally and use a URL instead. Consider using SVG for logos (smaller
+ * size, scalable).
+ *
  * @param filePath - Path to the image file (absolute or relative to cwd)
  * @param options - Optional icon configuration (sizes, theme, mimeType override)
  * @returns Icon object with base64 data URI
@@ -78,14 +88,29 @@ export interface IconFromFileOptions {
  * });
  * ```
  *
- * @throws Error if the file cannot be read or has an unsupported extension
+ * @throws Error if the file cannot be read, exceeds size limit, or has an unsupported extension
  */
 export function iconFromFile(filePath: string, options: IconFromFileOptions = {}): Icon {
   // Resolve to absolute path
   const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);
 
-  // Read file
-  const fileBuffer = fs.readFileSync(absolutePath);
+  // Read file with error handling
+  let fileBuffer: Buffer;
+  try {
+    fileBuffer = fs.readFileSync(absolutePath);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to read icon file "${filePath}": ${message}`);
+  }
+
+  // Check file size
+  if (fileBuffer.length > MAX_ICON_SIZE) {
+    const sizeMB = (fileBuffer.length / (1024 * 1024)).toFixed(2);
+    throw new Error(
+      `Icon file too large: ${sizeMB}MB (max: 1MB). ` +
+        `Consider using a smaller image, SVG format, or hosting it externally with a URL.`
+    );
+  }
 
   // Detect MIME type from extension
   const ext = path.extname(absolutePath).toLowerCase();
@@ -99,7 +124,8 @@ export function iconFromFile(filePath: string, options: IconFromFileOptions = {}
     );
   }
 
-  const mimeType = options.mimeType ?? detectedMimeType;
+  // mimeType is guaranteed to be defined after validation above
+  const mimeType = options.mimeType ?? detectedMimeType ?? "";
 
   // Convert to base64 data URI
   const base64 = fileBuffer.toString("base64");
