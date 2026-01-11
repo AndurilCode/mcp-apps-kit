@@ -15,6 +15,7 @@ vi.mock("node:fs", () => ({
 }));
 
 import { iconFromFile } from "../../src/utils/icons";
+import { normalizeIcons } from "../../src/server/index";
 import { readFileSync } from "node:fs";
 
 describe("Icon types", () => {
@@ -283,5 +284,113 @@ describe("iconFromFile", () => {
     expect(icon.mimeType).toBe("image/png");
     expect(icon.sizes).toEqual(["48x48"]);
     expect(icon.theme).toBe("light");
+  });
+});
+
+describe("normalizeIcons", () => {
+  describe("with icon shorthand", () => {
+    it("should convert icon string to icons array", () => {
+      const result = normalizeIcons("https://example.com/icon.png", undefined);
+
+      expect(result).toEqual([{ src: "https://example.com/icon.png" }]);
+    });
+
+    it("should convert data URI icon to icons array", () => {
+      const dataUri = "data:image/svg+xml;base64,PHN2Zw==";
+      const result = normalizeIcons(dataUri, undefined);
+
+      expect(result).toEqual([{ src: dataUri }]);
+    });
+
+    it("should return undefined for empty string icon", () => {
+      // Empty string is falsy, so it's treated as "no icon provided"
+      const result = normalizeIcons("", undefined);
+      expect(result).toBeUndefined();
+    });
+
+    it("should throw for whitespace-only icon", () => {
+      expect(() => normalizeIcons("   ", undefined)).toThrow(
+        "Icon must be a non-empty string URL or data URI"
+      );
+    });
+  });
+
+  describe("with icons array", () => {
+    it("should return icons array as-is", () => {
+      const icons = [
+        { src: "https://example.com/icon-48.png", sizes: ["48x48"] as string[] },
+        { src: "https://example.com/icon-96.png", sizes: ["96x96"] as string[] },
+      ];
+
+      const result = normalizeIcons(undefined, icons);
+
+      expect(result).toBe(icons);
+    });
+
+    it("should validate icon src is non-empty", () => {
+      expect(() => normalizeIcons(undefined, [{ src: "" }])).toThrow(
+        "Invalid icon at index 0: 'src' must be a non-empty string"
+      );
+    });
+
+    it("should validate icon src is not whitespace only", () => {
+      expect(() => normalizeIcons(undefined, [{ src: "   " }])).toThrow(
+        "Invalid icon at index 0: 'src' must be a non-empty string"
+      );
+    });
+
+    it("should report correct index for invalid icon", () => {
+      const icons = [{ src: "https://example.com/valid.png" }, { src: "" }];
+
+      expect(() => normalizeIcons(undefined, icons)).toThrow(
+        "Invalid icon at index 1: 'src' must be a non-empty string"
+      );
+    });
+
+    it("should accept theme-specific icons", () => {
+      const icons = [
+        { src: "https://example.com/light.png", theme: "light" as const },
+        { src: "https://example.com/dark.png", theme: "dark" as const },
+      ];
+
+      const result = normalizeIcons(undefined, icons);
+
+      expect(result).toBe(icons);
+      expect(result?.[0].theme).toBe("light");
+      expect(result?.[1].theme).toBe("dark");
+    });
+  });
+
+  describe("precedence", () => {
+    it("should prefer icons array over icon shorthand", () => {
+      const icons = [{ src: "https://example.com/primary.png" }];
+
+      const result = normalizeIcons("https://example.com/fallback.png", icons);
+
+      expect(result).toBe(icons);
+      expect(result).toHaveLength(1);
+      expect(result?.[0].src).toBe("https://example.com/primary.png");
+    });
+
+    it("should ignore icon shorthand when icons array is provided", () => {
+      const icons = [{ src: "https://example.com/primary.png" }];
+      const result = normalizeIcons("https://example.com/ignored.png", icons);
+
+      expect(result).not.toContainEqual({ src: "https://example.com/ignored.png" });
+    });
+  });
+
+  describe("with no icons", () => {
+    it("should return undefined when no icon or icons provided", () => {
+      const result = normalizeIcons(undefined, undefined);
+
+      expect(result).toBeUndefined();
+    });
+
+    it("should return undefined for empty icons array", () => {
+      const result = normalizeIcons(undefined, []);
+
+      expect(result).toBeUndefined();
+    });
   });
 });

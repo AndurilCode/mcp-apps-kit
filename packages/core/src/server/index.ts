@@ -59,7 +59,10 @@ function validateIcon(icon: Icon, index: number): void {
  *
  * @throws Error if any icon has an invalid or empty src
  */
-function normalizeIcons(icon: string | undefined, icons: Icon[] | undefined): Icon[] | undefined {
+export function normalizeIcons(
+  icon: string | undefined,
+  icons: Icon[] | undefined
+): Icon[] | undefined {
   // icons array takes precedence
   if (icons && icons.length > 0) {
     // Validate each icon

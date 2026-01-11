@@ -208,6 +208,7 @@ export type {
 // Icon utilities
 export { iconFromFile } from "./utils/icons";
 export type { IconFromFileOptions } from "./utils/icons";
+export { normalizeIcons } from "./server/index.js";
 
 // =============================================================================
 // MAIN ENTRY POINTS
