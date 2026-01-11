@@ -205,6 +205,10 @@ export type {
   OpenAIUIResourceMetadata,
 } from "./utils/csp";
 
+// Icon utilities
+export { iconFromFile } from "./utils/icons";
+export type { IconFromFileOptions } from "./utils/icons";
+
 // =============================================================================
 // MAIN ENTRY POINTS
 // =============================================================================

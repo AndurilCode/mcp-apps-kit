@@ -4,10 +4,18 @@
  * Tests the icon types and configuration for MCP server icons.
  */
 
-import { describe, it, expect, expectTypeOf } from "vitest";
+import { describe, it, expect, expectTypeOf, vi, beforeEach } from "vitest";
 import { z } from "zod";
 import type { Icon, IconTheme, AppConfig } from "../../src/types/config";
 import type { ToolDefs } from "../../src/types/tools";
+
+// Mock node:fs before importing iconFromFile
+vi.mock("node:fs", () => ({
+  readFileSync: vi.fn(),
+}));
+
+import { iconFromFile } from "../../src/utils/icons";
+import { readFileSync } from "node:fs";
 
 describe("Icon types", () => {
   describe("Icon interface", () => {
@@ -131,5 +139,123 @@ describe("Icon types", () => {
 
       expect(config.icon).toMatch(/^data:image\/svg\+xml;base64,/);
     });
+  });
+});
+
+describe("iconFromFile", () => {
+  const mockReadFileSync = vi.mocked(readFileSync);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should convert PNG file to data URI", () => {
+    const pngData = Buffer.from([0x89, 0x50, 0x4e, 0x47]); // PNG magic bytes
+    mockReadFileSync.mockReturnValue(pngData);
+
+    const icon = iconFromFile("/path/to/icon.png");
+
+    expect(icon.src).toMatch(/^data:image\/png;base64,/);
+    expect(icon.mimeType).toBe("image/png");
+    expect(icon.sizes).toBeUndefined();
+    expect(icon.theme).toBeUndefined();
+  });
+
+  it("should convert JPEG file to data URI", () => {
+    const jpegData = Buffer.from([0xff, 0xd8, 0xff, 0xe0]); // JPEG magic bytes
+    mockReadFileSync.mockReturnValue(jpegData);
+
+    const icon = iconFromFile("/path/to/photo.jpg");
+
+    expect(icon.src).toMatch(/^data:image\/jpeg;base64,/);
+    expect(icon.mimeType).toBe("image/jpeg");
+  });
+
+  it("should convert SVG file to data URI", () => {
+    const svgContent = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
+    mockReadFileSync.mockReturnValue(svgContent);
+
+    const icon = iconFromFile("/path/to/icon.svg");
+
+    expect(icon.src).toMatch(/^data:image\/svg\+xml;base64,/);
+    expect(icon.mimeType).toBe("image/svg+xml");
+  });
+
+  it("should handle .jpeg extension", () => {
+    const jpegData = Buffer.from([0xff, 0xd8, 0xff, 0xe0]);
+    mockReadFileSync.mockReturnValue(jpegData);
+
+    const icon = iconFromFile("/path/to/photo.jpeg");
+
+    expect(icon.mimeType).toBe("image/jpeg");
+  });
+
+  it("should handle WebP files", () => {
+    const webpData = Buffer.from("RIFF....WEBP");
+    mockReadFileSync.mockReturnValue(webpData);
+
+    const icon = iconFromFile("/path/to/icon.webp");
+
+    expect(icon.mimeType).toBe("image/webp");
+  });
+
+  it("should include sizes option when provided", () => {
+    const pngData = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    mockReadFileSync.mockReturnValue(pngData);
+
+    const icon = iconFromFile("/path/to/icon.png", { sizes: ["48x48", "96x96"] });
+
+    expect(icon.sizes).toEqual(["48x48", "96x96"]);
+  });
+
+  it("should include theme option when provided", () => {
+    const pngData = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    mockReadFileSync.mockReturnValue(pngData);
+
+    const icon = iconFromFile("/path/to/icon-dark.png", { theme: "dark" });
+
+    expect(icon.theme).toBe("dark");
+  });
+
+  it("should allow mimeType override", () => {
+    const customData = Buffer.from("custom format");
+    mockReadFileSync.mockReturnValue(customData);
+
+    const icon = iconFromFile("/path/to/icon.custom", { mimeType: "image/x-custom" });
+
+    expect(icon.src).toMatch(/^data:image\/x-custom;base64,/);
+    expect(icon.mimeType).toBe("image/x-custom");
+  });
+
+  it("should throw for unsupported extension without mimeType override", () => {
+    const unknownData = Buffer.from("unknown format");
+    mockReadFileSync.mockReturnValue(unknownData);
+
+    expect(() => iconFromFile("/path/to/icon.xyz")).toThrow("Unsupported image format: .xyz");
+  });
+
+  it("should correctly encode file content as base64", () => {
+    const testContent = Buffer.from("Hello, World!");
+    mockReadFileSync.mockReturnValue(testContent);
+
+    const icon = iconFromFile("/path/to/test.png");
+
+    // "Hello, World!" in base64 is "SGVsbG8sIFdvcmxkIQ=="
+    expect(icon.src).toBe("data:image/png;base64,SGVsbG8sIFdvcmxkIQ==");
+  });
+
+  it("should handle all options together", () => {
+    const pngData = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    mockReadFileSync.mockReturnValue(pngData);
+
+    const icon = iconFromFile("/path/to/icon.png", {
+      sizes: ["48x48"],
+      theme: "light",
+    });
+
+    expect(icon.src).toMatch(/^data:image\/png;base64,/);
+    expect(icon.mimeType).toBe("image/png");
+    expect(icon.sizes).toEqual(["48x48"]);
+    expect(icon.theme).toBe("light");
   });
 });
