@@ -42,3 +42,15 @@ function App() {
 - Forgetting `AppsProvider` wrapper
 - Not typing `useToolResult<T>()` generic
 - Using hooks outside provider context
+
+---
+
+## Learnings
+
+<!-- MANDATORY: Document failures here to prevent repeated mistakes -->
+<!-- Format: what went wrong → what to do instead -->
+
+<!-- Example:
+- Hook returned undefined unexpectedly → Ensure component is wrapped in AppsProvider
+- Re-renders caused infinite loop → Check useEffect dependencies, avoid object literals in deps
+-->

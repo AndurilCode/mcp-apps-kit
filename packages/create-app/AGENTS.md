@@ -37,3 +37,15 @@ Both include:
 - Running in non-empty directory (fails)
 - Fetches latest package versions from npm at runtime
 - Generated projects use npm (not pnpm) to avoid workspace conflicts
+
+---
+
+## Learnings
+
+<!-- MANDATORY: Document failures here to prevent repeated mistakes -->
+<!-- Format: what went wrong → what to do instead -->
+
+<!-- Example:
+- Template file had wrong path → Use path.join() not string concatenation for cross-platform
+- npm install failed in generated project → Check if package versions are valid on npm registry
+-->

@@ -36,3 +36,15 @@ All exports go through `src/index.ts` - no barrel files in subdirectories.
 - Forgetting to `await next()` in middleware
 - Using Zod 3 APIs that changed in v4 (check migration guide)
 - Adding exports outside `index.ts`
+
+---
+
+## Learnings
+
+<!-- MANDATORY: Document failures here to prevent repeated mistakes -->
+<!-- Format: what went wrong → what to do instead -->
+
+<!-- Example:
+- Type error in handler because input wasn't validated → Always use Zod schema, never trust raw input
+- Middleware chain broke silently → Add logging middleware first to debug chain issues
+-->

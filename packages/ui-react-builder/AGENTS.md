@@ -40,3 +40,15 @@ const uis = await buildAndTransform({ "my-widget": widgetUI });
 - Forgetting to rebuild after component changes
 - Not including component dependencies in build
 - Missing vite peer dep when using vite plugin
+
+---
+
+## Learnings
+
+<!-- MANDATORY: Document failures here to prevent repeated mistakes -->
+<!-- Format: what went wrong → what to do instead -->
+
+<!-- Example:
+- Build succeeded but component didn't render → Check if all imports are included in bundle
+- esbuild error about JSX → Ensure .tsx extension and jsx: 'automatic' in config
+-->

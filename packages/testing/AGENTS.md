@@ -38,3 +38,15 @@ await env.cleanup();
 - Forgetting `await env.cleanup()` (leaves server running)
 - Not setting up vitest/jest matchers in setup file
 - Missing optional peer deps for LLM eval features
+
+---
+
+## Learnings
+
+<!-- MANDATORY: Document failures here to prevent repeated mistakes -->
+<!-- Format: what went wrong → what to do instead -->
+
+<!-- Example:
+- Tests hung indefinitely → Server wasn't cleaned up from previous run, use port: 0 for random port
+- Matcher not found error → Import setupVitestMatchers in setup file before tests run
+-->
