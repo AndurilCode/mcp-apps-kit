@@ -235,3 +235,88 @@ describe.skipIf(!isFastCheckAvailable)("resolving generators with fast-check", (
     expect(resolved).toBeDefined();
   });
 });
+
+describe.skipIf(!isFastCheckAvailable)("generated value validation", () => {
+  let fc: typeof import("fast-check");
+
+  beforeAll(async () => {
+    await ensureFastCheckLoaded();
+    fc = await import("fast-check");
+  });
+
+  it("should generate strings within length bounds", async () => {
+    const gen = generators.string({ minLength: 5, maxLength: 10 });
+    const resolved = await resolveArbitrary(gen);
+    const samples = fc.sample(resolved, 50);
+    expect(samples.every((s) => s.length >= 5 && s.length <= 10)).toBe(true);
+  });
+
+  it("should generate integers within bounds", async () => {
+    const gen = generators.integer(10, 20);
+    const resolved = await resolveArbitrary(gen);
+    const samples = fc.sample(resolved, 50);
+    expect(samples.every((n) => n >= 10 && n <= 20 && Number.isInteger(n))).toBe(true);
+  });
+
+  it("should generate floats within bounds", async () => {
+    const gen = generators.float(0, 1);
+    const resolved = await resolveArbitrary(gen);
+    const samples = fc.sample(resolved, 50);
+    expect(samples.every((n) => n >= 0 && n <= 1)).toBe(true);
+  });
+
+  it("should generate booleans", async () => {
+    const gen = generators.boolean();
+    const resolved = await resolveArbitrary(gen);
+    const samples = fc.sample(resolved, 50);
+    expect(samples.every((b) => typeof b === "boolean")).toBe(true);
+    // With 50 samples, we should see both true and false
+    expect(samples.some((b) => b === true)).toBe(true);
+    expect(samples.some((b) => b === false)).toBe(true);
+  });
+
+  it("should generate arrays within length bounds", async () => {
+    const gen = generators.array(generators.integer(0, 10), { minLength: 2, maxLength: 4 });
+    const resolved = await resolveArbitrary(gen);
+    const samples = fc.sample(resolved, 20);
+    expect(samples.every((arr) => arr.length >= 2 && arr.length <= 4)).toBe(true);
+    expect(samples.every((arr) => arr.every((n) => n >= 0 && n <= 10))).toBe(true);
+  });
+
+  it("should generate objects with correct shape", async () => {
+    const gen = generators.object({
+      name: generators.string({ minLength: 1 }),
+      age: generators.integer(0, 120),
+    });
+    const resolved = await resolveArbitrary(gen);
+    const samples = fc.sample(resolved, 20);
+    expect(
+      samples.every(
+        (obj) =>
+          typeof obj.name === "string" &&
+          obj.name.length >= 1 &&
+          typeof obj.age === "number" &&
+          obj.age >= 0 &&
+          obj.age <= 120
+      )
+    ).toBe(true);
+  });
+
+  it("should generate oneOf values from provided options", async () => {
+    const gen = generators.oneOf("red", "green", "blue");
+    const resolved = await resolveArbitrary(gen);
+    const samples = fc.sample(resolved, 50);
+    const validValues = new Set(["red", "green", "blue"]);
+    expect(samples.every((v) => validValues.has(v))).toBe(true);
+  });
+
+  it("should generate optional values including undefined", async () => {
+    const gen = generators.optional(generators.string());
+    const resolved = await resolveArbitrary(gen);
+    const samples = fc.sample(resolved, 100);
+    expect(samples.every((v) => v === undefined || typeof v === "string")).toBe(true);
+    // With 100 samples, we should see some undefined values
+    expect(samples.some((v) => v === undefined)).toBe(true);
+    expect(samples.some((v) => typeof v === "string")).toBe(true);
+  });
+});

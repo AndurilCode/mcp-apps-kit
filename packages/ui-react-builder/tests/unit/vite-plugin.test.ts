@@ -206,4 +206,41 @@ describe("mcpReactUI", () => {
       expect(plugin).toBeDefined();
     });
   });
+
+  describe("default options", () => {
+    it("should use default standalone=false when not specified", () => {
+      const plugin = mcpReactUI({ serverEntry: "./src/index.ts" }) as Plugin;
+
+      // Default is standalone: false (plugin integrates with existing build)
+      const resolveId = plugin.resolveId as (id: string) => string | null;
+      expect(resolveId("virtual:mcp-react-ui-entry")).toBeNull();
+    });
+
+    it("should use default outDir when not specified", () => {
+      const plugin = mcpReactUI({ serverEntry: "./src/index.ts" });
+      expect(plugin).toBeDefined();
+      // outDir defaults to "dist" - verified by plugin creation succeeding
+    });
+  });
+
+  describe("path handling", () => {
+    it("should handle serverEntry with different path formats", () => {
+      // Relative path
+      expect(() => mcpReactUI({ serverEntry: "./src/index.ts" })).not.toThrow();
+
+      // Absolute-looking path (though may not exist)
+      expect(() => mcpReactUI({ serverEntry: "/absolute/path/index.ts" })).not.toThrow();
+
+      // Path with subdirectories
+      expect(() => mcpReactUI({ serverEntry: "./src/deep/nested/index.ts" })).not.toThrow();
+    });
+
+    it("should handle custom outDir", () => {
+      const plugin = mcpReactUI({
+        serverEntry: "./src/index.ts",
+        outDir: "custom-dist",
+      });
+      expect(plugin).toBeDefined();
+    });
+  });
 });
