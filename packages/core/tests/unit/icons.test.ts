@@ -235,6 +235,25 @@ describe("iconFromFile", () => {
     expect(() => iconFromFile("/path/to/icon.xyz")).toThrow("Unsupported image format: .xyz");
   });
 
+  it("should throw for non-image MIME type override", () => {
+    const data = Buffer.from("test data");
+    mockReadFileSync.mockReturnValue(data);
+
+    expect(() => iconFromFile("/path/to/file.txt", { mimeType: "text/plain" })).toThrow(
+      'Invalid MIME type: "text/plain". Must be an image MIME type'
+    );
+  });
+
+  it("should accept custom image MIME types", () => {
+    const data = Buffer.from("custom image data");
+    mockReadFileSync.mockReturnValue(data);
+
+    const icon = iconFromFile("/path/to/file.custom", { mimeType: "image/x-custom" });
+
+    expect(icon.mimeType).toBe("image/x-custom");
+    expect(icon.src).toMatch(/^data:image\/x-custom;base64,/);
+  });
+
   it("should throw for files exceeding size limit", () => {
     // Create buffer larger than 1MB
     const largeBuffer = Buffer.alloc(1024 * 1024 + 1);
@@ -302,10 +321,10 @@ describe("normalizeIcons", () => {
       expect(result).toEqual([{ src: dataUri }]);
     });
 
-    it("should return undefined for empty string icon", () => {
-      // Empty string is falsy, so it's treated as "no icon provided"
-      const result = normalizeIcons("", undefined);
-      expect(result).toBeUndefined();
+    it("should throw for empty string icon", () => {
+      expect(() => normalizeIcons("", undefined)).toThrow(
+        "Icon must be a non-empty string URL or data URI"
+      );
     });
 
     it("should throw for whitespace-only icon", () => {
@@ -391,6 +410,37 @@ describe("normalizeIcons", () => {
       const result = normalizeIcons(undefined, []);
 
       expect(result).toBeUndefined();
+    });
+  });
+
+  describe("sizes format validation", () => {
+    it("should accept valid WxH sizes format", () => {
+      const icons = [{ src: "https://example.com/icon.png", sizes: ["48x48", "96x96"] }];
+      const result = normalizeIcons(undefined, icons);
+      expect(result).toBe(icons);
+    });
+
+    it("should accept 'any' as valid size for scalable formats", () => {
+      const icons = [{ src: "https://example.com/icon.svg", sizes: ["any"] }];
+      const result = normalizeIcons(undefined, icons);
+      expect(result).toBe(icons);
+    });
+
+    it("should throw for invalid sizes format", () => {
+      const icons = [{ src: "https://example.com/icon.png", sizes: ["48"] }];
+      expect(() => normalizeIcons(undefined, icons)).toThrow('Invalid icon size "48" at index 0');
+    });
+
+    it("should throw for malformed sizes like 48x", () => {
+      const icons = [{ src: "https://example.com/icon.png", sizes: ["48x"] }];
+      expect(() => normalizeIcons(undefined, icons)).toThrow('Invalid icon size "48x" at index 0');
+    });
+
+    it("should throw for text in sizes", () => {
+      const icons = [{ src: "https://example.com/icon.png", sizes: ["large"] }];
+      expect(() => normalizeIcons(undefined, icons)).toThrow(
+        'Invalid icon size "large" at index 0'
+      );
     });
   });
 });

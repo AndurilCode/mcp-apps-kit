@@ -43,12 +43,34 @@ import * as crypto from "node:crypto";
 // =============================================================================
 
 /**
+ * Valid sizes format pattern: "WxH" (e.g., "48x48") or "any" for scalable formats.
+ */
+const SIZES_PATTERN = /^\d+x\d+$/;
+
+/**
+ * Validate icon sizes array format.
+ */
+function validateIconSizes(sizes: string[] | undefined, index: number): void {
+  if (!sizes) return;
+
+  for (const size of sizes) {
+    if (size !== "any" && !SIZES_PATTERN.test(size)) {
+      throw new Error(
+        `Invalid icon size "${size}" at index ${index}: ` +
+          `Sizes must be in "WxH" format (e.g., "48x48") or "any" for scalable formats.`
+      );
+    }
+  }
+}
+
+/**
  * Validate an icon object has required fields.
  */
 function validateIcon(icon: Icon, index: number): void {
   if (!icon.src || typeof icon.src !== "string" || icon.src.trim() === "") {
     throw new Error(`Invalid icon at index ${index}: 'src' must be a non-empty string`);
   }
+  validateIconSizes(icon.sizes, index);
 }
 
 /**
@@ -57,6 +79,7 @@ function validateIcon(icon: Icon, index: number): void {
  * Handles both the shorthand `icon` string and the full `icons` array.
  * If both are provided, `icons` takes precedence.
  *
+ * @internal This function is used internally by createApp. Do not use directly.
  * @throws Error if any icon has an invalid or empty src
  */
 export function normalizeIcons(
@@ -65,18 +88,15 @@ export function normalizeIcons(
 ): Icon[] | undefined {
   // icons array takes precedence
   if (icons && icons.length > 0) {
-    // Validate each icon
-    for (let i = 0; i < icons.length; i++) {
-      const icon = icons[i];
-      if (icon) {
-        validateIcon(icon, i);
-      }
-    }
+    icons.forEach((ic, i) => {
+      validateIcon(ic, i);
+    });
     return icons;
   }
 
   // Convert shorthand icon string to icons array
-  if (icon) {
+  // Validate before falsy check for consistency (empty string should also throw)
+  if (icon !== undefined) {
     if (typeof icon !== "string" || icon.trim() === "") {
       throw new Error("Icon must be a non-empty string URL or data URI");
     }

@@ -127,6 +127,13 @@ export function iconFromFile(filePath: string, options: IconFromFileOptions = {}
   // mimeType is guaranteed to be defined after validation above
   const mimeType = options.mimeType ?? detectedMimeType ?? "";
 
+  // Validate MIME type is an image type
+  if (!mimeType.startsWith("image/")) {
+    throw new Error(
+      `Invalid MIME type: "${mimeType}". Must be an image MIME type (e.g., "image/png").`
+    );
+  }
+
   // Convert to base64 data URI
   const base64 = fileBuffer.toString("base64");
   const dataUri = `data:${mimeType};base64,${base64}`;
