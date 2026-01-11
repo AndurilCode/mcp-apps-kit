@@ -139,7 +139,7 @@ export const generators = {
       } else if (max !== undefined) {
         return fc.float({ max, noNaN: true });
       }
-      return fc.float();
+      return fc.float({ noNaN: true });
     });
   },
 
