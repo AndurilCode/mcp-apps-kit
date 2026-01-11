@@ -23,7 +23,7 @@ pnpm -C packages/ui-react lint        # Lint only
 ```tsx
 <AppsProvider>
   <App />
-</AppsProvider>
+</AppsProvider>;
 
 function App() {
   const result = useToolResult<ToolOutputs>();

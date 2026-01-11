@@ -21,6 +21,7 @@ pnpm -C packages/create-app lint        # Lint only
 - `vanilla` - Vanilla JS + Vite + @mcp-apps-kit/ui
 
 Both include:
+
 - Server with example tool
 - UI with theming
 - Integration tests
