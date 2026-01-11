@@ -23,7 +23,7 @@ Use `defineTool` and `defineUI` for type inference instead of inline objects.
 
 Middleware is Koa-style: always `await next()` or the chain breaks.
 
-All exports go through `src/index.ts` - no barrel files in subdirectories.
+Exports are centralized through `src/index.ts`, which re-exports from barrel files (`index.ts`) in subdirectories: `adapters/`, `debug/`, `events/`, `middleware/`, `plugins/`, `server/`, and `server/oauth/`. Subdirectory barrel files are local re-exports only - all public API goes through the root `src/index.ts`.
 
 ## Dependencies
 
