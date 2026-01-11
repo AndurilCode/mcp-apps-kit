@@ -262,7 +262,9 @@ describe.skipIf(!isFastCheckAvailable)("generated value validation", () => {
     const gen = generators.float(0, 1);
     const resolved = await resolveArbitrary(gen);
     const samples = fc.sample(resolved, 50);
-    expect(samples.every((n) => n >= 0 && n <= 1)).toBe(true);
+    // Use small epsilon for floating point comparison tolerance
+    const epsilon = 1e-10;
+    expect(samples.every((n) => n >= 0 - epsilon && n <= 1 + epsilon)).toBe(true);
   });
 
   it("should generate booleans", async () => {

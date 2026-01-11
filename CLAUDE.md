@@ -62,7 +62,8 @@ Each package README has the detailed API. Don't duplicate here.
 
 ## Learnings
 
-<!-- Add specific lessons learned during development. Format: what happened → what to do instead -->
+<!-- MANDATORY: Document failures here to prevent repeated mistakes -->
+<!-- Format: what went wrong → what to do instead -->
 
 <!-- Example:
 - Forgot to rebuild ui package before testing ui-react → Always `pnpm build` from root, not package
