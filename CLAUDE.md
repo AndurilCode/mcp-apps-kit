@@ -23,7 +23,7 @@ pnpm release:version:patch     # Also: minor, major
 - **Zod 4** (not 3) - Breaking changes from v3, check migration if something looks wrong
 - **Express 5** (not 4) - Async error handling works differently
 - **Strict TS** - No `any`. Use `unknown` + narrowing. We've had production bugs from implicit any
-- **80% test coverage** - CI fails below this. Tests mirror source in `tests/`
+- **60% test coverage** - CI fails below this. Tests mirror source in `tests/`
 
 ## Patterns to Follow
 
