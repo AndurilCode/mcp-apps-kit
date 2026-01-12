@@ -79,14 +79,21 @@ jobs:
             Step 2: Issue Detection (Strict Mode)
             Scan the code for issues. You are STRICTLY FORBIDDEN from fabricating issues. Only report REAL issues you find.
 
-            If you cannot find at least one legitimate issue in any of the four categories below, state "No issues found in [category]" and SKIP creating a PR for today. It's better to skip than to force fake improvements.
+            If you cannot find at least one legitimate issue across ALL four categories combined, state "No issues found" and SKIP creating a PR for today. However, if you find ONE or MORE real issues in any category, proceed with the PR - this is true incremental Kaizen.
 
             Step 3: The Daily 4 (Optional - only if real issues exist)
             Look for issues in these categories (up to one per category). For each, cite the specific file and line number:
 
             1. The Typo Fix: A spelling error in user-facing text, variable names, or internal comments.
+
             2. The Logic Fix: A bug, undefined variable, dangerous unhandled promise, or off-by-one error.
-            3. The Documentation Fix: Where code has changed but comments/documentation have not, or a complex function with zero comments.
+
+            3. The Documentation Fix: Check for documentation misalignment between code and docs:
+               - JSDoc comments that don't match the actual function signature (missing parameters, wrong types, outdated descriptions)
+               - README.md or documentation files that reference deprecated APIs, wrong examples, or outdated usage
+               - Complex functions with zero JSDoc comments
+               - Code changes where the corresponding documentation wasn't updated
+               
             4. The Test Improvement: A critical path that is currently untested or a test that is flaky/weak.
 
             Step 4: Make Changes and Validate
