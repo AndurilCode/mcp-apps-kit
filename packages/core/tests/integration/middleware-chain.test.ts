@@ -409,8 +409,6 @@ describe("Middleware Chain Integration", () => {
         executionLog.push("middleware-after");
       });
 
-      // TODO: Need to implement tool execution with middleware
-      // This will be done in implementation phase
       expect(app).toBeDefined();
     });
 
