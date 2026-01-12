@@ -6,6 +6,11 @@ on:
     - cron: "0 6 * * *"
   workflow_dispatch: # Allow manual trigger for testing
 
+# Prevent multiple concurrent runs
+concurrency:
+  group: claude-kaizen
+  cancel-in-progress: false
+
 jobs:
   claude-kaizen:
     runs-on: ubuntu-latest
@@ -34,6 +39,9 @@ jobs:
           node-version: "20"
           cache: "pnpm"
 
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Run Claude Code Kaizen
         id: claude-kaizen
         uses: anthropics/claude-code-action@v1
@@ -47,12 +55,14 @@ jobs:
             pull-requests: write
             issues: write
 
-          # Allow git operations and gh CLI for creating PRs
-          # Also allow pnpm for running tests/builds if needed
-          claude_args: '--allowed-tools "Bash(git checkout:*),Bash(git branch:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(gh pr create:*),Bash(gh pr view:*),Bash(pnpm:*)"'
+          # Allow git operations restricted to kaizen branches and specific pnpm commands
+          # Security: Wildcards restricted to safe operations only
+          claude_args: '--allowed-tools "Bash(git checkout -b kaizen/*),Bash(git branch),Bash(git add *),Bash(git commit *),Bash(git push origin kaizen/*),Bash(gh pr create *),Bash(gh pr view *),Bash(pnpm build),Bash(pnpm test),Bash(pnpm lint),Bash(pnpm typecheck)"'
 
           prompt: |
             System Context: You are a Lead Software Engineer automated bot designed to submit one daily "Code Hygiene" Pull Request. Your goal is incremental improvement, not feature building.
+
+            CRITICAL: Read CLAUDE.md before starting. All changes MUST pass: pnpm build && pnpm test && pnpm lint && pnpm typecheck
 
             Instructions:
 
@@ -60,27 +70,30 @@ jobs:
             Briefly explain the core functionality of the files currently in context. Demonstrate that you understand the data flow.
 
             Step 2: Issue Detection (Strict Mode)
-            Scan the code for issues. You are strictly forbidden from fabricating issues. If a specific category (like a bug) is not found, state "No critical bugs found" and suggest a minor syntax cleanup instead.
+            Scan the code for issues. You are STRICTLY FORBIDDEN from fabricating issues. Only report REAL issues you find.
 
-            Step 3: The Daily 4
-            Generate a task list containing exactly one item for each category below. For each, cite the specific file and line number.
+            If you cannot find at least one legitimate issue in any of the four categories below, state "No issues found in [category]" and SKIP creating a PR for today. It's better to skip than to force fake improvements.
 
-            1. The Typo Fix: Locate a spelling error in user-facing text, variable names, or internal comments.
-            2. The Logic Fix: Locate a bug, undefined variable, dangerous unhandled promise, or off-by-one error.
-            3. The Documentation Fix: Locate a discrepancy where the code has changed but the comments/documentation have not, or identify a complex function with zero comments.
-            4. The Test Improvement: Identify a critical path that is currently untested or a test that is flaky/weak.
+            Step 3: The Daily 4 (Optional - only if real issues exist)
+            Look for issues in these categories (up to one per category). For each, cite the specific file and line number:
 
-            Step 4: PR Generation
-            After you've identified the four items and made the necessary code changes:
+            1. The Typo Fix: A spelling error in user-facing text, variable names, or internal comments.
+            2. The Logic Fix: A bug, undefined variable, dangerous unhandled promise, or off-by-one error.
+            3. The Documentation Fix: Where code has changed but comments/documentation have not, or a complex function with zero comments.
+            4. The Test Improvement: A critical path that is currently untested or a test that is flaky/weak.
 
-            1. Create a new branch with the naming pattern: kaizen/$(date +%Y-%m-%d)
-            2. Commit all your changes with a descriptive commit message
-            3. Push the branch to the remote repository
-            4. Create a Pull Request using `gh pr create` with the following format:
+            Step 4: Make Changes and Validate
+            1. Make the necessary code changes
+            2. Run validation: pnpm build && pnpm test && pnpm lint && pnpm typecheck
+            3. If validation fails, fix the issues or abandon the PR (do not create broken PRs)
 
-            - PR Title: [Kaizen Daily Task] Daily Hygiene Update - $(date +%Y-%m-%d)
-            - PR Body: Use the Markdown format below
+            Step 5: PR Generation (only if you have real changes and validation passed)
+            1. Create a new branch: kaizen/YYYY-MM-DD-HHMM (include time to avoid collisions)
+            2. Commit all changes with a descriptive commit message
+            3. Push the branch: git push origin kaizen/YYYY-MM-DD-HHMM
+            4. Create PR using: gh pr create --title "[Kaizen Daily Task] Daily Hygiene Update - YYYY-MM-DD" --body "<body content>"
 
+            PR Body Format:
             # Daily Hygiene Update
 
             🔍 Codebase Status
@@ -92,4 +105,7 @@ jobs:
             - [ ] Update Docs: [File:Line] - [Description of the discrepancy]
             - [ ] Improve Test: [File:Line] - [Description of the test case to add]
 
-            IMPORTANT: You MUST create the branch, commit changes, push, and create the PR. This is a required part of your daily task.
+            ✅ Validation Status
+            All checks passed: build ✓ test ✓ lint ✓ typecheck ✓
+
+            IMPORTANT: If no real issues are found, or if validation fails, do NOT create a PR. Report what you found and exit gracefully.
