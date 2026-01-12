@@ -62,7 +62,8 @@ jobs:
           # Includes pnpm -C for package-specific commands as documented in CLAUDE.md
           # Includes pnpm format to match CI requirements (see pr-check.yml)
           # Includes pnpm install for dependency verification (similar to claude.yml:61)
-          claude_args: '--allowed-tools "Bash(git checkout -b kaizen/*),Bash(git branch),Bash(git add *),Bash(git commit *),Bash(git push origin kaizen/*),Bash(gh pr create *),Bash(gh pr view *),Bash(pnpm build),Bash(pnpm test),Bash(pnpm lint),Bash(pnpm typecheck),Bash(pnpm format),Bash(pnpm install *),Bash(pnpm -C * test),Bash(pnpm -C * build),Bash(pnpm -C * lint),Bash(pnpm -C * typecheck),Bash(pnpm -C * dev)"'
+          # Includes file editing tools (Edit, Write, Read) and code navigation tools (Grep, Glob, LS)
+          claude_args: '--allowed-tools "Edit,Write,Read,Grep,Glob,LS,SemanticSearch,Bash(git checkout:*),Bash(git branch:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(gh pr create:*),Bash(gh pr view:*),Bash(pnpm build:*),Bash(pnpm test:*),Bash(pnpm lint:*),Bash(pnpm typecheck:*),Bash(pnpm format:*),Bash(pnpm install:*),Bash(pnpm -C:*)"'
 
           prompt: |
             System Context: You are a Lead Software Engineer automated bot designed to submit one daily "Code Hygiene" Pull Request. Your goal is incremental improvement, not feature building.
