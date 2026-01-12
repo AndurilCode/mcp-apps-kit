@@ -1,0 +1,119 @@
+name: Claude Kaizen Daily Task
+
+on:
+  schedule:
+    # Runs daily at 6:00 AM UTC (configurable)
+    - cron: "0 6 * * *"
+  workflow_dispatch: # Allow manual trigger for testing
+
+# Prevent multiple concurrent runs
+concurrency:
+  group: claude-kaizen
+  cancel-in-progress: false
+
+jobs:
+  claude-kaizen:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Create branches and commits
+      pull-requests: write # Create and update PRs
+      issues: write # Reference issues if needed
+      id-token: write # Required for Claude Code authentication
+      actions: read # Read CI results
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.19.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Claude Code Kaizen
+        id: claude-kaizen
+        uses: anthropics/claude-code-action@v1
+        env:
+          KAIZEN_BRANCH: kaizen/daily-${{ github.run_id }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+          # Additional permissions for Claude to interact with GitHub
+          additional_permissions: |
+            actions: read
+            contents: write
+            pull-requests: write
+            issues: write
+
+          # Allow git operations restricted to kaizen branches and specific pnpm commands
+          # Security: Wildcards restricted to safe operations only
+          # Includes pnpm -C for package-specific commands as documented in CLAUDE.md
+          # Includes pnpm format to match CI requirements (see pr-check.yml)
+          # Includes pnpm install for dependency verification (similar to claude.yml:61)
+          claude_args: '--allowed-tools "Bash(git checkout -b kaizen/*),Bash(git branch),Bash(git add *),Bash(git commit *),Bash(git push origin kaizen/*),Bash(gh pr create *),Bash(gh pr view *),Bash(pnpm build),Bash(pnpm test),Bash(pnpm lint),Bash(pnpm typecheck),Bash(pnpm format),Bash(pnpm install *),Bash(pnpm -C * test),Bash(pnpm -C * build),Bash(pnpm -C * lint),Bash(pnpm -C * typecheck),Bash(pnpm -C * dev)"'
+
+          prompt: |
+            System Context: You are a Lead Software Engineer automated bot designed to submit one daily "Code Hygiene" Pull Request. Your goal is incremental improvement, not feature building.
+
+            CRITICAL: Read CLAUDE.md before starting. All changes MUST pass: pnpm format && pnpm build && pnpm test && pnpm lint && pnpm typecheck
+
+            Available Tools: You can use package-specific commands for faster iteration (e.g., pnpm -C packages/core test, pnpm -C examples/minimal dev) as documented in CLAUDE.md line 17.
+
+            Instructions:
+
+            Step 1: Contextual Analysis
+            Briefly explain the core functionality of the files currently in context. Demonstrate that you understand the data flow.
+
+            Step 2: Issue Detection (Strict Mode)
+            Scan the code for issues. You are STRICTLY FORBIDDEN from fabricating issues. Only report REAL issues you find.
+
+            If you cannot find at least one legitimate issue in any of the four categories below, state "No issues found in [category]" and SKIP creating a PR for today. It's better to skip than to force fake improvements.
+
+            Step 3: The Daily 4 (Optional - only if real issues exist)
+            Look for issues in these categories (up to one per category). For each, cite the specific file and line number:
+
+            1. The Typo Fix: A spelling error in user-facing text, variable names, or internal comments.
+            2. The Logic Fix: A bug, undefined variable, dangerous unhandled promise, or off-by-one error.
+            3. The Documentation Fix: Where code has changed but comments/documentation have not, or a complex function with zero comments.
+            4. The Test Improvement: A critical path that is currently untested or a test that is flaky/weak.
+
+            Step 4: Make Changes and Validate
+            1. Make the necessary code changes
+            2. Run validation: pnpm format && pnpm build && pnpm test && pnpm lint && pnpm typecheck
+            3. If validation fails, fix the issues or abandon the PR (do not create broken PRs)
+
+            Step 5: PR Generation (only if you have real changes and validation passed)
+            1. Create a new branch using the environment variable: git checkout -b $KAIZEN_BRANCH
+               (Branch name format: kaizen/daily-{github_run_id} to prevent collisions)
+            2. Commit all changes with a descriptive commit message
+            3. Push the branch: git push origin $KAIZEN_BRANCH
+            4. Create PR using: gh pr create --title "[Kaizen Daily Task] Daily Hygiene Update - $(date +%Y-%m-%d)" --body "<body content>"
+
+            PR Body Format:
+            # Daily Hygiene Update
+
+            🔍 Codebase Status
+            [Brief summary of the code analyzed]
+
+            🛠 Proposed Changes
+            - [ ] Fix Typo: [File:Line] - Change x to y
+            - [ ] Fix Bug: [File:Line] - [Description of the bug]
+            - [ ] Update Docs: [File:Line] - [Description of the discrepancy]
+            - [ ] Improve Test: [File:Line] - [Description of the test case to add]
+
+            ✅ Validation Status
+            All checks passed: format ✓ build ✓ test ✓ lint ✓ typecheck ✓
+
+            IMPORTANT: If no real issues are found, or if validation fails, do NOT create a PR. Report what you found and exit gracefully.
