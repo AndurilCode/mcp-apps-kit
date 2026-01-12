@@ -60,12 +60,16 @@ jobs:
           # Allow git operations restricted to kaizen branches and specific pnpm commands
           # Security: Wildcards restricted to safe operations only
           # Includes pnpm -C for package-specific commands as documented in CLAUDE.md
-          claude_args: '--allowed-tools "Bash(git checkout -b kaizen/*),Bash(git branch),Bash(git add *),Bash(git commit *),Bash(git push origin kaizen/*),Bash(gh pr create *),Bash(gh pr view *),Bash(pnpm build),Bash(pnpm test),Bash(pnpm lint),Bash(pnpm typecheck),Bash(pnpm -C * test),Bash(pnpm -C * build)"'
+          # Includes pnpm format to match CI requirements (see pr-check.yml)
+          # Includes pnpm install for dependency verification (similar to claude.yml:61)
+          claude_args: '--allowed-tools "Bash(git checkout -b kaizen/*),Bash(git branch),Bash(git add *),Bash(git commit *),Bash(git push origin kaizen/*),Bash(gh pr create *),Bash(gh pr view *),Bash(pnpm build),Bash(pnpm test),Bash(pnpm lint),Bash(pnpm typecheck),Bash(pnpm format),Bash(pnpm install *),Bash(pnpm -C * test),Bash(pnpm -C * build),Bash(pnpm -C * lint),Bash(pnpm -C * typecheck),Bash(pnpm -C * dev)"'
 
           prompt: |
             System Context: You are a Lead Software Engineer automated bot designed to submit one daily "Code Hygiene" Pull Request. Your goal is incremental improvement, not feature building.
 
-            CRITICAL: Read CLAUDE.md before starting. All changes MUST pass: pnpm build && pnpm test && pnpm lint && pnpm typecheck
+            CRITICAL: Read CLAUDE.md before starting. All changes MUST pass: pnpm format && pnpm build && pnpm test && pnpm lint && pnpm typecheck
+
+            Available Tools: You can use package-specific commands for faster iteration (e.g., pnpm -C packages/core test, pnpm -C examples/minimal dev) as documented in CLAUDE.md line 17.
 
             Instructions:
 
@@ -87,7 +91,7 @@ jobs:
 
             Step 4: Make Changes and Validate
             1. Make the necessary code changes
-            2. Run validation: pnpm build && pnpm test && pnpm lint && pnpm typecheck
+            2. Run validation: pnpm format && pnpm build && pnpm test && pnpm lint && pnpm typecheck
             3. If validation fails, fix the issues or abandon the PR (do not create broken PRs)
 
             Step 5: PR Generation (only if you have real changes and validation passed)
@@ -110,6 +114,6 @@ jobs:
             - [ ] Improve Test: [File:Line] - [Description of the test case to add]
 
             ✅ Validation Status
-            All checks passed: build ✓ test ✓ lint ✓ typecheck ✓
+            All checks passed: format ✓ build ✓ test ✓ lint ✓ typecheck ✓
 
             IMPORTANT: If no real issues are found, or if validation fails, do NOT create a PR. Report what you found and exit gracefully.
