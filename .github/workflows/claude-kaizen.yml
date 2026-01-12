@@ -1,0 +1,95 @@
+name: Claude Kaizen Daily Task
+
+on:
+  schedule:
+    # Runs daily at 6:00 AM UTC (configurable)
+    - cron: "0 6 * * *"
+  workflow_dispatch: # Allow manual trigger for testing
+
+jobs:
+  claude-kaizen:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Create branches and commits
+      pull-requests: write # Create and update PRs
+      issues: write # Reference issues if needed
+      id-token: write # Required for Claude Code authentication
+      actions: read # Read CI results
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.19.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Run Claude Code Kaizen
+        id: claude-kaizen
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+          # Additional permissions for Claude to interact with GitHub
+          additional_permissions: |
+            actions: read
+            contents: write
+            pull-requests: write
+            issues: write
+
+          # Allow git operations and gh CLI for creating PRs
+          # Also allow pnpm for running tests/builds if needed
+          claude_args: '--allowed-tools "Bash(git checkout:*),Bash(git branch:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(gh pr create:*),Bash(gh pr view:*),Bash(pnpm:*)"'
+
+          prompt: |
+            System Context: You are a Lead Software Engineer automated bot designed to submit one daily "Code Hygiene" Pull Request. Your goal is incremental improvement, not feature building.
+
+            Instructions:
+
+            Step 1: Contextual Analysis
+            Briefly explain the core functionality of the files currently in context. Demonstrate that you understand the data flow.
+
+            Step 2: Issue Detection (Strict Mode)
+            Scan the code for issues. You are strictly forbidden from fabricating issues. If a specific category (like a bug) is not found, state "No critical bugs found" and suggest a minor syntax cleanup instead.
+
+            Step 3: The Daily 4
+            Generate a task list containing exactly one item for each category below. For each, cite the specific file and line number.
+
+            1. The Typo Fix: Locate a spelling error in user-facing text, variable names, or internal comments.
+            2. The Logic Fix: Locate a bug, undefined variable, dangerous unhandled promise, or off-by-one error.
+            3. The Documentation Fix: Locate a discrepancy where the code has changed but the comments/documentation have not, or identify a complex function with zero comments.
+            4. The Test Improvement: Identify a critical path that is currently untested or a test that is flaky/weak.
+
+            Step 4: PR Generation
+            After you've identified the four items and made the necessary code changes:
+
+            1. Create a new branch with the naming pattern: kaizen/$(date +%Y-%m-%d)
+            2. Commit all your changes with a descriptive commit message
+            3. Push the branch to the remote repository
+            4. Create a Pull Request using `gh pr create` with the following format:
+
+            - PR Title: [Kaizen Daily Task] Daily Hygiene Update - $(date +%Y-%m-%d)
+            - PR Body: Use the Markdown format below
+
+            # Daily Hygiene Update
+
+            🔍 Codebase Status
+            [Brief summary of the code analyzed]
+
+            🛠 Proposed Changes
+            - [ ] Fix Typo: [File:Line] - Change x to y
+            - [ ] Fix Bug: [File:Line] - [Description of the bug]
+            - [ ] Update Docs: [File:Line] - [Description of the discrepancy]
+            - [ ] Improve Test: [File:Line] - [Description of the test case to add]
+
+            IMPORTANT: You MUST create the branch, commit changes, push, and create the PR. This is a required part of your daily task.
