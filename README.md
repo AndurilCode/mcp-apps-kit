@@ -112,18 +112,35 @@ See [Packages](#packages) for all available packages.
 ### Server
 
 ```typescript
-import { createApp, defineTool } from "@mcp-apps-kit/core";
+import { createApp, defineTool, defineUI } from "@mcp-apps-kit/core";
 import { z } from "zod";
+
+// Define a UI resource for the tool
+const greetingUI = defineUI({
+  name: "Greeting Widget",
+  html: "./ui/dist/greeting.html",
+  prefersBorder: true,
+});
 
 const app = createApp({
   name: "my-app",
   version: "1.0.0",
   tools: {
     greet: defineTool({
-      description: "Greet a user",
-      input: z.object({ name: z.string() }),
-      output: z.object({ message: z.string() }),
-      handler: async ({ name }) => ({ message: `Hello, ${name}!` }),
+      title: "Greet User",
+      description: "Generate a personalized greeting",
+      input: z.object({
+        name: z.string().describe("Name to greet"),
+      }),
+      output: z.object({
+        message: z.string(),
+        timestamp: z.string(),
+      }),
+      ui: greetingUI,
+      handler: async ({ name }) => ({
+        message: `Hello, ${name}!`,
+        timestamp: new Date().toISOString(),
+      }),
     }),
   },
 });
@@ -133,19 +150,43 @@ await app.start({ port: 3000 });
 
 ### React UI
 
-```typescript
-import { useAppsClient, useToolResult } from "@mcp-apps-kit/ui-react";
+Wrap your app with `AppsProvider` and use hooks to access tool results:
 
-function MyWidget() {
-  const client = useAppsClient();
-  const result = useToolResult();
+```tsx
+// App.tsx
+import { AppsProvider } from "@mcp-apps-kit/ui-react";
+import { GreetingWidget } from "./GreetingWidget";
+
+export function App() {
+  return (
+    <AppsProvider>
+      <GreetingWidget />
+    </AppsProvider>
+  );
+}
+```
+
+```tsx
+// GreetingWidget.tsx
+import { useToolResult, useHostContext } from "@mcp-apps-kit/ui-react";
+
+interface GreetingResult {
+  message: string;
+  timestamp: string;
+}
+
+export function GreetingWidget() {
+  const result = useToolResult<GreetingResult>();
+  const { theme } = useHostContext();
+
+  if (!result) {
+    return <div>Loading...</div>;
+  }
 
   return (
-    <div>
-      <p>{result?.greet?.message}</p>
-      <button onClick={() => client.callTool("greet", { name: "World" })}>
-        Greet
-      </button>
+    <div style={{ background: theme === "dark" ? "#1a1a1a" : "#fff" }}>
+      <h2>{result.message}</h2>
+      <p>Generated at: {new Date(result.timestamp).toLocaleString()}</p>
     </div>
   );
 }
