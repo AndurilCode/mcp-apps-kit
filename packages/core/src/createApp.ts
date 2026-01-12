@@ -822,10 +822,10 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
       ui: Object.keys(uiDefs).length > 0 ? uiDefs : undefined,
     };
 
-    // Note: Debug logger is configured once with global config (line 681-683).
-    // We don't reconfigure it per-version because it's a global singleton.
-    // If version-specific debug configs are needed, they would require per-version
-    // logger instances, which is a larger architectural change.
+    // Note: Debug logger is configured with global config (line 805-807) for multi-version apps.
+    // For single-version apps, it's configured at line 562. We don't reconfigure it per-version
+    // because it's a global singleton. If version-specific debug configs are needed, they would
+    // require per-version logger instances, which is a larger architectural change.
 
     // Initialize version-specific plugin manager
     const versionPluginManager = new PluginManager(normalizedVersionConfig.plugins ?? []);
