@@ -45,6 +45,8 @@ jobs:
       - name: Run Claude Code Kaizen
         id: claude-kaizen
         uses: anthropics/claude-code-action@v1
+        env:
+          KAIZEN_BRANCH: kaizen/daily-${{ github.run_id }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
@@ -57,7 +59,8 @@ jobs:
 
           # Allow git operations restricted to kaizen branches and specific pnpm commands
           # Security: Wildcards restricted to safe operations only
-          claude_args: '--allowed-tools "Bash(git checkout -b kaizen/*),Bash(git branch),Bash(git add *),Bash(git commit *),Bash(git push origin kaizen/*),Bash(gh pr create *),Bash(gh pr view *),Bash(pnpm build),Bash(pnpm test),Bash(pnpm lint),Bash(pnpm typecheck)"'
+          # Includes pnpm -C for package-specific commands as documented in CLAUDE.md
+          claude_args: '--allowed-tools "Bash(git checkout -b kaizen/*),Bash(git branch),Bash(git add *),Bash(git commit *),Bash(git push origin kaizen/*),Bash(gh pr create *),Bash(gh pr view *),Bash(pnpm build),Bash(pnpm test),Bash(pnpm lint),Bash(pnpm typecheck),Bash(pnpm -C * test),Bash(pnpm -C * build)"'
 
           prompt: |
             System Context: You are a Lead Software Engineer automated bot designed to submit one daily "Code Hygiene" Pull Request. Your goal is incremental improvement, not feature building.
@@ -88,10 +91,11 @@ jobs:
             3. If validation fails, fix the issues or abandon the PR (do not create broken PRs)
 
             Step 5: PR Generation (only if you have real changes and validation passed)
-            1. Create a new branch: kaizen/YYYY-MM-DD-HHMM (include time to avoid collisions)
+            1. Create a new branch using the environment variable: git checkout -b $KAIZEN_BRANCH
+               (Branch name format: kaizen/daily-{github_run_id} to prevent collisions)
             2. Commit all changes with a descriptive commit message
-            3. Push the branch: git push origin kaizen/YYYY-MM-DD-HHMM
-            4. Create PR using: gh pr create --title "[Kaizen Daily Task] Daily Hygiene Update - YYYY-MM-DD" --body "<body content>"
+            3. Push the branch: git push origin $KAIZEN_BRANCH
+            4. Create PR using: gh pr create --title "[Kaizen Daily Task] Daily Hygiene Update - $(date +%Y-%m-%d)" --body "<body content>"
 
             PR Body Format:
             # Daily Hygiene Update
