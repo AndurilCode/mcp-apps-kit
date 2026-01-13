@@ -61,6 +61,39 @@ export interface MiddlewareContext {
  */
 export type Middleware = (context: MiddlewareContext, next: () => Promise<void>) => Promise<void>;
 
+/**
+ * Middleware function with result passing
+ *
+ * Allows middleware to inspect and transform results from downstream handlers.
+ * The generic type `TResult` represents the result type that flows through the chain.
+ *
+ * @template TResult - The type of result returned by the handler and middleware chain
+ *
+ * @example Basic usage
+ * ```typescript
+ * const logResult: MiddlewareWithResult<{ data: string }> = async (context, next) => {
+ *   const result = await next();
+ *   console.log("Result:", result.data);
+ *   return result;
+ * };
+ * ```
+ *
+ * @example Transform result
+ * ```typescript
+ * const addTimestamp: MiddlewareWithResult<ToolResult> = async (context, next) => {
+ *   const result = await next();
+ *   return {
+ *     ...result,
+ *     _meta: { ...result._meta, timestamp: Date.now() }
+ *   };
+ * };
+ * ```
+ */
+export type MiddlewareWithResult<TResult = unknown> = (
+  context: MiddlewareContext,
+  next: () => Promise<TResult>
+) => Promise<TResult>;
+
 // =============================================================================
 // MIDDLEWARE ERROR TYPES
 // =============================================================================

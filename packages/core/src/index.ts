@@ -91,7 +91,7 @@ export { PluginManager } from "./plugins/PluginManager";
 export { loggingPlugin } from "./plugins/builtin/logging";
 
 // Middleware types
-export type { Middleware, MiddlewareContext } from "./middleware/types";
+export type { Middleware, MiddlewareContext, MiddlewareWithResult } from "./middleware/types";
 export {
   MultipleNextCallsError,
   MiddlewareTimeoutError,
@@ -102,6 +102,19 @@ export {
   createTimeoutMiddleware,
 } from "./middleware/types";
 export { MiddlewareChain } from "./middleware/MiddlewareChain";
+
+// Safe middleware helpers
+export {
+  defineMiddleware,
+  type BeforeHook,
+  type AfterHook,
+  type WrapMiddleware,
+  type MiddlewareDefinition,
+  type BeforeHookWithResult,
+  type AfterHookWithResult,
+  type WrapMiddlewareWithResult,
+  type MiddlewareDefinitionWithResult,
+} from "./middleware/defineMiddleware";
 
 // Event types
 export type {

@@ -8,7 +8,7 @@ export default [
   eslint.configs.recommended,
   prettierConfig,
   {
-    ignores: ["node_modules/**", "dist/**", "coverage/**", ".nx/**"],
+    ignores: ["node_modules/**", "dist/**", "coverage/**", ".nx/**", "**/*.md"],
   },
   // Server-side packages (Node.js environment)
   {
