@@ -55,8 +55,8 @@
     "directory": "packages/ui-react-builder"
   },
   "dependencies": {
-    "@typescript-eslint/typescript-estree": "^8.0.0",
-    "esbuild": "^0.25.0"
+    "@typescript-eslint/typescript-estree": "^8.53.0",
+    "esbuild": "^0.27.2"
   },
   "peerDependencies": {
     "@mcp-apps-kit/core": "^0.4.0",
