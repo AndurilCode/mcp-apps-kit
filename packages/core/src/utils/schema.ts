@@ -52,6 +52,24 @@ export interface ZodToJsonSchemaOptions {
 export type ZodRawShapeRecord = Record<string, z.ZodType>;
 
 /**
+ * Helper type that enforces all properties in T are Zod schemas.
+ * Returns `never` for any property that is not a Zod schema, which causes
+ * TypeScript to error when the type is used in a function parameter.
+ *
+ * @example
+ * ```typescript
+ * // Valid - all properties are Zod schemas
+ * type Valid = AssertZodShape<{ name: z.ZodString }>; // { name: z.ZodString }
+ *
+ * // Invalid - 'age' is not a Zod schema
+ * type Invalid = AssertZodShape<{ name: z.ZodString; age: number }>; // { name: z.ZodString; age: never }
+ * ```
+ */
+export type AssertZodShape<T> = {
+  [K in keyof T]: T[K] extends z.ZodType ? T[K] : never;
+};
+
+/**
  * Type that accepts either a Zod schema or a plain object of Zod schemas.
  * The plain object will be auto-wrapped with z.object().
  *

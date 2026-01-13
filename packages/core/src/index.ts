@@ -166,6 +166,7 @@ export type {
   ZodRawShapeRecord,
   InferFromSchemaInput,
   NormalizeSchema,
+  AssertZodShape,
 } from "./utils/schema";
 
 // Error utilities

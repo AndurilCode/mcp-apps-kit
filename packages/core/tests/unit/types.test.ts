@@ -13,7 +13,7 @@ import type {
   InferToolOutputs,
   ClientToolsFromCore,
 } from "../../src/types/tools";
-import { createApp, defineTool } from "../../src/index.js";
+import { createApp, defineTool, normalizeSchema } from "../../src/index.js";
 
 describe("type inference utilities", () => {
   describe("InferToolInputs", () => {
@@ -712,6 +712,57 @@ describe("defineTool with inline schema syntax", () => {
         required: "test",
         nullable: null,
       });
+    });
+  });
+
+  describe("AssertZodShape type safety", () => {
+    it("should correctly type valid Zod shapes", () => {
+      type ValidShape = { name: z.ZodString; age: z.ZodNumber };
+      type Asserted = import("../../src/utils/schema").AssertZodShape<ValidShape>;
+
+      // Valid shape should preserve types
+      expectTypeOf<Asserted["name"]>().toEqualTypeOf<z.ZodString>();
+      expectTypeOf<Asserted["age"]>().toEqualTypeOf<z.ZodNumber>();
+    });
+
+    it("should mark invalid properties as never", () => {
+      type InvalidShape = { name: z.ZodString; age: number };
+      type Asserted = import("../../src/utils/schema").AssertZodShape<InvalidShape>;
+
+      // Valid property preserved
+      expectTypeOf<Asserted["name"]>().toEqualTypeOf<z.ZodString>();
+      // Invalid property becomes never
+      expectTypeOf<Asserted["age"]>().toEqualTypeOf<never>();
+    });
+
+    it("should handle mixed valid/invalid properties", () => {
+      type MixedShape = {
+        valid1: z.ZodString;
+        invalid1: string;
+        valid2: z.ZodOptional<z.ZodNumber>;
+        invalid2: boolean;
+      };
+      type Asserted = import("../../src/utils/schema").AssertZodShape<MixedShape>;
+
+      expectTypeOf<Asserted["valid1"]>().toEqualTypeOf<z.ZodString>();
+      expectTypeOf<Asserted["valid2"]>().toEqualTypeOf<z.ZodOptional<z.ZodNumber>>();
+      expectTypeOf<Asserted["invalid1"]>().toEqualTypeOf<never>();
+      expectTypeOf<Asserted["invalid2"]>().toEqualTypeOf<never>();
+    });
+
+    it("should throw runtime error for non-Zod values in inline syntax", () => {
+      // Runtime error for invalid schema
+      const invalidSchema = { name: "not a zod schema" };
+      expect(() => normalizeSchema(invalidSchema as never)).toThrow(
+        'Invalid schema definition: property "name" must be a Zod schema'
+      );
+    });
+
+    it("should throw runtime error for mixed valid/invalid values", () => {
+      const mixedSchema = { valid: z.string(), invalid: 123 };
+      expect(() => normalizeSchema(mixedSchema as never)).toThrow(
+        'Invalid schema definition: property "invalid" must be a Zod schema'
+      );
     });
   });
 });

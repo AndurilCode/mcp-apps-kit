@@ -12,6 +12,7 @@ import { createApp, defineTool, type ClientToolsFromCore } from "@mcp-apps-kit/c
 import { defineReactUI } from "@mcp-apps-kit/ui-react-builder";
 import { GreetingWidgetV1 } from "./ui/GreetingWidgetV1";
 import { GreetingWidgetV2 } from "./ui/GreetingWidgetV2";
+import { EchoWidget } from "./ui/EchoWidget";
 import { z } from "zod";
 
 // =============================================================================
@@ -145,9 +146,8 @@ const echoToolV3 = defineTool({
 
   visibility: "both",
 
-  // Reuse V2 widget (output structure compatible)
   ui: defineReactUI({
-    component: GreetingWidgetV2,
+    component: EchoWidget,
     name: "Echo Widget V3",
     description: "Echoes messages (v3 - inline schema syntax)",
     prefersBorder: true,
