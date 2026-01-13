@@ -441,6 +441,34 @@ export interface App<T extends ToolDefs = ToolDefs> {
   /** Typed tool definitions (for type inference) */
   readonly tools: T;
 
+  /**
+   * Phantom type for client-side type inference.
+   *
+   * This property has no runtime value - it exists only at the type level
+   * to enable automatic client type extraction.
+   *
+   * @example Single-version app
+   * ```typescript
+   * // server.ts
+   * export { app };
+   *
+   * // ui.tsx
+   * import { createTypedClient } from "@mcp-apps-kit/ui";
+   * import { app } from "./server";
+   * const client = await createTypedClient(app);
+   * ```
+   *
+   * @example Multi-version app
+   * ```typescript
+   * // server.ts
+   * export const v1 = app.getVersion("v1")!;
+   *
+   * // ui.tsx
+   * const client = await createTypedClient(v1);
+   * ```
+   */
+  readonly clientTypes: ClientToolsFromCore<T>;
+
   // ---------------------------------------------------------------------------
   // MIDDLEWARE
   // ---------------------------------------------------------------------------

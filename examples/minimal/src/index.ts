@@ -193,13 +193,17 @@ Debug logging:
 // Export types for UI
 // =============================================================================
 
-// V1 types
+// Note: For multi-version apps, TypeScript has limitations with per-version type extraction.
+// Manual type exports are still recommended for this use case.
+// For single-version apps, you can export the app and use typeof app.clientTypes() in your UI code.
+
+// V1 types (manual exports - required for multi-version apps)
 export type AppToolsV1 = { greet: typeof greetToolV1 };
 export type AppClientToolsV1 = ClientToolsFromCore<AppToolsV1>;
 export type GreetInputV1 = z.infer<typeof greetInputV1>;
 export type GreetOutputV1 = z.infer<typeof greetOutputV1>;
 
-// V2 types
+// V2 types (manual exports - required for multi-version apps)
 export type AppToolsV2 = { greet: typeof greetToolV2 };
 export type AppClientToolsV2 = ClientToolsFromCore<AppToolsV2>;
 export type GreetInputV2 = z.infer<typeof greetInputV2>;

@@ -298,7 +298,8 @@ const app = createApp({
   },
 });
 
-export type RestaurantFinderClientTools = ClientToolsFromCore<typeof app.tools>;
+// Export app for typed client creation in UI
+export { app };
 
 // =============================================================================
 // START SERVER
