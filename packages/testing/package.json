@@ -61,9 +61,9 @@
     "directory": "packages/testing"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.1",
+    "@modelcontextprotocol/sdk": "^1.25.2",
     "debug": "^4.0.0",
-    "zod": "^4.0.0"
+    "zod": "^4.3.5"
   },
   "peerDependencies": {
     "@anthropic-ai/sdk": ">=0.30.0",
