@@ -380,13 +380,6 @@ importers:
         version: 19.2.3(react@19.2.3)
 
   packages/ui-react-builder:
-    dependencies:
-      '@typescript-eslint/typescript-estree':
-        specifier: ^8.53.0
-        version: 8.53.0(typescript@5.9.3)
-      esbuild:
-        specifier: ^0.27.2
-        version: 0.27.2
     devDependencies:
       '@mcp-apps-kit/core':
         specifier: workspace:*
@@ -403,6 +396,12 @@ importers:
       '@typescript-eslint/types':
         specifier: ^8.53.0
         version: 8.53.0
+      '@typescript-eslint/typescript-estree':
+        specifier: ^8.53.0
+        version: 8.53.0(typescript@5.9.3)
+      esbuild:
+        specifier: ^0.27.2
+        version: 0.27.2
       react:
         specifier: ^19.2.3
         version: 19.2.3

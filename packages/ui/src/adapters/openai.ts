@@ -547,9 +547,23 @@ export class OpenAIAdapter implements ProtocolAdapter {
       _type: "modelContext",
     };
 
-    // Add structured content directly
+    // Add structured content, filtering out reserved underscore-prefixed keys
     if (params.structuredContent) {
-      Object.assign(modelContext, params.structuredContent);
+      const structuredContent = params.structuredContent;
+      const reservedKeys = Object.keys(structuredContent).filter((key) => key.startsWith("_"));
+      if (reservedKeys.length > 0) {
+        clientDebugLogger.debug(
+          "[OpenAI Adapter] Filtering reserved keys from structuredContent:",
+          reservedKeys
+        );
+      }
+
+      // Only merge non-reserved keys
+      Object.keys(structuredContent).forEach((key) => {
+        if (!key.startsWith("_")) {
+          modelContext[key] = structuredContent[key];
+        }
+      });
     }
 
     // Convert content blocks to text representation for the model
