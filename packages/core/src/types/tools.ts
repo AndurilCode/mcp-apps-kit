@@ -5,6 +5,12 @@
 import type { z } from "zod";
 import type { Middleware } from "../middleware/types";
 import type { EventMap, EventHandler, AnyEventHandler, UnsubscribeFn } from "../events/types";
+import {
+  normalizeSchema,
+  type SchemaInput,
+  type InferFromSchemaInput,
+  type NormalizeSchema,
+} from "../utils/schema";
 
 // Use Zod's built-in type inference utilities directly
 
@@ -341,7 +347,9 @@ export type ToolDefs = Record<string, ToolDef>;
  * This helper solves TypeScript's generic type inference limitations
  * by capturing the specific schema types at the call site.
  *
- * @example
+ * Supports both explicit Zod schemas and inline object syntax:
+ *
+ * @example Explicit Zod schemas
  * ```typescript
  * const myTool = defineTool({
  *   description: "My tool description",
@@ -353,20 +361,47 @@ export type ToolDefs = Record<string, ToolDef>;
  *   }
  * });
  * ```
+ *
+ * @example Inline object syntax (auto-wrapped with z.object())
+ * ```typescript
+ * const myTool = defineTool({
+ *   description: "My tool description",
+ *   input: { name: z.string() },
+ *   output: { result: z.string() },
+ *   handler: async (input, context) => {
+ *     // input is fully typed as { name: string }
+ *     return { result: `Hello ${input.name}` };
+ *   }
+ * });
+ * ```
  */
 export function defineTool<
-  TInput extends z.ZodType,
-  TOutput extends z.ZodType,
-  TActual extends z.infer<TOutput> & ToolOutputMeta = z.infer<TOutput> & ToolOutputMeta,
+  TInput extends SchemaInput,
+  TOutput extends SchemaInput = Record<string, never>,
+  TActual extends InferFromSchemaInput<TOutput> & ToolOutputMeta = InferFromSchemaInput<TOutput> &
+    ToolOutputMeta,
 >(
-  definition: Omit<ToolDef<TInput, TOutput>, "handler"> & {
+  definition: Omit<
+    ToolDef<NormalizeSchema<TInput>, NormalizeSchema<TOutput>>,
+    "handler" | "input" | "output"
+  > & {
+    input: TInput;
+    output?: TOutput;
     handler: (
-      input: z.infer<TInput>,
+      input: InferFromSchemaInput<TInput>,
       context: ToolContext
-    ) => Promise<StrictToolOutput<z.infer<TOutput>, TActual>>;
+    ) => Promise<StrictToolOutput<InferFromSchemaInput<TOutput>, TActual>>;
   }
-): ToolDef<TInput, TOutput> {
-  return definition as ToolDef<TInput, TOutput>;
+): ToolDef<NormalizeSchema<TInput>, NormalizeSchema<TOutput>> {
+  // Normalize input and output schemas at runtime
+  const normalizedInput = normalizeSchema(definition.input);
+  const normalizedOutput = definition.output ? normalizeSchema(definition.output) : undefined;
+
+  return {
+    ...definition,
+    input: normalizedInput,
+    output: normalizedOutput,
+  } as ToolDef<NormalizeSchema<TInput>, NormalizeSchema<TOutput>>;
 }
 
 // =============================================================================

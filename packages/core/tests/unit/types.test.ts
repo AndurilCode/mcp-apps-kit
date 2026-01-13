@@ -13,7 +13,7 @@ import type {
   InferToolOutputs,
   ClientToolsFromCore,
 } from "../../src/types/tools";
-import { createApp, defineTool } from "../../src/index.js";
+import { createApp, defineTool, normalizeSchema } from "../../src/index.js";
 
 describe("type inference utilities", () => {
   describe("InferToolInputs", () => {
@@ -260,6 +260,509 @@ describe("type inference utilities", () => {
       };
 
       expectTypeOf<ActualClientTypes>().toMatchTypeOf<ExpectedClientTypes>();
+    });
+  });
+});
+
+describe("defineTool with inline schema syntax", () => {
+  describe("type inference", () => {
+    it("should infer input type from inline object syntax", () => {
+      const tool = defineTool({
+        description: "Test tool",
+        input: { name: z.string(), age: z.number() },
+        output: { message: z.string() },
+        handler: async (input) => {
+          // Type assertion - input should be { name: string; age: number }
+          expectTypeOf(input).toEqualTypeOf<{ name: string; age: number }>();
+          return { message: `Hello ${input.name}` };
+        },
+      });
+
+      // Verify the tool's input is a ZodObject
+      expect(tool.input instanceof z.ZodObject).toBe(true);
+    });
+
+    it("should infer output type from inline object syntax", () => {
+      const tool = defineTool({
+        description: "Test tool",
+        input: { name: z.string() },
+        output: { message: z.string(), count: z.number() },
+        handler: async (input) => {
+          return { message: `Hello ${input.name}`, count: 1 };
+        },
+      });
+
+      expect(tool.output instanceof z.ZodObject).toBe(true);
+    });
+
+    it("should support mixed syntax (explicit input, inline output)", () => {
+      const tool = defineTool({
+        description: "Test tool",
+        input: z.object({ name: z.string() }),
+        output: { message: z.string() },
+        handler: async (input) => {
+          expectTypeOf(input).toEqualTypeOf<{ name: string }>();
+          return { message: `Hello ${input.name}` };
+        },
+      });
+
+      expect(tool.input instanceof z.ZodObject).toBe(true);
+      expect(tool.output instanceof z.ZodObject).toBe(true);
+    });
+
+    it("should support mixed syntax (inline input, explicit output)", () => {
+      const tool = defineTool({
+        description: "Test tool",
+        input: { name: z.string() },
+        output: z.object({ message: z.string() }),
+        handler: async (input) => {
+          expectTypeOf(input).toEqualTypeOf<{ name: string }>();
+          return { message: `Hello ${input.name}` };
+        },
+      });
+
+      expect(tool.input instanceof z.ZodObject).toBe(true);
+      expect(tool.output instanceof z.ZodObject).toBe(true);
+    });
+  });
+
+  describe("backward compatibility", () => {
+    it("should maintain backward compatibility with explicit Zod schemas", () => {
+      const tool = defineTool({
+        description: "Test tool",
+        input: z.object({ name: z.string() }),
+        output: z.object({ message: z.string() }),
+        handler: async (input) => {
+          expectTypeOf(input).toEqualTypeOf<{ name: string }>();
+          return { message: `Hello ${input.name}` };
+        },
+      });
+
+      expect(tool.input instanceof z.ZodObject).toBe(true);
+    });
+
+    it("should work with optional output", () => {
+      const tool = defineTool({
+        description: "Test tool",
+        input: { name: z.string() },
+        // No output defined
+        handler: async (input) => {
+          return { _text: `Greeted ${input.name}` };
+        },
+      });
+
+      expect(tool.input instanceof z.ZodObject).toBe(true);
+      expect(tool.output).toBeUndefined();
+    });
+  });
+
+  describe("runtime normalization", () => {
+    it("should normalize inline input to ZodObject", () => {
+      const tool = defineTool({
+        description: "Test tool",
+        input: { name: z.string(), age: z.number() },
+        handler: async (input) => ({ _text: "done" }),
+      });
+
+      // Verify the normalized schema works for parsing
+      const result = tool.input.parse({ name: "John", age: 30 });
+      expect(result).toEqual({ name: "John", age: 30 });
+    });
+
+    it("should normalize inline output to ZodObject", () => {
+      const tool = defineTool({
+        description: "Test tool",
+        input: {},
+        output: { message: z.string(), count: z.number() },
+        handler: async () => ({ message: "hello", count: 1 }),
+      });
+
+      // Verify the normalized schema works for parsing
+      const result = tool.output!.parse({ message: "test", count: 42 });
+      expect(result).toEqual({ message: "test", count: 42 });
+    });
+
+    it("should preserve schema identity for explicit Zod schemas", () => {
+      const inputSchema = z.object({ name: z.string() });
+      const outputSchema = z.object({ message: z.string() });
+
+      const tool = defineTool({
+        description: "Test tool",
+        input: inputSchema,
+        output: outputSchema,
+        handler: async (input) => ({ message: `Hello ${input.name}` }),
+      });
+
+      // The normalized schema should be the same object for explicit schemas
+      expect(tool.input).toBe(inputSchema);
+      expect(tool.output).toBe(outputSchema);
+    });
+
+    it("should handle empty inline input", () => {
+      const tool = defineTool({
+        description: "Ping tool",
+        input: {},
+        output: { status: z.literal("ok") },
+        handler: async () => ({ status: "ok" as const }),
+      });
+
+      expect(tool.input instanceof z.ZodObject).toBe(true);
+      const result = tool.input.parse({});
+      expect(result).toEqual({});
+    });
+  });
+
+  describe("complex schemas", () => {
+    it("should handle nested Zod schemas in inline syntax", () => {
+      const tool = defineTool({
+        description: "Test tool",
+        input: {
+          user: z.object({ name: z.string(), email: z.string() }),
+          tags: z.array(z.string()),
+        },
+        handler: async (input) => {
+          expectTypeOf(input.user).toEqualTypeOf<{ name: string; email: string }>();
+          expectTypeOf(input.tags).toEqualTypeOf<string[]>();
+          return { _text: "done" };
+        },
+      });
+
+      const result = tool.input.parse({
+        user: { name: "John", email: "john@example.com" },
+        tags: ["admin", "user"],
+      });
+
+      expect(result).toEqual({
+        user: { name: "John", email: "john@example.com" },
+        tags: ["admin", "user"],
+      });
+    });
+
+    it("should handle optional fields in inline syntax", () => {
+      const tool = defineTool({
+        description: "Test tool",
+        input: {
+          required: z.string(),
+          optional: z.number().optional(),
+        },
+        handler: async (input) => {
+          expectTypeOf(input.required).toEqualTypeOf<string>();
+          expectTypeOf(input.optional).toEqualTypeOf<number | undefined>();
+          return { _text: "done" };
+        },
+      });
+
+      // Should parse with optional field
+      expect(tool.input.parse({ required: "hello", optional: 42 })).toEqual({
+        required: "hello",
+        optional: 42,
+      });
+
+      // Should parse without optional field
+      expect(tool.input.parse({ required: "hello" })).toEqual({
+        required: "hello",
+      });
+    });
+  });
+
+  describe("edge cases", () => {
+    it("should handle deeply nested Zod objects in inline syntax", () => {
+      const tool = defineTool({
+        description: "Test tool with deeply nested schemas",
+        input: {
+          level1: z.object({
+            level2: z.object({
+              level3: z.object({
+                value: z.string(),
+              }),
+            }),
+          }),
+        },
+        handler: async (input) => {
+          expectTypeOf(input.level1.level2.level3.value).toEqualTypeOf<string>();
+          return { _text: input.level1.level2.level3.value };
+        },
+      });
+
+      const result = tool.input.parse({
+        level1: { level2: { level3: { value: "deep" } } },
+      });
+      expect(result.level1.level2.level3.value).toBe("deep");
+    });
+
+    it("should preserve .describe() on inline schema fields", () => {
+      const tool = defineTool({
+        description: "Test tool with descriptions",
+        input: {
+          name: z.string().describe("The user's full name"),
+          age: z.number().min(0).max(150).describe("Age in years"),
+          email: z.string().email().describe("Valid email address"),
+        },
+        handler: async (input) => ({ _text: input.name }),
+      });
+
+      // Verify schema is a ZodObject with correct shape
+      expect(tool.input instanceof z.ZodObject).toBe(true);
+
+      // Parsing should work with valid data
+      const result = tool.input.parse({
+        name: "John Doe",
+        age: 30,
+        email: "john@example.com",
+      });
+      expect(result.name).toBe("John Doe");
+    });
+
+    it("should work with Zod transformations in inline syntax", () => {
+      const tool = defineTool({
+        description: "Test tool with transforms",
+        input: {
+          date: z.string().transform((s) => new Date(s)),
+          count: z.string().transform(Number),
+        },
+        handler: async (input) => {
+          expectTypeOf(input.date).toEqualTypeOf<Date>();
+          expectTypeOf(input.count).toEqualTypeOf<number>();
+          return { _text: `${input.count}` };
+        },
+      });
+
+      const result = tool.input.parse({
+        date: "2024-01-15",
+        count: "42",
+      });
+      expect(result.date instanceof Date).toBe(true);
+      expect(result.count).toBe(42);
+    });
+
+    it("should work with Zod refinements in inline syntax", () => {
+      const tool = defineTool({
+        description: "Test tool with refinements",
+        input: {
+          password: z
+            .string()
+            .min(8)
+            .refine((p) => /[A-Z]/.test(p), {
+              message: "Must contain uppercase",
+            }),
+          confirmPassword: z.string(),
+        },
+        handler: async (input) => ({ _text: "valid" }),
+      });
+
+      // Valid input
+      expect(() =>
+        tool.input.parse({ password: "Password1", confirmPassword: "Password1" })
+      ).not.toThrow();
+
+      // Invalid input (no uppercase)
+      expect(() =>
+        tool.input.parse({ password: "password1", confirmPassword: "password1" })
+      ).toThrow();
+    });
+
+    it("should work with enums in inline syntax", () => {
+      const tool = defineTool({
+        description: "Test tool with enums",
+        input: {
+          status: z.enum(["pending", "active", "completed"]),
+          priority: z.enum(["low", "medium", "high"]).optional(),
+        },
+        handler: async (input) => {
+          expectTypeOf(input.status).toEqualTypeOf<"pending" | "active" | "completed">();
+          expectTypeOf(input.priority).toEqualTypeOf<"low" | "medium" | "high" | undefined>();
+          return { _text: input.status };
+        },
+      });
+
+      const result = tool.input.parse({ status: "active" });
+      expect(result.status).toBe("active");
+    });
+
+    it("should work with arrays of objects in inline syntax", () => {
+      const tool = defineTool({
+        description: "Test tool with array of objects",
+        input: {
+          items: z.array(
+            z.object({
+              id: z.number(),
+              name: z.string(),
+            })
+          ),
+        },
+        output: {
+          count: z.number(),
+          names: z.array(z.string()),
+        },
+        handler: async (input) => ({
+          count: input.items.length,
+          names: input.items.map((i) => i.name),
+        }),
+      });
+
+      const result = tool.input.parse({
+        items: [
+          { id: 1, name: "Alice" },
+          { id: 2, name: "Bob" },
+        ],
+      });
+      expect(result.items).toHaveLength(2);
+    });
+
+    it("should work with unions in inline syntax", () => {
+      const tool = defineTool({
+        description: "Test tool with union types",
+        input: {
+          value: z.union([z.string(), z.number()]),
+          action: z.union([z.literal("create"), z.literal("update"), z.literal("delete")]),
+        },
+        handler: async (input) => {
+          expectTypeOf(input.value).toEqualTypeOf<string | number>();
+          expectTypeOf(input.action).toEqualTypeOf<"create" | "update" | "delete">();
+          return { _text: String(input.value) };
+        },
+      });
+
+      expect(tool.input.parse({ value: "test", action: "create" })).toEqual({
+        value: "test",
+        action: "create",
+      });
+      expect(tool.input.parse({ value: 123, action: "update" })).toEqual({
+        value: 123,
+        action: "update",
+      });
+    });
+
+    it("should handle mixed inline/explicit in complex multi-tool scenario", () => {
+      // Tool 1: Fully inline
+      const tool1 = defineTool({
+        description: "Tool with inline syntax",
+        input: { query: z.string() },
+        output: { results: z.array(z.string()) },
+        handler: async (input) => ({ results: [input.query] }),
+      });
+
+      // Tool 2: Fully explicit
+      const explicitInput = z.object({ id: z.number() });
+      const explicitOutput = z.object({ found: z.boolean() });
+      const tool2 = defineTool({
+        description: "Tool with explicit syntax",
+        input: explicitInput,
+        output: explicitOutput,
+        handler: async (input) => ({ found: input.id > 0 }),
+      });
+
+      // Tool 3: Mixed (inline input, explicit output)
+      const mixedOutput = z.object({ message: z.string(), code: z.number() });
+      const tool3 = defineTool({
+        description: "Tool with mixed syntax",
+        input: { action: z.enum(["start", "stop"]) },
+        output: mixedOutput,
+        handler: async (input) => ({
+          message: `Action: ${input.action}`,
+          code: input.action === "start" ? 1 : 0,
+        }),
+      });
+
+      // All tools should have proper ZodObject inputs/outputs
+      expect(tool1.input instanceof z.ZodObject).toBe(true);
+      expect(tool1.output instanceof z.ZodObject).toBe(true);
+      expect(tool2.input).toBe(explicitInput);
+      expect(tool2.output).toBe(explicitOutput);
+      expect(tool3.input instanceof z.ZodObject).toBe(true);
+      expect(tool3.output).toBe(mixedOutput);
+    });
+
+    it("should work with default values in inline syntax", () => {
+      const tool = defineTool({
+        description: "Test tool with defaults",
+        input: {
+          name: z.string(),
+          limit: z.number().default(10),
+          active: z.boolean().default(true),
+        },
+        handler: async (input) => {
+          expectTypeOf(input.limit).toEqualTypeOf<number>();
+          expectTypeOf(input.active).toEqualTypeOf<boolean>();
+          return { _text: `${input.name}: ${input.limit}` };
+        },
+      });
+
+      const result = tool.input.parse({ name: "test" });
+      expect(result).toEqual({ name: "test", limit: 10, active: true });
+    });
+
+    it("should work with nullable fields in inline syntax", () => {
+      const tool = defineTool({
+        description: "Test tool with nullable",
+        input: {
+          required: z.string(),
+          nullable: z.string().nullable(),
+          optionalNullable: z.string().nullable().optional(),
+        },
+        handler: async (input) => {
+          expectTypeOf(input.required).toEqualTypeOf<string>();
+          expectTypeOf(input.nullable).toEqualTypeOf<string | null>();
+          expectTypeOf(input.optionalNullable).toEqualTypeOf<string | null | undefined>();
+          return { _text: input.required };
+        },
+      });
+
+      expect(tool.input.parse({ required: "test", nullable: null })).toEqual({
+        required: "test",
+        nullable: null,
+      });
+    });
+  });
+
+  describe("AssertZodShape type safety", () => {
+    it("should correctly type valid Zod shapes", () => {
+      type ValidShape = { name: z.ZodString; age: z.ZodNumber };
+      type Asserted = import("../../src/utils/schema").AssertZodShape<ValidShape>;
+
+      // Valid shape should preserve types
+      expectTypeOf<Asserted["name"]>().toEqualTypeOf<z.ZodString>();
+      expectTypeOf<Asserted["age"]>().toEqualTypeOf<z.ZodNumber>();
+    });
+
+    it("should mark invalid properties as never", () => {
+      type InvalidShape = { name: z.ZodString; age: number };
+      type Asserted = import("../../src/utils/schema").AssertZodShape<InvalidShape>;
+
+      // Valid property preserved
+      expectTypeOf<Asserted["name"]>().toEqualTypeOf<z.ZodString>();
+      // Invalid property becomes never
+      expectTypeOf<Asserted["age"]>().toEqualTypeOf<never>();
+    });
+
+    it("should handle mixed valid/invalid properties", () => {
+      type MixedShape = {
+        valid1: z.ZodString;
+        invalid1: string;
+        valid2: z.ZodOptional<z.ZodNumber>;
+        invalid2: boolean;
+      };
+      type Asserted = import("../../src/utils/schema").AssertZodShape<MixedShape>;
+
+      expectTypeOf<Asserted["valid1"]>().toEqualTypeOf<z.ZodString>();
+      expectTypeOf<Asserted["valid2"]>().toEqualTypeOf<z.ZodOptional<z.ZodNumber>>();
+      expectTypeOf<Asserted["invalid1"]>().toEqualTypeOf<never>();
+      expectTypeOf<Asserted["invalid2"]>().toEqualTypeOf<never>();
+    });
+
+    it("should throw runtime error for non-Zod values in inline syntax", () => {
+      // Runtime error for invalid schema
+      const invalidSchema = { name: "not a zod schema" };
+      expect(() => normalizeSchema(invalidSchema as never)).toThrow(
+        'Invalid schema definition: property "name" must be a Zod schema'
+      );
+    });
+
+    it("should throw runtime error for mixed valid/invalid values", () => {
+      const mixedSchema = { valid: z.string(), invalid: 123 };
+      expect(() => normalizeSchema(mixedSchema as never)).toThrow(
+        'Invalid schema definition: property "invalid" must be a Zod schema'
+      );
     });
   });
 });

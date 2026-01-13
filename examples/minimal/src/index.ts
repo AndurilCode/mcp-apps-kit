@@ -12,6 +12,7 @@ import { createApp, defineTool, type ClientToolsFromCore } from "@mcp-apps-kit/c
 import { defineReactUI } from "@mcp-apps-kit/ui-react-builder";
 import { GreetingWidgetV1 } from "./ui/GreetingWidgetV1";
 import { GreetingWidgetV2 } from "./ui/GreetingWidgetV2";
+import { EchoWidget } from "./ui/EchoWidget";
 import { z } from "zod";
 
 // =============================================================================
@@ -112,6 +113,59 @@ const greetToolV2 = defineTool({
 });
 
 // =============================================================================
+// V3: Inline schema syntax demo (no separate schema declarations)
+// =============================================================================
+
+/**
+ * Demonstrates the inline schema syntax (PRD-002).
+ * Instead of declaring separate schema variables, you can define schemas inline.
+ *
+ * Before (explicit):
+ *   const inputSchema = z.object({ name: z.string() });
+ *   defineTool({ input: inputSchema, ... })
+ *
+ * After (inline):
+ *   defineTool({ input: { name: z.string() }, ... })
+ */
+const echoToolV3 = defineTool({
+  title: "Echo",
+  description: "Echo back a message with metadata (demonstrates inline schema syntax)",
+
+  // Inline input schema - automatically wrapped with z.object()
+  input: {
+    message: z.string().describe("Message to echo back"),
+    uppercase: z.boolean().optional().describe("Convert to uppercase"),
+  },
+
+  // Inline output schema - automatically wrapped with z.object()
+  output: {
+    echo: z.string(),
+    length: z.number(),
+    timestamp: z.string(),
+  },
+
+  visibility: "both",
+
+  ui: defineReactUI({
+    component: EchoWidget,
+    name: "Echo Widget V3",
+    description: "Echoes messages (v3 - inline schema syntax)",
+    prefersBorder: true,
+  }),
+
+  handler: async (input) => {
+    const echo = input.uppercase ? input.message.toUpperCase() : input.message;
+
+    return {
+      echo,
+      length: echo.length,
+      timestamp: new Date().toISOString(),
+      _text: `Echo: ${echo}`,
+    };
+  },
+});
+
+// =============================================================================
 // Create Versioned App
 // =============================================================================
 
@@ -159,6 +213,13 @@ const app = createApp({
         },
       },
     },
+    v3: {
+      version: "3.0.0",
+      tools: {
+        echo: echoToolV3,
+      },
+      // v3 demonstrates inline schema syntax
+    },
   },
 });
 
@@ -180,11 +241,13 @@ Endpoints:
   - v1 MCP:     http://localhost:${port}/v1/mcp (uses log_debug MCP tool)
   - v2 MCP:     http://localhost:${port}/v2/mcp (uses API transport for logging)
   - v2 Logs:    http://localhost:${port}/api/logs (debug log API endpoint)
+  - v3 MCP:     http://localhost:${port}/v3/mcp (inline schema syntax demo)
   - Health:     http://localhost:${port}/health
 
 Debug logging:
   - v1: Uses log_debug MCP tool (default for MCP adapter)
   - v2: Uses HTTP API transport at /api/logs (ideal for OpenAI/ChatGPT)
+  - v3: Default MCP logging (demonstrates inline schema syntax)
   `);
   });
 }
@@ -208,3 +271,7 @@ export type AppToolsV2 = { greet: typeof greetToolV2 };
 export type AppClientToolsV2 = ClientToolsFromCore<AppToolsV2>;
 export type GreetInputV2 = z.infer<typeof greetInputV2>;
 export type GreetOutputV2 = z.infer<typeof greetOutputV2>;
+
+// V3 types (inline schema syntax - types inferred directly from tool definition)
+export type AppToolsV3 = { echo: typeof echoToolV3 };
+export type AppClientToolsV3 = ClientToolsFromCore<AppToolsV3>;
