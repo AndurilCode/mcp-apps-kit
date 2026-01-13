@@ -91,7 +91,7 @@ MCP AppsKit is a TypeScript framework for building interactive applications with
 
 ## Compatibility
 
-- **Node.js**: >= 18 (runtime), >= 20 (CLI and monorepo development)
+- **Node.js**: >= 18 (runtime packages), >= 20 (`@mcp-apps-kit/create-app` CLI and monorepo development)
 - **React**: 18.x or 19.x (peer dependency)
 - **Zod**: ^4.0.0 required
 
