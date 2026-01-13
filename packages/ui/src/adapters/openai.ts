@@ -529,12 +529,17 @@ export class OpenAIAdapter implements ProtocolAdapter {
   /**
    * Update model context (ext-apps v0.4.0+)
    *
-   * On ChatGPT, we use setState (which calls setWidgetState) to expose data
-   * to the model. setWidgetState in ChatGPT flows into AI context - anything
-   * passed to it will be shown to the model.
+   * On ChatGPT, this method uses setState() internally, which calls the
+   * OpenAI SDK's setWidgetState(). In ChatGPT, setWidgetState() exposes
+   * data to the AI model context, making it visible to the model.
    *
-   * Note: Unlike MCP Apps where this is purely context, on ChatGPT
-   * this also persists the state for the widget session.
+   * Important differences from MCP Apps:
+   * - MCP Apps: Pure context update via native protocol feature
+   * - ChatGPT: Uses setState/setWidgetState (exposes to AI + persists for session)
+   *
+   * Use updateModelContext() for context-focused use cases (informing the model
+   * about app state), and setState() for persistence-focused use cases.
+   * Note: On ChatGPT, both methods expose state to the AI model.
    */
   async updateModelContext(params: UpdateModelContextParams): Promise<void> {
     // Build a context object to send to the model via setState/setWidgetState

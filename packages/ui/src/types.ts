@@ -546,7 +546,13 @@ export interface AppsClient<T extends ToolDefs = ToolDefs> {
    * The host typically defers sending context to the model until the next
    * user message and only sends the most recent update.
    *
-   * On ChatGPT: Silent no-op (graceful degradation)
+   * Platform implementation details:
+   * - MCP Apps: Uses native protocol feature for pure context updates
+   * - ChatGPT: Uses setState/setWidgetState internally (exposes to AI + persists)
+   *
+   * On ChatGPT, both setState() and updateModelContext() expose state to the
+   * AI model. Use setState() for persistence-focused use cases, and
+   * updateModelContext() for context-focused use cases.
    *
    * @param params - Context content and/or structured content
    *

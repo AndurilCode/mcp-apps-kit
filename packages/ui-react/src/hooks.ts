@@ -261,8 +261,13 @@ export function useWidgetState<S>(defaultValue: S): [S, (newState: S | ((prev: S
  * Unlike sendMessage which triggers follow-up actions, context updates
  * inform the model about app state without triggering responses.
  *
- * On MCP Apps: Sends context to host via updateModelContext
- * On ChatGPT: Silent no-op (graceful degradation)
+ * Platform implementation details:
+ * - MCP Apps: Uses native protocol feature for pure context updates
+ * - ChatGPT: Uses setState/setWidgetState internally (exposes to AI + persists)
+ *
+ * On ChatGPT, both setState() and updateModelContext() expose state to the
+ * AI model. Use setState() for persistence-focused use cases, and
+ * updateModelContext() for context-focused use cases.
  *
  * @returns Function to update model context
  *
