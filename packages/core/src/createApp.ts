@@ -567,7 +567,7 @@ function createSingleVersionApp<T extends ToolDefs>(config: AppConfig<T>): App<T
   let pluginInitialized = false;
 
   // Initialize middleware chain
-  const middlewareChain = new MiddlewareChain();
+  const middlewareChain = new MiddlewareChain<unknown>();
 
   // Initialize event emitter
   const eventEmitter = new TypedEventEmitter<EventMap & Record<string, unknown>>();
@@ -832,7 +832,7 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
     let versionPluginInitialized = false;
 
     // Initialize version-specific middleware chain
-    const versionMiddlewareChain = new MiddlewareChain();
+    const versionMiddlewareChain = new MiddlewareChain<unknown>();
 
     // Initialize version-specific event emitter
     const versionEventEmitter = new TypedEventEmitter<EventMap & Record<string, unknown>>();

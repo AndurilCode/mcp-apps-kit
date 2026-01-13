@@ -50,7 +50,7 @@ export interface ServerInstance {
   /** HTTP server (when running) */
   httpServer?: Server;
   /** Set middleware chain (called by createApp) */
-  setMiddlewareChain: (chain: MiddlewareChain) => void;
+  setMiddlewareChain: (chain: MiddlewareChain<unknown>) => void;
   /** Set event emitter (called by createApp) */
   setEventEmitter: (emitter: TypedEventEmitter<EventMap & Record<string, unknown>>) => void;
   /** Start the server */
@@ -96,7 +96,7 @@ export function createServerInstance<T extends ToolDefs>(
     : {};
 
   // Will be set by createApp
-  let middlewareChainRef: MiddlewareChain | undefined;
+  let middlewareChainRef: MiddlewareChain<unknown> | undefined;
   let eventEmitterRef: TypedEventEmitter<EventMap & Record<string, unknown>> | undefined;
 
   // Register debug log tool if debug logging is enabled
@@ -288,7 +288,7 @@ export function createServerInstance<T extends ToolDefs>(
     expressApp,
     httpServer,
 
-    setMiddlewareChain: (chain: MiddlewareChain) => {
+    setMiddlewareChain: (chain: MiddlewareChain<unknown>) => {
       middlewareChainRef = chain;
     },
 
@@ -627,7 +627,7 @@ function registerTools(
   serverName: string,
   uiUriMap: Record<string, { uri: string; html: string }>,
   pluginManager: PluginManager,
-  getMiddlewareChain: () => MiddlewareChain | undefined,
+  getMiddlewareChain: () => MiddlewareChain<unknown> | undefined,
   getEventEmitter: () => TypedEventEmitter<EventMap & Record<string, unknown>> | undefined
 ): void {
   for (const [name, toolDef] of Object.entries(tools)) {
@@ -714,9 +714,7 @@ function registerTools(
           let result: unknown;
           const middlewareChain = getMiddlewareChain();
           if (middlewareChain?.hasMiddleware()) {
-            await middlewareChain.execute(middlewareContext, async () => {
-              result = await executeToolLogic();
-            });
+            result = await middlewareChain.execute(middlewareContext, executeToolLogic);
 
             // Validate that middleware didn't short-circuit without providing a result
             if (result === undefined) {
