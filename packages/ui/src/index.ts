@@ -196,3 +196,52 @@ export async function createClient<T extends ToolDefs = ToolDefs>(
   // Create and return the client
   return createAppsClient<T>(adapter);
 }
+
+/**
+ * Create a typed client from an App instance.
+ *
+ * Convenience function that automatically extracts client types from
+ * your App instance, eliminating manual type exports.
+ *
+ * @param app - App instance from @mcp-apps-kit/core with clientTypes
+ * @param options - Optional client configuration (forceAdapter, autoResize)
+ * @returns Fully typed AppsClient
+ *
+ * @example Single-version app
+ * ```typescript
+ * // server.ts
+ * import { createApp, defineTool } from "@mcp-apps-kit/core";
+ * const app = createApp({
+ *   tools: { greet: defineTool({ ... }) }
+ * });
+ * export { app };
+ *
+ * // ui.tsx
+ * import { createTypedClient } from "@mcp-apps-kit/ui";
+ * import { app } from "./server";
+ * const client = await createTypedClient(app);
+ * client.tools.callGreet({ name: "Alice" }); // Fully typed!
+ * ```
+ *
+ * @example Multi-version app
+ * ```typescript
+ * // server.ts
+ * const app = createApp({
+ *   versions: {
+ *     v1: { version: "1.0.0", tools: { ... } },
+ *     v2: { version: "2.0.0", tools: { ... } }
+ *   }
+ * });
+ * export const v1 = app.getVersion("v1")!;
+ * export const v2 = app.getVersion("v2")!;
+ *
+ * // ui.tsx
+ * const client = await createTypedClient(v1);
+ * ```
+ */
+export async function createTypedClient<T extends ToolDefs>(
+  _app: { readonly clientTypes: T },
+  options?: CreateClientOptions
+): Promise<AppsClient<T>> {
+  return createClient<T>(options);
+}

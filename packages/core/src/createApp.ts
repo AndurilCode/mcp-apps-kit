@@ -4,7 +4,14 @@
  * Creates an MCP app with unified tool and UI definitions.
  */
 
-import type { ToolDefs, App, StartOptions, McpServer, ExpressMiddleware } from "./types/tools";
+import type {
+  ToolDefs,
+  App,
+  StartOptions,
+  McpServer,
+  ExpressMiddleware,
+  ClientToolsFromCore,
+} from "./types/tools";
 import type {
   AppConfig,
   AppConfigInput,
@@ -659,6 +666,11 @@ function createSingleVersionApp<T extends ToolDefs>(config: AppConfig<T>): App<T
     // Typed tool definitions (original, not normalized - preserves inline UIDefs for type inference)
     tools: config.tools,
 
+    // Phantom type for client-side type inference (type-only, no runtime value)
+    get clientTypes(): ClientToolsFromCore<T> {
+      return {} as ClientToolsFromCore<T>;
+    },
+
     /**
      * Get the underlying Express app for serverless deployments (e.g., Vercel).
      */
@@ -942,6 +954,11 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
     const versionApp: App<T> = {
       tools: versionConfig.tools,
 
+      // Phantom type for client-side type inference (type-only, no runtime value)
+      get clientTypes(): ClientToolsFromCore<T> {
+        return {} as ClientToolsFromCore<T>;
+      },
+
       get expressApp() {
         return sharedExpressApp;
       },
@@ -1047,6 +1064,11 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
     // Use tools from first version (for type inference).
     // To access a specific version's tools, use getVersion(key).tools
     tools: (Object.values(config.versions)[0] as VersionConfig<T> | undefined)?.tools as T,
+
+    // Phantom type for client-side type inference (type-only, no runtime value)
+    get clientTypes(): ClientToolsFromCore<T> {
+      return {} as ClientToolsFromCore<T>;
+    },
 
     get expressApp() {
       return sharedExpressApp;

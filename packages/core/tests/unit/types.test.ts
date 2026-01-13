@@ -7,7 +7,13 @@
 
 import { describe, it, expect, expectTypeOf } from "vitest";
 import { z } from "zod";
-import type { ToolDefs, InferToolInputs, InferToolOutputs } from "../../src/types/tools";
+import type {
+  ToolDefs,
+  InferToolInputs,
+  InferToolOutputs,
+  ClientToolsFromCore,
+} from "../../src/types/tools";
+import { createApp, defineTool } from "../../src/index.js";
 
 describe("type inference utilities", () => {
   describe("InferToolInputs", () => {
@@ -159,6 +165,101 @@ describe("type inference utilities", () => {
       };
 
       expect(toolsWithUI.widget.ui).toBe("my-widget");
+    });
+  });
+
+  describe("clientTypes property", () => {
+    it("should expose clientTypes phantom type on single-version app", () => {
+      const greetTool = defineTool({
+        title: "Greet",
+        description: "Greet user",
+        input: z.object({ name: z.string() }),
+        output: z.object({ message: z.string() }),
+        handler: async (input) => ({ message: `Hello ${input.name}` }),
+      });
+
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: { greet: greetTool },
+      });
+
+      type Expected = ClientToolsFromCore<{ greet: typeof greetTool }>;
+      expectTypeOf(app.clientTypes).toEqualTypeOf<Expected>();
+    });
+
+    it("should expose clientTypes for each version in multi-version app", () => {
+      const v1Tool = defineTool({
+        title: "Greet V1",
+        description: "Greet user v1",
+        input: z.object({ name: z.string() }),
+        output: z.object({ message: z.string() }),
+        handler: async (input) => ({ message: `Hello ${input.name}` }),
+      });
+
+      const v2Tool = defineTool({
+        title: "Greet V2",
+        description: "Greet user v2",
+        input: z.object({ name: z.string(), greeting: z.string() }),
+        output: z.object({ message: z.string(), timestamp: z.string() }),
+        handler: async (input) => ({
+          message: `${input.greeting} ${input.name}`,
+          timestamp: new Date().toISOString(),
+        }),
+      });
+
+      const app = createApp({
+        name: "test-app",
+        versions: {
+          v1: { version: "1.0.0", tools: { greet: v1Tool } },
+          v2: { version: "2.0.0", tools: { greet: v2Tool } },
+        },
+      });
+
+      const v1 = app.getVersion("v1")!;
+      const v2 = app.getVersion("v2")!;
+
+      type ExpectedV1 = ClientToolsFromCore<{ greet: typeof v1Tool }>;
+      type ExpectedV2 = ClientToolsFromCore<{ greet: typeof v2Tool }>;
+
+      expectTypeOf(v1.clientTypes).toEqualTypeOf<ExpectedV1>();
+      expectTypeOf(v2.clientTypes).toEqualTypeOf<ExpectedV2>();
+    });
+
+    it("should infer correct client input and output types", () => {
+      const greetTool = defineTool({
+        title: "Greet",
+        description: "Greet user",
+        input: z.object({
+          name: z.string(),
+          age: z.number().optional(),
+        }),
+        output: z.object({
+          message: z.string(),
+          timestamp: z.date(),
+        }),
+        handler: async (input) => ({
+          message: `Hello ${input.name}`,
+          timestamp: new Date(),
+        }),
+      });
+
+      const app = createApp({
+        name: "test-app",
+        version: "1.0.0",
+        tools: { greet: greetTool },
+      });
+
+      // Type-level verification (avoid runtime access of phantom property)
+      type ActualClientTypes = typeof app.clientTypes;
+      type ExpectedClientTypes = {
+        greet: {
+          input: { name: string; age?: number };
+          output: { message: string; timestamp: Date };
+        };
+      };
+
+      expectTypeOf<ActualClientTypes>().toMatchTypeOf<ExpectedClientTypes>();
     });
   });
 });

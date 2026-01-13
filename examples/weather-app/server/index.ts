@@ -185,13 +185,8 @@ const app = createApp({
   },
 });
 
-// Export types for UI components
-export type AppToolsDef = {
-  getCurrentWeather: typeof app.tools.getCurrentWeather;
-  getForecast: typeof app.tools.getForecast;
-  getWeatherAlerts: typeof app.tools.getWeatherAlerts;
-};
-export type AppTools = ClientToolsFromCore<AppToolsDef>;
+// Export types for UI components - using auto-generated clientTypes
+export type AppTools = typeof app.clientTypes;
 
 // Start server (skip in test environment)
 if (process.env.NODE_ENV !== "test") {
