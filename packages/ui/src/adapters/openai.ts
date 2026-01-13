@@ -16,6 +16,7 @@ import type {
   SizeChangedParams,
   CallToolHandler,
   ListToolsHandler,
+  UpdateModelContextParams,
 } from "../types";
 import type { DebugTransport, LogEntry } from "../debug/logger";
 import { clientDebugLogger } from "../debug/logger";
@@ -521,6 +522,45 @@ export class OpenAIAdapter implements ProtocolAdapter {
         prompt: content.text,
       });
     }
+  }
+
+  // === Model Context ===
+
+  /**
+   * Update model context (ext-apps v0.4.0+)
+   *
+   * On ChatGPT, we use setState (which calls setWidgetState) to expose data
+   * to the model. setWidgetState in ChatGPT flows into AI context - anything
+   * passed to it will be shown to the model.
+   *
+   * Note: Unlike MCP Apps where this is purely context, on ChatGPT
+   * this also persists the state for the widget session.
+   */
+  async updateModelContext(params: UpdateModelContextParams): Promise<void> {
+    // Build a context object to send to the model via setState/setWidgetState
+    const modelContext: Record<string, unknown> = {
+      _type: "modelContext",
+    };
+
+    // Add structured content directly
+    if (params.structuredContent) {
+      Object.assign(modelContext, params.structuredContent);
+    }
+
+    // Convert content blocks to text representation for the model
+    if (params.content && params.content.length > 0) {
+      const textContent = params.content
+        .filter((block) => block.type === "text" && block.text)
+        .map((block) => block.text)
+        .join("\n");
+      if (textContent) {
+        modelContext._textContent = textContent;
+      }
+    }
+
+    // Use existing setState which calls setWidgetState
+    this.setState(modelContext);
+    clientDebugLogger.debug("[OpenAI Adapter] updateModelContext via setState:", modelContext);
   }
 
   // === Navigation ===

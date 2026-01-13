@@ -404,4 +404,59 @@ describe("MockAdapter", () => {
       });
     });
   });
+
+  // =============================================================================
+  // ext-apps v0.4.0 API TESTS
+  // =============================================================================
+
+  describe("updateModelContext (ext-apps v0.4.0+)", () => {
+    it("should handle updateModelContext calls", async () => {
+      await adapter.connect();
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      await adapter.updateModelContext({
+        structuredContent: { itemCount: 3, total: 150 },
+      });
+
+      expect(consoleSpy).toHaveBeenCalledWith("[MockAdapter] updateModelContext:", {
+        structuredContent: { itemCount: 3, total: 150 },
+      });
+      consoleSpy.mockRestore();
+    });
+
+    it("should store last model context for testing", async () => {
+      await adapter.connect();
+
+      await adapter.updateModelContext({
+        content: [{ type: "text", text: "User selected 3 items" }],
+        structuredContent: { selectedItems: 3 },
+      });
+
+      const lastContext = adapter.getLastModelContext();
+      expect(lastContext).toEqual({
+        content: [{ type: "text", text: "User selected 3 items" }],
+        structuredContent: { selectedItems: 3 },
+      });
+    });
+
+    it("should accept text content blocks", async () => {
+      await adapter.connect();
+
+      await expect(
+        adapter.updateModelContext({
+          content: [{ type: "text", text: "Hello world" }],
+        })
+      ).resolves.toBeUndefined();
+    });
+
+    it("should accept structured content", async () => {
+      await adapter.connect();
+
+      await expect(
+        adapter.updateModelContext({
+          structuredContent: { key: "value", count: 42 },
+        })
+      ).resolves.toBeUndefined();
+    });
+  });
 });

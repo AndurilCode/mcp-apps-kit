@@ -20,6 +20,7 @@ import type {
   CallToolHandler,
   ListToolsHandler,
   ToolMethods,
+  UpdateModelContextParams,
 } from "./types";
 import type { ProtocolAdapter } from "./adapters/types";
 
@@ -115,6 +116,12 @@ export function createAppsClient<T extends ToolDefs = ToolDefs>(
 
     async sendFollowUpMessage(prompt: string): Promise<void> {
       await adapter.sendMessage({ type: "text", text: prompt });
+    },
+
+    // === Model Context ===
+
+    async updateModelContext(params: UpdateModelContextParams): Promise<void> {
+      await adapter.updateModelContext(params);
     },
 
     // === Navigation ===

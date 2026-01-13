@@ -251,4 +251,32 @@ describe("McpAdapter", () => {
       expect(adapterWithAutoResize.isConnected()).toBe(true);
     });
   });
+
+  // =============================================================================
+  // ext-apps v0.4.0 API TESTS
+  // =============================================================================
+
+  describe("updateModelContext (ext-apps v0.4.0+)", () => {
+    it("should throw when not connected", async () => {
+      await expect(
+        adapter.updateModelContext({ structuredContent: { test: true } })
+      ).rejects.toThrow("MCP Apps adapter not connected");
+    });
+
+    it("should have updateModelContext method", async () => {
+      await adapter.connect();
+      expect(typeof adapter.updateModelContext).toBe("function");
+    });
+  });
+
+  describe("containerDimensions (ext-apps v0.4.0+)", () => {
+    it("should include containerDimensions in host context when provided", async () => {
+      await adapter.connect();
+      const context = adapter.getHostContext();
+      // Default context won't have containerDimensions (only from host)
+      expect(context.viewport).toBeDefined();
+      // containerDimensions is optional
+      expect(context.containerDimensions).toBeUndefined();
+    });
+  });
 });

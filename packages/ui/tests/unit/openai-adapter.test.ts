@@ -6,7 +6,7 @@
  * @vitest-environment jsdom
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { OpenAIAdapter } from "../../src/adapters/openai";
 
 describe("OpenAIAdapter", () => {
@@ -399,6 +399,88 @@ describe("OpenAIAdapter", () => {
 
       expect(consoleSpy).toHaveBeenCalledTimes(2);
       consoleSpy.mockRestore();
+    });
+  });
+
+  // =============================================================================
+  // ext-apps v0.4.0 API TESTS
+  // =============================================================================
+
+  describe("updateModelContext (ext-apps v0.4.0+)", () => {
+    it("should call setState (which calls setWidgetState) with structured content", async () => {
+      const mockSetWidgetState = vi.fn();
+      const mockOpenAI = {
+        setWidgetState: mockSetWidgetState,
+      };
+      Object.defineProperty(window, "openai", {
+        value: mockOpenAI,
+        writable: true,
+        configurable: true,
+      });
+
+      await adapter.connect();
+
+      await adapter.updateModelContext({
+        structuredContent: { itemCount: 3, total: 150 },
+      });
+
+      // setState internally calls setWidgetState
+      expect(mockSetWidgetState).toHaveBeenCalledWith({
+        _type: "modelContext",
+        itemCount: 3,
+        total: 150,
+      });
+
+      // Cleanup
+      // @ts-expect-error - cleaning up mock
+      delete window.openai;
+    });
+
+    it("should include text content in model context", async () => {
+      const mockSetWidgetState = vi.fn();
+      const mockOpenAI = {
+        setWidgetState: mockSetWidgetState,
+      };
+      Object.defineProperty(window, "openai", {
+        value: mockOpenAI,
+        writable: true,
+        configurable: true,
+      });
+
+      await adapter.connect();
+
+      await adapter.updateModelContext({
+        content: [
+          { type: "text", text: "Line 1" },
+          { type: "text", text: "Line 2" },
+        ],
+      });
+
+      expect(mockSetWidgetState).toHaveBeenCalledWith({
+        _type: "modelContext",
+        _textContent: "Line 1\nLine 2",
+      });
+
+      // Cleanup
+      // @ts-expect-error - cleaning up mock
+      delete window.openai;
+    });
+
+    it("should work without OpenAI SDK (graceful no-op for setWidgetState)", async () => {
+      await adapter.connect();
+
+      // Should not throw - setState internally handles missing SDK gracefully
+      await expect(
+        adapter.updateModelContext({
+          structuredContent: { test: true },
+        })
+      ).resolves.toBeUndefined();
+
+      // The state is stored locally even without SDK
+      expect(adapter.getState()).toEqual({
+        _type: "modelContext",
+        test: true,
+      });
     });
   });
 });

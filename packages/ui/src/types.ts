@@ -71,6 +71,70 @@ export interface HostCapabilities {
     listChanged?: boolean;
   };
 
+  /**
+   * Host supports model context updates (ext-apps v0.4.0+)
+   *
+   * Specifies which content block types are supported.
+   */
+  updateModelContext?: {
+    /** Supports text content blocks */
+    text?: Record<string, never>;
+    /** Supports image content blocks */
+    image?: Record<string, never>;
+    /** Supports audio content blocks */
+    audio?: Record<string, never>;
+    /** Supports resource content blocks */
+    resource?: Record<string, never>;
+    /** Supports resource link content blocks */
+    resourceLink?: Record<string, never>;
+    /** Supports structured content */
+    structuredContent?: Record<string, never>;
+  };
+
+  /**
+   * Host supports messages (ext-apps v0.4.0+)
+   *
+   * Specifies which content block types are supported for messages.
+   */
+  message?: {
+    /** Supports text content blocks */
+    text?: Record<string, never>;
+    /** Supports image content blocks */
+    image?: Record<string, never>;
+    /** Supports audio content blocks */
+    audio?: Record<string, never>;
+    /** Supports resource content blocks */
+    resource?: Record<string, never>;
+    /** Supports resource link content blocks */
+    resourceLink?: Record<string, never>;
+    /** Supports structured content */
+    structuredContent?: Record<string, never>;
+  };
+
+  /**
+   * Host sandbox capabilities (ext-apps v0.4.0+)
+   */
+  sandbox?: {
+    /** Supported permissions */
+    permissions?: {
+      camera?: Record<string, never>;
+      microphone?: Record<string, never>;
+      geolocation?: Record<string, never>;
+      clipboardWrite?: Record<string, never>;
+    };
+    /** Content Security Policy settings */
+    csp?: {
+      /** Allowed domains for fetch/XHR connections */
+      connectDomains?: string[];
+      /** Allowed domains for loading resources (images, scripts, etc.) */
+      resourceDomains?: string[];
+      /** Allowed domains for iframe embedding */
+      frameDomains?: string[];
+      /** Allowed domains for base URI */
+      baseUriDomains?: string[];
+    };
+  };
+
   // ===========================================================================
   // ChatGPT/OpenAI specific capabilities
   // ===========================================================================
@@ -199,6 +263,21 @@ export interface Viewport {
 }
 
 /**
+ * Container dimensions from host (ext-apps v0.4.0+)
+ *
+ * Replaces viewport for more explicit fixed vs flexible semantics.
+ * - Fixed dimensions (height/width): host controls the size
+ * - Flexible dimensions (maxHeight/maxWidth): app controls size up to max
+ *
+ * @internal
+ */
+export type ContainerDimensions =
+  | { height: number; width: number }
+  | { height: number; maxWidth?: number }
+  | { maxHeight?: number; width: number }
+  | { maxHeight?: number; maxWidth?: number };
+
+/**
  * Safe area insets (mobile devices)
  *
  * @internal
@@ -247,6 +326,14 @@ export interface HostContext {
 
   /** Viewport dimensions */
   viewport: Viewport;
+
+  /**
+   * Container dimensions from host (ext-apps v0.4.0+)
+   *
+   * More explicit than viewport - indicates whether dimensions are
+   * fixed (host-controlled) or flexible (app-controlled up to max).
+   */
+  containerDimensions?: ContainerDimensions;
 
   /** BCP 47 locale code */
   locale: string;
@@ -350,6 +437,49 @@ export type ToolResult<T extends ToolDefs> = {
 };
 
 // =============================================================================
+// MODEL CONTEXT TYPES
+// =============================================================================
+
+/**
+ * Content block for model context updates
+ *
+ * @internal
+ */
+export interface ContentBlock {
+  /** Content type */
+  type: "text" | "image" | "audio" | "resource" | "resource_link";
+  /** Text content (for type: "text") */
+  text?: string;
+  /** Binary data as base64 (for type: "image" or "audio") */
+  data?: string;
+  /** MIME type (for type: "image" or "audio") */
+  mimeType?: string;
+  /** Resource URI (for type: "resource" or "resource_link") */
+  uri?: string;
+  /** Resource name (for type: "resource_link") */
+  name?: string;
+  /** Resource description */
+  description?: string;
+}
+
+/**
+ * Parameters for updateModelContext
+ */
+export interface UpdateModelContextParams {
+  /**
+   * Content blocks to add to model context.
+   * Supports text, image, audio, resource, and resource_link types.
+   */
+  content?: ContentBlock[];
+
+  /**
+   * Structured content as key-value pairs.
+   * Useful for passing typed data that the model can interpret.
+   */
+  structuredContent?: Record<string, unknown>;
+}
+
+// =============================================================================
 // APPS CLIENT INTERFACE
 // =============================================================================
 
@@ -403,6 +533,37 @@ export interface AppsClient<T extends ToolDefs = ToolDefs> {
    * @param prompt - Message text
    */
   sendFollowUpMessage(prompt: string): Promise<void>;
+
+  // === Model Context ===
+
+  /**
+   * Update the host's model context with app state (ext-apps v0.4.0+)
+   *
+   * Unlike sendMessage which triggers follow-up actions, context updates
+   * inform the model about app state without triggering responses.
+   * Each call overwrites the previous context.
+   *
+   * The host typically defers sending context to the model until the next
+   * user message and only sends the most recent update.
+   *
+   * On ChatGPT: Silent no-op (graceful degradation)
+   *
+   * @param params - Context content and/or structured content
+   *
+   * @example
+   * ```typescript
+   * // Text content
+   * await client.updateModelContext({
+   *   content: [{ type: "text", text: "User selected 3 items totaling $150" }]
+   * });
+   *
+   * // Structured content
+   * await client.updateModelContext({
+   *   structuredContent: { selectedItems: 3, total: 150, currency: "USD" }
+   * });
+   * ```
+   */
+  updateModelContext(params: UpdateModelContextParams): Promise<void>;
 
   // === Navigation ===
 

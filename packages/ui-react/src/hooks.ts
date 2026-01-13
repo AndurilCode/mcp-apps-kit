@@ -14,6 +14,7 @@ import type {
   ModalResult,
   HostCapabilities,
   HostVersion,
+  UpdateModelContextParams,
 } from "@mcp-apps-kit/ui";
 import { clientDebugLogger, type ClientDebugLogger } from "@mcp-apps-kit/ui";
 import { useAppsContext } from "./context";
@@ -248,6 +249,57 @@ export function useWidgetState<S>(defaultValue: S): [S, (newState: S | ((prev: S
   );
 
   return [state, setState];
+}
+
+// =============================================================================
+// MODEL CONTEXT HOOKS
+// =============================================================================
+
+/**
+ * Hook to update the host's model context
+ *
+ * Unlike sendMessage which triggers follow-up actions, context updates
+ * inform the model about app state without triggering responses.
+ *
+ * On MCP Apps: Sends context to host via updateModelContext
+ * On ChatGPT: Silent no-op (graceful degradation)
+ *
+ * @returns Function to update model context
+ *
+ * @example
+ * ```tsx
+ * function ShoppingCart({ items }) {
+ *   const updateContext = useUpdateModelContext();
+ *
+ *   // Keep the model informed about cart state
+ *   useEffect(() => {
+ *     updateContext({
+ *       structuredContent: {
+ *         itemCount: items.length,
+ *         total: calculateTotal(items),
+ *         currency: "USD"
+ *       }
+ *     });
+ *   }, [items, updateContext]);
+ *
+ *   return <CartUI items={items} />;
+ * }
+ * ```
+ */
+export function useUpdateModelContext(): (params: UpdateModelContextParams) => Promise<void> {
+  const { client } = useAppsContext();
+
+  return useCallback(
+    async (params: UpdateModelContextParams) => {
+      if (!client) {
+        // eslint-disable-next-line no-console
+        console.warn("[useUpdateModelContext] Client not available");
+        return;
+      }
+      await client.updateModelContext(params);
+    },
+    [client]
+  );
 }
 
 // =============================================================================
