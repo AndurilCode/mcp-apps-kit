@@ -19,6 +19,8 @@ export default defineConfig({
     "@mcp-apps-kit/ui-react",
     "esbuild",
     "vite",
+    "@typescript-eslint/typescript-estree",
+    "@typescript-eslint/types",
   ],
   esbuildOptions(options) {
     options.jsx = "automatic";
