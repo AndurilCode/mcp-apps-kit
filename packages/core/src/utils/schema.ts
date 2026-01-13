@@ -37,6 +37,69 @@ export interface ZodToJsonSchemaOptions {
   includeSchema?: boolean;
 }
 
+/**
+ * A plain object where all values are Zod schemas.
+ * Used for inline schema syntax in defineTool.
+ *
+ * @example
+ * ```typescript
+ * const shape: ZodRawShapeRecord = {
+ *   name: z.string(),
+ *   age: z.number().optional(),
+ * };
+ * ```
+ */
+export type ZodRawShapeRecord = Record<string, z.ZodType>;
+
+/**
+ * Type that accepts either a Zod schema or a plain object of Zod schemas.
+ * The plain object will be auto-wrapped with z.object().
+ *
+ * @example
+ * ```typescript
+ * // Explicit Zod schema
+ * const explicit: SchemaInput = z.object({ name: z.string() });
+ *
+ * // Plain object (will be auto-wrapped)
+ * const inline: SchemaInput = { name: z.string() };
+ * ```
+ */
+export type SchemaInput = z.ZodType | ZodRawShapeRecord;
+
+/**
+ * Infers the TypeScript type from a SchemaInput.
+ * - If it's already a ZodType, uses z.infer<T>
+ * - If it's a plain object, infers as if wrapped in z.object()
+ *
+ * @example
+ * ```typescript
+ * type A = InferFromSchemaInput<z.ZodString>; // string
+ * type B = InferFromSchemaInput<{ name: z.ZodString }>; // { name: string }
+ * ```
+ */
+export type InferFromSchemaInput<T extends SchemaInput> = T extends z.ZodType
+  ? z.infer<T>
+  : T extends ZodRawShapeRecord
+    ? { [K in keyof T]: z.infer<T[K]> }
+    : never;
+
+/**
+ * Normalizes a SchemaInput to a ZodType at the type level.
+ * - If already a ZodType, returns as-is
+ * - If a plain object, returns the equivalent ZodObject type
+ *
+ * @example
+ * ```typescript
+ * type A = NormalizeSchema<z.ZodString>; // z.ZodString
+ * type B = NormalizeSchema<{ name: z.ZodString }>; // z.ZodObject<{ name: z.ZodString }>
+ * ```
+ */
+export type NormalizeSchema<T extends SchemaInput> = T extends z.ZodType
+  ? T
+  : T extends ZodRawShapeRecord
+    ? z.ZodObject<{ [K in keyof T]: T[K] }>
+    : never;
+
 // =============================================================================
 // FUNCTIONS
 // =============================================================================
@@ -145,4 +208,45 @@ export function isZodSchema(value: unknown): value is z.ZodType {
     "_def" in value &&
     typeof (value as { _def: unknown })._def === "object"
   );
+}
+
+/**
+ * Normalize a schema input to a Zod schema.
+ *
+ * If the input is already a Zod schema, returns it as-is.
+ * If the input is a plain object with Zod schema values, wraps it with z.object().
+ *
+ * @param input - Either a Zod schema or a plain object with Zod schema values
+ * @returns A Zod schema
+ *
+ * @example
+ * ```typescript
+ * // Already a Zod schema - pass through
+ * normalizeSchema(z.object({ name: z.string() }));
+ *
+ * // Plain object - auto-wrapped
+ * normalizeSchema({ name: z.string() }); // Returns z.object({ name: z.string() })
+ * ```
+ *
+ * @internal
+ */
+export function normalizeSchema<T extends SchemaInput>(input: T): NormalizeSchema<T> {
+  // Check if input is already a Zod schema
+  if (isZodSchema(input)) {
+    return input as NormalizeSchema<T>;
+  }
+
+  // Input is a plain object with Zod schema values - wrap with z.object()
+  const shape: Record<string, z.ZodType> = {};
+
+  for (const [key, value] of Object.entries(input)) {
+    if (!isZodSchema(value)) {
+      throw new Error(
+        `Invalid schema definition: property "${key}" must be a Zod schema, got ${typeof value}`
+      );
+    }
+    shape[key] = value as z.ZodType;
+  }
+
+  return z.object(shape) as NormalizeSchema<T>;
 }

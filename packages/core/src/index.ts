@@ -153,8 +153,20 @@ export {
 // =============================================================================
 
 // Schema utilities
-export { zodToJsonSchema, extractPropertyDescriptions, isZodSchema } from "./utils/schema";
-export type { JSONSchema, ZodToJsonSchemaOptions } from "./utils/schema";
+export {
+  zodToJsonSchema,
+  extractPropertyDescriptions,
+  isZodSchema,
+  normalizeSchema,
+} from "./utils/schema";
+export type {
+  JSONSchema,
+  ZodToJsonSchemaOptions,
+  SchemaInput,
+  ZodRawShapeRecord,
+  InferFromSchemaInput,
+  NormalizeSchema,
+} from "./utils/schema";
 
 // Error utilities
 export { AppError, ErrorCode, formatZodError, wrapError } from "./utils/errors";
