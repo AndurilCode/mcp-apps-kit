@@ -195,7 +195,7 @@ Debug logging:
 
 // Note: For multi-version apps, TypeScript has limitations with per-version type extraction.
 // Manual type exports are still recommended for this use case.
-// For single-version apps, you can use: export type AppTools = typeof app.clientTypes;
+// For single-version apps, you can export the app and use typeof app.clientTypes() in your UI code.
 
 // V1 types (manual exports - required for multi-version apps)
 export type AppToolsV1 = { greet: typeof greetToolV1 };

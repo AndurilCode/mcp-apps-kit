@@ -12,7 +12,7 @@ import {
   useDocumentTheme,
   useHostStyleVariables,
 } from "@mcp-apps-kit/ui-react";
-import type { AppTools } from "../../server/index.js";
+import { app } from "../../server/index.js";
 import type {
   CurrentWeather,
   WeatherForecast,
@@ -178,8 +178,8 @@ function isAlerts(data: unknown): data is WeatherAlertsResponse {
 }
 
 export function App() {
-  const client = useAppsClient<AppTools>();
-  const result = useToolResult<AppTools>();
+  const client = useAppsClient<typeof app.clientTypes>();
+  const result = useToolResult<typeof app.clientTypes>();
   const context = useHostContext();
 
   // Apply theme and host styles
