@@ -578,11 +578,19 @@ export class OpenAIAdapter implements ProtocolAdapter {
     }
 
     // Convert content blocks to text representation for the model
+    // Note: OpenAI adapter only supports text content blocks; other types are dropped
     if (params.content && params.content.length > 0) {
-      const textContent = params.content
-        .filter((block) => block.type === "text")
-        .map((block) => block.text)
-        .join("\n");
+      const textBlocks = params.content.filter((block) => block.type === "text");
+      const droppedBlocks = params.content.filter((block) => block.type !== "text");
+
+      if (droppedBlocks.length > 0) {
+        clientDebugLogger.debug(
+          `[OpenAI Adapter] Dropping ${String(droppedBlocks.length)} non-text content block(s):`,
+          droppedBlocks.map((b) => b.type)
+        );
+      }
+
+      const textContent = textBlocks.map((block) => block.text).join("\n");
       if (textContent) {
         modelContext.__mcp_textContent = textContent;
       }

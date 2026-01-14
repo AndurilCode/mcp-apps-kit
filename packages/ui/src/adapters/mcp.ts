@@ -9,6 +9,7 @@
 
 import { App } from "@modelcontextprotocol/ext-apps";
 import { UIError, UIErrorCode } from "../errors";
+import type { ContentBlock } from "../types";
 
 type ResourceReadResult = {
   contents: Array<{
@@ -481,6 +482,14 @@ export class McpAdapter implements ProtocolAdapter {
           // Convert to text representation for ext-apps
           const linkText = block.name ? `${block.name}: ${block.uri}` : block.uri;
           return { type: "text" as const, text: linkText };
+        }
+        default: {
+          // Exhaustiveness check - TypeScript will error if we add a new content type
+          const exhaustiveCheck: never = block;
+          throw new UIError(
+            UIErrorCode.PROTOCOL_ERROR,
+            `Unsupported content block type: ${(exhaustiveCheck as ContentBlock).type}`
+          );
         }
       }
     });
