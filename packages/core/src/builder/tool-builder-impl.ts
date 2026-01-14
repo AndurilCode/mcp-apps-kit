@@ -54,7 +54,12 @@ function normalizeVisibility(value: ToolVisibilityInput): Visibility {
     return "model";
   }
 
-  return value;
+  if (value === "model" || value === "app" || value === "both") {
+    return value;
+  }
+
+  // Fallback for unknown values/defensive programming
+  return value as Visibility;
 }
 
 // =============================================================================
@@ -87,6 +92,8 @@ export class ToolBuilderImpl<TName extends string> implements ToolBuilderInitial
     this: ToolBuilderWithInput<TName, TInput>,
     schema: TOutput
   ): ToolBuilderWithOutput<TName, TInput, NormalizedSchema<TOutput>> {
+    // Cast to implementation to access config.
+    // Necessary due to TypeScript limitations with 'this' types in fluent interfaces.
     const builder = this as unknown as ToolBuilderImpl<TName>;
     builder.config.output = normalizeSchema(schema) as z.ZodType;
     return this as unknown as ToolBuilderWithOutput<TName, TInput, NormalizedSchema<TOutput>>;
@@ -98,34 +105,34 @@ export class ToolBuilderImpl<TName extends string> implements ToolBuilderInitial
   }
 
   readOnly(): this {
-    this.config.annotations = {
-      ...this.config.annotations,
-      readOnlyHint: true,
-    };
+    if (!this.config.annotations) {
+      this.config.annotations = {};
+    }
+    this.config.annotations.readOnlyHint = true;
     return this;
   }
 
   destructive(): this {
-    this.config.annotations = {
-      ...this.config.annotations,
-      destructiveHint: true,
-    };
+    if (!this.config.annotations) {
+      this.config.annotations = {};
+    }
+    this.config.annotations.destructiveHint = true;
     return this;
   }
 
   idempotent(): this {
-    this.config.annotations = {
-      ...this.config.annotations,
-      idempotentHint: true,
-    };
+    if (!this.config.annotations) {
+      this.config.annotations = {};
+    }
+    this.config.annotations.idempotentHint = true;
     return this;
   }
 
   expensive(): this {
-    this.config.annotations = {
-      ...this.config.annotations,
-      openWorldHint: true,
-    };
+    if (!this.config.annotations) {
+      this.config.annotations = {};
+    }
+    this.config.annotations.openWorldHint = true;
     return this;
   }
 
@@ -204,6 +211,8 @@ export class ToolBuilderImpl<TName extends string> implements ToolBuilderInitial
   build<TInput extends z.ZodType, TOutput extends z.ZodType>(
     this: ToolBuilderComplete<TName, TInput, TOutput>
   ): ToolDef<TInput, TOutput> {
+    // Cast to implementation to access config.
+    // Necessary due to TypeScript limitations with 'this' types in fluent interfaces.
     const builder = this as unknown as ToolBuilderImpl<TName>;
 
     if (!builder.config.description) {

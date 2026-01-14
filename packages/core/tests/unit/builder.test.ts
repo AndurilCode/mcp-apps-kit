@@ -108,4 +108,105 @@ describe("Tool Builder", () => {
 
     expectTypeOf(t).toMatchTypeOf<ToolDef>();
   });
+  it("handles schema normalization", () => {
+    // Empty object -> z.object({})
+    const t1 = tool("empty")
+      .describe("Empty")
+      .input({})
+      .handle(async () => ({}))
+      .build();
+    expect(t1.input).toBeInstanceOf(z.ZodObject);
+    expect((t1.input as z.ZodObject<any>).shape).toEqual({});
+
+    // Inline shape -> z.object({...})
+    const t2 = tool("inline")
+      .describe("Inline")
+      .input({ name: z.string() })
+      .handle(async () => ({}))
+      .build();
+    expect(t2.input).toBeInstanceOf(z.ZodObject);
+    expect((t2.input as z.ZodObject<any>).shape.name).toBeInstanceOf(z.ZodString);
+  });
+
+  it("normalizes visibility aliases", () => {
+    const t1 = tool("v1")
+      .describe("V1")
+      .input(z.object({}))
+      .visibility("mcp")
+      .handle(async () => ({}))
+      .build();
+    expect(t1.visibility).toBe("app");
+
+    const t2 = tool("v2")
+      .describe("V2")
+      .input(z.object({}))
+      .visibility("chatgpt")
+      .handle(async () => ({}))
+      .build();
+    expect(t2.visibility).toBe("model");
+  });
+
+  it("applies optional configuration methods", () => {
+    const t = tool("opt")
+      .describe("Optional")
+      .input(z.object({}))
+      .widgetAccessible(true)
+      .invokingMessage("invok")
+      .invokedMessage("invokD")
+      .fileParams(["file1"])
+      .handle(async () => ({}))
+      .build();
+
+    expect(t.widgetAccessible).toBe(true);
+    expect(t.invokingMessage).toBe("invok");
+    expect(t.invokedMessage).toBe("invokD");
+    expect(t.fileParams).toEqual(["file1"]);
+  });
+
+  it("handles UI heuristics and edge cases", () => {
+    // "my-layout" -> key (no dot, no slash)
+    const t1 = tool("key1")
+      .describe("Key 1")
+      .input(z.object({}))
+      .ui("my-layout")
+      .handle(async () => ({}))
+      .build();
+    expect(t1.ui).toBe("my-layout");
+
+    // "my.ui" -> path because of extension detection
+    const t2 = tool("path_ext")
+      .describe("Path Ext")
+      .input(z.object({}))
+      .ui("my.ui")
+      .handle(async () => ({}))
+      .build();
+    expect(t2.ui).toEqual({ html: "my.ui" });
+
+    // "my.ui" enforced as key using uiRef
+    const t3 = tool("key_ref")
+      .describe("Key Ref")
+      .input(z.object({}))
+      .uiRef("my.ui")
+      .handle(async () => ({}))
+      .build();
+    expect(t3.ui).toBe("my.ui");
+
+    // "section/widget" -> path because of slash
+    const t4 = tool("path_slash")
+      .describe("Path Slash")
+      .input(z.object({}))
+      .ui("section/widget")
+      .handle(async () => ({}))
+      .build();
+    expect(t4.ui).toEqual({ html: "section/widget" });
+
+    // Inline HTML
+    const t5 = tool("html")
+      .describe("HTML")
+      .input(z.object({}))
+      .ui("<div></div>")
+      .handle(async () => ({}))
+      .build();
+    expect(t5.ui).toEqual({ html: "<div></div>" });
+  });
 });

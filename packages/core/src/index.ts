@@ -209,3 +209,11 @@ export type {
 
 export { createApp, defineTool, defineUI } from "./createApp";
 export { tool } from "./builder";
+export type {
+  ToolBuilderInitial,
+  ToolBuilderWithDescription,
+  ToolBuilderWithInput,
+  ToolBuilderWithOutput,
+  ToolBuilderComplete,
+  ToolBuilderConfigurable,
+} from "./builder/tool-builder";
