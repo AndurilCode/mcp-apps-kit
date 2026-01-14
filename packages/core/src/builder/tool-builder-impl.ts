@@ -105,33 +105,25 @@ export class ToolBuilderImpl<TName extends string> implements ToolBuilderInitial
   }
 
   readOnly(): this {
-    if (!this.config.annotations) {
-      this.config.annotations = {};
-    }
+    this.config.annotations ??= {};
     this.config.annotations.readOnlyHint = true;
     return this;
   }
 
   destructive(): this {
-    if (!this.config.annotations) {
-      this.config.annotations = {};
-    }
+    this.config.annotations ??= {};
     this.config.annotations.destructiveHint = true;
     return this;
   }
 
   idempotent(): this {
-    if (!this.config.annotations) {
-      this.config.annotations = {};
-    }
+    this.config.annotations ??= {};
     this.config.annotations.idempotentHint = true;
     return this;
   }
 
   expensive(): this {
-    if (!this.config.annotations) {
-      this.config.annotations = {};
-    }
+    this.config.annotations ??= {};
     this.config.annotations.openWorldHint = true;
     return this;
   }
