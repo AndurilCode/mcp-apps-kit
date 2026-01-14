@@ -12,6 +12,11 @@ export default defineConfig({
   clean: true,
   treeshake: true,
   minify: true,
+  // External dependencies - these must be listed in package.json dependencies (not devDependencies)
+  // because they're needed at runtime:
+  // - @typescript-eslint/* packages: Used by ast-parser.ts to parse user TypeScript code at build time
+  // - esbuild: Used to bundle React components into standalone HTML files
+  // - vite: Peer dependency, used when plugin is loaded by Vite config
   external: [
     "react",
     "react-dom",

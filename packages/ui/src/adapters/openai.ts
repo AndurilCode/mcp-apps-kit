@@ -533,9 +533,19 @@ export class OpenAIAdapter implements ProtocolAdapter {
    * OpenAI SDK's setWidgetState(). In ChatGPT, setWidgetState() exposes
    * data to the AI model context, making it visible to the model.
    *
-   * Important differences from MCP Apps:
-   * - MCP Apps: Pure context update via native protocol feature
-   * - ChatGPT: Uses setState/setWidgetState (exposes to AI + persists for session)
+   * **ChatGPT Implementation Details:**
+   * - Uses setState/setWidgetState (exposes to AI + persists for session)
+   * - Each call **replaces** the previous context (not accumulated)
+   * - Context persists for the widget's session lifetime
+   * - Be mindful of data size when sending large structured content
+   *
+   * **MCP Apps Implementation:**
+   * - Pure context update via native protocol feature
+   * - No persistence, only sent to model with next user message
+   *
+   * **Reserved Keys:**
+   * - Keys starting with underscore (`_`) in structuredContent are filtered
+   * - Internal keys use double-underscore prefix (`__mcp_*`)
    *
    * Use updateModelContext() for context-focused use cases (informing the model
    * about app state), and setState() for persistence-focused use cases.
@@ -543,8 +553,9 @@ export class OpenAIAdapter implements ProtocolAdapter {
    */
   async updateModelContext(params: UpdateModelContextParams): Promise<void> {
     // Build a context object to send to the model via setState/setWidgetState
+    // Use double-underscore prefix for internal keys to avoid collisions with user data
     const modelContext: Record<string, unknown> = {
-      _type: "modelContext",
+      __mcp_type: "modelContext",
     };
 
     // Add structured content, filtering out reserved underscore-prefixed keys
@@ -553,12 +564,12 @@ export class OpenAIAdapter implements ProtocolAdapter {
       const reservedKeys = Object.keys(structuredContent).filter((key) => key.startsWith("_"));
       if (reservedKeys.length > 0) {
         clientDebugLogger.debug(
-          "[OpenAI Adapter] Filtering reserved keys from structuredContent:",
+          "[OpenAI Adapter] Filtering reserved keys (underscore-prefixed) from structuredContent:",
           reservedKeys
         );
       }
 
-      // Only merge non-reserved keys
+      // Only merge non-reserved keys (single-underscore prefix is reserved for internal use)
       Object.keys(structuredContent).forEach((key) => {
         if (!key.startsWith("_")) {
           modelContext[key] = structuredContent[key];
@@ -569,11 +580,11 @@ export class OpenAIAdapter implements ProtocolAdapter {
     // Convert content blocks to text representation for the model
     if (params.content && params.content.length > 0) {
       const textContent = params.content
-        .filter((block) => block.type === "text" && block.text)
+        .filter((block) => block.type === "text")
         .map((block) => block.text)
         .join("\n");
       if (textContent) {
-        modelContext._textContent = textContent;
+        modelContext.__mcp_textContent = textContent;
       }
     }
 

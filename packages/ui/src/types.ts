@@ -443,24 +443,17 @@ export type ToolResult<T extends ToolDefs> = {
 /**
  * Content block for model context updates
  *
+ * Uses discriminated unions for type safety - each content type
+ * has only the fields that are valid for that type.
+ *
  * @internal
  */
-export interface ContentBlock {
-  /** Content type */
-  type: "text" | "image" | "audio" | "resource" | "resource_link";
-  /** Text content (for type: "text") */
-  text?: string;
-  /** Binary data as base64 (for type: "image" or "audio") */
-  data?: string;
-  /** MIME type (for type: "image" or "audio") */
-  mimeType?: string;
-  /** Resource URI (for type: "resource" or "resource_link") */
-  uri?: string;
-  /** Resource name (for type: "resource_link") */
-  name?: string;
-  /** Resource description */
-  description?: string;
-}
+export type ContentBlock =
+  | { type: "text"; text: string }
+  | { type: "image"; data: string; mimeType?: string }
+  | { type: "audio"; data: string; mimeType?: string }
+  | { type: "resource"; uri: string; description?: string }
+  | { type: "resource_link"; uri: string; name?: string; description?: string };
 
 /**
  * Parameters for updateModelContext
@@ -541,18 +534,27 @@ export interface AppsClient<T extends ToolDefs = ToolDefs> {
    *
    * Unlike sendMessage which triggers follow-up actions, context updates
    * inform the model about app state without triggering responses.
-   * Each call overwrites the previous context.
    *
-   * The host typically defers sending context to the model until the next
-   * user message and only sends the most recent update.
+   * **Context Persistence:**
+   * - Each call **replaces** the previous context (not accumulated)
+   * - The host defers sending context to the model until the next user message
+   * - Only the most recent update is sent to the model
    *
-   * Platform implementation details:
-   * - MCP Apps: Uses native protocol feature for pure context updates
-   * - ChatGPT: Uses setState/setWidgetState internally (exposes to AI + persists)
+   * **Platform Implementation Details:**
    *
-   * On ChatGPT, both setState() and updateModelContext() expose state to the
-   * AI model. Use setState() for persistence-focused use cases, and
-   * updateModelContext() for context-focused use cases.
+   * - **MCP Apps:** Uses native protocol feature for pure context updates
+   * - **ChatGPT:** Uses setState/setWidgetState internally
+   *   - Context persists for the widget's session lifetime
+   *   - Both setState() and updateModelContext() expose data to the AI model
+   *   - Use setState() for persistence-focused use cases
+   *   - Use updateModelContext() for context-focused use cases
+   *   - **Important:** Be mindful of data size when sending large structured content,
+   *     as it may impact message context limits
+   *
+   * **Reserved Keys:**
+   * - Keys starting with underscore (`_`) in `structuredContent` are reserved
+   *   for internal use and will be filtered out
+   * - Use alphanumeric keys for your application data
    *
    * @param params - Context content and/or structured content
    *

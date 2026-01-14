@@ -427,26 +427,61 @@ export class McpAdapter implements ProtocolAdapter {
       throw new UIError(UIErrorCode.NOT_CONNECTED, "MCP Apps adapter not connected");
     }
 
-    // Map our content blocks to ext-apps format
+    // Map our content blocks to ext-apps format with validation
     const content = params.content?.map((block) => {
       switch (block.type) {
         case "text":
-          return { type: "text" as const, text: block.text ?? "" };
+          if (!block.text) {
+            throw new UIError(
+              UIErrorCode.INVALID_PARAMS,
+              "Text content block requires 'text' field"
+            );
+          }
+          return { type: "text" as const, text: block.text };
         case "image":
+          if (!block.data) {
+            throw new UIError(
+              UIErrorCode.INVALID_PARAMS,
+              "Image content block requires 'data' field"
+            );
+          }
           return {
             type: "image" as const,
-            data: block.data ?? "",
+            data: block.data,
             mimeType: block.mimeType ?? "image/png",
           };
         case "audio":
+          if (!block.data) {
+            throw new UIError(
+              UIErrorCode.INVALID_PARAMS,
+              "Audio content block requires 'data' field"
+            );
+          }
           return {
             type: "audio" as const,
-            data: block.data ?? "",
+            data: block.data,
             mimeType: block.mimeType ?? "audio/wav",
           };
-        default:
-          // For resource types, fall back to text representation
-          return { type: "text" as const, text: block.text ?? block.uri ?? "" };
+        case "resource":
+          if (!block.uri) {
+            throw new UIError(
+              UIErrorCode.INVALID_PARAMS,
+              "Resource content block requires 'uri' field"
+            );
+          }
+          // Convert to text representation for ext-apps
+          return { type: "text" as const, text: block.uri };
+        case "resource_link": {
+          if (!block.uri) {
+            throw new UIError(
+              UIErrorCode.INVALID_PARAMS,
+              "Resource link content block requires 'uri' field"
+            );
+          }
+          // Convert to text representation for ext-apps
+          const linkText = block.name ? `${block.name}: ${block.uri}` : block.uri;
+          return { type: "text" as const, text: linkText };
+        }
       }
     });
 
