@@ -1275,5 +1275,8 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
 // Re-export defineTool from types/tools for convenience
 export { defineTool } from "./types/tools";
 
+// Re-export tool builder from builder for convenience
+export { tool } from "./builder";
+
 // Re-export defineUI from types/ui for convenience
 export { defineUI } from "./types/ui";

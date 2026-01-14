@@ -8,7 +8,7 @@
  * - Each version exposed at /v1/mcp and /v2/mcp
  */
 
-import { createApp, defineTool, type ClientToolsFromCore } from "@mcp-apps-kit/core";
+import { createApp, defineTool, tool, type ClientToolsFromCore } from "@mcp-apps-kit/core";
 import { defineReactUI } from "@mcp-apps-kit/ui-react-builder";
 import { GreetingWidgetV1 } from "./ui/GreetingWidgetV1";
 import { GreetingWidgetV2 } from "./ui/GreetingWidgetV2";
@@ -69,36 +69,35 @@ const greetOutputV2 = z.object({
   timestamp: z.string(),
 });
 
-const greetToolV2 = defineTool({
-  title: "Greet",
-  description: "Greet someone by name and optional surname",
-  input: greetInputV2,
-  output: greetOutputV2,
-  visibility: "both",
-
-  ui: defineReactUI({
-    component: GreetingWidgetV2,
-    name: "Greeting Widget V2",
-    description: "Displays greeting messages (v2 - with surname support)",
-    prefersBorder: true,
-    // CSP configuration for ChatGPT - allow connections and resources
-    csp: {
-      // Allow fetch/XHR to your server (use your public URL or ngrok)
-      connectDomains: [
-        "http://localhost:3000", // Local dev
-        "https://*.ngrok-free.app", // ngrok tunnels
-        // Add your production domain here
-      ],
-      // Allow fonts, images, scripts, stylesheets from CDNs
-      resourceDomains: [
-        "https://fonts.googleapis.com",
-        "https://fonts.gstatic.com",
-        // Add other CDNs as needed
-      ],
-    },
-  }),
-
-  handler: async (input, context) => {
+const greetToolV2 = tool("Greet")
+  .describe("Greet someone by name and optional surname")
+  .input(greetInputV2)
+  .output(greetOutputV2)
+  .visibility("both")
+  .ui(
+    defineReactUI({
+      component: GreetingWidgetV2,
+      name: "Greeting Widget V2",
+      description: "Displays greeting messages (v2 - with surname support)",
+      prefersBorder: true,
+      // CSP configuration for ChatGPT - allow connections and resources
+      csp: {
+        // Allow fetch/XHR to your server (use your public URL or ngrok)
+        connectDomains: [
+          "http://localhost:3000", // Local dev
+          "https://*.ngrok-free.app", // ngrok tunnels
+          // Add your production domain here
+        ],
+        // Allow fonts, images, scripts, stylesheets from CDNs
+        resourceDomains: [
+          "https://fonts.googleapis.com",
+          "https://fonts.gstatic.com",
+          // Add other CDNs as needed
+        ],
+      },
+    })
+  )
+  .handle(async (input, context) => {
     const fullName = input.surname ? `${input.name} ${input.surname}` : input.name;
     const userInfo = context.subject ? ` (authenticated as ${context.subject})` : "";
     const message = `Hello, ${fullName}${userInfo}!`;
@@ -109,8 +108,8 @@ const greetToolV2 = defineTool({
       timestamp: new Date().toISOString(),
       _text: message,
     };
-  },
-});
+  })
+  .build();
 
 // =============================================================================
 // V3: Inline schema syntax demo (no separate schema declarations)

@@ -208,3 +208,4 @@ export type {
 // =============================================================================
 
 export { createApp, defineTool, defineUI } from "./createApp";
+export { tool } from "./builder";
