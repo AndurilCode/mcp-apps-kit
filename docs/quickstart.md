@@ -156,6 +156,33 @@ function Widget() {
 }
 ```
 
+## Output Type Inference
+
+For faster prototyping, you can omit the `output` schema and let TypeScript infer the type from your handler's return value:
+
+```typescript
+const greet = defineTool({
+  description: "Greet a user",
+  input: z.object({ name: z.string() }),
+  // No output schema - type inferred from handler
+  handler: async ({ name }) => ({
+    message: `Hello, ${name}!`,
+    timestamp: new Date().toISOString(),
+  }),
+});
+
+// Client types are automatically inferred
+export type AppClientTools = ClientToolsFromCore<{ greet: typeof greet }>;
+// AppClientTools["greet"]["output"] is { message: string; timestamp: string }
+```
+
+**When to use each approach:**
+
+- **Omit `output`**: Rapid prototyping, internal tools, compile-time type safety only
+- **Include `output`**: Production tools, external data validation, API documentation (generates JSON Schema)
+
+**Note:** Output inference is compile-time only. For runtime validation of data from external sources (databases, APIs), always use an explicit `output` schema.
+
 ## Available React Hooks
 
 ### Core Hooks
