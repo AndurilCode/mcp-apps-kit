@@ -19,6 +19,7 @@ import type {
   VersionConfig,
   GlobalConfig,
   VersionSpecificConfig,
+  Icon,
 } from "./types/config";
 import type { UIDef, UIDefs } from "./types/ui";
 import type { Middleware } from "./middleware/types";
@@ -436,7 +437,9 @@ function deepMerge<T extends Record<string, unknown>>(
 function mergeVersionConfig<T extends ToolDefs>(
   globalConfig: GlobalConfig | undefined,
   versionConfig: VersionConfig<T>,
-  globalPlugins: Plugin[] | undefined
+  globalPlugins: Plugin[] | undefined,
+  globalIcon?: string,
+  globalIcons?: Icon[]
 ): AppConfig<T> & { ui?: UIDefs } {
   // Handle primitive config properties (null means remove, undefined means inherit)
   const serverRoute =
@@ -488,6 +491,9 @@ function mergeVersionConfig<T extends ToolDefs>(
     ui: versionConfig.ui,
     config: mergedConfig,
     plugins: mergedPlugins.length > 0 ? mergedPlugins : undefined,
+    // Propagate global icons to each version
+    icon: globalIcon,
+    icons: globalIcons,
   };
 }
 
@@ -820,8 +826,14 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
 
   // Create app instance for each version
   for (const [versionKey, versionConfig] of Object.entries(config.versions)) {
-    // Merge global and version-specific configs
-    const mergedConfig = mergeVersionConfig(config.config, versionConfig, config.plugins);
+    // Merge global and version-specific configs (including icons)
+    const mergedConfig = mergeVersionConfig(
+      config.config,
+      versionConfig,
+      config.plugins,
+      config.icon,
+      config.icons
+    );
     mergedConfig.name = config.name; // Set app name from global config
 
     // Extract colocated UIs from tool definitions

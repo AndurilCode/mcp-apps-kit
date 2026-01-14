@@ -8,7 +8,13 @@
  * - Each version exposed at /v1/mcp and /v2/mcp
  */
 
-import { createApp, defineTool, tool, type ClientToolsFromCore } from "@mcp-apps-kit/core";
+import {
+  createApp,
+  defineTool,
+  tool,
+  type ClientToolsFromCore,
+  iconFromFile,
+} from "@mcp-apps-kit/core";
 import { defineReactUI } from "@mcp-apps-kit/ui-react-builder";
 import { GreetingWidgetV1 } from "./ui/GreetingWidgetV1";
 import { GreetingWidgetV2 } from "./ui/GreetingWidgetV2";
@@ -170,6 +176,10 @@ const echoToolV3 = defineTool({
 
 const app = createApp({
   name: "minimal-app",
+
+  // Server icon - displayed in MCP client UIs
+  // Can be a URL or base64 data URI
+  icon: iconFromFile("./src/logo.png").src,
 
   // Shared config across all versions
   config: {

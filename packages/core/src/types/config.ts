@@ -8,6 +8,81 @@ import type { OAuthConfig } from "../server/oauth/types.js";
 import type { UIDefs } from "./ui";
 
 // =============================================================================
+// ICON CONFIGURATION
+// =============================================================================
+
+/**
+ * Icon theme for light/dark mode support
+ */
+export type IconTheme = "light" | "dark";
+
+/**
+ * Icon definition following the MCP specification.
+ *
+ * Supports both URL references and inline base64 data URIs.
+ *
+ * @see https://modelcontextprotocol.io/specification/2025-11-25/schema#implementation
+ *
+ * @example URL reference
+ * ```typescript
+ * { src: "https://example.com/icon.png", mimeType: "image/png", sizes: ["48x48"] }
+ * ```
+ *
+ * @example Base64 data URI
+ * ```typescript
+ * { src: "data:image/svg+xml;base64,PHN2Zy...", mimeType: "image/svg+xml", sizes: ["any"] }
+ * ```
+ *
+ * @example Theme-specific icon
+ * ```typescript
+ * { src: "https://example.com/icon-dark.png", theme: "dark" }
+ * ```
+ */
+export interface Icon {
+  /**
+   * Icon source URI.
+   *
+   * Can be:
+   * - HTTP/HTTPS URL (e.g., "https://example.com/icon.png")
+   * - Data URI with base64 encoding (e.g., "data:image/png;base64,...")
+   */
+  src: string;
+
+  /**
+   * MIME type of the icon.
+   *
+   * Required MIME types that clients must support:
+   * - `"image/png"`
+   * - `"image/jpeg"`
+   *
+   * Optional MIME types:
+   * - `"image/svg+xml"`
+   * - `"image/webp"`
+   *
+   * @example "image/png"
+   */
+  mimeType?: string;
+
+  /**
+   * Icon sizes in "WxH" format.
+   *
+   * Use `["any"]` for scalable formats like SVG.
+   *
+   * @example ["48x48", "96x96"]
+   * @example ["any"]
+   */
+  sizes?: string[];
+
+  /**
+   * Theme this icon is designed for.
+   *
+   * When specified, clients can select the appropriate icon
+   * based on their current light/dark mode setting.
+   */
+  theme?: IconTheme;
+}
+
+// =============================================================================
 // PROTOCOL CONFIGURATION
 // =============================================================================
 
@@ -463,6 +538,27 @@ export interface VersionsConfig<T extends ToolDefs = ToolDefs> {
    * Merged with each version's plugins.
    */
   plugins?: Plugin[];
+
+  /**
+   * Server icon URL or data URI (shorthand for single icon).
+   *
+   * Applied to all versions. For multiple icons or advanced configuration, use `icons` instead.
+   *
+   * @example
+   * ```typescript
+   * icon: "https://example.com/icon.png"
+   * ```
+   */
+  icon?: string;
+
+  /**
+   * Server icons for MCP client display.
+   *
+   * Applied to all versions. Follows the MCP specification for Implementation icons.
+   *
+   * @see https://modelcontextprotocol.io/specification/2025-11-25/schema#implementation
+   */
+  icons?: Icon[];
 }
 
 /**
@@ -533,6 +629,42 @@ export interface AppConfig<T extends ToolDefs = ToolDefs> {
    * ```
    */
   plugins?: Plugin[];
+
+  /**
+   * Server icon URL or data URI (shorthand for single icon).
+   *
+   * For multiple icons or advanced configuration, use `icons` instead.
+   *
+   * @example URL
+   * ```typescript
+   * icon: "https://example.com/icon.png"
+   * ```
+   *
+   * @example Data URI
+   * ```typescript
+   * icon: "data:image/svg+xml;base64,PHN2Zy..."
+   * ```
+   */
+  icon?: string;
+
+  /**
+   * Server icons for MCP client display.
+   *
+   * Allows specifying multiple icons with different sizes, formats, and themes.
+   * Follows the MCP specification for Implementation icons.
+   *
+   * @see https://modelcontextprotocol.io/specification/2025-11-25/schema#implementation
+   *
+   * @example
+   * ```typescript
+   * icons: [
+   *   { src: "https://example.com/icon-48.png", mimeType: "image/png", sizes: ["48x48"] },
+   *   { src: "https://example.com/icon-96.png", mimeType: "image/png", sizes: ["96x96"] },
+   *   { src: "https://example.com/icon-dark.png", theme: "dark" }
+   * ]
+   * ```
+   */
+  icons?: Icon[];
 }
 
 /**

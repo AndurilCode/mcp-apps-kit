@@ -24,7 +24,7 @@ import type {
   ToolContext,
   UserLocation,
 } from "../types/tools";
-import type { AppConfig, CORSConfig, DebugConfig } from "../types/config";
+import type { AppConfig, CORSConfig, DebugConfig, Icon } from "../types/config";
 import type { UIDefs, UIDef } from "../types/ui";
 import type { MiddlewareContext } from "../middleware/types";
 import type { EventMap } from "../events/types";
@@ -37,6 +37,74 @@ import { debugLogger, type LogEntry } from "../debug/logger";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
+
+// =============================================================================
+// ICON HELPERS
+// =============================================================================
+
+/**
+ * Valid sizes format pattern: "WxH" (e.g., "48x48") or "any" for scalable formats.
+ */
+const SIZES_PATTERN = /^\d+x\d+$/;
+
+/**
+ * Validate icon sizes array format.
+ */
+function validateIconSizes(sizes: string[] | undefined, index: number): void {
+  if (!sizes) return;
+
+  for (const size of sizes) {
+    if (size !== "any" && !SIZES_PATTERN.test(size)) {
+      throw new Error(
+        `Invalid icon size "${size}" at index ${index}: ` +
+          `Sizes must be in "WxH" format (e.g., "48x48") or "any" for scalable formats.`
+      );
+    }
+  }
+}
+
+/**
+ * Validate an icon object has required fields.
+ */
+function validateIcon(icon: Icon, index: number): void {
+  if (!icon.src || typeof icon.src !== "string" || icon.src.trim() === "") {
+    throw new Error(`Invalid icon at index ${index}: 'src' must be a non-empty string`);
+  }
+  validateIconSizes(icon.sizes, index);
+}
+
+/**
+ * Normalize icon configuration into an icons array.
+ *
+ * Handles both the shorthand `icon` string and the full `icons` array.
+ * If both are provided, `icons` takes precedence.
+ *
+ * @internal This function is used internally by createApp. Do not use directly.
+ * @throws Error if any icon has an invalid or empty src
+ */
+export function normalizeIcons(
+  icon: string | undefined,
+  icons: Icon[] | undefined
+): Icon[] | undefined {
+  // icons array takes precedence
+  if (icons && icons.length > 0) {
+    icons.forEach((ic, i) => {
+      validateIcon(ic, i);
+    });
+    return icons;
+  }
+
+  // Convert shorthand icon string to icons array
+  // Validate before falsy check for consistency (empty string should also throw)
+  if (icon !== undefined) {
+    if (typeof icon !== "string" || icon.trim() === "") {
+      throw new Error("Icon must be a non-empty string URL or data URI");
+    }
+    return [{ src: icon }];
+  }
+
+  return undefined;
+}
 
 // =============================================================================
 // SERVER WRAPPER
@@ -83,10 +151,14 @@ export function createServerInstance<T extends ToolDefs>(
   // Create protocol adapter
   const adapter = createAdapter(config.config?.protocol ?? "mcp");
 
-  // Create MCP server
+  // Normalize icons from shorthand or array format
+  const icons = normalizeIcons(config.icon, config.icons);
+
+  // Create MCP server with icons if provided
   const mcpServer = new McpServer({
     name: config.name,
     version: config.version,
+    ...(icons && { icons }),
   });
 
   // Compute UI resource URIs with content hashes for cache busting

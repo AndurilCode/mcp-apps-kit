@@ -286,6 +286,45 @@ describe("createApp versioning", () => {
       expect(app).toBeDefined();
       // Both plugins should be registered for v1
     });
+
+    it("should propagate global icon to all versions", () => {
+      const app = createApp({
+        name: "test-app",
+        icon: "https://example.com/icon.png",
+        versions: {
+          v1: {
+            version: "1.0.0",
+            tools: {},
+          },
+          v2: {
+            version: "2.0.0",
+            tools: {},
+          },
+        },
+      });
+
+      expect(app).toBeDefined();
+      // Global icon should be applied to both versions
+    });
+
+    it("should propagate global icons array to all versions", () => {
+      const app = createApp({
+        name: "test-app",
+        icons: [
+          { src: "https://example.com/icon-48.png", sizes: ["48x48"] },
+          { src: "https://example.com/icon-96.png", sizes: ["96x96"] },
+        ],
+        versions: {
+          v1: {
+            version: "1.0.0",
+            tools: {},
+          },
+        },
+      });
+
+      expect(app).toBeDefined();
+      // Global icons should be applied to v1
+    });
   });
 
   describe("deep config merging", () => {

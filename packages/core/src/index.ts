@@ -62,6 +62,8 @@ export type {
   ServerConfig,
   VersionSpecificConfig,
   DeepPartialWithNull,
+  Icon,
+  IconTheme,
 } from "./types/config";
 
 // OAuth types
@@ -202,6 +204,10 @@ export type {
   McpUIResourceMetadata,
   OpenAIUIResourceMetadata,
 } from "./utils/csp";
+
+// Icon utilities
+export { iconFromFile } from "./utils/icons";
+export type { IconFromFileOptions } from "./utils/icons";
 
 // =============================================================================
 // MAIN ENTRY POINTS
