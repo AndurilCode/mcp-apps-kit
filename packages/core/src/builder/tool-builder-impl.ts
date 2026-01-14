@@ -16,6 +16,7 @@ import type {
   ToolBuilderWithOutput,
   ToolVisibilityInput,
   UIOptions,
+  ToolOutputMeta,
 } from "./tool-builder";
 
 // =============================================================================
@@ -189,27 +190,27 @@ export class ToolBuilderImpl<TName extends string> implements ToolBuilderInitial
     return this;
   }
 
-  handle<TInput extends z.ZodType, TReturn>(
+  handle<TInput extends z.ZodType, TReturn extends Record<string, unknown> & ToolOutputMeta>(
     this: ToolBuilderImpl<TName> & ToolBuilderWithInput<TName, TInput>,
     handler: (input: z.infer<TInput>, context: ToolContext) => Promise<TReturn>
-  ): ToolBuilderComplete<TName, TInput, z.ZodType>;
+  ): ToolBuilderComplete<TName, TInput, z.ZodType, TReturn>;
   handle<TInput extends z.ZodType, TOutput extends z.ZodType, TActual>(
     this: ToolBuilderImpl<TName> & ToolBuilderWithOutput<TName, TInput, TOutput>,
     handler: (input: z.infer<TInput>, context: ToolContext) => Promise<TActual>
-  ): ToolBuilderComplete<TName, TInput, TOutput>;
+  ): ToolBuilderComplete<TName, TInput, TOutput, z.infer<TOutput>>;
   handle(
     handler: (input: unknown, context: ToolContext) => Promise<unknown>
-  ): ToolBuilderComplete<TName, z.ZodType, z.ZodType> {
+  ): ToolBuilderComplete<TName, z.ZodType, z.ZodType, unknown> {
     if (!(this instanceof ToolBuilderImpl)) {
       throw new Error("ToolBuilder method called with invalid context");
     }
     this.config.handler = handler;
-    return this as unknown as ToolBuilderComplete<TName, z.ZodType, z.ZodType>;
+    return this as unknown as ToolBuilderComplete<TName, z.ZodType, z.ZodType, unknown>;
   }
 
-  build<TInput extends z.ZodType, TOutput extends z.ZodType>(
-    this: ToolBuilderComplete<TName, TInput, TOutput>
-  ): ToolDef<TInput, TOutput> {
+  build<TInput extends z.ZodType, TOutput extends z.ZodType, TInferredOutput>(
+    this: ToolBuilderComplete<TName, TInput, TOutput, TInferredOutput>
+  ): ToolDef<TInput, TOutput, TInferredOutput> {
     // Cast to implementation to access config.
     // Necessary due to TypeScript limitations with 'this' types in fluent interfaces.
     if (!(this instanceof ToolBuilderImpl)) {
@@ -244,6 +245,6 @@ export class ToolBuilderImpl<TName extends string> implements ToolBuilderInitial
       invokingMessage: builder.config.invokingMessage,
       invokedMessage: builder.config.invokedMessage,
       fileParams: builder.config.fileParams,
-    } as ToolDef<TInput, TOutput>;
+    } as ToolDef<TInput, TOutput, TInferredOutput>;
   }
 }

@@ -13,7 +13,7 @@ import type {
   InferToolOutputs,
   ClientToolsFromCore,
 } from "../../src/types/tools";
-import { createApp, defineTool, normalizeSchema } from "../../src/index.js";
+import { createApp, defineTool, normalizeSchema, tool } from "../../src/index.js";
 
 describe("type inference utilities", () => {
   describe("InferToolInputs", () => {
@@ -763,6 +763,234 @@ describe("defineTool with inline schema syntax", () => {
       expect(() => normalizeSchema(mixedSchema as never)).toThrow(
         'Invalid schema definition: property "invalid" must be a Zod schema'
       );
+    });
+  });
+});
+
+describe("output type inference without explicit schema (PRD-004)", () => {
+  describe("inline tool objects", () => {
+    it("should infer output type from handler return when output is omitted", () => {
+      const tools = {
+        greet: {
+          description: "Greet a user",
+          input: z.object({ name: z.string() }),
+          // No output schema
+          handler: async ({ name }: { name: string }) => ({
+            message: `Hello, ${name}!`,
+            timestamp: Date.now(),
+          }),
+        },
+      } satisfies ToolDefs;
+
+      // Type-level: InferToolOutputs should infer from handler return
+      type Outputs = InferToolOutputs<typeof tools>;
+      expectTypeOf<Outputs["greet"]>().toEqualTypeOf<{ message: string; timestamp: number }>();
+    });
+
+    it("should exclude meta keys from inferred output type", () => {
+      const tools = {
+        test: {
+          description: "Test tool",
+          input: z.object({}),
+          handler: async () => ({
+            data: "value",
+            _meta: { internal: "data" },
+            _text: "narration",
+            _closeWidget: true,
+          }),
+        },
+      } satisfies ToolDefs;
+
+      // Meta keys should be stripped from inferred output
+      type Outputs = InferToolOutputs<typeof tools>;
+      expectTypeOf<Outputs["test"]>().toEqualTypeOf<{ data: string }>();
+    });
+
+    it("should work with ClientToolsFromCore for inline tools", () => {
+      const tools = {
+        search: {
+          description: "Search items",
+          input: z.object({ query: z.string() }),
+          handler: async ({ query }: { query: string }) => ({
+            results: [query],
+            count: 1,
+          }),
+        },
+      } satisfies ToolDefs;
+
+      type ClientTools = ClientToolsFromCore<typeof tools>;
+      expectTypeOf<ClientTools["search"]["output"]>().toEqualTypeOf<{
+        results: string[];
+        count: number;
+      }>();
+    });
+  });
+
+  describe("defineTool without output", () => {
+    it("should infer output type from handler return", () => {
+      const myTool = defineTool({
+        description: "Get user info",
+        input: z.object({ id: z.string() }),
+        handler: async (input) => ({
+          userId: input.id,
+          name: "John Doe",
+          verified: true,
+        }),
+      });
+
+      // Test via ClientToolsFromCore
+      type ClientTools = ClientToolsFromCore<{ test: typeof myTool }>;
+      expectTypeOf<ClientTools["test"]["output"]>().toEqualTypeOf<{
+        userId: string;
+        name: string;
+        verified: boolean;
+      }>();
+    });
+
+    it("should exclude meta keys from inferred defineTool output", () => {
+      const myTool = defineTool({
+        description: "Test tool",
+        input: z.object({}),
+        handler: async () => ({
+          status: "ok",
+          _meta: { debug: true },
+          _text: "Done",
+        }),
+      });
+
+      type ClientTools = ClientToolsFromCore<{ test: typeof myTool }>;
+      expectTypeOf<ClientTools["test"]["output"]>().toEqualTypeOf<{ status: string }>();
+    });
+
+    it("should preserve explicit output schema when provided", () => {
+      const myTool = defineTool({
+        description: "Test tool",
+        input: z.object({}),
+        output: z.object({ result: z.string() }),
+        handler: async () => ({ result: "test" }),
+      });
+
+      type ClientTools = ClientToolsFromCore<{ test: typeof myTool }>;
+      expectTypeOf<ClientTools["test"]["output"]>().toEqualTypeOf<{ result: string }>();
+    });
+  });
+
+  describe("fluent builder without output", () => {
+    it("should infer output type from handler return", () => {
+      const myTool = tool("getData")
+        .describe("Get some data")
+        .input(z.object({ key: z.string() }))
+        .handle(async (input) => ({
+          key: input.key,
+          value: "test-value",
+          cached: false,
+        }))
+        .build();
+
+      type ClientTools = ClientToolsFromCore<{ getData: typeof myTool }>;
+      expectTypeOf<ClientTools["getData"]["output"]>().toEqualTypeOf<{
+        key: string;
+        value: string;
+        cached: boolean;
+      }>();
+    });
+
+    it("should exclude meta keys from inferred builder output", () => {
+      const builtTool = tool("test")
+        .describe("Test")
+        .input(z.object({}))
+        .handle(async () => ({
+          data: 123,
+          _meta: { foo: "bar" },
+          _closeWidget: true,
+        }))
+        .build();
+
+      type ClientTools = ClientToolsFromCore<{ test: typeof builtTool }>;
+      expectTypeOf<ClientTools["test"]["output"]>().toEqualTypeOf<{ data: number }>();
+    });
+
+    it("should preserve explicit output when provided via builder", () => {
+      const builtTool = tool("test")
+        .describe("Test")
+        .input(z.object({}))
+        .output(z.object({ result: z.number() }))
+        .handle(async () => ({ result: 42 }))
+        .build();
+
+      type ClientTools = ClientToolsFromCore<{ test: typeof builtTool }>;
+      expectTypeOf<ClientTools["test"]["output"]>().toEqualTypeOf<{ result: number }>();
+    });
+  });
+
+  describe("complex inference scenarios", () => {
+    it("should handle nested objects in inferred output", () => {
+      const myTool = defineTool({
+        description: "Get user",
+        input: z.object({ id: z.string() }),
+        handler: async (input) => ({
+          user: {
+            id: input.id,
+            profile: {
+              name: "John",
+              email: "john@example.com",
+            },
+          },
+          metadata: {
+            timestamp: new Date(),
+            version: 1,
+          },
+        }),
+      });
+
+      type ClientTools = ClientToolsFromCore<{ getUser: typeof myTool }>;
+      expectTypeOf<ClientTools["getUser"]["output"]>().toMatchTypeOf<{
+        user: {
+          id: string;
+          profile: {
+            name: string;
+            email: string;
+          };
+        };
+        metadata: {
+          timestamp: Date;
+          version: number;
+        };
+      }>();
+    });
+
+    it("should handle arrays in inferred output", () => {
+      const myTool = defineTool({
+        description: "Search",
+        input: z.object({ query: z.string() }),
+        handler: async (input) => ({
+          results: [{ id: "1", title: input.query }],
+          total: 1,
+        }),
+      });
+
+      type ClientTools = ClientToolsFromCore<{ search: typeof myTool }>;
+      expectTypeOf<ClientTools["search"]["output"]>().toMatchTypeOf<{
+        results: Array<{ id: string; title: string }>;
+        total: number;
+      }>();
+    });
+
+    it("should handle optional fields in inferred output", () => {
+      const myTool = defineTool({
+        description: "Get data",
+        input: z.object({}),
+        handler: async () => ({
+          required: "value",
+          optional: Math.random() > 0.5 ? "maybe" : undefined,
+        }),
+      });
+
+      type ClientTools = ClientToolsFromCore<{ getData: typeof myTool }>;
+      expectTypeOf<ClientTools["getData"]["output"]>().toMatchTypeOf<{
+        required: string;
+        optional?: string;
+      }>();
     });
   });
 });

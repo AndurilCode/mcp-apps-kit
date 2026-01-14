@@ -215,10 +215,15 @@ export interface ToolAnnotations {
 
 /**
  * Single tool definition with Zod schemas
+ *
+ * @template TInput - Input schema (Zod type)
+ * @template TOutput - Output schema (Zod type, optional)
+ * @template TInferredOutput - Inferred output type from handler (when no output schema provided)
  */
 export interface ToolDef<
   TInput extends z.ZodType = z.ZodType,
   TOutput extends z.ZodType = z.ZodType,
+  TInferredOutput = z.infer<TOutput>,
 > {
   /** Human-readable description for the LLM */
   description: string;
@@ -251,7 +256,7 @@ export interface ToolDef<
     input: z.infer<TInput>,
     context: ToolContext
   ) => Promise<
-    z.infer<TOutput> & {
+    TInferredOutput & {
       /** Additional metadata for UI (not sent to model) */
       _meta?: Record<string, unknown>;
       /** Text narration for model (optional) */
@@ -347,9 +352,13 @@ export type ToolDefs = Record<string, ToolDef>;
  * This helper solves TypeScript's generic type inference limitations
  * by capturing the specific schema types at the call site.
  *
- * Supports both explicit Zod schemas and inline object syntax:
+ * Supports both explicit Zod schemas and inline object syntax.
  *
- * @example Explicit Zod schemas
+ * When `output` is omitted, the output type is inferred from the handler's
+ * return type (compile-time only). When `output` is provided, runtime validation
+ * is performed against the schema.
+ *
+ * @example With explicit output schema (runtime validation)
  * ```typescript
  * const myTool = defineTool({
  *   description: "My tool description",
@@ -358,6 +367,18 @@ export type ToolDefs = Record<string, ToolDef>;
  *   handler: async (input, context) => {
  *     // input is fully typed as { name: string }
  *     return { result: `Hello ${input.name}` };
+ *   }
+ * });
+ * ```
+ *
+ * @example With inferred output (no runtime validation)
+ * ```typescript
+ * const myTool = defineTool({
+ *   description: "My tool description",
+ *   input: z.object({ name: z.string() }),
+ *   handler: async (input, context) => {
+ *     // Return type is inferred for client-side typing
+ *     return { result: `Hello ${input.name}`, count: 1 };
  *   }
  * });
  * ```
@@ -375,24 +396,59 @@ export type ToolDefs = Record<string, ToolDef>;
  * });
  * ```
  */
+
+// Overload 1: With explicit output schema (strict checking)
 export function defineTool<
   TInput extends SchemaInput,
-  TOutput extends SchemaInput = Record<string, never>,
+  TOutput extends SchemaInput,
   TActual extends InferFromSchemaInput<TOutput> & ToolOutputMeta = InferFromSchemaInput<TOutput> &
     ToolOutputMeta,
->(
-  definition: Omit<
-    ToolDef<NormalizeSchema<TInput>, NormalizeSchema<TOutput>>,
-    "handler" | "input" | "output"
-  > & {
-    input: TInput;
-    output?: TOutput;
-    handler: (
-      input: InferFromSchemaInput<TInput>,
-      context: ToolContext
-    ) => Promise<StrictToolOutput<InferFromSchemaInput<TOutput>, TActual>>;
-  }
-): ToolDef<NormalizeSchema<TInput>, NormalizeSchema<TOutput>> {
+>(definition: {
+  description: string;
+  title?: string;
+  input: TInput;
+  output: TOutput; // Required for this overload
+  handler: (
+    input: InferFromSchemaInput<TInput>,
+    context: ToolContext
+  ) => Promise<StrictToolOutput<InferFromSchemaInput<TOutput>, TActual>>;
+  visibility?: Visibility;
+  ui?: string | UIDef;
+  widgetAccessible?: boolean;
+  invokingMessage?: string;
+  invokedMessage?: string;
+  fileParams?: string[];
+  annotations?: ToolAnnotations;
+}): ToolDef<NormalizeSchema<TInput>, NormalizeSchema<TOutput>, InferFromSchemaInput<TOutput>>;
+
+// Overload 2: Without output schema (inferred from handler return type)
+// eslint-disable-next-line no-redeclare
+export function defineTool<
+  TInput extends SchemaInput,
+  THandlerReturn extends Record<string, unknown> & ToolOutputMeta,
+>(definition: {
+  description: string;
+  title?: string;
+  input: TInput;
+  // output property completely omitted (not optional)
+  handler: (input: InferFromSchemaInput<TInput>, context: ToolContext) => Promise<THandlerReturn>;
+  visibility?: Visibility;
+  ui?: string | UIDef;
+  widgetAccessible?: boolean;
+  invokingMessage?: string;
+  invokedMessage?: string;
+  fileParams?: string[];
+  annotations?: ToolAnnotations;
+}): ToolDef<NormalizeSchema<TInput>, z.ZodType, THandlerReturn>;
+
+// Implementation (unchanged)
+// eslint-disable-next-line no-redeclare
+export function defineTool(definition: {
+  input: SchemaInput;
+  output?: SchemaInput;
+  handler: (input: unknown, context: ToolContext) => Promise<unknown>;
+  [key: string]: unknown;
+}): ToolDef {
   // Normalize input and output schemas at runtime
   const normalizedInput = normalizeSchema(definition.input);
   const normalizedOutput = definition.output ? normalizeSchema(definition.output) : undefined;
@@ -401,7 +457,7 @@ export function defineTool<
     ...definition,
     input: normalizedInput,
     output: normalizedOutput,
-  } as ToolDef<NormalizeSchema<TInput>, NormalizeSchema<TOutput>>;
+  } as ToolDef;
 }
 
 // =============================================================================
@@ -611,6 +667,32 @@ export interface App<T extends ToolDefs = ToolDefs> {
 // =============================================================================
 
 /**
+ * Strip reserved metadata keys from a type.
+ * Removes _meta, _text, and _closeWidget from object types.
+ *
+ * @internal
+ */
+export type StripToolOutputMeta<T> =
+  T extends Record<string, unknown> ? Omit<T, "_meta" | "_text" | "_closeWidget"> : T;
+
+/**
+ * Extract the output type from a tool definition.
+ * - If the tool has an explicit output schema, use it
+ * - Otherwise, infer from the handler return type (stripping meta keys)
+ *
+ * @internal
+ */
+export type ToolOutputFromDef<TTool> = TTool extends {
+  output: z.ZodType;
+}
+  ? z.infer<TTool["output"]>
+  : TTool extends {
+        handler: (...args: unknown[]) => Promise<infer TResult>;
+      }
+    ? StripToolOutputMeta<TResult>
+    : unknown;
+
+/**
  * Extract input types from tool definitions
  *
  * @example
@@ -628,6 +710,8 @@ export type InferToolInputs<T extends ToolDefs> = {
 /**
  * Extract output types from tool definitions
  *
+ * Uses ToolOutputFromDef to support both explicit schemas and inferred types.
+ *
  * @example
  * ```typescript
  * type Outputs = InferToolOutputs<typeof app.tools>;
@@ -637,7 +721,7 @@ export type InferToolInputs<T extends ToolDefs> = {
  * @internal
  */
 export type InferToolOutputs<T extends ToolDefs> = {
-  [K in keyof T]: T[K]["output"] extends z.ZodType ? z.infer<T[K]["output"]> : unknown;
+  [K in keyof T]: ToolOutputFromDef<T[K]>;
 };
 
 /**
@@ -646,6 +730,8 @@ export type InferToolOutputs<T extends ToolDefs> = {
  *
  * This is the recommended way to get end-to-end typing for UI clients without
  * duplicating schemas.
+ *
+ * Supports both explicit output schemas and inferred output types.
  *
  * @example
  * ```ts
@@ -659,8 +745,6 @@ export type InferToolOutputs<T extends ToolDefs> = {
 export type ClientToolsFromCore<T extends ToolDefs> = {
   [K in keyof T]: {
     input: z.input<T[K]["input"]>;
-    output: NonNullable<T[K]["output"]> extends z.ZodType
-      ? z.infer<NonNullable<T[K]["output"]>>
-      : unknown;
+    output: ToolOutputFromDef<T[K]>;
   };
 };

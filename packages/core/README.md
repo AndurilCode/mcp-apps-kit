@@ -254,6 +254,59 @@ function Widget() {
 }
 ```
 
+### Output Type Inference
+
+When the `output` schema is omitted, the framework automatically infers the output type from your handler's return value at **compile time only**. This provides full type safety without the overhead of writing schemas for rapid prototyping or internal tools.
+
+```ts
+// No output schema - type is inferred from handler return
+const greetTool = defineTool({
+  description: "Greet a user",
+  input: z.object({ name: z.string() }),
+  // output omitted
+  handler: async (input) => ({
+    message: `Hello, ${input.name}!`,
+    count: 1,
+  }),
+});
+
+// Client-side: result is fully typed as { message: string; count: number }
+type ClientTools = ClientToolsFromCore<{ greet: typeof greetTool }>;
+// ClientTools["greet"]["output"] is { message: string; count: number }
+```
+
+**When to use inferred vs explicit schemas:**
+
+| Scenario                                     | Recommendation                                   |
+| -------------------------------------------- | ------------------------------------------------ |
+| Prototyping / rapid iteration                | Omit `output` for type inference                 |
+| Internal tools (no external data)            | Either approach works                            |
+| External data sources (DB, APIs)             | Use explicit `output` with runtime validation    |
+| Public API documentation                     | Use explicit `output` for JSON Schema generation |
+| Complex validation (transforms, refinements) | Use explicit `output`                            |
+
+**Key differences:**
+
+- **Inferred output**: Compile-time type safety only. No runtime validation. Output type is inferred from handler return.
+- **Explicit output**: Runtime validation + compile-time types. Zod schema validates handler return. Generates JSON Schema for API docs.
+
+**Note:** Reserved metadata keys (`_meta`, `_text`, `_closeWidget`) are automatically excluded from the inferred client-side output type.
+
+```ts
+const tool = defineTool({
+  description: "Example",
+  input: z.object({}),
+  handler: async () => ({
+    data: "value",
+    _meta: { internal: "metadata" }, // Not exposed to client types
+    _text: "Narration for model", // Not exposed to client types
+  }),
+});
+
+type ClientTools = ClientToolsFromCore<{ test: typeof tool }>;
+// ClientTools["test"]["output"] is { data: string } - meta keys excluded
+```
+
 ## API Versioning
 
 Expose multiple API versions from a single application, each with its own tools, UI, and optional configuration overrides.

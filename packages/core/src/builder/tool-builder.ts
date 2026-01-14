@@ -37,7 +37,7 @@ export type UIOptions = Omit<UIDef, "html">;
 /**
  * Reserved metadata keys that are always allowed in tool handler output.
  */
-type ToolOutputMeta = {
+export type ToolOutputMeta = {
   _meta?: Record<string, unknown>;
   _text?: string;
   _closeWidget?: boolean;
@@ -171,11 +171,11 @@ export interface ToolBuilderWithInput<
   ): ToolBuilderWithOutput<TName, TInput, NormalizedSchema<TOutput>>;
 
   /**
-   * Set the handler without an output schema.
+   * Set the handler without an output schema (output type will be inferred).
    */
-  handle<TReturn>(
+  handle<TReturn extends Record<string, unknown> & ToolOutputMeta>(
     handler: (input: z.infer<TInput>, context: ToolContext) => Promise<TReturn>
-  ): ToolBuilderComplete<TName, TInput, z.ZodType>;
+  ): ToolBuilderComplete<TName, TInput, z.ZodType, TReturn>;
 }
 
 /**
@@ -194,7 +194,7 @@ export interface ToolBuilderWithOutput<
       input: z.infer<TInput>,
       context: ToolContext
     ) => Promise<StrictToolOutput<z.infer<TOutput>, TActual>>
-  ): ToolBuilderComplete<TName, TInput, TOutput>;
+  ): ToolBuilderComplete<TName, TInput, TOutput, z.infer<TOutput>>;
 }
 
 /**
@@ -204,9 +204,10 @@ export interface ToolBuilderComplete<
   _TName extends string,
   TInput extends z.ZodType,
   TOutput extends z.ZodType,
+  TInferredOutput = z.infer<TOutput>,
 > {
   /**
    * Build the tool definition.
    */
-  build(): ToolDef<TInput, TOutput>;
+  build(): ToolDef<TInput, TOutput, TInferredOutput>;
 }
