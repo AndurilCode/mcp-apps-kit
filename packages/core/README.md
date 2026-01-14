@@ -54,7 +54,7 @@ npm install @mcp-apps-kit/core zod
 ### Quick start
 
 ```ts
-import { createApp, defineTool } from "@mcp-apps-kit/core";
+import { createApp, tool } from "@mcp-apps-kit/core";
 import { z } from "zod";
 
 const app = createApp({
@@ -62,16 +62,15 @@ const app = createApp({
   version: "1.0.0",
 
   tools: {
-    greet: defineTool({
-      description: "Greet a user",
-      input: z.object({
+    greet: tool("greet")
+      .describe("Greet a user")
+      .input({
         name: z.string().describe("Name to greet"),
-      }),
-      output: z.object({ message: z.string() }),
-      handler: async (input) => {
-        return { message: `Hello, ${input.name}!` };
-      },
-    }),
+      })
+      .handle(async ({ name }) => {
+        return { message: `Hello, ${name}!` };
+      })
+      .build(),
   },
 });
 
@@ -116,11 +115,53 @@ const app = createApp({
 });
 ```
 
-## Type-Safe Tool Definitions
+## Defining Tools
 
-### The `defineTool` helper
+Core provides two ways to define tools: the **Fluent Builder API** (recommended) and the **Legacy `defineTool` Helper**. Both ensure full type inference for Zod schemas.
 
-Use `defineTool` to get automatic type inference in your handlers:
+### Fluent Tool Builder (Recommended)
+
+The `tool()` factory provides a progressive, discoverable API for defining tools. It guides you through the definition process with type safety at every step.
+
+```ts
+import { tool } from "@mcp-apps-kit/core";
+
+tools: {
+  search: tool("search")
+    .describe("Search database")
+    .input({
+      query: z.string(),
+      limit: z.number().optional(),
+    })
+    .handle(async ({ query, limit }) => {
+      // Types inferred automatically
+      return { results: await db.search(query, limit) };
+    })
+    .build(),
+}
+```
+
+#### Builder Features
+
+- **Progressive Discovery**: Chain methods to see available options (`describe`, `input`, `handle`).
+- **Shortcuts**: Use `.readOnly()`, `.destructive()`, `.expensive()` for common annotations.
+- **UI Attachment**: Attach UI definitions directly with `.ui()`.
+- **Validation**: Ensures all required steps (description, input, handler) are completed.
+
+```ts
+tool("deleteUser")
+  .describe("Delete a user account")
+  .input({ userId: z.string() })
+  .destructive() // Adds warning annotation
+  .handle(async ({ userId }) => {
+    /* ... */
+  })
+  .build();
+```
+
+### Legacy: The `defineTool` helper
+
+Use `defineTool` to get automatic type inference in your handlers with a configuration object:
 
 ```ts
 import { defineTool } from "@mcp-apps-kit/core";
@@ -138,9 +179,7 @@ tools: {
 }
 ```
 
-Why `defineTool`?
-
-With Zod v4, TypeScript cannot infer concrete schema types across module boundaries when using generic `z.ZodType`. The `defineTool` helper captures specific schema types at the call site, enabling proper type inference without manual type assertions.
+Why helpers? With Zod v4, TypeScript cannot infer concrete schema types across module boundaries when using generic `z.ZodType`. Both `tool()` and `defineTool` capture specific schema types at the call site enabling proper inference.
 
 ### Alternative: object syntax with type assertions
 
@@ -957,7 +996,7 @@ const app = createApp({
 
 Key exports include:
 
-- `createApp`, `defineTool`, `defineUI`
+- `createApp`, `tool`, `defineTool`, `defineUI`
 - `createPlugin`, `loggingPlugin`
 - `debugLogger`, `ClientToolsFromCore`
 - `Middleware`, `TypedEventEmitter`
