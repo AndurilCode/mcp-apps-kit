@@ -94,6 +94,10 @@ export class ToolBuilderImpl<TName extends string> implements ToolBuilderInitial
   ): ToolBuilderWithOutput<TName, TInput, NormalizedSchema<TOutput>> {
     // Cast to implementation to access config.
     // Necessary due to TypeScript limitations with 'this' types in fluent interfaces.
+    // We assert runtime safety to ensure we haven't lost the 'this' context.
+    if (!(this instanceof ToolBuilderImpl)) {
+      throw new Error("ToolBuilder method called with invalid context");
+    }
     const builder = this as unknown as ToolBuilderImpl<TName>;
     builder.config.output = normalizeSchema(schema) as z.ZodType;
     return this as unknown as ToolBuilderWithOutput<TName, TInput, NormalizedSchema<TOutput>>;
@@ -196,6 +200,9 @@ export class ToolBuilderImpl<TName extends string> implements ToolBuilderInitial
   handle(
     handler: (input: unknown, context: ToolContext) => Promise<unknown>
   ): ToolBuilderComplete<TName, z.ZodType, z.ZodType> {
+    if (!(this instanceof ToolBuilderImpl)) {
+      throw new Error("ToolBuilder method called with invalid context");
+    }
     this.config.handler = handler;
     return this as unknown as ToolBuilderComplete<TName, z.ZodType, z.ZodType>;
   }
@@ -205,6 +212,9 @@ export class ToolBuilderImpl<TName extends string> implements ToolBuilderInitial
   ): ToolDef<TInput, TOutput> {
     // Cast to implementation to access config.
     // Necessary due to TypeScript limitations with 'this' types in fluent interfaces.
+    if (!(this instanceof ToolBuilderImpl)) {
+      throw new Error("ToolBuilder method called with invalid context");
+    }
     const builder = this as unknown as ToolBuilderImpl<TName>;
 
     if (!builder.config.description) {

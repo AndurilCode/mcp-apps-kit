@@ -209,4 +209,24 @@ describe("Tool Builder", () => {
       .build();
     expect(t5.ui).toEqual({ html: "<div></div>" });
   });
+
+  it("enforces runtime safety for context", () => {
+    const t = tool("safe") as any;
+
+    // Extract method to lose context
+    const build = t.build;
+    expect(() => build.call({})).toThrow("ToolBuilder method called with invalid context");
+
+    // output
+    const output = t.output;
+    expect(() => output.call({}, z.object({}))).toThrow(
+      "ToolBuilder method called with invalid context"
+    );
+
+    // handle
+    const handle = t.handle;
+    expect(() => handle.call({}, async () => ({}))).toThrow(
+      "ToolBuilder method called with invalid context"
+    );
+  });
 });
