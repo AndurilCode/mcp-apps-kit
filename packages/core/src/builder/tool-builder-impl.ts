@@ -129,6 +129,15 @@ export class ToolBuilderImpl<TName extends string> implements ToolBuilderInitial
     return this;
   }
 
+  /**
+   * Attach a UI using a string that is heuristically parsed:
+   * - Inline HTML if it starts with `<`
+   * - File path if it contains `/`, `\`, starts with `.`, or ends with an extension (e.g. `.html`)
+   * - Otherwise treated as a UI key (legacy alias for `uiRef`)
+   *
+   * For explicit keys (e.g. "my.ui" or "section/widget" that might look like paths), use {@link uiRef}.
+   * You can also pass a full definition object to matching `ui(definition)`.
+   */
   ui(path: string, options?: UIOptions): this;
   ui(definition: UIDef): this;
   ui(pathOrDefinition: string | UIDef, options?: UIOptions): this {
