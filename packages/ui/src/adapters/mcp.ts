@@ -470,8 +470,7 @@ export class McpAdapter implements ProtocolAdapter {
               "Resource content block requires 'uri' field"
             );
           }
-          // Map to native ext-apps resource format (v0.4.0+)
-          // ext-apps expects a nested resource object with uri and text/blob
+          // Map to ext-apps v0.4.0 resource format (nested structure)
           return {
             type: "resource" as const,
             resource: {
@@ -486,14 +485,13 @@ export class McpAdapter implements ProtocolAdapter {
               "Resource link content block requires 'uri' field"
             );
           }
-          // Map to native ext-apps resource format (v0.4.0+)
-          // resource_link uses the same structure as resource in ext-apps
+          // Map to ext-apps v0.4.0 resource_link format (flat structure)
+          // ext-apps requires 'name' to be present (not optional)
           return {
-            type: "resource" as const,
-            resource: {
-              uri: block.uri,
-              text: block.description ?? (block.name ? `${block.name}: ${block.uri}` : block.uri),
-            },
+            type: "resource_link" as const,
+            uri: block.uri,
+            name: block.name ?? block.uri,
+            ...(block.description && { description: block.description }),
           };
         }
         default: {
