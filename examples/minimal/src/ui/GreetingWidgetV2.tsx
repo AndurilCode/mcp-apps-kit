@@ -82,7 +82,7 @@ export function GreetingWidgetV2() {
       // Extract from structuredContent if present (handles different response formats)
       const result =
         (response as { structuredContent?: typeof response }).structuredContent ?? response;
-      setGreetResult(result);
+      setGreetResult(result as { message: string; fullName: string; timestamp: string });
       setIsModalOpen(false);
       setName("");
       setSurname("");

@@ -171,6 +171,95 @@ const echoToolV3 = defineTool({
 });
 
 // =============================================================================
+// V4: Output Type Inference Demo (PRD-004)
+// =============================================================================
+
+/**
+ * Demonstrates output type inference (PRD-004).
+ * When you omit the output schema, TypeScript infers the type from your handler's return.
+ *
+ * Benefits:
+ * - Faster prototyping (no need to write output schemas)
+ * - Still get full type safety on the client side
+ * - Compile-time only (no runtime validation overhead)
+ *
+ * When to use:
+ * - Rapid prototyping / internal tools
+ * - When handler return type is simple and obvious
+ *
+ * When NOT to use:
+ * - External data sources (DB, APIs) - use explicit output for runtime validation
+ * - Need JSON Schema generation for API docs
+ */
+const inferredToolV4 = defineTool({
+  title: "Get Stats",
+  description:
+    "Get server statistics (demonstrates output type inference - no output schema needed!)",
+
+  input: z.object({
+    includeMemory: z.boolean().optional().describe("Include memory usage stats"),
+  }),
+
+  // NO output schema! TypeScript will infer from handler return type
+  // Output type: { uptime: number; timestamp: string; memory?: { used: number; total: number } }
+
+  visibility: "both",
+
+  handler: async (input) => {
+    return {
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      // Optional field based on input
+      ...(input.includeMemory && {
+        memory: {
+          used: process.memoryUsage().heapUsed,
+          total: process.memoryUsage().heapTotal,
+        },
+      }),
+      _text: `Server uptime: ${process.uptime().toFixed(2)}s`,
+    };
+  },
+});
+
+// Fluent builder with inferred output
+const quickMathV4 = tool("QuickMath")
+  .describe("Perform quick math operations (fluent builder with inferred output)")
+  .input(
+    z.object({
+      a: z.number().describe("First number"),
+      b: z.number().describe("Second number"),
+      operation: z.enum(["add", "subtract", "multiply", "divide"]).describe("Operation to perform"),
+    })
+  )
+  // No .output() call - type inferred from handler!
+  .visibility("both")
+  .handle(async (input) => {
+    let result: number;
+    switch (input.operation) {
+      case "add":
+        result = input.a + input.b;
+        break;
+      case "subtract":
+        result = input.a - input.b;
+        break;
+      case "multiply":
+        result = input.a * input.b;
+        break;
+      case "divide":
+        result = input.b !== 0 ? input.a / input.b : NaN;
+        break;
+    }
+
+    return {
+      result,
+      expression: `${input.a} ${input.operation} ${input.b} = ${result}`,
+      isValid: !isNaN(result),
+      _text: `Result: ${result}`,
+    };
+  })
+  .build();
+
+// =============================================================================
 // Create Versioned App
 // =============================================================================
 
@@ -229,6 +318,15 @@ const app = createApp({
       },
       // v3 demonstrates inline schema syntax
     },
+    v4: {
+      version: "4.0.0",
+      tools: {
+        getStats: inferredToolV4,
+        quickMath: quickMathV4,
+      },
+      // v4 demonstrates output type inference (PRD-004)
+      // No output schemas needed - types inferred from handler returns!
+    },
   },
 });
 
@@ -251,12 +349,14 @@ Endpoints:
   - v2 MCP:     http://localhost:${port}/v2/mcp (uses API transport for logging)
   - v2 Logs:    http://localhost:${port}/api/logs (debug log API endpoint)
   - v3 MCP:     http://localhost:${port}/v3/mcp (inline schema syntax demo)
+  - v4 MCP:     http://localhost:${port}/v4/mcp (output type inference demo)
   - Health:     http://localhost:${port}/health
 
 Debug logging:
   - v1: Uses log_debug MCP tool (default for MCP adapter)
   - v2: Uses HTTP API transport at /api/logs (ideal for OpenAI/ChatGPT)
   - v3: Default MCP logging (demonstrates inline schema syntax)
+  - v4: Default MCP logging (demonstrates output type inference)
   `);
   });
 }
@@ -284,3 +384,15 @@ export type GreetOutputV2 = z.infer<typeof greetOutputV2>;
 // V3 types (inline schema syntax - types inferred directly from tool definition)
 export type AppToolsV3 = { echo: typeof echoToolV3 };
 export type AppClientToolsV3 = ClientToolsFromCore<AppToolsV3>;
+
+// V4 types (output inference - no output schemas needed!)
+// ClientToolsFromCore will automatically infer output types from handler returns
+export type AppToolsV4 = { getStats: typeof inferredToolV4; quickMath: typeof quickMathV4 };
+export type AppClientToolsV4 = ClientToolsFromCore<AppToolsV4>;
+
+// Type examples showing what gets inferred:
+// AppClientToolsV4["getStats"]["output"] is:
+//   { uptime: number; timestamp: string; memory?: { used: number; total: number } }
+// AppClientToolsV4["quickMath"]["output"] is:
+//   { result: number; expression: string; isValid: boolean }
+// Note: _text and other meta keys are automatically excluded from client types!

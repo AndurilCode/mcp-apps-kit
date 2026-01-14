@@ -4,12 +4,15 @@ A simple example demonstrating @mcp-apps-kit/core versioning support - exposing 
 
 ## Features
 
-- **API Versioning**: Two API versions exposed at different routes
+- **API Versioning**: Multiple API versions exposed at different routes
   - `v1`: Simple greet tool (name only)
   - `v2`: Enhanced greet tool (name + optional surname)
+  - `v3`: Echo tool (demonstrates inline schema syntax - PRD-002)
+  - `v4`: Stats & math tools (demonstrates output type inference - PRD-004)
 - **Shared Configuration**: CORS, debug settings shared across versions
 - **Type-Safe Tools**: Full TypeScript support for each version's tools
 - **React UI Widgets**: Version-specific UI components
+- **Output Type Inference**: Automatic type inference from handler returns (v4)
 
 ## Quick Start
 
@@ -29,11 +32,13 @@ pnpm start
 
 Once running, the server exposes:
 
-| Endpoint       | Description                 |
-| -------------- | --------------------------- |
-| `GET /health`  | Health check                |
-| `POST /v1/mcp` | MCP v1 API (name only)      |
-| `POST /v2/mcp` | MCP v2 API (name + surname) |
+| Endpoint       | Description                             |
+| -------------- | --------------------------------------- |
+| `GET /health`  | Health check                            |
+| `POST /v1/mcp` | MCP v1 API (name only)                  |
+| `POST /v2/mcp` | MCP v2 API (name + surname)             |
+| `POST /v3/mcp` | MCP v3 API (inline schema syntax demo)  |
+| `POST /v4/mcp` | MCP v4 API (output type inference demo) |
 
 ## Testing the API
 
@@ -141,6 +146,57 @@ Greet someone by name and optional surname.
 - `fullName` (string): The full name used in greeting
 - `timestamp` (string): ISO timestamp
 
+### V3: `echo`
+
+Echo back a message with metadata (demonstrates inline schema syntax).
+
+**Input:**
+
+- `message` (string): Message to echo back
+- `uppercase` (boolean, optional): Convert to uppercase
+
+**Output:**
+
+- `echo` (string): The echoed message
+- `length` (number): Length of the message
+- `timestamp` (string): ISO timestamp
+
+### V4: `getStats` & `quickMath`
+
+Demonstrates **output type inference** (PRD-004) - no output schemas needed!
+
+#### `getStats`
+
+Get server statistics (no output schema - types inferred from handler).
+
+**Input:**
+
+- `includeMemory` (boolean, optional): Include memory usage stats
+
+**Output (inferred):**
+
+- `uptime` (number): Server uptime in seconds
+- `timestamp` (string): ISO timestamp
+- `memory` (optional object): Memory usage stats if requested
+  - `used` (number): Heap used
+  - `total` (number): Heap total
+
+#### `quickMath`
+
+Perform quick math operations (fluent builder with inferred output).
+
+**Input:**
+
+- `a` (number): First number
+- `b` (number): Second number
+- `operation` (enum): Operation - "add", "subtract", "multiply", or "divide"
+
+**Output (inferred):**
+
+- `result` (number): Calculation result
+- `expression` (string): The calculation as a string
+- `isValid` (boolean): Whether the result is valid (false for NaN)
+
 ## Versioning Configuration
 
 The app uses the `createApp` versioning feature:
@@ -164,6 +220,15 @@ const app = createApp({
     v2: {
       version: "2.0.0",
       tools: { greet: greetToolV2 },
+    },
+    v3: {
+      version: "3.0.0",
+      tools: { echo: echoToolV3 },
+    },
+    v4: {
+      version: "4.0.0",
+      tools: { getStats: inferredToolV4, quickMath: quickMathV4 },
+      // v4 demonstrates output type inference - no output schemas!
     },
   },
 });

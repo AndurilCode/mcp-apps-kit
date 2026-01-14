@@ -54,7 +54,7 @@ export function EchoWidget() {
       // Extract from structuredContent if present (handles different response formats)
       const result =
         (response as { structuredContent?: typeof response }).structuredContent ?? response;
-      setEchoResult(result);
+      setEchoResult(result as { echo: string; length: number; timestamp: string });
       setIsModalOpen(false);
       setMessage("");
       setUppercase(false);
