@@ -54,10 +54,6 @@
     "url": "git+https://github.com/AndurilCode/mcp-apps-kit.git",
     "directory": "packages/ui-react-builder"
   },
-  "dependencies": {
-    "@typescript-eslint/typescript-estree": "^8.53.0",
-    "esbuild": "^0.27.2"
-  },
   "peerDependencies": {
     "@mcp-apps-kit/core": "^0.4.0",
     "@mcp-apps-kit/ui-react": "^0.4.0",
@@ -70,12 +66,16 @@
       "optional": true
     }
   },
+  "dependencies": {
+    "@typescript-eslint/types": "^8.53.0",
+    "@typescript-eslint/typescript-estree": "^8.53.0",
+    "esbuild": "^0.27.2"
+  },
   "devDependencies": {
     "@mcp-apps-kit/core": "workspace:*",
     "@mcp-apps-kit/ui-react": "workspace:*",
     "@types/react": "^19.2.8",
     "@types/react-dom": "^19.2.3",
-    "@typescript-eslint/types": "^8.53.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "vite": "^7.3.1"

@@ -9,6 +9,7 @@
 
 import { App } from "@modelcontextprotocol/ext-apps";
 import { UIError, UIErrorCode } from "../errors";
+import type { ContentBlock } from "../types";
 
 type ResourceReadResult = {
   contents: Array<{
@@ -44,6 +45,8 @@ import type {
   SizeChangedParams,
   CallToolHandler,
   ListToolsHandler,
+  UpdateModelContextParams,
+  ContainerDimensions,
 } from "../types";
 
 /**
@@ -248,6 +251,7 @@ export class McpAdapter implements ProtocolAdapter {
       displayMode?: unknown;
       availableDisplayModes?: unknown;
       viewport?: unknown;
+      containerDimensions?: unknown;
       locale?: unknown;
       timeZone?: unknown;
       platform?: unknown;
@@ -274,11 +278,22 @@ export class McpAdapter implements ProtocolAdapter {
       ? ctx.availableDisplayModes.filter((m): m is string => typeof m === "string")
       : base.availableDisplayModes;
 
-    const isViewportObject = (v: unknown): v is Record<string, unknown> =>
+    const isObjectLike = (v: unknown): v is Record<string, unknown> =>
       v !== null && typeof v === "object" && !Array.isArray(v);
-    const viewport = isViewportObject(ctx.viewport)
-      ? { ...base.viewport, ...ctx.viewport }
-      : base.viewport;
+
+    // Parse containerDimensions (ext-apps v0.4.0+)
+    const containerDimensions = isObjectLike(ctx.containerDimensions)
+      ? (ctx.containerDimensions as ContainerDimensions)
+      : undefined;
+
+    // Derive viewport from containerDimensions for backward compatibility,
+    // or fall back to explicit viewport or defaults
+    let viewport = base.viewport;
+    if (containerDimensions) {
+      viewport = this.deriveViewportFromContainerDimensions(containerDimensions, base.viewport);
+    } else if (isObjectLike(ctx.viewport)) {
+      viewport = { ...base.viewport, ...ctx.viewport };
+    }
 
     const locale = typeof ctx.locale === "string" ? ctx.locale : base.locale;
     const timeZone = typeof ctx.timeZone === "string" ? ctx.timeZone : base.timeZone;
@@ -292,6 +307,7 @@ export class McpAdapter implements ProtocolAdapter {
       displayMode,
       availableDisplayModes,
       viewport,
+      containerDimensions,
       locale,
       timeZone,
       platform,
@@ -300,6 +316,23 @@ export class McpAdapter implements ProtocolAdapter {
       safeAreaInsets: ctx.safeAreaInsets as HostContext["safeAreaInsets"],
       styles: ctx.styles as HostContext["styles"],
       view: typeof ctx.view === "string" ? ctx.view : base.view,
+    };
+  }
+
+  /**
+   * Derive viewport dimensions from containerDimensions for backward compatibility.
+   * containerDimensions uses fixed (height/width) vs flexible (maxHeight/maxWidth) semantics.
+   */
+  private deriveViewportFromContainerDimensions(
+    dims: ContainerDimensions,
+    defaults: HostContext["viewport"]
+  ): HostContext["viewport"] {
+    const d = dims as Record<string, unknown>;
+    return {
+      width: typeof d.width === "number" ? d.width : defaults.width,
+      height: typeof d.height === "number" ? d.height : defaults.height,
+      maxWidth: typeof d.maxWidth === "number" ? d.maxWidth : undefined,
+      maxHeight: typeof d.maxHeight === "number" ? d.maxHeight : undefined,
     };
   }
 
@@ -385,6 +418,96 @@ export class McpAdapter implements ProtocolAdapter {
     await this.app.sendMessage({
       role: "user",
       content: [{ type: "text", text: content.text }],
+    });
+  }
+
+  // === Model Context ===
+
+  async updateModelContext(params: UpdateModelContextParams): Promise<void> {
+    if (!this.app) {
+      throw new UIError(UIErrorCode.NOT_CONNECTED, "MCP Apps adapter not connected");
+    }
+
+    // Map our content blocks to ext-apps format with validation
+    const content = params.content?.map((block) => {
+      switch (block.type) {
+        case "text":
+          if (!block.text) {
+            throw new UIError(
+              UIErrorCode.INVALID_PARAMS,
+              "Text content block requires 'text' field"
+            );
+          }
+          return { type: "text" as const, text: block.text };
+        case "image":
+          if (!block.data) {
+            throw new UIError(
+              UIErrorCode.INVALID_PARAMS,
+              "Image content block requires 'data' field"
+            );
+          }
+          return {
+            type: "image" as const,
+            data: block.data,
+            mimeType: block.mimeType ?? "image/png",
+          };
+        case "audio":
+          if (!block.data) {
+            throw new UIError(
+              UIErrorCode.INVALID_PARAMS,
+              "Audio content block requires 'data' field"
+            );
+          }
+          return {
+            type: "audio" as const,
+            data: block.data,
+            mimeType: block.mimeType ?? "audio/wav",
+          };
+        case "resource":
+          if (!block.uri) {
+            throw new UIError(
+              UIErrorCode.INVALID_PARAMS,
+              "Resource content block requires 'uri' field"
+            );
+          }
+          // Map to ext-apps v0.4.0 resource format (nested structure)
+          return {
+            type: "resource" as const,
+            resource: {
+              uri: block.uri,
+              text: block.description ?? block.uri,
+            },
+          };
+        case "resource_link": {
+          if (!block.uri) {
+            throw new UIError(
+              UIErrorCode.INVALID_PARAMS,
+              "Resource link content block requires 'uri' field"
+            );
+          }
+          // Map to ext-apps v0.4.0 resource_link format (flat structure)
+          // ext-apps requires 'name' to be present (not optional)
+          return {
+            type: "resource_link" as const,
+            uri: block.uri,
+            name: block.name ?? block.uri,
+            ...(block.description && { description: block.description }),
+          };
+        }
+        default: {
+          // Exhaustiveness check - TypeScript will error if we add a new content type
+          const exhaustiveCheck: never = block;
+          throw new UIError(
+            UIErrorCode.PROTOCOL_ERROR,
+            `Unsupported content block type: ${(exhaustiveCheck as ContentBlock).type}`
+          );
+        }
+      }
+    });
+
+    await this.app.updateModelContext({
+      content,
+      structuredContent: params.structuredContent,
     });
   }
 
@@ -548,7 +671,7 @@ export class McpAdapter implements ProtocolAdapter {
     // Map MCP Apps SDK capabilities to our unified interface.
     // MCP SDK already provides: logging, openLinks, serverResources, serverTools
     // We augment with common abstraction fields for protocol-agnostic usage.
-    const sdkCaps = mcpCaps as HostCapabilities;
+    const sdkCaps = mcpCaps as Record<string, unknown>;
 
     // Extract available display modes from host context if provided
     const hostContext = this.app.getHostContext();
@@ -556,11 +679,11 @@ export class McpAdapter implements ProtocolAdapter {
 
     return {
       // MCP SDK native capabilities (priority)
-      logging: sdkCaps.logging,
-      openLinks: sdkCaps.openLinks,
-      serverResources: sdkCaps.serverResources,
-      serverTools: sdkCaps.serverTools,
-      experimental: sdkCaps.experimental,
+      logging: sdkCaps.logging as HostCapabilities["logging"],
+      openLinks: sdkCaps.openLinks as HostCapabilities["openLinks"],
+      serverResources: sdkCaps.serverResources as HostCapabilities["serverResources"],
+      serverTools: sdkCaps.serverTools as HostCapabilities["serverTools"],
+      experimental: sdkCaps.experimental as HostCapabilities["experimental"],
 
       // Common capabilities derived from host context when available
       theming: {
@@ -578,6 +701,11 @@ export class McpAdapter implements ProtocolAdapter {
       sizeNotifications: {},
       partialToolInput: {},
       appTools: { listChanged: false },
+
+      // ext-apps v0.4.0+ capabilities
+      updateModelContext: sdkCaps.updateModelContext as HostCapabilities["updateModelContext"],
+      message: sdkCaps.message as HostCapabilities["message"],
+      sandbox: sdkCaps.sandbox as HostCapabilities["sandbox"],
     };
   }
 

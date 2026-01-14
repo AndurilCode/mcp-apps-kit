@@ -8,10 +8,11 @@
  * - Each version exposed at /v1/mcp and /v2/mcp
  */
 
-import { createApp, defineTool, type ClientToolsFromCore } from "@mcp-apps-kit/core";
+import { createApp, defineTool, tool, type ClientToolsFromCore } from "@mcp-apps-kit/core";
 import { defineReactUI } from "@mcp-apps-kit/ui-react-builder";
 import { GreetingWidgetV1 } from "./ui/GreetingWidgetV1";
 import { GreetingWidgetV2 } from "./ui/GreetingWidgetV2";
+import { EchoWidget } from "./ui/EchoWidget";
 import { z } from "zod";
 
 // =============================================================================
@@ -68,36 +69,35 @@ const greetOutputV2 = z.object({
   timestamp: z.string(),
 });
 
-const greetToolV2 = defineTool({
-  title: "Greet",
-  description: "Greet someone by name and optional surname",
-  input: greetInputV2,
-  output: greetOutputV2,
-  visibility: "both",
-
-  ui: defineReactUI({
-    component: GreetingWidgetV2,
-    name: "Greeting Widget V2",
-    description: "Displays greeting messages (v2 - with surname support)",
-    prefersBorder: true,
-    // CSP configuration for ChatGPT - allow connections and resources
-    csp: {
-      // Allow fetch/XHR to your server (use your public URL or ngrok)
-      connectDomains: [
-        "http://localhost:3000", // Local dev
-        "https://*.ngrok-free.app", // ngrok tunnels
-        // Add your production domain here
-      ],
-      // Allow fonts, images, scripts, stylesheets from CDNs
-      resourceDomains: [
-        "https://fonts.googleapis.com",
-        "https://fonts.gstatic.com",
-        // Add other CDNs as needed
-      ],
-    },
-  }),
-
-  handler: async (input, context) => {
+const greetToolV2 = tool("Greet")
+  .describe("Greet someone by name and optional surname")
+  .input(greetInputV2)
+  .output(greetOutputV2)
+  .visibility("both")
+  .ui(
+    defineReactUI({
+      component: GreetingWidgetV2,
+      name: "Greeting Widget V2",
+      description: "Displays greeting messages (v2 - with surname support)",
+      prefersBorder: true,
+      // CSP configuration for ChatGPT - allow connections and resources
+      csp: {
+        // Allow fetch/XHR to your server (use your public URL or ngrok)
+        connectDomains: [
+          "http://localhost:3000", // Local dev
+          "https://*.ngrok-free.app", // ngrok tunnels
+          // Add your production domain here
+        ],
+        // Allow fonts, images, scripts, stylesheets from CDNs
+        resourceDomains: [
+          "https://fonts.googleapis.com",
+          "https://fonts.gstatic.com",
+          // Add other CDNs as needed
+        ],
+      },
+    })
+  )
+  .handle(async (input, context) => {
     const fullName = input.surname ? `${input.name} ${input.surname}` : input.name;
     const userInfo = context.subject ? ` (authenticated as ${context.subject})` : "";
     const message = `Hello, ${fullName}${userInfo}!`;
@@ -107,6 +107,59 @@ const greetToolV2 = defineTool({
       fullName,
       timestamp: new Date().toISOString(),
       _text: message,
+    };
+  })
+  .build();
+
+// =============================================================================
+// V3: Inline schema syntax demo (no separate schema declarations)
+// =============================================================================
+
+/**
+ * Demonstrates the inline schema syntax (PRD-002).
+ * Instead of declaring separate schema variables, you can define schemas inline.
+ *
+ * Before (explicit):
+ *   const inputSchema = z.object({ name: z.string() });
+ *   defineTool({ input: inputSchema, ... })
+ *
+ * After (inline):
+ *   defineTool({ input: { name: z.string() }, ... })
+ */
+const echoToolV3 = defineTool({
+  title: "Echo",
+  description: "Echo back a message with metadata (demonstrates inline schema syntax)",
+
+  // Inline input schema - automatically wrapped with z.object()
+  input: {
+    message: z.string().describe("Message to echo back"),
+    uppercase: z.boolean().optional().describe("Convert to uppercase"),
+  },
+
+  // Inline output schema - automatically wrapped with z.object()
+  output: {
+    echo: z.string(),
+    length: z.number(),
+    timestamp: z.string(),
+  },
+
+  visibility: "both",
+
+  ui: defineReactUI({
+    component: EchoWidget,
+    name: "Echo Widget V3",
+    description: "Echoes messages (v3 - inline schema syntax)",
+    prefersBorder: true,
+  }),
+
+  handler: async (input) => {
+    const echo = input.uppercase ? input.message.toUpperCase() : input.message;
+
+    return {
+      echo,
+      length: echo.length,
+      timestamp: new Date().toISOString(),
+      _text: `Echo: ${echo}`,
     };
   },
 });
@@ -159,6 +212,13 @@ const app = createApp({
         },
       },
     },
+    v3: {
+      version: "3.0.0",
+      tools: {
+        echo: echoToolV3,
+      },
+      // v3 demonstrates inline schema syntax
+    },
   },
 });
 
@@ -180,11 +240,13 @@ Endpoints:
   - v1 MCP:     http://localhost:${port}/v1/mcp (uses log_debug MCP tool)
   - v2 MCP:     http://localhost:${port}/v2/mcp (uses API transport for logging)
   - v2 Logs:    http://localhost:${port}/api/logs (debug log API endpoint)
+  - v3 MCP:     http://localhost:${port}/v3/mcp (inline schema syntax demo)
   - Health:     http://localhost:${port}/health
 
 Debug logging:
   - v1: Uses log_debug MCP tool (default for MCP adapter)
   - v2: Uses HTTP API transport at /api/logs (ideal for OpenAI/ChatGPT)
+  - v3: Default MCP logging (demonstrates inline schema syntax)
   `);
   });
 }
@@ -208,3 +270,7 @@ export type AppToolsV2 = { greet: typeof greetToolV2 };
 export type AppClientToolsV2 = ClientToolsFromCore<AppToolsV2>;
 export type GreetInputV2 = z.infer<typeof greetInputV2>;
 export type GreetOutputV2 = z.infer<typeof greetOutputV2>;
+
+// V3 types (inline schema syntax - types inferred directly from tool definition)
+export type AppToolsV3 = { echo: typeof echoToolV3 };
+export type AppClientToolsV3 = ClientToolsFromCore<AppToolsV3>;

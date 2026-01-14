@@ -7,7 +7,13 @@
 
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
-import { zodToJsonSchema, extractPropertyDescriptions, isZodSchema } from "../../src/utils/schema";
+import {
+  zodToJsonSchema,
+  extractPropertyDescriptions,
+  isZodSchema,
+  normalizeSchema,
+  type SchemaInput,
+} from "../../src/utils/schema";
 
 describe("zodToJsonSchema", () => {
   describe("basic type conversions", () => {
@@ -218,5 +224,131 @@ describe("isZodSchema", () => {
     // Objects with _def that is not a proper Zod _def object will pass
     // the basic check, so we use a stricter test
     expect(isZodSchema({ notAZodSchema: true })).toBe(false);
+  });
+});
+
+describe("normalizeSchema", () => {
+  describe("pass-through for Zod schemas", () => {
+    it("should return z.object() as-is", () => {
+      const schema = z.object({ name: z.string() });
+      const normalized = normalizeSchema(schema);
+
+      expect(normalized).toBe(schema);
+      expect(normalized instanceof z.ZodObject).toBe(true);
+    });
+
+    it("should return z.string() as-is", () => {
+      const schema = z.string();
+      const normalized = normalizeSchema(schema);
+
+      expect(normalized).toBe(schema);
+    });
+
+    it("should return z.array() as-is", () => {
+      const schema = z.array(z.string());
+      const normalized = normalizeSchema(schema);
+
+      expect(normalized).toBe(schema);
+    });
+
+    it("should return z.union() as-is", () => {
+      const schema = z.union([z.string(), z.number()]);
+      const normalized = normalizeSchema(schema);
+
+      expect(normalized).toBe(schema);
+    });
+  });
+
+  describe("wrapping plain objects", () => {
+    it("should wrap plain object with z.object()", () => {
+      const input = { name: z.string(), age: z.number() };
+      const normalized = normalizeSchema(input);
+
+      expect(normalized instanceof z.ZodObject).toBe(true);
+
+      // Verify it parses correctly
+      const result = normalized.parse({ name: "John", age: 30 });
+      expect(result).toEqual({ name: "John", age: 30 });
+    });
+
+    it("should handle nested Zod schemas in plain object", () => {
+      const input = {
+        user: z.object({ name: z.string() }),
+        tags: z.array(z.string()),
+      };
+      const normalized = normalizeSchema(input);
+
+      expect(normalized instanceof z.ZodObject).toBe(true);
+
+      const result = normalized.parse({
+        user: { name: "John" },
+        tags: ["a", "b"],
+      });
+      expect(result).toEqual({ user: { name: "John" }, tags: ["a", "b"] });
+    });
+
+    it("should handle optional Zod schemas in plain object", () => {
+      const input = {
+        required: z.string(),
+        optional: z.string().optional(),
+      };
+      const normalized = normalizeSchema(input);
+
+      const result = normalized.parse({ required: "hello" });
+      expect(result).toEqual({ required: "hello" });
+    });
+
+    it("should handle empty plain object", () => {
+      const input = {};
+      const normalized = normalizeSchema(input);
+
+      expect(normalized instanceof z.ZodObject).toBe(true);
+
+      const result = normalized.parse({});
+      expect(result).toEqual({});
+    });
+
+    it("should preserve descriptions on wrapped schemas", () => {
+      const input = { name: z.string().describe("User name") };
+      const normalized = normalizeSchema(input);
+
+      // Verify description is preserved in JSON schema conversion
+      const jsonSchema = zodToJsonSchema(normalized);
+      expect(jsonSchema).toMatchObject({
+        type: "object",
+        properties: {
+          name: { type: "string", description: "User name" },
+        },
+      });
+    });
+  });
+
+  describe("error handling", () => {
+    it("should throw for plain objects with non-Zod values", () => {
+      const input = { name: "string" }; // Not a Zod schema
+
+      expect(() => normalizeSchema(input as unknown as SchemaInput)).toThrow(
+        'Invalid schema definition: property "name" must be a Zod schema'
+      );
+    });
+
+    it("should throw for plain objects with number values", () => {
+      const input = { count: 123 };
+
+      expect(() => normalizeSchema(input as unknown as SchemaInput)).toThrow(
+        'Invalid schema definition: property "count" must be a Zod schema'
+      );
+    });
+
+    it("should throw for mixed valid and invalid values", () => {
+      const input = {
+        valid: z.string(),
+        invalid: "not a zod schema",
+      };
+
+      expect(() => normalizeSchema(input as unknown as SchemaInput)).toThrow(
+        'Invalid schema definition: property "invalid" must be a Zod schema'
+      );
+    });
   });
 });

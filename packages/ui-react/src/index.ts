@@ -17,6 +17,10 @@ export type {
   AppToolDefinition,
   CallToolHandler,
   ListToolsHandler,
+  // Model context types (ext-apps v0.4.0+)
+  ContainerDimensions,
+  ContentBlock,
+  UpdateModelContextParams,
 } from "@mcp-apps-kit/ui";
 
 // Context
@@ -51,6 +55,8 @@ export {
   useHostCapabilities,
   useHostVersion,
   useSizeChangedNotifications,
+  // Model context (ext-apps v0.4.0+)
+  useUpdateModelContext,
 } from "./hooks";
 
 // File operation types

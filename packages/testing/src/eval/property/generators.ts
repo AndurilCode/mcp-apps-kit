@@ -133,11 +133,11 @@ export const generators = {
     propertyLogger("Creating float generator: %d to %d", min ?? "unbounded", max ?? "unbounded");
     return lazy((fc) => {
       if (min !== undefined && max !== undefined) {
-        return fc.float({ min, max });
+        return fc.float({ min, max, noNaN: true });
       } else if (min !== undefined) {
-        return fc.float({ min });
+        return fc.float({ min, noNaN: true });
       } else if (max !== undefined) {
-        return fc.float({ max });
+        return fc.float({ max, noNaN: true });
       }
       return fc.float();
     });

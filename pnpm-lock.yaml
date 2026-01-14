@@ -381,6 +381,9 @@ importers:
 
   packages/ui-react-builder:
     dependencies:
+      '@typescript-eslint/types':
+        specifier: ^8.53.0
+        version: 8.53.0
       '@typescript-eslint/typescript-estree':
         specifier: ^8.53.0
         version: 8.53.0(typescript@5.9.3)
@@ -400,9 +403,6 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.8)
-      '@typescript-eslint/types':
-        specifier: ^8.53.0
-        version: 8.53.0
       react:
         specifier: ^19.2.3
         version: 19.2.3

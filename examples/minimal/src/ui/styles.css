@@ -38,6 +38,11 @@ body {
   border-color: rgba(0, 200, 100, 0.5);
 }
 
+.version-badge.v3 {
+  background: rgba(138, 43, 226, 0.3);
+  border-color: rgba(138, 43, 226, 0.5);
+}
+
 .greeting {
   text-align: center;
   padding: 24px;
@@ -146,6 +151,21 @@ body {
 
 .input-group input::placeholder {
   color: #999;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: #666;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  cursor: pointer;
 }
 
 .modal-actions {
