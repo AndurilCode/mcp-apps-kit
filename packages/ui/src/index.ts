@@ -26,6 +26,7 @@
 
 export type {
   Viewport,
+  ContainerDimensions,
   SafeAreaInsets,
   DeviceCapabilities,
   HostStyles,
@@ -52,6 +53,9 @@ export type {
   AppToolDefinition,
   CallToolHandler,
   ListToolsHandler,
+  // Model context types (ext-apps v0.4.0+)
+  ContentBlock,
+  UpdateModelContextParams,
 } from "./types";
 
 // Constants

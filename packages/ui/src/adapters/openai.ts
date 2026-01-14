@@ -16,6 +16,7 @@ import type {
   SizeChangedParams,
   CallToolHandler,
   ListToolsHandler,
+  UpdateModelContextParams,
 } from "../types";
 import type { DebugTransport, LogEntry } from "../debug/logger";
 import { clientDebugLogger } from "../debug/logger";
@@ -521,6 +522,83 @@ export class OpenAIAdapter implements ProtocolAdapter {
         prompt: content.text,
       });
     }
+  }
+
+  // === Model Context ===
+
+  /**
+   * Update model context (ext-apps v0.4.0+)
+   *
+   * On ChatGPT, this method uses setState() internally, which calls the
+   * OpenAI SDK's setWidgetState(). In ChatGPT, setWidgetState() exposes
+   * data to the AI model context, making it visible to the model.
+   *
+   * **ChatGPT Implementation Details:**
+   * - Uses setState/setWidgetState (exposes to AI + persists for session)
+   * - Each call **replaces** the previous context (not accumulated)
+   * - Context persists for the widget's session lifetime
+   * - Be mindful of data size when sending large structured content
+   *
+   * **MCP Apps Implementation:**
+   * - Pure context update via native protocol feature
+   * - No persistence, only sent to model with next user message
+   *
+   * **Reserved Keys:**
+   * - Keys starting with underscore (`_`) in structuredContent are filtered
+   * - Internal keys use double-underscore prefix (`__mcp_*`)
+   *
+   * Use updateModelContext() for context-focused use cases (informing the model
+   * about app state), and setState() for persistence-focused use cases.
+   * Note: On ChatGPT, both methods expose state to the AI model.
+   */
+  async updateModelContext(params: UpdateModelContextParams): Promise<void> {
+    // Build a context object to send to the model via setState/setWidgetState
+    // Use double-underscore prefix for internal keys to avoid collisions with user data
+    const modelContext: Record<string, unknown> = {
+      __mcp_type: "modelContext",
+    };
+
+    // Add structured content, filtering out reserved underscore-prefixed keys
+    if (params.structuredContent) {
+      const structuredContent = params.structuredContent;
+      const reservedKeys = Object.keys(structuredContent).filter((key) => key.startsWith("_"));
+      if (reservedKeys.length > 0) {
+        clientDebugLogger.debug(
+          "[OpenAI Adapter] Filtering reserved keys (underscore-prefixed) from structuredContent:",
+          reservedKeys
+        );
+      }
+
+      // Only merge non-reserved keys (single-underscore prefix is reserved for internal use)
+      Object.keys(structuredContent).forEach((key) => {
+        if (!key.startsWith("_")) {
+          modelContext[key] = structuredContent[key];
+        }
+      });
+    }
+
+    // Convert content blocks to text representation for the model
+    // Note: OpenAI adapter only supports text content blocks; other types are dropped
+    if (params.content && params.content.length > 0) {
+      const textBlocks = params.content.filter((block) => block.type === "text");
+      const droppedBlocks = params.content.filter((block) => block.type !== "text");
+
+      if (droppedBlocks.length > 0) {
+        clientDebugLogger.debug(
+          `[OpenAI Adapter] Dropping ${String(droppedBlocks.length)} non-text content block(s):`,
+          droppedBlocks.map((b) => b.type)
+        );
+      }
+
+      const textContent = textBlocks.map((block) => block.text).join("\n");
+      if (textContent) {
+        modelContext.__mcp_textContent = textContent;
+      }
+    }
+
+    // Use existing setState which calls setWidgetState
+    this.setState(modelContext);
+    clientDebugLogger.debug("[OpenAI Adapter] updateModelContext via setState:", modelContext);
   }
 
   // === Navigation ===

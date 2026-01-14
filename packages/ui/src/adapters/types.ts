@@ -15,6 +15,7 @@ import type {
   SizeChangedParams,
   CallToolHandler,
   ListToolsHandler,
+  UpdateModelContextParams,
 } from "../types";
 import type { LogEntry } from "../debug/logger";
 
@@ -67,6 +68,18 @@ export interface ProtocolAdapter {
    * @param content - Message content
    */
   sendMessage(content: { type: string; text: string }): Promise<void>;
+
+  // === Model Context ===
+
+  /**
+   * Update the host's model context with app state (ext-apps v0.4.0+)
+   *
+   * On MCP Apps: Calls app.updateModelContext()
+   * On ChatGPT: Silent no-op (graceful degradation)
+   *
+   * @param params - Context content and/or structured content
+   */
+  updateModelContext(params: UpdateModelContextParams): Promise<void>;
 
   // === Navigation ===
 

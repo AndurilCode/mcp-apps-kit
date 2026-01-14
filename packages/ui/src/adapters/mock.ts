@@ -17,6 +17,7 @@ import type {
   SizeChangedParams,
   CallToolHandler,
   ListToolsHandler,
+  UpdateModelContextParams,
 } from "../types";
 
 /**
@@ -133,6 +134,24 @@ export class MockAdapter implements ProtocolAdapter {
   async sendMessage(content: { type: string; text: string }): Promise<void> {
     // eslint-disable-next-line no-console
     console.log("[MockAdapter] sendMessage:", content);
+  }
+
+  // === Model Context ===
+
+  /** Last model context params (for testing) */
+  private lastModelContext?: UpdateModelContextParams;
+
+  async updateModelContext(params: UpdateModelContextParams): Promise<void> {
+    this.lastModelContext = params;
+    // eslint-disable-next-line no-console
+    console.log("[MockAdapter] updateModelContext:", params);
+  }
+
+  /**
+   * Get the last model context params (for testing)
+   */
+  getLastModelContext(): UpdateModelContextParams | undefined {
+    return this.lastModelContext;
   }
 
   // === Navigation ===
