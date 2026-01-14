@@ -470,8 +470,15 @@ export class McpAdapter implements ProtocolAdapter {
               "Resource content block requires 'uri' field"
             );
           }
-          // Convert to text representation for ext-apps
-          return { type: "text" as const, text: block.uri };
+          // Map to native ext-apps resource format (v0.4.0+)
+          // ext-apps expects a nested resource object with uri and text/blob
+          return {
+            type: "resource" as const,
+            resource: {
+              uri: block.uri,
+              text: block.description ?? block.uri,
+            },
+          };
         case "resource_link": {
           if (!block.uri) {
             throw new UIError(
@@ -479,9 +486,15 @@ export class McpAdapter implements ProtocolAdapter {
               "Resource link content block requires 'uri' field"
             );
           }
-          // Convert to text representation for ext-apps
-          const linkText = block.name ? `${block.name}: ${block.uri}` : block.uri;
-          return { type: "text" as const, text: linkText };
+          // Map to native ext-apps resource format (v0.4.0+)
+          // resource_link uses the same structure as resource in ext-apps
+          return {
+            type: "resource" as const,
+            resource: {
+              uri: block.uri,
+              text: block.description ?? (block.name ? `${block.name}: ${block.uri}` : block.uri),
+            },
+          };
         }
         default: {
           // Exhaustiveness check - TypeScript will error if we add a new content type
