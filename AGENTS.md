@@ -6,7 +6,7 @@ Build a **single TypeScript codebase** that runs interactive apps on **MCP Apps 
 
 - **Monorepo**: pnpm workspaces + Nx (`nx run-many`)
 - **Language**: TypeScript (strict, `noImplicitAny`, `noUncheckedIndexedAccess`, `verbatimModuleSyntax`)
-- **Runtime**: Node.js (monorepo dev requires >= 20; runtime packages may support >= 18—check package README before changing)
+- **Runtime**: Node.js >= 20 (repo development + CI; don’t change without updating engines/tooling)
 - **Schema/validation**: Zod **v4** (not v3)
 - **Server**: Express **v5** (not v4) via `@mcp-apps-kit/core`
 - **Testing**: Vitest; repo-level coverage thresholds enforced (50% lines/functions/branches/statements)
@@ -15,7 +15,6 @@ Build a **single TypeScript codebase** that runs interactive apps on **MCP Apps 
 
 ## @Knowledge Graph (Context Links)
 
-- [Repo agent rules + pitfalls]: ./CLAUDE.md
 - [Quickstart patterns (defineTool/defineUI, middleware, OAuth)]: ./docs/quickstart.md
 - [Core server framework API + exports contract]: ./packages/core/README.md
 - [Client SDK (protocol detection/adapters) API]: ./packages/ui/README.md
@@ -23,7 +22,7 @@ Build a **single TypeScript codebase** that runs interactive apps on **MCP Apps 
 - [React UI builder + Vite plugin API]: ./packages/ui-react-builder/README.md
 - [Testing utilities + eval/property patterns]: ./packages/testing/README.md
 - [CLI scaffolder templates + constraints]: ./packages/create-app/README.md
-- [Package-specific agent notes]: ./packages/*/AGENTS.md
+- [Package-specific agent notes (where present)]: ./packages/*/AGENTS.md
 - [Tooling scripts + pinned versions]: ./package.json
 - [ESLint rules (strictness + exceptions in tests)]: ./eslint.config.js
 - [TypeScript base config + path aliases]: ./tsconfig.base.json
