@@ -39,7 +39,7 @@ Interactive MCP apps often need to support multiple hosts with slightly differen
 
 ## Compatibility
 
-- Node.js: `>= 20`
+- Node.js: `>= 18`
 - Zod: `^4.0.0` (peer dependency)
 - MCP SDK: uses `@modelcontextprotocol/sdk`
 
