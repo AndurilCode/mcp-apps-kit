@@ -6,7 +6,7 @@ Build a **single TypeScript codebase** that runs interactive apps on **MCP Apps 
 
 - **Monorepo**: pnpm workspaces + Nx (`nx run-many`)
 - **Language**: TypeScript (strict, `noImplicitAny`, `noUncheckedIndexedAccess`, `verbatimModuleSyntax`)
-- **Runtime**: Node.js >= 20 (repo development + CI; don’t change without updating engines/tooling)
+- **Runtime**: Node.js >= 18 (runtime packages), >= 20 (development/CLI/CI; don't change without updating engines/tooling)
 - **Schema/validation**: Zod **v4** (not v3)
 - **Server**: Express **v5** (not v4) via `@mcp-apps-kit/core`
 - **Testing**: Vitest; repo-level coverage thresholds enforced (50% lines/functions/branches/statements)
