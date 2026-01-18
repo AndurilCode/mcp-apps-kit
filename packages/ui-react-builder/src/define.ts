@@ -109,8 +109,6 @@ export function defineReactUI(definition: ReactUIInput): ReactUIDef {
  *   console.log("React UI:", ui.__component.name);
  * }
  * ```
- *
- * @internal
  */
 export function isReactUIDef(value: unknown): value is ReactUIDef {
   return (
