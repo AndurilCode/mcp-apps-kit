@@ -12,6 +12,9 @@ import {
   createApp,
   defineTool,
   tool,
+  workflow,
+  toolStep,
+  customStep,
   type ClientToolsFromCore,
   iconFromFile,
 } from "@mcp-apps-kit/core";
@@ -19,6 +22,8 @@ import { defineReactUI } from "@mcp-apps-kit/ui-react-builder";
 import { GreetingWidgetV1 } from "./ui/GreetingWidgetV1";
 import { GreetingWidgetV2 } from "./ui/GreetingWidgetV2";
 import { EchoWidget } from "./ui/EchoWidget";
+import { WorkflowWidget } from "./ui/WorkflowWidget";
+import { AdvancedWorkflowWidget } from "./ui/AdvancedWorkflowWidget";
 import { z } from "zod";
 
 // =============================================================================
@@ -171,6 +176,195 @@ const echoToolV3 = defineTool({
 });
 
 // =============================================================================
+// V4: Workflow Engine Demo - Multi-Step Tool Composition
+// =============================================================================
+
+/**
+ * Demonstrates the workflow engine feature.
+ * Workflows allow you to compose multi-step tools from existing tools and custom logic.
+ *
+ * This example creates a "greet_and_echo" workflow that:
+ * 1. Greets a person using the greet tool
+ * 2. Transforms the greeting message
+ * 3. Echoes the transformed message using the echo tool
+ * 4. Combines both results with a timestamp
+ */
+
+// First, define the individual tools that the workflow will use
+const greetForWorkflowTool = defineTool({
+  title: "Greet For Workflow",
+  description: "Greet someone (internal tool for workflow)",
+  input: {
+    name: z.string().describe("Name to greet"),
+  },
+  output: {
+    message: z.string(),
+  },
+  visibility: "model", // Only visible to AI model, not in app UI
+  handler: async (input) => {
+    return {
+      message: `Hello, ${input.name}!`,
+    };
+  },
+});
+
+const echoForWorkflowTool = defineTool({
+  title: "Echo For Workflow",
+  description: "Echo a message (internal tool for workflow)",
+  input: {
+    message: z.string().describe("Message to echo"),
+    uppercase: z.boolean().optional().describe("Convert to uppercase"),
+  },
+  output: {
+    echo: z.string(),
+  },
+  visibility: "model", // Only visible to AI model, not in app UI
+  handler: async (input) => {
+    const echo = input.uppercase ? input.message.toUpperCase() : input.message;
+    return { echo };
+  },
+});
+
+// Now create a workflow that composes these tools
+const greetAndEchoWorkflow = workflow("greet_and_echo")
+  .describe("Greet someone and echo their greeting with a fun twist")
+  .input({
+    name: z.string().describe("Person's name to greet"),
+    excitement: z.number().min(1).max(10).default(5).describe("Excitement level (1-10)"),
+  })
+  .output({
+    greet_and_echo: z.object({
+      greeting: z.string(),
+      echo: z.string(),
+      excitementLevel: z.number(),
+      timestamp: z.string(),
+    }),
+  })
+  // Step 1: Greet the person
+  .step("greet", toolStep("greet_for_workflow"), {
+    mapInput: (ctx) => ({
+      name: (ctx.input as { name: string }).name,
+    }),
+  })
+  // Step 2: Add custom excitement transformation
+  .step(
+    "add_excitement",
+    customStep(async (ctx) => {
+      const greetingMsg = (ctx.outputs.greet as { message: string }).message;
+      const excitement = (ctx.input as { excitement: number }).excitement;
+      const exclamations = "!".repeat(excitement);
+      return {
+        enhancedMessage: `${greetingMsg}${exclamations}`,
+      };
+    })
+  )
+  // Step 3: Echo the enhanced message in uppercase
+  .step("echo", toolStep("echo_for_workflow"), {
+    mapInput: (ctx) => ({
+      message: (ctx.outputs.add_excitement as { enhancedMessage: string }).enhancedMessage,
+      uppercase: true,
+    }),
+  })
+  // Step 4: Combine results
+  .step(
+    "combine",
+    customStep(async (ctx) => {
+      const greeting = (ctx.outputs.greet as { message: string }).message;
+      const echo = (ctx.outputs.echo as { echo: string }).echo;
+      const excitement = (ctx.input as { excitement: number }).excitement;
+
+      return {
+        greet_and_echo: {
+          greeting,
+          echo,
+          excitementLevel: excitement,
+          timestamp: new Date().toISOString(),
+        },
+      };
+    })
+  )
+  // Add interactive UI for the workflow
+  .ui(
+    defineReactUI({
+      component: WorkflowWidget,
+      name: "Workflow Engine Widget",
+      description: "Interactive UI demonstrating multi-step workflow execution",
+      prefersBorder: true,
+    })
+  )
+  .build();
+
+// Example of a workflow with parallel execution and branching
+const advancedWorkflow = workflow("process_greeting")
+  .describe("Advanced workflow with parallel steps and conditional logic")
+  .input({
+    names: z.array(z.string()).describe("List of names to greet"),
+    format: z.enum(["formal", "casual"]).default("casual").describe("Greeting format"),
+  })
+  .output({
+    summary: z.string(),
+    greetings: z.array(z.string()),
+    format: z.string(),
+  })
+  // Parallel step: Greet all names simultaneously
+  .parallel("greet_all", [
+    customStep(async (ctx) => {
+      const names = (ctx.input as { names: string[] }).names;
+      return { count: names.length };
+    }),
+    customStep(async (ctx) => {
+      const names = (ctx.input as { names: string[] }).names;
+      return { longestName: names.reduce((a, b) => (a.length > b.length ? a : b), "") };
+    }),
+  ])
+  // Conditional branching based on format
+  .branch("format_greeting", {
+    when: (ctx) => (ctx.input as { format: string }).format === "formal",
+    then: [
+      customStep(async (ctx) => ({
+        prefix: "Dear",
+        suffix: "Sincerely yours",
+      })),
+    ],
+    else: [
+      customStep(async (ctx) => ({
+        prefix: "Hey",
+        suffix: "Cheers",
+      })),
+    ],
+  })
+  // Final step: combine everything
+  .step(
+    "finalize",
+    customStep(async (ctx) => {
+      const names = (ctx.input as { names: string[] }).names;
+      const format = (ctx.input as { format: string }).format;
+      const parallelResults = ctx.outputs.greet_all as [{ count: number }, { longestName: string }];
+      const branchResults = ctx.outputs.format_greeting as [{ prefix: string; suffix: string }];
+
+      const formatData = branchResults[0];
+      const greetings = names.map((name) => `${formatData?.prefix} ${name}`);
+      const summary = `Processed ${parallelResults[0].count} greetings in ${format} format`;
+
+      return {
+        summary,
+        greetings,
+        format,
+      };
+    })
+  )
+  // Add interactive UI for the advanced workflow
+  .ui(
+    defineReactUI({
+      component: AdvancedWorkflowWidget,
+      name: "Advanced Workflow Widget",
+      description: "Interactive UI demonstrating parallel execution and conditional branching",
+      prefersBorder: true,
+    })
+  )
+  .build();
+
+// =============================================================================
 // Create Versioned App
 // =============================================================================
 
@@ -229,6 +423,19 @@ const app = createApp({
       },
       // v3 demonstrates inline schema syntax
     },
+    v4: {
+      version: "4.0.0",
+      tools: {
+        // Internal tools used by workflows (visibility: "model")
+        greet_for_workflow: greetForWorkflowTool,
+        echo_for_workflow: echoForWorkflowTool,
+
+        // Workflows exposed as tools
+        greet_and_echo: greetAndEchoWorkflow,
+        process_greeting: advancedWorkflow,
+      },
+      // v4 demonstrates the workflow engine
+    },
   },
 });
 
@@ -251,12 +458,18 @@ Endpoints:
   - v2 MCP:     http://localhost:${port}/v2/mcp (uses API transport for logging)
   - v2 Logs:    http://localhost:${port}/api/logs (debug log API endpoint)
   - v3 MCP:     http://localhost:${port}/v3/mcp (inline schema syntax demo)
+  - v4 MCP:     http://localhost:${port}/v4/mcp (workflow engine demo)
   - Health:     http://localhost:${port}/health
 
 Debug logging:
   - v1: Uses log_debug MCP tool (default for MCP adapter)
   - v2: Uses HTTP API transport at /api/logs (ideal for OpenAI/ChatGPT)
   - v3: Default MCP logging (demonstrates inline schema syntax)
+  - v4: Default MCP logging (demonstrates workflow engine)
+
+Try the workflow tools:
+  - greet_and_echo: Compose greet + custom logic + echo
+  - process_greeting: Parallel execution + conditional branching
   `);
   });
 }
@@ -284,3 +497,12 @@ export type GreetOutputV2 = z.infer<typeof greetOutputV2>;
 // V3 types (inline schema syntax - types inferred directly from tool definition)
 export type AppToolsV3 = { echo: typeof echoToolV3 };
 export type AppClientToolsV3 = ClientToolsFromCore<AppToolsV3>;
+
+// V4 types (workflow engine)
+export type AppToolsV4 = {
+  greet_for_workflow: typeof greetForWorkflowTool;
+  echo_for_workflow: typeof echoForWorkflowTool;
+  greet_and_echo: typeof greetAndEchoWorkflow;
+  process_greeting: typeof advancedWorkflow;
+};
+export type AppClientToolsV4 = ClientToolsFromCore<AppToolsV4>;
