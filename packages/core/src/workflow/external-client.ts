@@ -6,15 +6,18 @@
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { ExternalToolError } from "./errors";
 
 // =============================================================================
 // CONNECTION CACHE
 // =============================================================================
 
+type Transport = StdioClientTransport | StreamableHTTPClientTransport;
+
 interface CachedConnection {
   client: Client;
-  transport: StdioClientTransport;
+  transport: Transport;
   lastUsed: number;
 }
 
@@ -102,9 +105,10 @@ export class ExternalToolClient {
     const client = await this.createConnection(server);
 
     // Cache the connection
+    // Note: transport is managed by the client, we just keep a reference for cleanup
     this.connections.set(server, {
       client,
-      transport: null as never, // Transport is handled internally by client
+      transport: null as never, // Transport reference (managed by client)
       lastUsed: Date.now(),
     });
 
@@ -113,20 +117,28 @@ export class ExternalToolClient {
 
   /**
    * Create a new MCP client connection
+   *
+   * Supports both stdio and HTTP transports:
+   * - stdio: mcp://server-name or server-name (command in PATH)
+   * - HTTP: http://... or https://...
    */
   private async createConnection(server: string): Promise<Client> {
-    // For now, we only support stdio transport to local MCP servers
-    // In the future, this could be extended to support HTTP transport for remote servers
+    let transport: Transport;
 
-    // Parse server identifier
-    // Format: mcp://server-name or just server-name
-    const serverName = server.replace(/^mcp:\/\//, "");
+    // Determine transport type based on server identifier
+    if (server.startsWith("http://") || server.startsWith("https://")) {
+      // HTTP transport for remote servers
+      transport = new StreamableHTTPClientTransport(new URL(server));
+    } else {
+      // Stdio transport for local MCP servers
+      // Parse server identifier (remove mcp:// prefix if present)
+      const serverName = server.replace(/^mcp:\/\//, "");
 
-    // Create stdio transport (assuming server command is available in PATH)
-    const transport = new StdioClientTransport({
-      command: serverName,
-      args: [],
-    });
+      transport = new StdioClientTransport({
+        command: serverName,
+        args: [],
+      });
+    }
 
     // Create client
     const client = new Client(

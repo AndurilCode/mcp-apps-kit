@@ -74,9 +74,13 @@ export function customStep<TContext = WorkflowContext>(
 
 /**
  * Configuration for external tool step
+ *
+ * Supports both stdio and HTTP transports:
+ * - stdio: Server command name (e.g., "weather-server" or "mcp://weather-server")
+ * - HTTP: Full URL (e.g., "http://localhost:3000/mcp" or "https://api.example.com/mcp")
  */
 export interface ExternalStepConfig<TContext = WorkflowContext> extends StepConfig<TContext> {
-  /** MCP server URL or identifier */
+  /** MCP server identifier - command name for stdio or URL for HTTP */
   server: string;
 
   /** Tool name on the external server */
@@ -86,13 +90,27 @@ export interface ExternalStepConfig<TContext = WorkflowContext> extends StepConf
 /**
  * Create an external step that calls a tool from another MCP server
  *
+ * Supports both stdio and HTTP transports based on the server identifier.
+ *
  * @param config - External step configuration including server and tool name
  * @returns External step definition
  *
- * @example
+ * @example stdio transport (local MCP server)
  * ```typescript
  * const weatherStep = externalStep({
- *   server: "mcp://weather-service.example.com",
+ *   server: "weather-server", // or "mcp://weather-server"
+ *   tool: "get_forecast",
+ *   mapInput: (ctx) => ({
+ *     location: ctx.input.destination,
+ *     date: ctx.input.date,
+ *   }),
+ * });
+ * ```
+ *
+ * @example HTTP transport (remote MCP server)
+ * ```typescript
+ * const weatherStep = externalStep({
+ *   server: "http://localhost:3000/mcp",
  *   tool: "get_forecast",
  *   mapInput: (ctx) => ({
  *     location: ctx.input.destination,
