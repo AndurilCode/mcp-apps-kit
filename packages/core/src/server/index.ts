@@ -745,8 +745,30 @@ function registerTools(
           // Create state map for middleware
           const state = new Map<string, unknown>();
 
-          // Create full context with state
-          const context: ToolContext = { ...baseContext, state };
+          // Create internal tool caller for workflows
+          const internalToolCaller = async (
+            targetToolName: string,
+            targetInput: unknown,
+            targetContext: ToolContext
+          ): Promise<unknown> => {
+            const targetToolDef = tools[targetToolName];
+            if (!targetToolDef) {
+              throw new Error(`Tool "${targetToolName}" not found`);
+            }
+
+            // Validate input
+            const validatedInput = targetToolDef.input.parse(targetInput);
+
+            // Execute the target tool's handler with the provided context
+            return await targetToolDef.handler(validatedInput, targetContext);
+          };
+
+          // Create full context with state and internal tool caller
+          const context: ToolContext = {
+            ...baseContext,
+            state,
+            _internalToolCaller: internalToolCaller,
+          };
           contextForErrorHandling = context;
 
           // Emit tool:called event

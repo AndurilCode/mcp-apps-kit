@@ -169,6 +169,18 @@ export interface ToolContext {
    * ```
    */
   state?: Map<string, unknown>;
+
+  /**
+   * Internal tool caller for workflows.
+   * Allows workflows to call other tools in the same app.
+   *
+   * @internal
+   */
+  _internalToolCaller?: (
+    toolName: string,
+    input: unknown,
+    context: ToolContext
+  ) => Promise<unknown>;
 }
 
 /**
