@@ -12,17 +12,38 @@ import type { ToolContext } from "../types/tools";
 // =============================================================================
 
 /**
- * Function to call a tool defined in the same app
+ * Type for a validator function or Zod schema
  */
-export type ToolCaller = <TOutput = unknown>(toolName: string, input: unknown) => Promise<TOutput>;
+export type ToolValidator<T> = z.ZodType<T> | ((value: unknown) => T);
+
+/**
+ * Function to call a tool defined in the same app
+ *
+ * @param toolName - Name of the tool to call
+ * @param input - Input for the tool
+ * @param validator - Optional Zod schema or validator function to validate the response
+ * @returns The tool output, validated if a validator is provided
+ */
+export type ToolCaller = <TOutput = unknown>(
+  toolName: string,
+  input: unknown,
+  validator?: ToolValidator<TOutput>
+) => Promise<TOutput>;
 
 /**
  * Function to call a tool from an external MCP server
+ *
+ * @param server - MCP server URL or identifier
+ * @param toolName - Name of the tool to call
+ * @param input - Input for the tool
+ * @param validator - Optional Zod schema or validator function to validate the response
+ * @returns The tool output, validated if a validator is provided
  */
 export type ExternalToolCaller = <TOutput = unknown>(
   server: string,
   toolName: string,
-  input: unknown
+  input: unknown,
+  validator?: ToolValidator<TOutput>
 ) => Promise<TOutput>;
 
 /**

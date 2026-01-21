@@ -72,3 +72,27 @@ export class WorkflowValidationError extends WorkflowError {
     this.name = "WorkflowValidationError";
   }
 }
+
+/**
+ * Error thrown when workflow definition is invalid at runtime
+ */
+export class WorkflowDefinitionError extends WorkflowError {
+  constructor(message: string, details?: Record<string, unknown>) {
+    super(message, "WORKFLOW_DEFINITION_ERROR", details);
+    this.name = "WorkflowDefinitionError";
+  }
+}
+
+/**
+ * Error thrown when tool response validation fails
+ */
+export class ToolResponseValidationError extends WorkflowError {
+  constructor(
+    message: string,
+    public readonly toolName: string,
+    details?: Record<string, unknown>
+  ) {
+    super(message, "TOOL_RESPONSE_VALIDATION_ERROR", { toolName, ...details });
+    this.name = "ToolResponseValidationError";
+  }
+}

@@ -4,6 +4,7 @@
  * @module workflow/executor
  */
 
+import type { z } from "zod";
 import type { ToolContext } from "../types/tools";
 import type {
   WorkflowDefinition,
@@ -20,8 +21,19 @@ import type {
   RetryConfig,
   ErrorHandling,
 } from "./types";
-import { WorkflowExecutionError, StepTimeoutError, ExternalToolError } from "./errors";
+import {
+  WorkflowExecutionError,
+  StepTimeoutError,
+  ExternalToolError,
+  WorkflowDefinitionError,
+  ToolResponseValidationError,
+} from "./errors";
 import { ExternalToolClient } from "./external-client";
+
+/**
+ * Type for a validator function or Zod schema
+ */
+type Validator<T> = z.ZodType<T> | ((value: unknown) => T);
 
 // =============================================================================
 // WORKFLOW EXECUTOR
@@ -47,6 +59,16 @@ export class WorkflowExecutor {
   }
 
   /**
+   * Close the executor and release resources
+   *
+   * This closes all external MCP client connections.
+   * Call this method when the executor is no longer needed.
+   */
+  async close(): Promise<void> {
+    await this.externalClient.closeAll();
+  }
+
+  /**
    * Execute the workflow with the given input
    *
    * @param input - Workflow input matching the input schema
@@ -68,7 +90,8 @@ export class WorkflowExecutor {
       toolContext,
       callTool: async <TOutput = unknown>(
         toolName: string,
-        toolInput: unknown
+        toolInput: unknown,
+        validator?: Validator<TOutput>
       ): Promise<TOutput> => {
         // Use the internal tool caller from context if available
         if (!toolContext._internalToolCaller) {
@@ -81,14 +104,30 @@ export class WorkflowExecutor {
 
         // Call the tool via the internal caller
         const result = await toolContext._internalToolCaller(toolName, toolInput, toolContext);
+
+        // Validate the result if a validator is provided
+        if (validator) {
+          return this.validateToolResponse<TOutput>(result, toolName, validator);
+        }
+
+        // No validator provided - return as unknown (caller is responsible for validation)
         return result as TOutput;
       },
       callExternalTool: async <TOutput = unknown>(
         server: string,
         toolName: string,
-        toolInput: unknown
+        toolInput: unknown,
+        validator?: Validator<TOutput>
       ): Promise<TOutput> => {
-        return this.externalClient.callTool(server, toolName, toolInput) as Promise<TOutput>;
+        const result = await this.externalClient.callTool(server, toolName, toolInput);
+
+        // Validate the result if a validator is provided
+        if (validator) {
+          return this.validateToolResponse<TOutput>(result, `${server}:${toolName}`, validator);
+        }
+
+        // No validator provided - return as unknown (caller is responsible for validation)
+        return result as TOutput;
       },
     };
 
@@ -104,11 +143,23 @@ export class WorkflowExecutor {
     // Validate output if schema is provided
     let finalOutput: unknown = outputs;
     if (this.definition.outputSchema) {
+      // Check if workflow has no steps but declares an output schema
+      if (this.definition.steps.length === 0) {
+        throw new WorkflowDefinitionError(
+          `Workflow declares an outputSchema but has no steps to produce that output. ` +
+            `Add at least one step to the workflow or remove the outputSchema.`,
+          {
+            hasOutputSchema: true,
+            stepsCount: this.definition.steps.length,
+          }
+        );
+      }
+
       // If output schema is defined, use the last step's output as the final output
       // This allows the workflow to define its final output structure in the last step
       const lastStep = this.definition.steps[this.definition.steps.length - 1];
       const lastStepOutput = lastStep ? outputs[lastStep.name] : outputs;
-      finalOutput = this.definition.outputSchema.parse(lastStepOutput as unknown);
+      finalOutput = this.definition.outputSchema.parse(lastStepOutput);
     }
 
     return {
@@ -117,6 +168,27 @@ export class WorkflowExecutor {
       duration: Date.now() - startTime,
       success: true,
     };
+  }
+
+  /**
+   * Validate a tool response using the provided validator
+   */
+  private validateToolResponse<T>(result: unknown, toolName: string, validator: Validator<T>): T {
+    try {
+      // Check if validator is a Zod schema (has parse method) or a function
+      if (typeof validator === "function") {
+        return validator(result);
+      } else if (typeof validator === "object" && "parse" in validator) {
+        return validator.parse(result);
+      }
+      throw new Error("Invalid validator type");
+    } catch (error) {
+      throw new ToolResponseValidationError(
+        `Tool response validation failed for "${toolName}": ${(error as Error).message}`,
+        toolName,
+        { originalError: error, response: result }
+      );
+    }
   }
 
   /**
@@ -235,14 +307,23 @@ export class WorkflowExecutor {
     context: WorkflowContext,
     timeout: number
   ): Promise<unknown> {
-    return Promise.race([
-      this.executeStep(step, context),
-      new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          reject(new StepTimeoutError("step", timeout));
-        }, timeout);
-      }),
-    ]);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        reject(new StepTimeoutError("step", timeout));
+      }, timeout);
+    });
+
+    try {
+      const result = await Promise.race([this.executeStep(step, context), timeoutPromise]);
+      return result;
+    } finally {
+      // Always clear the timer to prevent memory leaks
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
+    }
   }
 
   /**

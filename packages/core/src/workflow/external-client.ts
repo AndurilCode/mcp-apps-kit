@@ -29,6 +29,8 @@ interface CachedConnection {
  */
 export class ExternalToolClient {
   private connections: Map<string, CachedConnection> = new Map();
+  private pendingConnections: Map<string, Promise<{ client: Client; transport: Transport }>> =
+    new Map();
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
   private readonly MAX_CONNECTIONS = 10;
 
@@ -86,6 +88,9 @@ export class ExternalToolClient {
 
   /**
    * Get or create a connection to an external server
+   *
+   * Handles race conditions: if multiple concurrent calls request the same server,
+   * they will share the same connection promise to prevent creating duplicate connections.
    */
   private async getOrCreateConnection(server: string): Promise<Client> {
     // Check if we have a cached connection
@@ -96,33 +101,53 @@ export class ExternalToolClient {
       return cached.client;
     }
 
-    // Evict old connections if cache is full
-    if (this.connections.size >= this.MAX_CONNECTIONS) {
-      this.evictOldConnections();
+    // Check if a connection is already being created for this server
+    const pending = this.pendingConnections.get(server);
+    if (pending) {
+      // Wait for the existing connection attempt and return its client
+      const { client } = await pending;
+      return client;
     }
 
-    // Create new connection
-    const client = await this.createConnection(server);
+    // Evict old connections if cache is full
+    if (this.connections.size >= this.MAX_CONNECTIONS) {
+      await this.evictOldConnections();
+    }
 
-    // Cache the connection
-    // Note: transport is managed by the client, we just keep a reference for cleanup
-    this.connections.set(server, {
-      client,
-      transport: null as never, // Transport reference (managed by client)
-      lastUsed: Date.now(),
-    });
+    // Create new connection promise and track it
+    const connectionPromise = this.createConnectionWithTransport(server);
+    this.pendingConnections.set(server, connectionPromise);
 
-    return client;
+    try {
+      // Await the connection
+      const { client, transport } = await connectionPromise;
+
+      // Cache the connection with the actual transport for cleanup
+      this.connections.set(server, {
+        client,
+        transport,
+        lastUsed: Date.now(),
+      });
+
+      return client;
+    } finally {
+      // Always remove from pending, whether success or failure
+      this.pendingConnections.delete(server);
+    }
   }
 
   /**
-   * Create a new MCP client connection
+   * Create a new MCP client connection with transport
    *
    * Supports both stdio and HTTP transports:
    * - stdio: mcp://server-name or server-name (command in PATH)
    * - HTTP: http://... or https://...
+   *
+   * @returns Both the client and transport for proper lifecycle management
    */
-  private async createConnection(server: string): Promise<Client> {
+  private async createConnectionWithTransport(
+    server: string
+  ): Promise<{ client: Client; transport: Transport }> {
     let transport: Transport;
 
     // Determine transport type based on server identifier
@@ -154,13 +179,13 @@ export class ExternalToolClient {
     // Connect to server
     await client.connect(transport);
 
-    return client;
+    return { client, transport };
   }
 
   /**
    * Evict old connections from cache
    */
-  private evictOldConnections(): void {
+  private async evictOldConnections(): Promise<void> {
     const now = Date.now();
     const toEvict: string[] = [];
 
@@ -192,9 +217,30 @@ export class ExternalToolClient {
     for (const server of toEvict) {
       const connection = this.connections.get(server);
       if (connection) {
-        // Close the connection
-        void connection.client.close();
+        await this.closeConnection(connection);
         this.connections.delete(server);
+      }
+    }
+  }
+
+  /**
+   * Close a connection with fallback transport cleanup
+   */
+  private async closeConnection(connection: CachedConnection): Promise<void> {
+    try {
+      await connection.client.close();
+    } catch {
+      // If Client.close() fails, attempt to close the transport directly
+      try {
+        await connection.transport.close();
+      } catch {
+        // Transport close also failed - for stdio transport, try to kill the process
+        if (connection.transport instanceof StdioClientTransport) {
+          // StdioClientTransport has internal process management
+          // The close() call above should handle it, but if it doesn't,
+          // we've done our best effort
+        }
+        // Swallow the error - we've attempted cleanup
       }
     }
   }
@@ -204,7 +250,7 @@ export class ExternalToolClient {
    */
   async closeAll(): Promise<void> {
     for (const connection of this.connections.values()) {
-      await connection.client.close();
+      await this.closeConnection(connection);
     }
     this.connections.clear();
   }

@@ -74,6 +74,7 @@ export type {
   WorkflowContext,
   ToolCaller,
   ExternalToolCaller,
+  ToolValidator,
   RetryConfig,
   ErrorHandler,
   ErrorHandling,
@@ -110,6 +111,8 @@ export {
   StepTimeoutError,
   ExternalToolError,
   WorkflowValidationError,
+  WorkflowDefinitionError,
+  ToolResponseValidationError,
 } from "./errors";
 
 // =============================================================================
