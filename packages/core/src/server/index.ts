@@ -393,6 +393,11 @@ export function createServerInstance<T extends ToolDefs>(
     },
 
     stop: async () => {
+      // Shutdown workflow executors first
+      const { ExecutorManager } = await import("../workflow/executor-manager.js");
+      await ExecutorManager.getInstance().shutdown();
+
+      // Then stop the HTTP server
       return new Promise<void>((resolve) => {
         if (httpServer) {
           httpServer.close(() => {

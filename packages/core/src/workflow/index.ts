@@ -5,6 +5,115 @@
  * Workflows support tool calls, custom logic, parallel execution, conditional
  * branching, and configurable error handling.
  *
+ * ## Production Best Practices
+ *
+ * ### Automatic Lifecycle Management
+ *
+ * Workflows automatically detect your environment and use the appropriate executor manager:
+ *
+ * **Traditional Servers** (Node.js, Express, etc.):
+ * - Uses global singleton with persistent pooling
+ * - Background cleanup of idle executors (10 min TTL)
+ * - LRU eviction when pool reaches 100 executors
+ * - Graceful shutdown via `server.stop()`
+ *
+ * **Edge/Serverless** (Supabase, Vercel, Cloudflare, AWS Lambda):
+ * - Creates fresh manager per invocation (no singleton)
+ * - Smaller pool size (10 executors, memory-constrained)
+ * - No background timers (function terminates quickly)
+ * - Auto-cleanup on function exit via process handlers
+ *
+ * Environment detection is automatic based on runtime characteristics.
+ *
+ * ### Edge Function Example (Supabase)
+ *
+ * ```typescript
+ * import { serve } from "https://deno.land/std/http/server.ts";
+ * import { createApp, workflow, toolStep } from "@mcp-apps-kit/core";
+ *
+ * const myWorkflow = workflow("process_data")
+ *   .describe("Process data")
+ *   .input({ data: z.string() })
+ *   .step("validate", toolStep("validate"))
+ *   .step("process", toolStep("process"))
+ *   .build();
+ *
+ * const app = createApp({
+ *   name: "edge-app",
+ *   tools: { myWorkflow },
+ * });
+ *
+ * serve(async (req) => {
+ *   // Workflows automatically use edge-optimized manager
+ *   // Cleanup happens when function terminates
+ *   return await app.handleRequest(req);
+ * });
+ * ```
+ *
+ * ### Traditional Server Example
+ *
+ * ```typescript
+ * const server = createApp({
+ *   name: "my-app",
+ *   tools: { myWorkflow },
+ * });
+ *
+ * await server.start(); // Starts background cleanup timer
+ *
+ * // Later, during shutdown
+ * await server.stop(); // Automatically cleans up all workflow resources
+ * ```
+ *
+ * ### Advanced Configuration
+ *
+ * **Traditional Servers:**
+ * ```typescript
+ * import { ExecutorManager } from "@mcp-apps-kit/core";
+ *
+ * // Configure the global executor manager
+ * const manager = ExecutorManager.getInstance({
+ *   maxExecutors: 200,           // Increase pool size for high-traffic apps
+ *   executorTTL: 5 * 60 * 1000,  // Cleanup after 5 minutes of inactivity
+ *   autoCleanup: true,           // Enable automatic cleanup (default)
+ *   cleanupInterval: 60 * 1000,  // Run cleanup every minute
+ * });
+ *
+ * // Get statistics
+ * const stats = manager.getStats();
+ * console.log(`Active workflows: ${stats.activeExecutors}`);
+ * console.log(`Total cached: ${stats.totalExecutors}`);
+ * ```
+ *
+ * **Edge Functions:**
+ * ```typescript
+ * import { EdgeExecutorManager } from "@mcp-apps-kit/core";
+ *
+ * // Configure defaults for all edge invocations
+ * EdgeExecutorManager.configureDefaults({
+ *   maxExecutors: 5,  // Smaller pool for memory-constrained edge
+ *   autoCleanup: false, // No background timers needed
+ * });
+ * ```
+ *
+ * ### External MCP Connection Configuration
+ *
+ * For workflows calling external MCP servers, configure connection pooling:
+ *
+ * ```typescript
+ * import { ExternalToolClient } from "@mcp-apps-kit/core";
+ *
+ * // Configure per-executor connection settings
+ * const client = new ExternalToolClient({
+ *   cacheTTL: 10 * 60 * 1000,    // Keep connections alive for 10 minutes
+ *   maxConnections: 20,          // Maximum concurrent MCP connections
+ * });
+ * ```
+ *
+ * Note: Each WorkflowExecutor has its own ExternalToolClient. In traditional
+ * servers, the ExecutorManager reuses executors efficiently, so connection
+ * pooling is shared across invocations. In edge functions, connections are
+ * per-invocation and cleaned up when the function terminates.
+ *
  * @example Sequential workflow
  * ```typescript
  * import { workflow, toolStep, customStep } from "@mcp-apps-kit/core";
@@ -22,7 +131,7 @@
  *
  * @example Parallel execution
  * ```typescript
- * const workflow = workflow("notifications")
+ * const notificationsWorkflow = workflow("notifications")
  *   .describe("Send notifications")
  *   .input({ userId: z.string() })
  *   .parallel("notify", [
@@ -35,7 +144,7 @@
  *
  * @example Conditional branching
  * ```typescript
- * const workflow = workflow("shipping")
+ * const shippingWorkflow = workflow("shipping")
  *   .describe("Handle shipping")
  *   .input({ orderId: z.string() })
  *   .step("validate", toolStep("validate_order"))
@@ -49,7 +158,7 @@
  *
  * @example External MCP tool
  * ```typescript
- * const workflow = workflow("weather_plan")
+ * const weatherWorkflow = workflow("weather_plan")
  *   .describe("Plan travel with weather")
  *   .input({ destination: z.string(), date: z.string() })
  *   .step("weather", externalStep({
@@ -154,3 +263,14 @@ export function workflow<TName extends string>(name: TName): WorkflowBuilderInit
 
 export { WorkflowExecutor } from "./executor";
 export { ExternalToolClient } from "./external-client";
+export type { ExternalToolClientConfig } from "./external-client";
+
+// =============================================================================
+// EXECUTOR MANAGER EXPORT (production lifecycle management)
+// =============================================================================
+
+export { ExecutorManager } from "./executor-manager";
+export type { ExecutorManagerConfig } from "./executor-manager";
+
+export { EdgeExecutorManager } from "./executor-manager-edge";
+export type { EdgeExecutorManagerConfig } from "./executor-manager-edge";

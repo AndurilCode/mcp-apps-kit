@@ -58,7 +58,7 @@ export class ExternalToolError extends WorkflowError {
     public readonly toolName: string,
     details?: Record<string, unknown>
   ) {
-    super(message, "EXTERNAL_TOOL_ERROR", { server, toolName, ...details });
+    super(message, "EXTERNAL_TOOL_ERROR", { ...details, server, toolName });
     this.name = "ExternalToolError";
   }
 }
@@ -92,7 +92,7 @@ export class ToolResponseValidationError extends WorkflowError {
     public readonly toolName: string,
     details?: Record<string, unknown>
   ) {
-    super(message, "TOOL_RESPONSE_VALIDATION_ERROR", { toolName, ...details });
+    super(message, "TOOL_RESPONSE_VALIDATION_ERROR", { ...details, toolName });
     this.name = "ToolResponseValidationError";
   }
 }

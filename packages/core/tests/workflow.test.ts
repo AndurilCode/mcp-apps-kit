@@ -4,7 +4,7 @@
  * @module workflow.test
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, onTestFinished } from "vitest";
 import { z } from "zod";
 import {
   workflow,
@@ -12,7 +12,7 @@ import {
   customStep,
   externalStep,
   WorkflowValidationError,
-  WorkflowExecutionError,
+  ExecutorManager,
   type WorkflowContext,
 } from "../src/workflow";
 import type { ToolContext } from "../src/types/tools";
@@ -27,6 +27,29 @@ const mockToolContext: ToolContext = {
   subject: "test-user",
 };
 
+// Reset ExecutorManager between tests to prevent cross-test pollution
+let testCounter = 0;
+beforeEach(() => {
+  ExecutorManager.resetInstance();
+  testCounter++;
+
+  // Use onTestFinished to ensure cleanup happens even if test fails
+  onTestFinished(async () => {
+    try {
+      await ExecutorManager.getInstance().shutdown(true);
+      ExecutorManager.resetInstance();
+    } catch (error) {
+      // Log but don't fail the test cleanup
+      console.error("Failed to cleanup ExecutorManager:", error);
+    }
+  });
+});
+
+// Helper to generate unique workflow names per test
+function uniqueWorkflowName(base: string): string {
+  return `${base}_${testCounter}_${Date.now()}`;
+}
+
 // =============================================================================
 // WORKFLOW BUILDER TESTS
 // =============================================================================
@@ -35,7 +58,7 @@ describe("Workflow Builder", () => {
   describe("Basic Configuration", () => {
     it("should require description", () => {
       expect(() => {
-        const builder = workflow("test") as any;
+        const builder = workflow(uniqueWorkflowName("test")) as any;
         builder
           .input({ value: z.string() })
           .step(
@@ -48,7 +71,7 @@ describe("Workflow Builder", () => {
 
     it("should require input schema", () => {
       expect(() => {
-        const builder = workflow("test").describe("Test workflow") as any;
+        const builder = workflow(uniqueWorkflowName("test")).describe("Test workflow") as any;
         builder
           .step(
             "step1",
@@ -60,12 +83,15 @@ describe("Workflow Builder", () => {
 
     it("should require at least one step", () => {
       expect(() => {
-        workflow("test").describe("Test workflow").input({ value: z.string() }).build();
+        workflow(uniqueWorkflowName("test"))
+          .describe("Test workflow")
+          .input({ value: z.string() })
+          .build();
       }).toThrow(WorkflowValidationError);
     });
 
     it("should build valid workflow", () => {
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ value: z.string() })
         .step(
@@ -80,7 +106,7 @@ describe("Workflow Builder", () => {
     });
 
     it("should accept output schema", () => {
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ value: z.string() })
         .output({ result: z.string() })
@@ -96,7 +122,7 @@ describe("Workflow Builder", () => {
 
     it("should reject duplicate step names", () => {
       expect(() => {
-        workflow("test")
+        workflow(uniqueWorkflowName("test"))
           .describe("Test workflow")
           .input({ value: z.string() })
           .step(
@@ -114,7 +140,7 @@ describe("Workflow Builder", () => {
 
   describe("Step Types", () => {
     it("should accept tool step", () => {
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ value: z.string() })
         .step("step1", toolStep("my_tool"))
@@ -124,7 +150,7 @@ describe("Workflow Builder", () => {
     });
 
     it("should accept custom step", () => {
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ value: z.string() })
         .step(
@@ -137,7 +163,7 @@ describe("Workflow Builder", () => {
     });
 
     it("should accept external step", () => {
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ value: z.string() })
         .step(
@@ -153,7 +179,7 @@ describe("Workflow Builder", () => {
     });
 
     it("should accept parallel steps", () => {
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ value: z.string() })
         .parallel("parallel1", [
@@ -166,7 +192,7 @@ describe("Workflow Builder", () => {
     });
 
     it("should accept branch steps", () => {
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ value: z.string() })
         .branch("branch1", {
@@ -188,7 +214,7 @@ describe("Workflow Builder", () => {
 describe("Workflow Execution", () => {
   describe("Custom Steps", () => {
     it("should execute single custom step", async () => {
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ value: z.string() })
         .step(
@@ -207,7 +233,7 @@ describe("Workflow Execution", () => {
     });
 
     it("should execute multiple sequential steps", async () => {
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ value: z.number() })
         .step(
@@ -233,7 +259,7 @@ describe("Workflow Execution", () => {
     });
 
     it("should provide accumulated outputs to steps", async () => {
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ value: z.number() })
         .step(
@@ -266,7 +292,7 @@ describe("Workflow Execution", () => {
     it("should execute parallel steps concurrently", async () => {
       const executionOrder: number[] = [];
 
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ value: z.string() })
         .parallel("parallel1", [
@@ -301,7 +327,7 @@ describe("Workflow Execution", () => {
 
   describe("Conditional Branching", () => {
     it("should execute then branch when condition is true", async () => {
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ shouldTakeThen: z.boolean() })
         .branch("branch1", {
@@ -319,7 +345,7 @@ describe("Workflow Execution", () => {
     });
 
     it("should execute else branch when condition is false", async () => {
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ shouldTakeThen: z.boolean() })
         .branch("branch1", {
@@ -337,7 +363,7 @@ describe("Workflow Execution", () => {
     });
 
     it("should handle async condition", async () => {
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ value: z.number() })
         .branch("branch1", {
@@ -360,7 +386,7 @@ describe("Workflow Execution", () => {
 
   describe("Error Handling", () => {
     it("should fail workflow by default on step error", async () => {
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ value: z.string() })
         .step(
@@ -375,7 +401,7 @@ describe("Workflow Execution", () => {
     });
 
     it("should skip step when onError is skip", async () => {
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ value: z.string() })
         .step(
@@ -400,9 +426,9 @@ describe("Workflow Execution", () => {
     });
 
     it("should use custom error handler", async () => {
-      const errorHandler = vi.fn(async (error, ctx) => ({ recovered: true }));
+      const errorHandler = vi.fn(async (_error, _ctx) => ({ recovered: true }));
 
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ value: z.string() })
         .step(
@@ -427,7 +453,7 @@ describe("Workflow Execution", () => {
     it("should retry failed step with linear backoff", async () => {
       let attempts = 0;
 
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ value: z.string() })
         .step(
@@ -458,7 +484,7 @@ describe("Workflow Execution", () => {
       const delays: number[] = [];
       let lastTime = Date.now();
 
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ value: z.string() })
         .step(
@@ -493,7 +519,7 @@ describe("Workflow Execution", () => {
     it("should respect maxDelay for exponential backoff", async () => {
       let attempts = 0;
 
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ value: z.string() })
         .step(
@@ -528,7 +554,7 @@ describe("Workflow Execution", () => {
 
   describe("Step Configuration", () => {
     it("should map input using mapInput", async () => {
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ a: z.number(), b: z.number() })
         .step(
@@ -554,7 +580,7 @@ describe("Workflow Execution", () => {
     });
 
     it("should enforce timeout", async () => {
-      const wf = workflow("test")
+      const wf = workflow(uniqueWorkflowName("test"))
         .describe("Test workflow")
         .input({ value: z.string() })
         .step(

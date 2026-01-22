@@ -26,7 +26,115 @@ import type {
 } from "./types";
 import { isZodSchema } from "../utils/schema";
 import { WorkflowValidationError } from "./errors";
-import { WorkflowExecutor } from "./executor";
+import { ExecutorManager } from "./executor-manager";
+import { EdgeExecutorManager } from "./executor-manager-edge";
+import { debugLogger } from "../debug/logger";
+
+// Type declarations for edge runtime detection
+declare const Deno: { env?: { get?: (key: string) => string | undefined } } | undefined;
+declare const EdgeRuntime: string | undefined;
+declare const WorkerGlobalScope: new () => unknown;
+declare const self: unknown;
+
+// =============================================================================
+// ENVIRONMENT DETECTION
+// =============================================================================
+
+/**
+ * Detect if we're running in an edge/serverless environment
+ *
+ * Edge environments are characterized by short-lived function invocations,
+ * limited memory, and no persistent background processes.
+ */
+function isEdgeEnvironment(): boolean {
+  // Vercel Edge Runtime
+  if (typeof EdgeRuntime !== "undefined") return true;
+
+  // Deno-based edge (Supabase Edge, Deno Deploy)
+  if (typeof Deno !== "undefined") return true;
+
+  // Cloudflare Workers - check specific user agent
+  if (typeof navigator !== "undefined") {
+    // Cloudflare Workers have a specific user agent
+    if (
+      typeof navigator === "object" &&
+      navigator !== null &&
+      "userAgent" in navigator &&
+      navigator.userAgent === "Cloudflare-Workers"
+    ) {
+      return true;
+    }
+  }
+
+  // Web Worker environments (includes Service Workers and Cloudflare Workers)
+  if (typeof WorkerGlobalScope !== "undefined" && typeof self !== "undefined") {
+    try {
+      if (self instanceof WorkerGlobalScope) return true;
+    } catch {
+      // instanceof might fail in some environments, continue checking
+    }
+  }
+
+  // Serverless environments (AWS Lambda, Google Cloud Functions, Vercel, Netlify)
+  if (typeof process !== "undefined" && process.env) {
+    const env = process.env;
+    if (
+      env.AWS_LAMBDA_FUNCTION_NAME !== undefined ||
+      env.FUNCTION_NAME !== undefined ||
+      env.VERCEL !== undefined ||
+      env.NETLIFY !== undefined
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// Module-level cache for edge executor manager
+// In edge environments, this prevents creating multiple managers per invocation
+let cachedEdgeManager: EdgeExecutorManager | null = null;
+
+/**
+ * Reset the cached edge executor manager
+ *
+ * This is primarily for testing purposes. In production edge environments,
+ * the manager is automatically garbage collected when the function instance terminates.
+ *
+ * @internal
+ */
+export async function resetEdgeExecutorManagerCache(): Promise<void> {
+  if (cachedEdgeManager) {
+    try {
+      await cachedEdgeManager.shutdown();
+    } catch (error) {
+      // Log but don't throw - allow reset to complete
+      debugLogger.error("Error shutting down cached edge executor manager", { error });
+    } finally {
+      // Always clear the cache even if shutdown failed
+      cachedEdgeManager = null;
+    }
+  }
+}
+
+/**
+ * Get the appropriate executor manager for the current environment
+ *
+ * For edge environments, returns a cached manager to prevent accumulation
+ * in the global cleanup registry. The cached manager is reused across
+ * tool invocations within the same function instance.
+ */
+function getExecutorManagerForEnvironment() {
+  if (isEdgeEnvironment()) {
+    // Edge: use cached manager per function instance (prevents accumulation)
+    // The manager will be garbage collected when the function instance terminates
+    cachedEdgeManager ??= new EdgeExecutorManager();
+    return cachedEdgeManager;
+  } else {
+    // Traditional: use global singleton with pooling
+    return ExecutorManager.getInstance();
+  }
+}
 
 // =============================================================================
 // INTERNAL BUILDER CONFIG
@@ -199,16 +307,25 @@ export class WorkflowBuilderImpl<TName extends string> implements WorkflowBuilde
       throw new WorkflowValidationError("Workflow requires at least one step");
     }
 
-    // Create workflow executor
-    const executor = new WorkflowExecutor({
+    // Create workflow definition
+    const definition = {
       name: builder.config.name,
       description: builder.config.description,
       inputSchema: builder.config.inputSchema,
       outputSchema: builder.config.outputSchema,
       steps: builder.config.steps,
-    });
+    };
 
     // Create tool definition with workflow handler
+    // The ExecutorManager provides:
+    // - Executor pooling and reuse across invocations (optimal performance)
+    // - Automatic cleanup of idle executors (prevents memory leaks)
+    // - LRU eviction when pool is full (bounded resource usage)
+    // - Reference counting to prevent cleanup during execution
+    // - Graceful shutdown hooks (proper cleanup on server stop)
+    //
+    // In edge environments, pooling is per-invocation and cleanup
+    // happens automatically when the function terminates.
     const toolDef: ToolDef<TInput, TOutput> = {
       description: builder.config.description,
       title: builder.config.name,
@@ -216,15 +333,31 @@ export class WorkflowBuilderImpl<TName extends string> implements WorkflowBuilde
       output: builder.config.outputSchema as TOutput,
       ui: builder.config.ui,
       handler: async (input: z.infer<TInput>, context: ToolContext) => {
-        // Execute workflow
-        const result = await executor.execute(input, context);
+        // Get the appropriate executor manager for the environment at invocation time
+        // - Edge/Serverless: creates new manager per invocation (no singleton)
+        // - Traditional: uses global singleton with pooling and background cleanup
+        const executorManager = getExecutorManagerForEnvironment();
 
-        // Return workflow output with metadata support
-        return result.output as z.infer<TOutput> & {
-          _meta?: Record<string, unknown>;
-          _text?: string;
-          _closeWidget?: boolean;
-        };
+        // Get or create the executor (reused across invocations)
+        const executor = executorManager.getOrCreate(definition);
+
+        // Mark as in-use to prevent cleanup during execution
+        executorManager.markInUse(definition.name);
+
+        try {
+          // Execute workflow
+          const result = await executor.execute(input, context);
+
+          // Return workflow output with metadata support
+          return result.output as z.infer<TOutput> & {
+            _meta?: Record<string, unknown>;
+            _text?: string;
+            _closeWidget?: boolean;
+          };
+        } finally {
+          // Mark as idle - allows cleanup after TTL expires
+          executorManager.markIdle(definition.name);
+        }
       },
     };
 

@@ -12,6 +12,7 @@ import type {
   WorkflowExecutionResult,
   StepExecutionResult,
   Step,
+  StepConfig,
   ToolStep,
   CustomStep,
   ExternalStep,
@@ -34,6 +35,18 @@ import { ExternalToolClient } from "./external-client";
  * Type for a validator function or Zod schema
  */
 type Validator<T> = z.ZodType<T> | ((value: unknown) => T);
+
+/**
+ * Type guard to check if a validator is a Zod schema
+ */
+function isZodSchema<T>(validator: Validator<T>): validator is z.ZodType<T> {
+  return (
+    typeof validator === "object" &&
+    validator !== null &&
+    "parse" in validator &&
+    typeof validator.parse === "function"
+  );
+}
 
 // =============================================================================
 // WORKFLOW EXECUTOR
@@ -175,13 +188,15 @@ export class WorkflowExecutor {
    */
   private validateToolResponse<T>(result: unknown, toolName: string, validator: Validator<T>): T {
     try {
-      // Check if validator is a Zod schema (has parse method) or a function
-      if (typeof validator === "function") {
-        return validator(result);
-      } else if (typeof validator === "object" && "parse" in validator) {
+      // Use type guard to check if validator is a Zod schema
+      if (isZodSchema(validator)) {
         return validator.parse(result);
       }
-      throw new Error("Invalid validator type");
+      // Otherwise, it must be a validation function
+      if (typeof validator === "function") {
+        return validator(result);
+      }
+      throw new Error("Invalid validator: must be a Zod schema or validation function");
     } catch (error) {
       throw new ToolResponseValidationError(
         `Tool response validation failed for "${toolName}": ${(error as Error).message}`,
@@ -202,10 +217,15 @@ export class WorkflowExecutor {
     let retries = 0;
 
     try {
-      // Execute step with retry logic
-      const output = await this.executeStepWithRetry(namedStep.step, context, (attempt) => {
-        retries = attempt;
-      });
+      // Execute step with retry logic, passing step name for error messages
+      const output = await this.executeStepWithRetry(
+        namedStep.name,
+        namedStep.step,
+        context,
+        (attempt) => {
+          retries = attempt;
+        }
+      );
 
       return {
         name: namedStep.name,
@@ -262,11 +282,14 @@ export class WorkflowExecutor {
 
   /**
    * Execute a step with retry logic
+   *
+   * @param onRetry - Callback invoked with the retry number (1, 2, 3, ...) when a retry is about to be performed
    */
   private async executeStepWithRetry(
+    stepName: string,
     step: Step,
     context: WorkflowContext,
-    onRetry: (attempt: number) => void
+    onRetry: (retryNumber: number) => void
   ): Promise<unknown> {
     const retryConfig = this.getRetryConfig(step);
     const timeout = this.getTimeout(step);
@@ -276,18 +299,20 @@ export class WorkflowExecutor {
       try {
         // Apply timeout if configured
         if (timeout) {
-          return await this.executeStepWithTimeout(step, context, timeout);
+          return await this.executeStepWithTimeout(stepName, step, context, timeout);
         } else {
           return await this.executeStep(step, context);
         }
       } catch (error) {
         lastError = error as Error;
-        onRetry(attempt);
 
         // If this was the last attempt, throw
         if (attempt >= retryConfig.maxAttempts - 1) {
           throw lastError;
         }
+
+        // Report the retry number (1-based: retry 1, retry 2, etc.)
+        onRetry(attempt + 1);
 
         // Wait before retry
         const delay = this.calculateRetryDelay(attempt, retryConfig);
@@ -303,6 +328,7 @@ export class WorkflowExecutor {
    * Execute a step with timeout
    */
   private async executeStepWithTimeout(
+    stepName: string,
     step: Step,
     context: WorkflowContext,
     timeout: number
@@ -311,7 +337,7 @@ export class WorkflowExecutor {
 
     const timeoutPromise = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
-        reject(new StepTimeoutError("step", timeout));
+        reject(new StepTimeoutError(stepName, timeout));
       }, timeout);
     });
 
@@ -390,6 +416,12 @@ export class WorkflowExecutor {
       // Call the external tool
       return await context.callExternalTool(step.server, step.toolName, input);
     } catch (error) {
+      // If error is already an ExternalToolError, rethrow it unchanged to avoid double-wrapping
+      if (error instanceof ExternalToolError) {
+        throw error;
+      }
+
+      // Wrap other errors in ExternalToolError with context
       throw new ExternalToolError((error as Error).message, step.server, step.toolName, {
         originalError: error,
       });
@@ -434,10 +466,17 @@ export class WorkflowExecutor {
   }
 
   /**
+   * Get step configuration (all step types have a config property)
+   */
+  private getStepConfig(step: Step): StepConfig | undefined {
+    return step.config;
+  }
+
+  /**
    * Get retry configuration for a step
    */
   private getRetryConfig(step: Step): Required<RetryConfig> {
-    const config = step.type === "parallel" || step.type === "branch" ? step.config : step.config;
+    const config = this.getStepConfig(step);
 
     return {
       maxAttempts: config?.retry?.maxAttempts ?? 1,
@@ -451,16 +490,14 @@ export class WorkflowExecutor {
    * Get error handling strategy for a step
    */
   private getErrorHandling(step: Step): ErrorHandling {
-    const config = step.type === "parallel" || step.type === "branch" ? step.config : step.config;
-    return config?.onError ?? "fail";
+    return this.getStepConfig(step)?.onError ?? "fail";
   }
 
   /**
    * Get timeout for a step
    */
   private getTimeout(step: Step): number | undefined {
-    const config = step.type === "parallel" || step.type === "branch" ? step.config : step.config;
-    return config?.timeout;
+    return this.getStepConfig(step)?.timeout;
   }
 
   /**
