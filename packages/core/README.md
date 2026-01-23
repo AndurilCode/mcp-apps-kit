@@ -14,6 +14,8 @@ MCP AppsKit Core is the server runtime for defining tools, validating inputs and
 - [Install](#install)
 - [Usage](#usage)
 - [Type-Safe Tool Definitions](#type-safe-tool-definitions)
+- [API Versioning](#api-versioning)
+- [Workflow Engine](#workflow-engine)
 - [Plugins, Middleware & Events](#plugins-middleware--events)
 - [Debug Logging](#debug-logging)
 - [OAuth 2.1 Authentication](#oauth-21-authentication)
@@ -31,6 +33,7 @@ Interactive MCP apps often need to support multiple hosts with slightly differen
 
 - Single `createApp()` entry point for tools and UI definitions
 - **API Versioning**: Expose multiple API versions from a single app (e.g., `/v1/mcp`, `/v2/mcp`)
+- **Workflow Engine**: Compose multi-step workflows with parallel execution, branching, and retry policies
 - Zod-powered validation with strong TypeScript inference
 - Unified metadata for MCP Apps and ChatGPT Apps
 - OAuth 2.1 bearer token validation with JWKS discovery
@@ -468,6 +471,227 @@ app.getVersions(); // []
 
 // getVersion() returns undefined for single-version apps
 app.getVersion("v1"); // undefined
+```
+
+## Workflow Engine
+
+The workflow engine enables composing multi-step workflows as MCP tools. Workflows support tool calls, custom logic, parallel execution, conditional branching, and configurable error handling.
+
+### Basic Workflow
+
+```ts
+import { workflow, toolStep, customStep } from "@mcp-apps-kit/core";
+import { z } from "zod";
+
+const orderWorkflow = workflow("process_order")
+  .describe("Process a customer order end-to-end")
+  .input({
+    orderId: z.string(),
+    customerId: z.string(),
+  })
+  .output({
+    success: z.boolean(),
+    receiptId: z.string().optional(),
+  })
+  .step("validate", toolStep("validate_order"))
+  .step("payment", toolStep("process_payment"))
+  .step(
+    "fulfill",
+    customStep(async (ctx) => {
+      // Access previous step outputs
+      const paymentResult = ctx.outputs.payment;
+      return { success: true, receiptId: paymentResult.receiptId };
+    })
+  )
+  .build();
+
+// Register as a tool
+const app = createApp({
+  name: "order-service",
+  tools: { process_order: orderWorkflow },
+});
+```
+
+### Step Types
+
+#### Tool Steps
+
+Call other registered tools in the same app:
+
+```ts
+.step("validate", toolStep("validate_order"))
+
+// With input mapping
+.step("payment", toolStep("process_payment", {
+  mapInput: (ctx) => ({
+    amount: ctx.outputs.validate.total,
+    customerId: ctx.input.customerId,
+  }),
+}))
+```
+
+#### Custom Steps
+
+Execute arbitrary async logic:
+
+```ts
+.step("enrich", customStep(async (ctx) => {
+  const userData = await fetchUserData(ctx.input.userId);
+  return { ...ctx.input, userData };
+}))
+```
+
+#### External Steps
+
+Call tools on external MCP servers:
+
+```ts
+import { externalStep } from "@mcp-apps-kit/core";
+
+.step("weather", externalStep({
+  server: "mcp://weather-service",
+  tool: "get_forecast",
+  mapInput: (ctx) => ({
+    location: ctx.input.destination,
+    date: ctx.input.date,
+  }),
+}))
+```
+
+### Parallel Execution
+
+Run multiple steps concurrently:
+
+```ts
+.parallel("notifications", [
+  toolStep("send_email"),
+  toolStep("send_sms"),
+  toolStep("log_event"),
+])
+```
+
+### Conditional Branching
+
+Execute different paths based on runtime conditions:
+
+```ts
+.branch("shipping_method", {
+  when: (ctx) => ctx.outputs.validate.isDigital,
+  then: [customStep(async () => ({ delivered: true }))],
+  else: [toolStep("create_shipment"), toolStep("notify_warehouse")],
+})
+```
+
+### Step Configuration
+
+Configure retry, timeout, and error handling per step:
+
+```ts
+.step("payment", toolStep("process_payment"), {
+  // Retry configuration
+  retry: {
+    maxAttempts: 3,
+    delay: 1000,           // Initial delay in ms
+    backoff: "exponential", // "linear" | "exponential"
+    maxDelay: 10000,       // Cap for exponential backoff
+  },
+
+  // Timeout
+  timeout: 30000, // 30 seconds
+
+  // Error handling
+  onError: "skip", // "fail" | "skip" | custom handler
+})
+
+// Custom error handler
+.step("optional", toolStep("optional_step"), {
+  onError: async (error, ctx) => {
+    console.log(`Step failed: ${error.message}`);
+    return { fallbackResult: true }; // Return fallback value
+  },
+})
+```
+
+### Attaching UI to Workflows
+
+Workflows can have UI widgets just like regular tools:
+
+```ts
+const workflowUI = defineUI({
+  name: "Order Status",
+  html: "./dist/order-widget.html",
+});
+
+const orderWorkflow = workflow("process_order")
+  .describe("Process order")
+  .input({ orderId: z.string() })
+  .ui(workflowUI)
+  .step("validate", toolStep("validate_order"))
+  .build();
+```
+
+### Production Lifecycle Management
+
+Workflows automatically detect your environment and use the appropriate executor manager:
+
+**Traditional Servers** (Node.js, Express):
+
+- Global singleton with persistent pooling
+- Background cleanup of idle executors (10 min TTL)
+- LRU eviction when pool reaches 100 executors
+- Graceful shutdown via `server.stop()`
+
+**Edge/Serverless** (Supabase, Vercel, Cloudflare, AWS Lambda):
+
+- Fresh manager per invocation (no singleton)
+- Smaller pool size (10 executors, memory-constrained)
+- No background timers
+- Auto-cleanup on function exit
+
+```ts
+// Traditional server - automatic cleanup on stop
+const server = createApp({ tools: { myWorkflow } });
+await server.start();
+await server.stop(); // Cleans up all workflow resources
+
+// Advanced configuration
+import { ExecutorManager } from "@mcp-apps-kit/core";
+
+const manager = ExecutorManager.getInstance({
+  maxExecutors: 200, // Pool size for high-traffic apps
+  executorTTL: 5 * 60 * 1000, // 5 minute idle timeout
+  autoCleanup: true, // Enable automatic cleanup
+  cleanupInterval: 60 * 1000, // Cleanup every minute
+});
+
+// Get statistics
+const stats = manager.getStats();
+console.log(`Active: ${stats.activeExecutors}, Total: ${stats.totalExecutors}`);
+```
+
+### Workflow Errors
+
+The workflow engine provides specific error types for debugging:
+
+```ts
+import {
+  WorkflowError, // Base class for all workflow errors
+  WorkflowExecutionError, // Step execution failures
+  StepTimeoutError, // Step timeout exceeded
+  ExternalToolError, // External MCP call failures
+  WorkflowValidationError, // Input/output validation failures
+  WorkflowDefinitionError, // Invalid workflow configuration
+} from "@mcp-apps-kit/core";
+
+try {
+  await orderWorkflow.handler(input, context);
+} catch (error) {
+  if (error instanceof StepTimeoutError) {
+    console.log(`Step timed out: ${error.stepName}`);
+  } else if (error instanceof ExternalToolError) {
+    console.log(`External call failed: ${error.serverUri}`);
+  }
+}
 ```
 
 ## Plugins, Middleware & Events
@@ -997,6 +1221,8 @@ const app = createApp({
 Key exports include:
 
 - `createApp`, `tool`, `defineTool`, `defineUI`
+- `workflow`, `toolStep`, `customStep`, `externalStep`
+- `ExecutorManager`, `ExternalToolClient`
 - `createPlugin`, `loggingPlugin`
 - `debugLogger`, `ClientToolsFromCore`
 - `Middleware`, `TypedEventEmitter`

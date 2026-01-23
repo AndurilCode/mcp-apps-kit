@@ -56,6 +56,7 @@ cd my-app && npm run dev
 - 🧪 **Testing utilities** — Property-based testing, UI mocks, and LLM evaluation
 - 📦 **Flexible deployment** — Express server, serverless, or stdio
 - 🔀 **API versioning** — Expose multiple versions from a single app
+- 🔄 **Workflow engine** — Compose multi-step workflows with parallel execution, branching, and retry policies
 
 ## Table of Contents
 
@@ -193,6 +194,74 @@ export function GreetingWidget() {
 ```
 
 For complete examples including API versioning, React component UIs, and advanced patterns, see the [Examples](#examples) section.
+
+### Workflow Engine
+
+Compose multi-step workflows as MCP tools with parallel execution, conditional branching, and retry policies:
+
+```typescript
+import { createApp, workflow, toolStep, customStep } from "@mcp-apps-kit/core";
+import { z } from "zod";
+
+const orderWorkflow = workflow("process_order")
+  .describe("Process a customer order end-to-end")
+  .input({
+    orderId: z.string(),
+    customerId: z.string(),
+  })
+  .output({
+    success: z.boolean(),
+    receiptId: z.string().optional(),
+  })
+  // Sequential steps
+  .step("validate", toolStep("validate_order"))
+  .step("payment", toolStep("process_payment"), {
+    retry: { maxAttempts: 3, delay: 1000, backoff: "exponential" },
+  })
+  // Parallel execution
+  .parallel("notify", [toolStep("send_email"), toolStep("send_sms")])
+  // Conditional branching
+  .branch("shipping", {
+    when: (ctx) => ctx.outputs.validate.isDigital,
+    then: [customStep(async () => ({ delivered: true }))],
+    else: [toolStep("create_shipment")],
+  })
+  .build();
+
+const app = createApp({
+  name: "order-service",
+  version: "1.0.0",
+  tools: {
+    validate_order: defineTool({
+      /* ... */
+    }),
+    process_payment: defineTool({
+      /* ... */
+    }),
+    send_email: defineTool({
+      /* ... */
+    }),
+    send_sms: defineTool({
+      /* ... */
+    }),
+    create_shipment: defineTool({
+      /* ... */
+    }),
+    // Register the workflow as a tool
+    process_order: orderWorkflow,
+  },
+});
+```
+
+Features include:
+
+- **Sequential steps** with `step()` for ordered execution
+- **Parallel execution** with `parallel()` for concurrent operations
+- **Conditional branching** with `branch()` for dynamic flow control
+- **Retry policies** with exponential/linear backoff
+- **Timeout handling** per step
+- **External MCP calls** to other MCP servers with `externalStep()`
+- **Production-ready** lifecycle management for servers and edge functions
 
 ## Deployment
 
