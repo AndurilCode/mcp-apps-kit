@@ -120,24 +120,25 @@ export class MCPHostEmulator {
                   jsonrpc: '2.0',
                   id: message.id,
                   result: {
+                    protocolVersion: '2025-11-21',
+                    hostInfo: {
+                      name: 'MCP Inspector Emulator',
+                      version: '1.0.0',
+                    },
                     hostCapabilities: {
                       logging: {},
                       serverTools: {},
-                    },
-                    hostVersion: {
-                      name: 'MCP Inspector Emulator',
-                      version: '1.0.0',
                     },
                     hostContext: {
                       theme: 'light',
                       displayMode: 'inline',
                       availableDisplayModes: ['inline', 'fullscreen'],
-                      viewport: { width: 800, height: 600 },
                       locale: 'en-US',
                       timeZone: 'UTC',
                       toolInfo: {
                         tool: {
                           name: ${toolName},
+                          inputSchema: { type: 'object' },
                         },
                       },
                     },
@@ -155,16 +156,15 @@ export class MCPHostEmulator {
                 console.log('[MCP Host Emulator] Sent ui/initialize response');
 
                 // Then send the tool result after a longer delay to ensure widget is ready
+                // Method: 'ui/notifications/tool-result', params: CallToolResult (not wrapped)
                 setTimeout(function() {
-                  console.log('[MCP Host Emulator] Sending tool/result...');
+                  console.log('[MCP Host Emulator] Sending ui/notifications/tool-result...');
                   var resultMessage = {
                     jsonrpc: '2.0',
-                    method: 'tool/result',
+                    method: 'ui/notifications/tool-result',
                     params: {
-                      result: {
-                        structuredContent: ${toolResult},
-                        content: [{ type: 'text', text: JSON.stringify(${toolResult}) }],
-                      },
+                      structuredContent: ${toolResult},
+                      content: [{ type: 'text', text: JSON.stringify(${toolResult}) }],
                     },
                   };
                   window.dispatchEvent(new MessageEvent('message', {
@@ -227,13 +227,14 @@ export class MCPHostEmulator {
       case "ui/initialize":
         // Respond with initialization success
         this.sendResponse(window, msg.id, {
+          protocolVersion: "2025-11-21",
+          hostInfo: {
+            name: "MCP Inspector Emulator",
+            version: "1.0.0",
+          },
           hostCapabilities: {
             logging: {},
             serverTools: {},
-          },
-          hostVersion: {
-            name: "MCP Inspector Emulator",
-            version: "1.0.0",
           },
           hostContext: this.buildHostContext(),
         });
@@ -296,12 +297,12 @@ export class MCPHostEmulator {
       theme: "light",
       displayMode: "inline",
       availableDisplayModes: ["inline", "fullscreen"],
-      viewport: { width: 800, height: 600 },
       locale: "en-US",
       timeZone: "UTC",
       toolInfo: {
         tool: {
           name: this.options.toolName,
+          inputSchema: { type: "object" },
         },
       },
     };
@@ -318,13 +319,12 @@ export class MCPHostEmulator {
 
   /**
    * Emit tool result to the widget
+   * Method: 'ui/notifications/tool-result', params: CallToolResult (not wrapped in 'result')
    */
   private emitToolResult(window: Window, result: unknown): void {
-    this.sendNotification(window, "tool/result", {
-      result: {
-        structuredContent: result,
-        content: [{ type: "text", text: JSON.stringify(result) }],
-      },
+    this.sendNotification(window, "ui/notifications/tool-result", {
+      structuredContent: result,
+      content: [{ type: "text", text: JSON.stringify(result) }],
     });
   }
 

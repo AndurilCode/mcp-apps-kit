@@ -223,10 +223,45 @@ export function createTestWidgetInteractionTool(connectionManager: ConnectionMan
           viewport
         );
 
-        const { page, mcpEmulator, openaiEmulator } = renderResult;
+        const { page } = renderResult;
         errors.push(...renderResult.errors);
 
-        // Perform each interaction
+        // Capture tool calls from console messages (host page logs them)
+        const toolCalls: Array<{ name: string; args: unknown }> = [];
+        const stateChanges: Array<{ state: unknown; timestamp: number }> = [];
+
+        page.on("console", (msg) => {
+          const text = msg.text();
+          if (text.startsWith("[WIDGET_TOOL_CALL] ")) {
+            try {
+              const data = JSON.parse(text.replace("[WIDGET_TOOL_CALL] ", "")) as {
+                name: string;
+                args: unknown;
+              };
+              toolCalls.push(data);
+            } catch {
+              // Ignore parse errors
+            }
+          }
+        });
+
+        // Get the widget iframe for interactions
+        const frame = page.frame({ url: /\/widget\// });
+        if (!frame) {
+          errors.push("Widget iframe not found");
+          await page.close();
+          await uiHostManager.dispose();
+          return {
+            hasUI: true,
+            protocol,
+            snapshots,
+            toolCalls,
+            stateChanges,
+            errors,
+          };
+        }
+
+        // Perform each interaction on the iframe
         for (let i = 0; i < input.interactions.length; i++) {
           const actionItem = input.interactions[i];
           if (!actionItem) continue;
@@ -241,21 +276,23 @@ export function createTestWidgetInteractionTool(connectionManager: ConnectionMan
             switch (actionType) {
               case "click":
                 if (selector) {
-                  await page.click(selector);
+                  await frame.click(selector);
                 } else if (position) {
+                  // For position-based clicks, use page mouse (frame doesn't have mouse)
+                  // Note: position is relative to viewport, may need adjustment for iframe offset
                   await page.mouse.click(position.x, position.y);
                 }
                 break;
 
               case "type":
                 if (selector && text) {
-                  await page.fill(selector, text);
+                  await frame.fill(selector, text);
                 }
                 break;
 
               case "hover":
                 if (selector) {
-                  await page.hover(selector);
+                  await frame.hover(selector);
                 }
                 break;
 
@@ -267,8 +304,8 @@ export function createTestWidgetInteractionTool(connectionManager: ConnectionMan
                 if (position) {
                   const scrollX = position.x;
                   const scrollY = position.y;
-                  // Function runs in browser context via Playwright page.evaluate
-                  await page.evaluate(
+                  // Function runs in browser context via Playwright frame.evaluate
+                  await frame.evaluate(
                     ({ x, y }: { x: number; y: number }) => {
                       // eslint-disable-next-line no-undef
                       window.scrollTo(x, y);
@@ -279,11 +316,17 @@ export function createTestWidgetInteractionTool(connectionManager: ConnectionMan
                 break;
 
               case "snapshot": {
-                const snapshot = await uiHostManager.getDOMSnapshot(page);
+                // Get snapshot from the iframe content
+                const html = await frame.content();
+                const textContent = await frame.evaluate(
+                  () =>
+                    // eslint-disable-next-line no-undef
+                    document.body?.textContent?.trim() ?? ""
+                );
                 snapshots.push({
                   afterAction: i,
-                  dom: snapshot.html,
-                  textContent: snapshot.textContent,
+                  dom: html,
+                  textContent,
                 });
                 break;
               }
@@ -296,28 +339,6 @@ export function createTestWidgetInteractionTool(connectionManager: ConnectionMan
 
         // Close the page
         await page.close();
-
-        // Get tool calls and state changes from emulators
-        const toolCalls: Array<{ name: string; args: unknown }> = [];
-        const stateChanges: Array<{ state: unknown; timestamp: number }> = [];
-
-        if (mcpEmulator) {
-          const history = mcpEmulator.getToolCallHistory();
-          for (const call of history) {
-            toolCalls.push({ name: call.name, args: call.args });
-          }
-        }
-
-        if (openaiEmulator) {
-          const oaiToolCalls = openaiEmulator.getToolCalls();
-          for (const call of oaiToolCalls) {
-            toolCalls.push({ name: call.name, args: call.args });
-          }
-          const changes = openaiEmulator.getStateChanges();
-          for (const change of changes) {
-            stateChanges.push({ state: change.state, timestamp: change.timestamp });
-          }
-        }
 
         // Dispose of the browser pool
         await uiHostManager.dispose();
