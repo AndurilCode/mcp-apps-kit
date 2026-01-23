@@ -2,7 +2,7 @@
  * ExecutorManager tests - Production lifecycle management
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ExecutorManager } from "../src/workflow/executor-manager";
 import { WorkflowExecutor } from "../src/workflow/executor";
 import type { WorkflowDefinition } from "../src/workflow/types";

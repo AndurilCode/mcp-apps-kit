@@ -393,12 +393,18 @@ export function createServerInstance<T extends ToolDefs>(
     },
 
     stop: async () => {
-      // Shutdown workflow executors first
-      const { ExecutorManager } = await import("../workflow/executor-manager.js");
-      await ExecutorManager.getInstance().shutdown();
+      // Shutdown workflow executors first, but always close HTTP server
+      let executorError: Error | undefined;
+      try {
+        const { ExecutorManager } = await import("../workflow/executor-manager.js");
+        await ExecutorManager.getInstance().shutdown();
+      } catch (error) {
+        // Capture error but continue to close HTTP server
+        executorError = error instanceof Error ? error : new Error(String(error));
+      }
 
-      // Then stop the HTTP server
-      return new Promise<void>((resolve) => {
+      // Always stop the HTTP server, even if executor shutdown failed
+      await new Promise<void>((resolve) => {
         if (httpServer) {
           httpServer.close(() => {
             httpServer = undefined;
@@ -409,6 +415,11 @@ export function createServerInstance<T extends ToolDefs>(
           resolve();
         }
       });
+
+      // Re-throw executor error after server is closed
+      if (executorError) {
+        throw executorError;
+      }
     },
 
     handler: (): ExpressMiddleware => {

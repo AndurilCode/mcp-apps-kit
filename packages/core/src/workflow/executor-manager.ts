@@ -144,7 +144,14 @@ export class ExecutorManager {
 
     // Evict old executors if cache is full
     if (this.executors.size >= this.config.maxExecutors) {
-      this.evictLRU();
+      const evicted = this.evictIdleLRU();
+      if (!evicted) {
+        // All executors are active - fail fast rather than break running workflows
+        throw new Error(
+          `ExecutorManager capacity exceeded: all ${this.config.maxExecutors} executors are active. ` +
+            `Increase maxExecutors or wait for active workflows to complete.`
+        );
+      }
     }
 
     // Create new executor
@@ -303,13 +310,19 @@ export class ExecutorManager {
   }
 
   /**
-   * Evict the least recently used executor
+   * Evict the least recently used idle executor
+   *
+   * Only evicts idle executors (activeInvocations === 0) to avoid
+   * breaking running workflows. Returns false if no idle executor
+   * is available for eviction.
+   *
+   * @returns true if an executor was evicted, false if all are active
    */
-  private evictLRU(): void {
+  private evictIdleLRU(): boolean {
     let oldestKey: string | undefined;
     let oldestTime = Infinity;
 
-    // Find the oldest idle executor
+    // Find the oldest idle executor only
     for (const [key, managed] of this.executors.entries()) {
       if (managed.activeInvocations === 0 && managed.lastUsed < oldestTime) {
         oldestTime = managed.lastUsed;
@@ -317,23 +330,18 @@ export class ExecutorManager {
       }
     }
 
-    // If no idle executor found, evict the oldest regardless
+    // If no idle executor found, don't evict active ones
     if (!oldestKey) {
-      for (const [key, managed] of this.executors.entries()) {
-        if (managed.lastUsed < oldestTime) {
-          oldestTime = managed.lastUsed;
-          oldestKey = key;
-        }
-      }
+      debugLogger.debug("No idle executors available for eviction");
+      return false;
     }
 
-    if (oldestKey) {
-      debugLogger.debug(`Evicting LRU executor: ${oldestKey}`);
-      // Fire and forget - don't block on cleanup
-      this.closeExecutor(oldestKey).catch(() => {
-        // Ignore errors during eviction
-      });
-    }
+    debugLogger.debug(`Evicting LRU idle executor: ${oldestKey}`);
+    // Fire and forget - don't block on cleanup
+    this.closeExecutor(oldestKey).catch(() => {
+      // Ignore errors during eviction
+    });
+    return true;
   }
 
   /**
