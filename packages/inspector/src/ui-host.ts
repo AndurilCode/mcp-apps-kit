@@ -71,8 +71,6 @@ export interface HeadlessRenderResult {
 export interface BrowserRenderResult {
   page: Page;
   errors: string[];
-  mcpEmulator?: MCPHostEmulator;
-  openaiEmulator?: OpenAIHostEmulator;
 }
 
 /**
@@ -437,31 +435,9 @@ export class UIHostManager {
       server.deleteSession(sessionId);
     }, 60000);
 
-    // Create emulators for tracking (the actual emulation is done by the host page)
-    let mcpEmulator: MCPHostEmulator | undefined;
-    let openaiEmulator: OpenAIHostEmulator | undefined;
-
-    if (protocol === "mcp") {
-      const options: MCPHostEmulatorOptions = {
-        toolName,
-        toolResult,
-        debug: this.options.debug,
-      };
-      mcpEmulator = new MCPHostEmulator(options);
-    } else {
-      const options: OpenAIHostEmulatorOptions = {
-        toolName,
-        toolResult,
-        debug: this.options.debug,
-      };
-      openaiEmulator = new OpenAIHostEmulator(options);
-    }
-
     return {
       page,
       errors,
-      mcpEmulator,
-      openaiEmulator,
     };
   }
 
