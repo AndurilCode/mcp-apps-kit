@@ -38,7 +38,7 @@ async function directoryExists(dirPath: string): Promise<boolean> {
 async function discoverFilesInDirectory(
   dirPath: string,
   basePath: string,
-  resourceType: "tool" | "workflow" | "ui"
+  resourceType: "tool" | "workflow" | "ui" | "ui-widget"
 ): Promise<DiscoveredFile[]> {
   const files: DiscoveredFile[] = [];
 
@@ -193,6 +193,8 @@ function generateManifestCode(
   tools: DiscoveredFile[],
   workflows: DiscoveredFile[],
   uis: DiscoveredFile[],
+  uiWidgets: DiscoveredFile[],
+  toolUiBindings: Map<string, string>,
   outDir: string,
   projectRoot: string
 ): string {
@@ -236,7 +238,37 @@ function generateManifestCode(
     lines.push(`import ${ui.identifier} from "${importPath}";`);
   }
 
-  lines.push("");
+  // Generate imports for UI widgets (convention-based binding)
+  if (uiWidgets.length > 0) {
+    lines.push("");
+    lines.push("// UI widget imports (from uiWidgets directory)");
+    for (const widget of uiWidgets) {
+      // For widget files, check if they're TSX/JSX (React) files
+      // TSX files need to keep their extension for jiti/tsx runtime loading
+      const isTsxFile = widget.filePath.endsWith(".tsx") || widget.filePath.endsWith(".jsx");
+      const importPath = getRelativeImportPath(outDir, widget.filePath, projectRoot, !isTsxFile);
+      const uiIdentifier = `${widget.identifier}_ui`;
+      // Use named 'ui' export if available (allows colocating React component as default)
+      // Otherwise fall back to default export
+      if (widget.hasUiExport) {
+        lines.push(`import { ui as ${uiIdentifier} } from "${importPath}";`);
+      } else {
+        lines.push(`import ${uiIdentifier} from "${importPath}";`);
+      }
+    }
+  }
+
+  // Apply convention-based UI bindings (only if tool doesn't have explicit ui: field)
+  if (toolUiBindings.size > 0) {
+    lines.push("// Apply convention-based UI bindings");
+    lines.push("// (only if tool doesn't have explicit ui: field)");
+    for (const [toolId, widgetId] of toolUiBindings) {
+      lines.push(`if (!${toolId}.ui) {`);
+      lines.push(`  ${toolId}.ui = ${widgetId}_ui;`);
+      lines.push(`}`);
+    }
+    lines.push("");
+  }
 
   // Generate tools export (includes both tools and workflows since workflows become tools)
   const allTools = [...tools, ...workflows];
@@ -282,10 +314,25 @@ function generateManifestCode(
   lines.push("} as const;");
   lines.push("");
 
+  // Generate UI widgets export (convention-based bindings)
+  if (uiWidgets.length > 0) {
+    lines.push("// UI widgets for convention-based binding");
+  } else {
+    lines.push("// No UI widgets discovered in uiWidgets directory");
+  }
+  lines.push("export const uiWidgets = {");
+  for (const widget of uiWidgets) {
+    const uiIdentifier = `${widget.identifier}_ui`;
+    lines.push(`  ${uiIdentifier},`);
+  }
+  lines.push("} as const;");
+  lines.push("");
+
   // Generate type exports
   lines.push("export type AppTools = typeof tools;");
   lines.push("export type AppWorkflows = typeof workflows;");
   lines.push("export type AppUI = typeof ui;");
+  lines.push("export type AppUIWidgets = typeof uiWidgets;");
   lines.push("");
 
   return lines.join("\n");
@@ -318,6 +365,10 @@ export async function generateManifest(options: GenerateManifestOptions): Promis
   const workflowsDir = path.resolve(projectRoot, directories.workflows ?? "workflows");
   // Only scan for standalone UIs if explicitly configured (UIs attached via `ui:` in defineTool don't need this)
   const uiDir = directories.ui ? path.resolve(projectRoot, directories.ui) : null;
+  // UI widgets directory for convention-based binding (opt-in via directories.uiWidgets)
+  const uiWidgetsDir = directories.uiWidgets
+    ? path.resolve(projectRoot, directories.uiWidgets)
+    : null;
 
   const warnings: string[] = [];
   const errors: string[] = [];
@@ -336,10 +387,17 @@ export async function generateManifest(options: GenerateManifestOptions): Promis
       ? await discoverFilesInDirectory(uiDir, uiDir, "ui")
       : [];
 
+  // Discover UI widget files for convention-based binding
+  const uiWidgetFiles =
+    uiWidgetsDir && (await directoryExists(uiWidgetsDir))
+      ? await discoverFilesInDirectory(uiWidgetsDir, uiWidgetsDir, "ui-widget")
+      : [];
+
   // Check for name collisions within each category
   const toolCollisions = findNameCollisions(toolFiles);
   const workflowCollisions = findNameCollisions(workflowFiles);
   const uiCollisions = findNameCollisions(uiFiles);
+  const uiWidgetCollisions = findNameCollisions(uiWidgetFiles);
 
   // Report collisions as errors
   for (const [identifier, paths] of toolCollisions) {
@@ -352,6 +410,11 @@ export async function generateManifest(options: GenerateManifestOptions): Promis
   }
   for (const [identifier, paths] of uiCollisions) {
     errors.push(`UI name collision: '${identifier}' is defined in both ${paths.join(" and ")}`);
+  }
+  for (const [identifier, paths] of uiWidgetCollisions) {
+    errors.push(
+      `UI widget name collision: '${identifier}' is defined in both ${paths.join(" and ")}`
+    );
   }
 
   if (errors.length > 0) {
@@ -401,16 +464,59 @@ export async function generateManifest(options: GenerateManifestOptions): Promis
     validUis.push(file);
   }
 
-  // Generate the manifest code
-  const code = generateManifestCode(validTools, validWorkflows, validUis, outDir, projectRoot);
+  // Analyze UI widget files
+  // Widget files can export UI definition as default OR as named 'ui' export
+  // (named export allows colocating React component as default for vite plugin)
+  const validUiWidgets: DiscoveredFile[] = [];
+  for (const file of uiWidgetFiles) {
+    const { hasDefaultExport, hasUiExport } = await analyzeFile(file.filePath);
+    if (!hasDefaultExport && !hasUiExport) {
+      warnings.push(`Skipping ${file.relativePath}: no default or ui export found`);
+      logger.warn(`Skipping uiWidgets/${file.relativePath}: no default or ui export found`);
+      continue;
+    }
+    file.hasDefaultExport = hasDefaultExport;
+    file.hasUiExport = hasUiExport;
+    validUiWidgets.push(file);
+  }
 
+  // Build identifier → UI widget map for convention-based binding
+  const uiWidgetMap = new Map<string, DiscoveredFile>();
+  for (const widget of validUiWidgets) {
+    uiWidgetMap.set(widget.identifier, widget);
+  }
+
+  // Match tools and workflows to UI widgets by identifier (convention-based binding)
+  // Workflows become tools at runtime, so they also support UI widget binding
+  const toolUiBindings = new Map<string, string>();
+  for (const tool of [...validTools, ...validWorkflows]) {
+    const matchingWidget = uiWidgetMap.get(tool.identifier);
+    if (matchingWidget) {
+      toolUiBindings.set(tool.identifier, matchingWidget.identifier);
+      logger.info(`Matched UI widget: ${tool.identifier} → ${matchingWidget.relativePath}`);
+    }
+  }
+
+  // Generate the manifest code
+  const code = generateManifestCode(
+    validTools,
+    validWorkflows,
+    validUis,
+    validUiWidgets,
+    toolUiBindings,
+    outDir,
+    projectRoot
+  );
+
+  const uiWidgetBindingsCount = toolUiBindings.size;
   logger.info(
-    `Generated manifest with ${validTools.length} tools, ${validWorkflows.length} workflows, ${validUis.length} UIs`
+    `Generated manifest with ${validTools.length} tools, ${validWorkflows.length} workflows, ${validUis.length} UIs` +
+      (uiWidgetBindingsCount > 0 ? `, ${uiWidgetBindingsCount} UI widget bindings` : "")
   );
 
   return {
     code,
-    files: [...validTools, ...validWorkflows, ...validUis],
+    files: [...validTools, ...validWorkflows, ...validUis, ...validUiWidgets],
     warnings,
     errors,
   };
@@ -572,9 +678,12 @@ export async function runCodegen(options: RunCodegenOptions = {}): Promise<void>
   const toolCount = result.files.filter((f) => f.type === "tool").length;
   const workflowCount = result.files.filter((f) => f.type === "workflow").length;
   const uiCount = result.files.filter((f) => f.type === "ui").length;
+  const uiWidgetCount = result.files.filter((f) => f.type === "ui-widget").length;
 
-  logger.info(
-    `Generated manifest with ${toolCount} tools, ${workflowCount} workflows, ${uiCount} UIs`
-  );
+  const summary = [`${toolCount} tools`, `${workflowCount} workflows`, `${uiCount} UIs`];
+  if (uiWidgetCount > 0) {
+    summary.push(`${uiWidgetCount} UI widgets`);
+  }
+  logger.info(`Generated manifest with ${summary.join(", ")}`);
   logger.info(`Written to: ${outDir}/`);
 }

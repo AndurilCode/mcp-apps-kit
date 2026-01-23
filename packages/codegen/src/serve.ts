@@ -77,6 +77,7 @@ async function serve(options: ServeOptions = {}): Promise<void> {
   const jiti = createJiti(projectRoot, {
     interopDefault: true,
     moduleCache: false, // Disable cache for hot reload
+    jsx: true, // Enable JSX support for widget TSX files
   });
 
   // Import the generated manifest
@@ -165,6 +166,7 @@ Endpoints:
             interopDefault: true,
             moduleCache: false,
             fsCache: false,
+            jsx: true, // Enable JSX support for widget TSX files
           });
           const cacheBustPath = `${manifestPath}?t=${Date.now()}`;
           const newManifestModule = await freshJiti.import(cacheBustPath);

@@ -4,18 +4,10 @@
  * Returns active weather alerts and warnings for a specified location.
  */
 
-import { defineTool, defineUI } from "@mcp-apps-kit/core";
+import { defineTool } from "@mcp-apps-kit/core";
 import { z } from "zod";
 import { weatherService, alertsOutputSchema } from "./_shared.js";
 import type { WeatherAlertsResponse } from "../services/weatherService.js";
-
-// Colocated UI for this tool
-const alertsUI = defineUI({
-  name: "Weather Alerts Widget",
-  description: "Displays active weather alerts and warnings with severity levels",
-  html: "./ui/dist/index.html",
-  prefersBorder: true,
-});
 
 export default defineTool({
   title: "Get Weather Alerts",
@@ -32,5 +24,4 @@ export default defineTool({
   handler: async ({ location }): Promise<WeatherAlertsResponse> => {
     return await weatherService.getAlerts(location);
   },
-  ui: alertsUI,
 });

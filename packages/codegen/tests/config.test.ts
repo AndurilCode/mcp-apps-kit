@@ -121,6 +121,30 @@ describe("config", () => {
       );
     });
 
+    it("should validate uiWidgets directory configuration", () => {
+      const config = {
+        name: "my-app",
+        version: "1.0.0",
+        directories: {
+          uiWidgets: "ui/widgets",
+        },
+      };
+
+      expect(() => validateConfig(config)).not.toThrow();
+    });
+
+    it("should throw for invalid uiWidgets directory value", () => {
+      const config = {
+        name: "my-app",
+        version: "1.0.0",
+        directories: { uiWidgets: 123 },
+      };
+
+      expect(() => validateConfig(config)).toThrow(
+        "Configuration 'directories.uiWidgets' must be a string"
+      );
+    });
+
     it("should validate global config", () => {
       const config = {
         name: "my-app",

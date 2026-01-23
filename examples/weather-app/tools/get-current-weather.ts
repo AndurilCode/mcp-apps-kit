@@ -4,18 +4,10 @@
  * Returns current weather conditions for a specified location.
  */
 
-import { defineTool, defineUI } from "@mcp-apps-kit/core";
+import { defineTool } from "@mcp-apps-kit/core";
 import { z } from "zod";
 import { weatherService, currentWeatherOutputSchema } from "./_shared.js";
 import type { CurrentWeather } from "../services/weatherService.js";
-
-// Colocated UI for this tool
-const currentWeatherUI = defineUI({
-  name: "Current Weather Widget",
-  description: "Displays current weather conditions with temperature, humidity, and wind",
-  html: "./ui/dist/index.html",
-  prefersBorder: true,
-});
 
 export default defineTool({
   title: "Get Current Weather",
@@ -36,5 +28,4 @@ export default defineTool({
   handler: async ({ location }): Promise<CurrentWeather> => {
     return await weatherService.getCurrentWeather(location);
   },
-  ui: currentWeatherUI,
 });

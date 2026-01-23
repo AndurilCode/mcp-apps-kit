@@ -15,6 +15,8 @@ export interface DirectoriesConfig {
   workflows?: string;
   /** Directory containing UI files. Default: "ui" */
   ui?: string;
+  /** Directory containing UI widget files for convention-based binding. Default: undefined (disabled) */
+  uiWidgets?: string;
 }
 
 // Re-export types from core for convenience
@@ -122,7 +124,7 @@ export interface DiscoveredFile {
   /** Has a named 'ui' export (for colocated UI) */
   hasUiExport: boolean;
   /** Type of resource */
-  type: "tool" | "workflow" | "ui";
+  type: "tool" | "workflow" | "ui" | "ui-widget";
 }
 
 /**

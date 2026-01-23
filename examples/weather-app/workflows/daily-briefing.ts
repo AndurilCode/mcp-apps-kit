@@ -7,18 +7,9 @@
  * Demonstrates how workflows are registered as tools in file-based apps.
  */
 
-import { defineTool, defineUI } from "@mcp-apps-kit/core";
+import { defineTool } from "@mcp-apps-kit/core";
 import { z } from "zod";
 import { weatherService } from "../tools/_shared.js";
-
-// UI for displaying the daily briefing
-const dailyBriefingUI = defineUI({
-  name: "Daily Briefing Widget",
-  description:
-    "Displays comprehensive daily weather briefing with current conditions, forecast, and alerts",
-  html: "./ui/dist/index.html",
-  prefersBorder: true,
-});
 
 export default defineTool({
   title: "Daily Weather Briefing",
@@ -37,7 +28,6 @@ export default defineTool({
   annotations: {
     readOnlyHint: true,
   },
-  ui: dailyBriefingUI,
   handler: async ({ location }) => {
     // Fetch all weather data in parallel
     const [current, forecast, alerts] = await Promise.all([

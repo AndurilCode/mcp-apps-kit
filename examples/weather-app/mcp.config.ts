@@ -15,6 +15,7 @@ export default defineConfig({
   directories: {
     tools: "tools",
     workflows: "workflows",
+    uiWidgets: "ui/widgets",
   },
 
   // Server configuration

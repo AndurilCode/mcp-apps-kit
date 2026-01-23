@@ -220,6 +220,9 @@ importers:
       '@mcp-apps-kit/ui-react':
         specifier: workspace:*
         version: link:../../packages/ui-react
+      '@mcp-apps-kit/ui-react-builder':
+        specifier: workspace:*
+        version: link:../../packages/ui-react-builder
       react:
         specifier: ^19.2.3
         version: 19.2.3

@@ -4,18 +4,10 @@
  * Returns multi-day weather forecast for a specified location.
  */
 
-import { defineTool, defineUI } from "@mcp-apps-kit/core";
+import { defineTool } from "@mcp-apps-kit/core";
 import { z } from "zod";
 import { weatherService, forecastOutputSchema } from "./_shared.js";
 import type { WeatherForecast } from "../services/weatherService.js";
-
-// Colocated UI for this tool
-const forecastUI = defineUI({
-  name: "Weather Forecast Widget",
-  description: "Displays multi-day weather forecast with daily temperatures and conditions",
-  html: "./ui/dist/index.html",
-  prefersBorder: true,
-});
 
 export default defineTool({
   title: "Get Weather Forecast",
@@ -38,5 +30,4 @@ export default defineTool({
   handler: async ({ location, days }): Promise<WeatherForecast> => {
     return await weatherService.getForecast(location, days);
   },
-  ui: forecastUI,
 });

@@ -140,6 +140,9 @@ export function validateConfig(config: unknown): asserts config is FileBasedConf
     if (dirs.ui !== undefined && typeof dirs.ui !== "string") {
       throw new Error("Configuration 'directories.ui' must be a string");
     }
+    if (dirs.uiWidgets !== undefined && typeof dirs.uiWidgets !== "string") {
+      throw new Error("Configuration 'directories.uiWidgets' must be a string");
+    }
   }
 
   // Optional config
