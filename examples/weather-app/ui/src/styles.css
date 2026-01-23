@@ -282,6 +282,37 @@ body {
   color: var(--text-muted);
 }
 
+/* Daily Briefing */
+.daily-briefing .briefing-content {
+  font-family: inherit;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  padding: 16px;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-x: auto;
+}
+
+.briefing-alert-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  margin-top: 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 8px;
+  color: var(--danger-color);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.alert-icon {
+  font-size: 1.25rem;
+}
+
 /* Timestamp */
 .timestamp {
   font-size: 0.75rem;

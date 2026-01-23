@@ -1,6 +1,7 @@
 node_modules/
 dist/
 public/
+__generated__/
 *.log
 .env
 .env.local

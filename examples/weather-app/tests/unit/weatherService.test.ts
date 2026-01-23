@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { WeatherService, mockWeatherService } from "../../server/services/weatherService.js";
+import { WeatherService, mockWeatherService } from "../../services/weatherService.js";
 
 describe("WeatherService", () => {
   describe("Mock Mode", () => {

@@ -1,0 +1,77 @@
+{
+  "name": "@mcp-apps-kit/codegen",
+  "version": "0.5.0",
+  "description": "Code generation for file-based MCP application development",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "mcp-codegen": "./dist/cli.js",
+    "mcp-serve": "./dist/serve.js"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./cli": {
+      "import": "./dist/cli.js"
+    },
+    "./serve": {
+      "import": "./dist/serve.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "codegen",
+    "file-based",
+    "manifest"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AndurilCode/mcp-apps-kit.git",
+    "directory": "packages/codegen"
+  },
+  "peerDependencies": {
+    "@mcp-apps-kit/core": ">=0.5.0",
+    "vite": "^5.0.0 || ^6.0.0 || ^7.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@typescript-eslint/typescript-estree": "^8.53.0",
+    "@typescript-eslint/types": "^8.53.0"
+  },
+  "devDependencies": {
+    "@mcp-apps-kit/core": "workspace:*",
+    "vite": "^7.3.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "sideEffects": false
+}

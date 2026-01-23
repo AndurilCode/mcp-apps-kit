@@ -12,12 +12,12 @@ import {
   useDocumentTheme,
   useHostStyleVariables,
 } from "@mcp-apps-kit/ui-react";
-import { app } from "../../server/index.js";
+import { app } from "../../__generated__/server.js";
 import type {
   CurrentWeather,
   WeatherForecast,
   WeatherAlertsResponse,
-} from "../../server/services/weatherService.js";
+} from "../../services/weatherService.js";
 
 // Component for displaying current weather
 function CurrentWeatherDisplay({ data }: { data: CurrentWeather }) {
@@ -177,6 +177,46 @@ function isAlerts(data: unknown): data is WeatherAlertsResponse {
   );
 }
 
+// Type for daily briefing result
+interface DailyBriefingResult {
+  location: string;
+  briefing: string;
+  hasAlerts: boolean;
+  generatedAt: string;
+}
+
+function isDailyBriefing(data: unknown): data is DailyBriefingResult {
+  return (
+    !!data &&
+    typeof data === "object" &&
+    "briefing" in data &&
+    typeof (data as DailyBriefingResult).briefing === "string"
+  );
+}
+
+// Component for displaying daily briefing
+function DailyBriefingDisplay({ data }: { data: DailyBriefingResult }) {
+  return (
+    <div className="weather-card daily-briefing">
+      <div className="weather-header">
+        <h2>Daily Briefing</h2>
+        <span className="country">{data.location}</span>
+      </div>
+
+      <pre className="briefing-content">{data.briefing}</pre>
+
+      {data.hasAlerts && (
+        <div className="briefing-alert-indicator">
+          <span className="alert-icon">⚠️</span>
+          <span>Active weather alerts in this area</span>
+        </div>
+      )}
+
+      <p className="timestamp">Generated: {new Date(data.generatedAt).toLocaleString()}</p>
+    </div>
+  );
+}
+
 export function App() {
   const client = useAppsClient<typeof app.clientTypes>();
   const result = useToolResult<typeof app.clientTypes>();
@@ -189,7 +229,11 @@ export function App() {
   // Extract the actual data from the result
   // Handle both wrapped ({ toolName: data }) and unwrapped (data) formats
   const rawResult =
-    result?.getCurrentWeather ?? result?.getForecast ?? result?.getWeatherAlerts ?? result;
+    result?.get_current_weather ??
+    result?.get_forecast ??
+    result?.get_weather_alerts ??
+    result?.daily_briefing ??
+    result;
 
   // Determine what type of data we have
   let content: React.ReactNode;
@@ -208,6 +252,8 @@ export function App() {
     content = <ForecastDisplay data={rawResult} />;
   } else if (isAlerts(rawResult)) {
     content = <AlertsDisplay data={rawResult} />;
+  } else if (isDailyBriefing(rawResult)) {
+    content = <DailyBriefingDisplay data={rawResult} />;
   } else {
     content = (
       <div className="error">
@@ -238,6 +284,12 @@ export function App() {
           onClick={() => client.sendFollowUpMessage("Are there any weather alerts?")}
         >
           Alerts
+        </button>
+        <button
+          className="button"
+          onClick={() => client.sendFollowUpMessage("Give me a daily weather briefing")}
+        >
+          Daily Briefing
         </button>
       </div>
 

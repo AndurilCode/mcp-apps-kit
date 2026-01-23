@@ -50,6 +50,7 @@ export type {
 export type { CSPConfig, UIDef, UIDefs } from "./types/ui";
 
 // Config types
+import type { GlobalConfig, Icon } from "./types/config";
 export type {
   Protocol,
   CORSConfig,
@@ -77,6 +78,7 @@ export { OAuthConfigSchema } from "./server/oauth/types.js";
 export { OAuthError, ErrorCode as OAuthErrorCode } from "./server/oauth/errors.js";
 
 // Plugin types
+import type { Plugin } from "./plugins/types";
 export type {
   Plugin,
   PluginInitContext,
@@ -213,7 +215,84 @@ export type { IconFromFileOptions } from "./utils/icons";
 // MAIN ENTRY POINTS
 // =============================================================================
 
-export { createApp, defineTool, defineUI } from "./createApp";
+export { createApp, defineTool, defineUI, createFileBasedApp } from "./createApp";
+export type { FileBasedAppConfig } from "./createApp";
+
+// =============================================================================
+// FILE-BASED CONFIGURATION HELPER
+// =============================================================================
+
+/**
+ * Configuration for file-based MCP app
+ *
+ * Used with `defineFileBasedConfig()` in `mcp.config.ts`.
+ * This is the same type used by `@mcp-apps-kit/codegen`.
+ */
+export interface FileBasedConfigDefinition {
+  /** App name (required) */
+  name: string;
+
+  /** App version (required) */
+  version: string;
+
+  /** Override default directories */
+  directories?: {
+    /** Directory containing tool files. Default: "tools" */
+    tools?: string;
+    /** Directory containing workflow files. Default: "workflows" */
+    workflows?: string;
+    /** Directory containing UI files. Default: "ui" */
+    ui?: string;
+  };
+
+  /** Global config passed to createFileBasedApp */
+  config?: GlobalConfig;
+
+  /** Plugins array */
+  plugins?: Plugin[];
+
+  /** App icon (shorthand for single icon) */
+  icon?: string;
+
+  /** App icons for MCP client display */
+  icons?: Icon[];
+}
+
+/**
+ * Helper function to define a file-based app configuration with TypeScript autocomplete.
+ *
+ * This is a simple identity function that provides type safety and IDE autocomplete
+ * when creating configuration files for file-based MCP apps.
+ *
+ * @param config - The configuration object
+ * @returns The same configuration object (for type inference)
+ *
+ * @example
+ * ```typescript
+ * // mcp.config.ts
+ * import { defineFileBasedConfig } from "@mcp-apps-kit/core";
+ *
+ * export default defineFileBasedConfig({
+ *   name: "my-app",
+ *   version: "1.0.0",
+ *   directories: {
+ *     tools: "tools",
+ *     workflows: "workflows",
+ *     ui: "ui",
+ *   },
+ *   config: {
+ *     protocol: "mcp",
+ *     cors: { origin: true },
+ *     debug: { logTool: true, level: "debug" },
+ *   },
+ * });
+ * ```
+ */
+export function defineFileBasedConfig(
+  config: FileBasedConfigDefinition
+): FileBasedConfigDefinition {
+  return config;
+}
 export { tool } from "./builder";
 export type {
   ToolBuilderInitial,

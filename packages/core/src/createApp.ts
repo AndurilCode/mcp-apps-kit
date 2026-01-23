@@ -1292,3 +1292,129 @@ export { tool } from "./builder";
 
 // Re-export defineUI from types/ui for convenience
 export { defineUI } from "./types/ui";
+
+// =============================================================================
+// FILE-BASED APP CREATION
+// =============================================================================
+
+import type { WorkflowDefinition } from "./workflow";
+
+/**
+ * Configuration for file-based MCP app
+ *
+ * Used with `createFileBasedApp()` and the generated manifest from
+ * `@mcp-apps-kit/codegen`.
+ *
+ * @typeParam T - The tool definitions type for type inference
+ *
+ * @example
+ * ```typescript
+ * import { createFileBasedApp } from "@mcp-apps-kit/core";
+ * import config from "../mcp.config";
+ * import { tools, workflows, ui } from "../__generated__/app-manifest";
+ *
+ * const app = createFileBasedApp({
+ *   ...config,
+ *   tools,
+ *   workflows,
+ *   ui,
+ * });
+ *
+ * await app.start({ port: 3000 });
+ * ```
+ */
+export interface FileBasedAppConfig<T extends ToolDefs = ToolDefs> {
+  /** App name */
+  name: string;
+
+  /** App version */
+  version: string;
+
+  /** Tool definitions from generated manifest */
+  tools: T;
+
+  /** Workflow definitions from generated manifest */
+  workflows?: Record<string, WorkflowDefinition>;
+
+  /** UI definitions from generated manifest */
+  ui?: UIDefs;
+
+  /** Global config */
+  config?: GlobalConfig;
+
+  /** Plugins array */
+  plugins?: Plugin[];
+
+  /** App icon (shorthand for single icon) */
+  icon?: string;
+
+  /** App icons for MCP client display */
+  icons?: Icon[];
+}
+
+/**
+ * Create a file-based MCP app from a generated manifest
+ *
+ * This is a convenience wrapper around `createApp()` that accepts the
+ * output from `@mcp-apps-kit/codegen`'s generated manifest.
+ *
+ * The main difference from `createApp()` is that tools, workflows, and UIs
+ * are provided as separate arguments (matching the manifest structure)
+ * rather than being nested in the tools definition.
+ *
+ * @param config - File-based app configuration with manifest imports
+ * @returns App instance for starting server or getting middleware
+ *
+ * @example
+ * ```typescript
+ * // server/index.ts
+ * import { createFileBasedApp } from "@mcp-apps-kit/core";
+ * import config from "../mcp.config";
+ * import { tools, workflows, ui } from "../__generated__/app-manifest";
+ *
+ * const app = createFileBasedApp({
+ *   ...config,
+ *   tools,
+ *   workflows,
+ *   ui,
+ * });
+ *
+ * await app.start({ port: 3000 });
+ *
+ * // Export for client type inference
+ * export type { AppTools } from "../__generated__/app-manifest";
+ * ```
+ */
+export function createFileBasedApp<T extends ToolDefs>(config: FileBasedAppConfig<T>): App<T> {
+  const { tools, workflows, ui, ...appConfig } = config;
+
+  // Log warnings for features that are discovered but not yet auto-registered
+  const workflowCount = workflows ? Object.keys(workflows).length : 0;
+  const standaloneUiCount = ui ? Object.keys(ui).length : 0;
+
+  /* eslint-disable no-console */
+  if (workflowCount > 0) {
+    console.warn(
+      `[mcp-apps-kit] Found ${workflowCount} workflow(s) in manifest. ` +
+        `Workflow auto-registration is not yet implemented. ` +
+        `Use WorkflowExecutor to execute workflows manually.`
+    );
+  }
+
+  if (standaloneUiCount > 0) {
+    console.warn(
+      `[mcp-apps-kit] Found ${standaloneUiCount} standalone UI(s) in manifest. ` +
+        `Standalone UI auto-registration is not yet implemented. ` +
+        `Colocate UIs with tools using 'export const ui = ...' for now.`
+    );
+  }
+  /* eslint-enable no-console */
+
+  // Create the app with the standard createApp
+  const normalizedConfig: AppConfig<T> = {
+    ...appConfig,
+    tools,
+  };
+
+  return createApp(normalizedConfig);
+}

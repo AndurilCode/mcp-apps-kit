@@ -1,26 +1,69 @@
 # Weather App Example
 
-An MCP application demonstrating weather tools built with @mcp-apps-kit. Uses the [Open-Meteo API](https://open-meteo.com/) for real weather data (free, no API key required) with mock data fallback.
+An MCP application demonstrating **file-based development** with @mcp-apps-kit. Uses the [Open-Meteo API](https://open-meteo.com/) for real weather data (free, no API key required) with mock data fallback.
 
-## Features
+## File-Based Development
 
-- **getCurrentWeather**: Get current weather conditions for any location
-- **getForecast**: Get up to 16-day weather forecast
-- **getWeatherAlerts**: Get weather alerts and warnings (mock data)
+This example showcases the file-based convention pattern where tools are discovered from the filesystem:
+
+- **Tools** are defined in individual files in `tools/`
+- **UIs** are colocated with their tools using `export const ui = ...`
+- **Manifest** is auto-generated from file structure via `@mcp-apps-kit/codegen`
 
 ## Tools
 
-| Tool                | Description                                                               |
-| ------------------- | ------------------------------------------------------------------------- |
-| `getCurrentWeather` | Returns current temperature, humidity, wind, and conditions               |
-| `getForecast`       | Returns daily forecast with high/low temps, precipitation, sunrise/sunset |
-| `getWeatherAlerts`  | Returns active weather warnings, watches, and advisories                  |
+| Tool                  | File                           | Description                                                               |
+| --------------------- | ------------------------------ | ------------------------------------------------------------------------- |
+| `get_current_weather` | `tools/get-current-weather.ts` | Returns current temperature, humidity, wind, and conditions               |
+| `get_forecast`        | `tools/get-forecast.ts`        | Returns daily forecast with high/low temps, precipitation, sunrise/sunset |
+| `get_weather_alerts`  | `tools/get-weather-alerts.ts`  | Returns active weather warnings, watches, and advisories                  |
+| `daily_briefing`      | `tools/daily-briefing.ts`      | Generates comprehensive morning weather briefing                          |
+
+## Project Structure
+
+```
+weather-app/
+├── mcp.config.ts              # App configuration
+├── tools/
+│   ├── _shared.ts             # Shared schemas and services (not a tool)
+│   ├── get-current-weather.ts # → get_current_weather tool + UI
+│   ├── get-forecast.ts        # → get_forecast tool + UI
+│   └── get-weather-alerts.ts  # → get_weather_alerts tool + UI
+├── workflows/
+│   └── daily-briefing.ts      # → daily_briefing tool (workflow)
+├── __generated__/             # Auto-generated (gitignored)
+│   └── app-manifest.ts        # Typed tool imports
+├── server/
+│   ├── index.ts               # Entry point using createFileBasedApp
+│   └── services/
+│       └── weatherService.ts  # Open-Meteo API integration
+├── ui/
+│   └── src/                   # React UI components
+├── scripts/
+│   └── generate.ts            # Manifest generator script
+└── tests/
+```
+
+### Workflows Directory
+
+The `workflows/` directory is for organizing complex, multi-step tools separately from simple tools. At codegen time, workflows are merged into the `tools` export (since workflows become tools at runtime). The generated manifest also exports a `workflows` object for documentation purposes.
+
+## Naming Convention
+
+Files are automatically converted to tool names:
+
+- `get-current-weather.ts` → `get_current_weather`
+- `daily-briefing.ts` → `daily_briefing`
+- Files starting with `_` are ignored (e.g., `_shared.ts`)
 
 ## Development
 
 ```bash
 # Install dependencies (from monorepo root)
 pnpm install
+
+# Generate manifest (run after adding/removing tools)
+pnpm -C examples/weather-app generate
 
 # Run development server
 pnpm -C examples/weather-app dev
@@ -31,6 +74,12 @@ pnpm -C examples/weather-app dev
 ```bash
 pnpm -C examples/weather-app build
 ```
+
+This will:
+
+1. Generate the manifest from `tools/`
+2. Build the UI components
+3. Compile TypeScript
 
 ## Testing
 
@@ -62,26 +111,6 @@ Configure your MCP Apps-compatible host to connect to the server:
 
 ```bash
 npx tsx examples/weather-app/server/index.ts
-```
-
-## Project Structure
-
-```
-weather-app/
-├── server/
-│   ├── index.ts              # App entry point with tool definitions
-│   └── services/
-│       └── weatherService.ts # Open-Meteo API integration
-├── ui/
-│   ├── src/
-│   │   ├── App.tsx          # React UI components
-│   │   └── styles.css       # Styling
-│   └── vite.config.ts
-└── tests/
-    ├── integration/
-    │   └── server.test.ts    # Integration tests
-    └── unit/
-        └── weatherService.test.ts # Unit tests
 ```
 
 ## API Reference
