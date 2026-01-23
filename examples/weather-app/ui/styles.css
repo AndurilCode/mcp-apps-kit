@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+@source "./widgets/**/*.tsx";
+
+@theme {
+  /* Weather app color palette */
+  --color-card: #ffffff;
+  --color-card-dark: #1f2937;
+
+  /* Shadows */
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-card-dark: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+}
+
+/* Base styles */
+@layer base {
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    @apply bg-gray-100 text-gray-900 leading-relaxed;
+  }
+
+  .dark body {
+    @apply bg-gray-900 text-gray-100;
+  }
+}
+
+/* Component styles */
+@layer components {
+  .weather-card {
+    @apply bg-white rounded-2xl p-6 shadow-md mb-4;
+  }
+
+  .dark .weather-card {
+    @apply bg-gray-800;
+  }
+
+  .widget-container {
+    @apply max-w-md mx-auto p-5 min-h-screen flex flex-col;
+  }
+
+  .detail-box {
+    @apply flex flex-col items-center text-center;
+  }
+
+  .detail-label {
+    @apply text-xs text-gray-400 uppercase tracking-wide;
+  }
+
+  .detail-value {
+    @apply text-base font-semibold text-gray-900;
+  }
+
+  .dark .detail-value {
+    @apply text-gray-100;
+  }
+}
+
+/* Animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}

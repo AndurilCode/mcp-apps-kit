@@ -9,7 +9,7 @@ export default defineConfig({
       // Output directory for built HTML files
       outDir: "./ui/dist",
       // Global CSS to include in all UIs
-      globalCss: "./ui/src/styles.css",
+      globalCss: "./ui/styles.css",
       // Standalone mode: only output UI HTML files
       standalone: true,
     }),
