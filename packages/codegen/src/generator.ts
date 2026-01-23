@@ -18,21 +18,7 @@ import {
   findNameCollisions,
   getRelativeImportPath,
 } from "./naming";
-
-/**
- * Default logger that uses console methods
- */
-const defaultLogger: PluginLogger = {
-  info: (message: string) => {
-    console.log(`[mcp-apps-plugin] ${message}`); // eslint-disable-line no-console
-  },
-  warn: (message: string) => {
-    console.warn(`[mcp-apps-plugin] ${message}`); // eslint-disable-line no-console
-  },
-  error: (message: string) => {
-    console.error(`[mcp-apps-plugin] ${message}`); // eslint-disable-line no-console
-  },
-};
+import { defaultLogger } from "./utils/logger";
 
 /**
  * Check if a directory exists

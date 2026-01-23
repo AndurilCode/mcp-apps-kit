@@ -9,21 +9,12 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { createJiti } from "jiti";
 import type { FileBasedConfig, PluginLogger } from "./types";
+import { defaultLogger as createDefaultLogger } from "./utils/logger";
 
 /**
  * Default logger
  */
-const defaultLogger: PluginLogger = {
-  info: (message: string) => {
-    console.log(`[mcp-apps-plugin] ${message}`); // eslint-disable-line no-console
-  },
-  warn: (message: string) => {
-    console.warn(`[mcp-apps-plugin] ${message}`); // eslint-disable-line no-console
-  },
-  error: (message: string) => {
-    console.error(`[mcp-apps-plugin] ${message}`); // eslint-disable-line no-console
-  },
-};
+const defaultLogger: PluginLogger = createDefaultLogger;
 
 /**
  * Helper function to define a file-based app configuration with TypeScript autocomplete
@@ -57,6 +48,58 @@ const defaultLogger: PluginLogger = {
  */
 export function defineConfig(config: FileBasedConfig): FileBasedConfig {
   return config;
+}
+
+/**
+ * Validate global config fields (protocol, cors, debug, serverRoute)
+ * Lightweight version for codegen package that uses plain Error instead of AppError
+ */
+function validateGlobalConfigFields(globalConfig: Record<string, unknown>, prefix: string): void {
+  // Validate protocol
+  if (globalConfig.protocol !== undefined) {
+    if (globalConfig.protocol !== "mcp" && globalConfig.protocol !== "openai") {
+      throw new Error(`${prefix}.protocol must be 'mcp' or 'openai'`);
+    }
+  }
+
+  // Validate cors
+  if (globalConfig.cors !== undefined && globalConfig.cors !== null) {
+    if (typeof globalConfig.cors !== "object") {
+      throw new Error(`${prefix}.cors must be an object`);
+    }
+  }
+
+  // Validate debug
+  if (globalConfig.debug !== undefined && globalConfig.debug !== null) {
+    if (typeof globalConfig.debug !== "object") {
+      throw new Error(`${prefix}.debug must be an object`);
+    }
+
+    const debug = globalConfig.debug as Record<string, unknown>;
+    if (debug.level !== undefined) {
+      const validLevels = ["debug", "info", "warn", "error"];
+      if (!validLevels.includes(debug.level as string)) {
+        throw new Error(`${prefix}.debug.level must be one of: ${validLevels.join(", ")}`);
+      }
+    }
+
+    if (debug.transport !== undefined) {
+      const validTransports = ["builtin", "tool", "api"];
+      if (!validTransports.includes(debug.transport as string)) {
+        throw new Error(`${prefix}.debug.transport must be one of: ${validTransports.join(", ")}`);
+      }
+    }
+  }
+
+  // Validate serverRoute
+  if (globalConfig.serverRoute !== undefined) {
+    if (typeof globalConfig.serverRoute !== "string") {
+      throw new Error(`${prefix}.serverRoute must be a string`);
+    }
+    if (!globalConfig.serverRoute.startsWith("/")) {
+      throw new Error(`${prefix}.serverRoute must start with '/'`);
+    }
+  }
 }
 
 /**
@@ -107,55 +150,8 @@ export function validateConfig(config: unknown): asserts config is FileBasedConf
 
     const globalConfig = cfg.config as Record<string, unknown>;
 
-    // Validate protocol
-    if (globalConfig.protocol !== undefined) {
-      if (globalConfig.protocol !== "mcp" && globalConfig.protocol !== "openai") {
-        throw new Error("Configuration 'config.protocol' must be 'mcp' or 'openai'");
-      }
-    }
-
-    // Validate cors
-    if (globalConfig.cors !== undefined && globalConfig.cors !== null) {
-      if (typeof globalConfig.cors !== "object") {
-        throw new Error("Configuration 'config.cors' must be an object");
-      }
-    }
-
-    // Validate debug
-    if (globalConfig.debug !== undefined && globalConfig.debug !== null) {
-      if (typeof globalConfig.debug !== "object") {
-        throw new Error("Configuration 'config.debug' must be an object");
-      }
-
-      const debug = globalConfig.debug as Record<string, unknown>;
-      if (debug.level !== undefined) {
-        const validLevels = ["debug", "info", "warn", "error"];
-        if (!validLevels.includes(debug.level as string)) {
-          throw new Error(
-            `Configuration 'config.debug.level' must be one of: ${validLevels.join(", ")}`
-          );
-        }
-      }
-
-      if (debug.transport !== undefined) {
-        const validTransports = ["builtin", "tool", "api"];
-        if (!validTransports.includes(debug.transport as string)) {
-          throw new Error(
-            `Configuration 'config.debug.transport' must be one of: ${validTransports.join(", ")}`
-          );
-        }
-      }
-    }
-
-    // Validate serverRoute
-    if (globalConfig.serverRoute !== undefined) {
-      if (typeof globalConfig.serverRoute !== "string") {
-        throw new Error("Configuration 'config.serverRoute' must be a string");
-      }
-      if (!globalConfig.serverRoute.startsWith("/")) {
-        throw new Error("Configuration 'config.serverRoute' must start with '/'");
-      }
-    }
+    // Use shared validation logic
+    validateGlobalConfigFields(globalConfig, "Configuration 'config'");
   }
 
   // Optional plugins

@@ -41,10 +41,11 @@
 
 import type { Plugin, ResolvedConfig, ViteDevServer } from "vite";
 import * as path from "node:path";
-import type { McpAppsPluginOptions, FileBasedConfig, PluginLogger, McpAppsPlugin } from "./types";
+import type { McpAppsPluginOptions, FileBasedConfig, McpAppsPlugin } from "./types";
 import { generateManifest, writeManifest } from "./generator";
 import { setupWatcher } from "./watcher";
 import { loadConfig, defineConfig as defineConfigFn } from "./config";
+import { defaultLogger } from "./utils/logger";
 
 // Re-export types
 export type {
@@ -80,21 +81,6 @@ export {
   getRelativeImportPath,
   VALID_EXTENSIONS,
 } from "./naming";
-
-/**
- * Default logger that uses console methods with a prefix
- */
-const defaultLogger: PluginLogger = {
-  info: (message: string) => {
-    console.log(`[mcp-apps-plugin] ${message}`); // eslint-disable-line no-console
-  },
-  warn: (message: string) => {
-    console.warn(`[mcp-apps-plugin] ${message}`); // eslint-disable-line no-console
-  },
-  error: (message: string) => {
-    console.error(`[mcp-apps-plugin] ${message}`); // eslint-disable-line no-console
-  },
-};
 
 /**
  * Vite plugin for file-based MCP application development

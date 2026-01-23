@@ -144,7 +144,7 @@ describe("config", () => {
       };
 
       expect(() => validateConfig(config)).toThrow(
-        "Configuration 'config.protocol' must be 'mcp' or 'openai'"
+        "Configuration 'config'.protocol must be 'mcp' or 'openai'"
       );
     });
 
@@ -156,7 +156,7 @@ describe("config", () => {
       };
 
       expect(() => validateConfig(config)).toThrow(
-        "Configuration 'config.debug.level' must be one of"
+        "Configuration 'config'.debug.level must be one of"
       );
     });
 
@@ -168,7 +168,7 @@ describe("config", () => {
       };
 
       expect(() => validateConfig(config)).toThrow(
-        "Configuration 'config.debug.transport' must be one of"
+        "Configuration 'config'.debug.transport must be one of"
       );
     });
 
@@ -180,7 +180,7 @@ describe("config", () => {
       };
 
       expect(() => validateConfig(config)).toThrow(
-        "Configuration 'config.serverRoute' must start with '/'"
+        "Configuration 'config'.serverRoute must start with '/'"
       );
     });
 

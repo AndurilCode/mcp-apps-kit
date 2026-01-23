@@ -18,19 +18,18 @@ import type {
   VersionsConfig,
   VersionConfig,
   GlobalConfig,
-  VersionSpecificConfig,
   Icon,
 } from "./types/config";
 import type { UIDef, UIDefs } from "./types/ui";
 import type { Middleware } from "./middleware/types";
 import type { EventMap, EventHandler } from "./events/types";
 import { AppError, ErrorCode, wrapError } from "./utils/errors";
+import { validateGlobalConfig } from "./utils/config-validation";
 import { createServerInstance, type ServerInstance } from "./server/index";
 import { PluginManager } from "./plugins/PluginManager";
 import { MiddlewareChain } from "./middleware/MiddlewareChain";
 import { TypedEventEmitter } from "./events/EventEmitter";
 import { configureDebugLogger, debugLogger } from "./debug/logger";
-import { OAuthConfigSchema } from "./server/oauth/types.js";
 import { getJwksUri } from "./server/oauth/discovery.js";
 import { createJwksClient } from "./server/oauth/jwks-client.js";
 import type { JwksClient } from "jwks-rsa";
@@ -78,6 +77,44 @@ function extractColocatedUIs<T extends ToolDefs>(tools: T): { uiDefs: UIDefs; no
 }
 
 /**
+ * Apply tool updates for hot reload
+ *
+ * Extracts colocated UIs, updates config, and replaces the MCP server.
+ * Used by both single-version and multi-version apps.
+ *
+ * @param newTools - New tool definitions
+ * @param normalizedConfig - Config object to update
+ * @param serverInstance - Server instance to update
+ * @param versionKey - Optional version key for logging
+ */
+function applyToolUpdate<T extends ToolDefs>(
+  newTools: T,
+  normalizedConfig: AppConfig<T> & { ui?: UIDefs },
+  serverInstance: ServerInstance,
+  versionKey?: string
+): void {
+  // Extract colocated UIs from the new tools
+  const { uiDefs, normalizedTools } = extractColocatedUIs(newTools);
+  const newUI = Object.keys(uiDefs).length > 0 ? uiDefs : undefined;
+
+  // Update the stored config for any future getServer() calls
+  normalizedConfig.tools = normalizedTools;
+  if (newUI) {
+    normalizedConfig.ui = newUI;
+  }
+
+  // Replace the MCP server in the running instance
+  serverInstance.replaceMcpServer(normalizedTools, newUI);
+
+  // Log the update
+  const versionSuffix = versionKey ? ` for version ${versionKey}` : "";
+  debugLogger.info(
+    `Hot reload: Updated ${Object.keys(newTools).length} tools${versionSuffix}` +
+      (newUI ? ` and ${Object.keys(newUI).length} UIs` : "")
+  );
+}
+
+/**
  * Check if config is a multi-version config
  */
 function isVersionsConfig<T extends ToolDefs>(
@@ -121,7 +158,10 @@ function validateVersionConfig<T extends ToolDefs>(
 
   // Validate version-specific config if provided
   if (versionConfig.config) {
-    validateGlobalConfig(versionConfig.config, `Version "${versionKey}".config`);
+    validateGlobalConfig(
+      versionConfig.config as Record<string, unknown>,
+      `Version "${versionKey}".config`
+    );
   }
 
   // Validate version-specific plugins if provided
@@ -136,145 +176,8 @@ function validateVersionConfig<T extends ToolDefs>(
 }
 
 /**
- * Validate global config
- * Accepts GlobalConfig, Partial<GlobalConfig>, or VersionSpecificConfig (which allows null values)
+ * Validate a single version config
  */
-function validateGlobalConfig(
-  config: GlobalConfig | Partial<GlobalConfig> | VersionSpecificConfig,
-  prefix = "Config"
-): void {
-  // Validate serverRoute if provided
-  if (config.serverRoute !== undefined) {
-    const serverRoute = config.serverRoute;
-    if (typeof serverRoute !== "string") {
-      throw new AppError(ErrorCode.INVALID_CONFIG, `${prefix}.serverRoute must be a string`);
-    }
-    if (!serverRoute.startsWith("/")) {
-      throw new AppError(
-        ErrorCode.INVALID_CONFIG,
-        `${prefix}.serverRoute must start with "/", got: "${serverRoute}"`
-      );
-    }
-    if (serverRoute === "/health") {
-      throw new AppError(
-        ErrorCode.INVALID_CONFIG,
-        `${prefix}.serverRoute cannot be "/health" as it conflicts with the health check endpoint`
-      );
-    }
-  }
-
-  // Validate debug config if provided (null is valid - means disable)
-  if (config.debug !== undefined && config.debug !== null) {
-    const debug = config.debug;
-    if (typeof debug !== "object") {
-      throw new AppError(ErrorCode.INVALID_CONFIG, `${prefix}.debug must be an object or null`);
-    }
-    // Note: Nested null values (e.g., logTool: null) are valid for deep merge
-    // and will be handled by deepMerge to remove the property
-    if (
-      debug.logTool !== undefined &&
-      debug.logTool !== null &&
-      typeof debug.logTool !== "boolean"
-    ) {
-      throw new AppError(
-        ErrorCode.INVALID_CONFIG,
-        `${prefix}.debug.logTool must be a boolean if provided`
-      );
-    }
-    if (debug.level !== undefined && debug.level !== null) {
-      const validLevels = ["debug", "info", "warn", "error"];
-      if (!validLevels.includes(debug.level)) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `${prefix}.debug.level must be one of: ${validLevels.join(", ")}`
-        );
-      }
-    }
-    if (debug.batchSize !== undefined && debug.batchSize !== null) {
-      if (typeof debug.batchSize !== "number" || debug.batchSize < 1) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `${prefix}.debug.batchSize must be a positive number`
-        );
-      }
-    }
-    if (debug.flushIntervalMs !== undefined && debug.flushIntervalMs !== null) {
-      if (typeof debug.flushIntervalMs !== "number" || debug.flushIntervalMs < 0) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `${prefix}.debug.flushIntervalMs must be a non-negative number`
-        );
-      }
-    }
-    if (debug.transport !== undefined && debug.transport !== null) {
-      const validTransports = ["builtin", "tool", "api"];
-      if (!validTransports.includes(debug.transport)) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `${prefix}.debug.transport must be one of: ${validTransports.join(", ")}`
-        );
-      }
-    }
-    if (debug.apiEndpoint !== undefined && debug.apiEndpoint !== null) {
-      if (typeof debug.apiEndpoint !== "string") {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `${prefix}.debug.apiEndpoint must be a string`
-        );
-      }
-      if (!debug.apiEndpoint.startsWith("/")) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `${prefix}.debug.apiEndpoint must start with "/", got: "${debug.apiEndpoint}"`
-        );
-      }
-    }
-  }
-
-  // Validate OAuth config if provided (null is valid - means disable)
-  if (config.oauth !== undefined && config.oauth !== null) {
-    try {
-      OAuthConfigSchema.parse(config.oauth);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `${prefix}.oauth: Invalid OAuth configuration: ${error.message}`
-        );
-      }
-      throw new AppError(ErrorCode.INVALID_CONFIG, `${prefix}.oauth: Invalid OAuth configuration`);
-    }
-  }
-
-  // Validate OpenAI config if provided (null is valid - means disable)
-  if (config.openai !== undefined && config.openai !== null) {
-    const openaiConfig = config.openai as Record<string, unknown>;
-    if (typeof openaiConfig !== "object") {
-      throw new AppError(ErrorCode.INVALID_CONFIG, `${prefix}.openai must be an object or null`);
-    }
-    if (openaiConfig.domain_challenge !== undefined) {
-      const token = openaiConfig.domain_challenge;
-      if (typeof token !== "string") {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `${prefix}.openai.domain_challenge must be a string`
-        );
-      }
-      if (token.length === 0) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `${prefix}.openai.domain_challenge cannot be an empty string`
-        );
-      }
-      if (token.length > 1000) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `${prefix}.openai.domain_challenge cannot exceed 1000 characters`
-        );
-      }
-    }
-  }
-}
 
 /**
  * Validate app configuration (supports both single and multi-version)
@@ -325,7 +228,7 @@ function validateConfig<T extends ToolDefs>(config: unknown): asserts config is 
 
     // Validate global config if provided
     if (versionsConfig.config) {
-      validateGlobalConfig(versionsConfig.config);
+      validateGlobalConfig(versionsConfig.config as Record<string, unknown>);
     }
 
     // Validate global plugins if provided
@@ -353,7 +256,7 @@ function validateConfig<T extends ToolDefs>(config: unknown): asserts config is 
     // Validate global config if provided
     const globalConfig = cfg.config as GlobalConfig | undefined;
     if (globalConfig) {
-      validateGlobalConfig(globalConfig);
+      validateGlobalConfig(globalConfig as Record<string, unknown>);
     }
   }
 }
@@ -803,23 +706,7 @@ function createSingleVersionApp<T extends ToolDefs>(config: AppConfig<T>): App<T
         return;
       }
 
-      // Extract colocated UIs from the new tools
-      const { uiDefs, normalizedTools } = extractColocatedUIs(newTools as T);
-      const newUI = Object.keys(uiDefs).length > 0 ? uiDefs : undefined;
-
-      // Update the stored config for any future getServer() calls
-      normalizedConfig.tools = normalizedTools;
-      if (newUI) {
-        normalizedConfig.ui = newUI;
-      }
-
-      // Replace the MCP server in the running instance
-      serverInstance.replaceMcpServer(normalizedTools, newUI);
-
-      debugLogger.info(
-        `Hot reload: Updated ${Object.keys(newTools).length} tools` +
-          (newUI ? ` and ${Object.keys(newUI).length} UIs` : "")
-      );
+      applyToolUpdate(newTools as T, normalizedConfig, serverInstance);
     },
   };
 
@@ -1076,25 +963,7 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
       },
 
       updateTools: (newTools: ToolDefs): void => {
-        // Extract colocated UIs from the new tools
-        const { uiDefs, normalizedTools: updatedNormalizedTools } = extractColocatedUIs(
-          newTools as T
-        );
-        const newUI = Object.keys(uiDefs).length > 0 ? uiDefs : undefined;
-
-        // Update the stored config
-        normalizedVersionConfig.tools = updatedNormalizedTools;
-        if (newUI) {
-          normalizedVersionConfig.ui = newUI;
-        }
-
-        // Replace the MCP server in the running instance
-        versionServerInstance.replaceMcpServer(updatedNormalizedTools, newUI);
-
-        debugLogger.info(
-          `Hot reload: Updated ${Object.keys(newTools).length} tools for version ${versionKey}` +
-            (newUI ? ` and ${Object.keys(newUI).length} UIs` : "")
-        );
+        applyToolUpdate(newTools as T, normalizedVersionConfig, versionServerInstance, versionKey);
       },
     };
 
