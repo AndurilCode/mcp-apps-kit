@@ -393,7 +393,18 @@ export function createServerInstance<T extends ToolDefs>(
     },
 
     stop: async () => {
-      return new Promise<void>((resolve) => {
+      // Shutdown workflow executors first, but always close HTTP server
+      let executorError: Error | undefined;
+      try {
+        const { ExecutorManager } = await import("../workflow/executor-manager.js");
+        await ExecutorManager.getInstance().shutdown();
+      } catch (error) {
+        // Capture error but continue to close HTTP server
+        executorError = error instanceof Error ? error : new Error(String(error));
+      }
+
+      // Always stop the HTTP server, even if executor shutdown failed
+      await new Promise<void>((resolve) => {
         if (httpServer) {
           httpServer.close(() => {
             httpServer = undefined;
@@ -404,6 +415,11 @@ export function createServerInstance<T extends ToolDefs>(
           resolve();
         }
       });
+
+      // Re-throw executor error after server is closed
+      if (executorError) {
+        throw executorError;
+      }
     },
 
     handler: (): ExpressMiddleware => {
@@ -745,8 +761,30 @@ function registerTools(
           // Create state map for middleware
           const state = new Map<string, unknown>();
 
-          // Create full context with state
-          const context: ToolContext = { ...baseContext, state };
+          // Create internal tool caller for workflows
+          const internalToolCaller = async (
+            targetToolName: string,
+            targetInput: unknown,
+            targetContext: ToolContext
+          ): Promise<unknown> => {
+            const targetToolDef = tools[targetToolName];
+            if (!targetToolDef) {
+              throw new Error(`Tool "${targetToolName}" not found`);
+            }
+
+            // Validate input
+            const validatedInput = targetToolDef.input.parse(targetInput);
+
+            // Execute the target tool's handler with the provided context
+            return await targetToolDef.handler(validatedInput, targetContext);
+          };
+
+          // Create full context with state and internal tool caller
+          const context: ToolContext = {
+            ...baseContext,
+            state,
+            _internalToolCaller: internalToolCaller,
+          };
           contextForErrorHandling = context;
 
           // Emit tool:called event

@@ -223,3 +223,55 @@ export type {
   ToolBuilderComplete,
   ToolBuilderConfigurable,
 } from "./builder/tool-builder";
+
+// =============================================================================
+// WORKFLOW ENGINE
+// =============================================================================
+
+export {
+  workflow,
+  toolStep,
+  customStep,
+  externalStep,
+  WorkflowExecutor,
+  ExternalToolClient,
+  ExecutorManager,
+  EdgeExecutorManager,
+  WorkflowError,
+  WorkflowExecutionError,
+  WorkflowDefinitionError,
+  ToolResponseValidationError,
+  StepTimeoutError,
+  ExternalToolError,
+  WorkflowValidationError,
+} from "./workflow";
+
+export type {
+  WorkflowContext,
+  ToolCaller,
+  ExternalToolCaller,
+  ToolValidator,
+  RetryConfig,
+  ErrorHandler,
+  ErrorHandling,
+  StepConfig,
+  ToolStep,
+  CustomStep,
+  ExternalStep,
+  ParallelStep,
+  BranchStep,
+  Step,
+  NamedStep,
+  WorkflowDefinition,
+  StepExecutionResult,
+  WorkflowExecutionResult,
+  WorkflowBuilderInitial,
+  WorkflowBuilderWithDescription,
+  WorkflowBuilderWithInput,
+  WorkflowBuilderWithOutput,
+  WorkflowBuilderWithSteps,
+  ExternalStepConfig,
+  ExternalToolClientConfig,
+  ExecutorManagerConfig,
+  EdgeExecutorManagerConfig,
+} from "./workflow";
