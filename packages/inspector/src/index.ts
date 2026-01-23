@@ -74,6 +74,7 @@ export type {
 
 export { createInspectorServer } from "./server";
 export { ConnectionManager } from "./connection";
+export { WidgetServer, type WidgetSession, type CreateSessionResult } from "./widget-server";
 
 // =============================================================================
 // TOOL CREATORS (for advanced usage)

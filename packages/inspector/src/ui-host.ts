@@ -11,6 +11,7 @@ import { JSDOM } from "jsdom";
 import { MCP_WIDGET_MIME_TYPE, OPENAI_WIDGET_MIME_TYPE } from "@mcp-apps-kit/core";
 import { MCPHostEmulator, type MCPHostEmulatorOptions } from "./hosts/mcp-host";
 import { OpenAIHostEmulator, type OpenAIHostEmulatorOptions } from "./hosts/openai-host";
+import { WidgetServer } from "./widget-server";
 import type { ElementInfo } from "./types";
 
 // Playwright types - use dynamic import since it's optional
@@ -84,6 +85,7 @@ export interface BrowserRenderResult {
 export class UIHostManager {
   private client: TestClient;
   private browserPool: Browser | null = null;
+  private widgetServer?: WidgetServer;
   private options: Required<UIHostManagerOptions>;
 
   constructor(client: TestClient, options: UIHostManagerOptions = {}) {
@@ -377,7 +379,21 @@ export class UIHostManager {
   }
 
   /**
+   * Get or create widget server (lazy initialization)
+   */
+  private async getWidgetServer(): Promise<WidgetServer> {
+    if (!this.widgetServer) {
+      this.widgetServer = new WidgetServer({ debug: this.options.debug });
+      await this.widgetServer.start();
+    }
+    return this.widgetServer;
+  }
+
+  /**
    * Render widget in browser mode (Playwright)
+   *
+   * Uses a WidgetServer to serve the widget in a real iframe,
+   * enabling proper postMessage communication where event.source === window.parent.
    */
   async renderInBrowser(
     html: string,
@@ -403,10 +419,27 @@ export class UIHostManager {
       }
     });
 
-    // Create appropriate emulator
+    // Get the widget server (lazy initialization)
+    const server = await this.getWidgetServer();
+
+    // Create a session for this widget
+    const { hostUrl, sessionId } = server.createSession(html, toolResult, toolName, protocol);
+
+    // Navigate to the host page (which embeds the widget in an iframe)
+    await page.goto(hostUrl, { waitUntil: "networkidle" });
+
+    // Wait for widget to initialize and receive tool result via postMessage
+    // The widget needs time to: load iframe -> execute JS -> init client -> send init -> receive response + tool/result -> re-render
+    await page.waitForTimeout(500);
+
+    // Schedule session cleanup (defer to allow interactions)
+    setTimeout(() => {
+      server.deleteSession(sessionId);
+    }, 60000);
+
+    // Create emulators for tracking (the actual emulation is done by the host page)
     let mcpEmulator: MCPHostEmulator | undefined;
     let openaiEmulator: OpenAIHostEmulator | undefined;
-    let initScript: string;
 
     if (protocol === "mcp") {
       const options: MCPHostEmulatorOptions = {
@@ -415,7 +448,6 @@ export class UIHostManager {
         debug: this.options.debug,
       };
       mcpEmulator = new MCPHostEmulator(options);
-      initScript = mcpEmulator.getPlaywrightInitScript();
     } else {
       const options: OpenAIHostEmulatorOptions = {
         toolName,
@@ -423,28 +455,7 @@ export class UIHostManager {
         debug: this.options.debug,
       };
       openaiEmulator = new OpenAIHostEmulator(options);
-      initScript = openaiEmulator.getPlaywrightInitScript();
     }
-
-    // Inject init script directly into HTML (addInitScript doesn't work with setContent)
-    // Insert at the very beginning of <head> so it runs before any other scripts
-    const scriptTag = `<script>${initScript}</script>`;
-    let modifiedHtml = html;
-    if (html.includes("<head>")) {
-      modifiedHtml = html.replace("<head>", `<head>${scriptTag}`);
-    } else if (html.includes("<html>")) {
-      modifiedHtml = html.replace("<html>", `<html><head>${scriptTag}</head>`);
-    } else {
-      // Prepend script if no head/html tags
-      modifiedHtml = scriptTag + html;
-    }
-
-    // Load the HTML content with injected init script
-    await page.setContent(modifiedHtml, { waitUntil: "networkidle" });
-
-    // Wait for widget to initialize and receive tool result via postMessage
-    // The widget needs time to: execute JS -> init MCP client -> send ui/initialize -> receive response + tool/result -> re-render
-    await page.waitForTimeout(500);
 
     return {
       page,
@@ -551,6 +562,10 @@ export class UIHostManager {
     if (this.browserPool) {
       await this.browserPool.close();
       this.browserPool = null;
+    }
+    if (this.widgetServer) {
+      await this.widgetServer.stop();
+      this.widgetServer = undefined;
     }
   }
 }

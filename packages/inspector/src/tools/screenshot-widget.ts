@@ -191,11 +191,22 @@ export function createScreenshotWidgetTool(connectionManager: ConnectionManager)
         const { page, errors } = renderResult;
         const format = input.format ?? "png";
 
-        // Take screenshot
-        const screenshotResult = await uiHostManager.takeScreenshot(page, {
-          format,
-          fullPage: input.fullPage,
-        });
+        // Target the widget iframe for screenshot (unless fullPage is requested)
+        const frame = page.frame({ url: /\/widget\// });
+        let screenshotResult: { data: Buffer; format: "png" | "jpeg" };
+
+        if (frame && !input.fullPage) {
+          // Screenshot widget iframe content only
+          const body = frame.locator("body");
+          const data = await body.screenshot({ type: format });
+          screenshotResult = { data, format };
+        } else {
+          // Fallback to full page (includes host frame)
+          screenshotResult = await uiHostManager.takeScreenshot(page, {
+            format,
+            fullPage: input.fullPage,
+          });
+        }
 
         // Close the page
         await page.close();
