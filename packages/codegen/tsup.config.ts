@@ -14,7 +14,7 @@ export default defineConfig([
     clean: true,
     treeshake: true,
     minify: true,
-    external: ["vite", "@typescript-eslint/typescript-estree", "@typescript-eslint/types"],
+    external: ["vite", "@typescript-eslint/typescript-estree", "@typescript-eslint/types", "jiti"],
   },
   // CLI builds (ESM only, executable)
   {
@@ -28,6 +28,7 @@ export default defineConfig([
       "@typescript-eslint/typescript-estree",
       "@typescript-eslint/types",
       "@mcp-apps-kit/core",
+      "jiti",
     ],
     banner: {
       js: "#!/usr/bin/env node",

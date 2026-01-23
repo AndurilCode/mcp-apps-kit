@@ -6,10 +6,10 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"pnpm dev:server\" \"pnpm dev:ui\"",
-    "dev:server": "tsx watch __generated__/server.ts",
+    "dev:server": "mcp-serve --watch",
     "dev:ui": "vite build --watch --config ui/vite.config.ts",
-    "start": "tsx __generated__/server.ts",
-    "generate": "tsx -e \"import('@mcp-apps-kit/codegen/cli')\"",
+    "start": "mcp-serve",
+    "generate": "mcp-codegen",
     "build": "pnpm generate && pnpm build:ui && tsc",
     "build:ui": "vite build --config ui/vite.config.ts",
     "typecheck": "tsc --noEmit",

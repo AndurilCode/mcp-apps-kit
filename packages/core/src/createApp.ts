@@ -789,6 +789,38 @@ function createSingleVersionApp<T extends ToolDefs>(config: AppConfig<T>): App<T
     getVersions: (): string[] => {
       return [];
     },
+
+    /**
+     * Update tool definitions at runtime (hot reload support)
+     *
+     * Replaces the current tool definitions without restarting the HTTP server.
+     */
+    updateTools: (newTools: ToolDefs): void => {
+      if (!serverInstance) {
+        // Server not started yet - just update the config
+        // The new tools will be used when the server starts
+        normalizedConfig.tools = newTools as T;
+        return;
+      }
+
+      // Extract colocated UIs from the new tools
+      const { uiDefs, normalizedTools } = extractColocatedUIs(newTools as T);
+      const newUI = Object.keys(uiDefs).length > 0 ? uiDefs : undefined;
+
+      // Update the stored config for any future getServer() calls
+      normalizedConfig.tools = normalizedTools;
+      if (newUI) {
+        normalizedConfig.ui = newUI;
+      }
+
+      // Replace the MCP server in the running instance
+      serverInstance.replaceMcpServer(normalizedTools, newUI);
+
+      debugLogger.info(
+        `Hot reload: Updated ${Object.keys(newTools).length} tools` +
+          (newUI ? ` and ${Object.keys(newUI).length} UIs` : "")
+      );
+    },
   };
 
   // Emit app:init event after app is created
@@ -1042,6 +1074,28 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
       getVersions: (): string[] => {
         return Array.from(versionApps.keys());
       },
+
+      updateTools: (newTools: ToolDefs): void => {
+        // Extract colocated UIs from the new tools
+        const { uiDefs, normalizedTools: updatedNormalizedTools } = extractColocatedUIs(
+          newTools as T
+        );
+        const newUI = Object.keys(uiDefs).length > 0 ? uiDefs : undefined;
+
+        // Update the stored config
+        normalizedVersionConfig.tools = updatedNormalizedTools;
+        if (newUI) {
+          normalizedVersionConfig.ui = newUI;
+        }
+
+        // Replace the MCP server in the running instance
+        versionServerInstance.replaceMcpServer(updatedNormalizedTools, newUI);
+
+        debugLogger.info(
+          `Hot reload: Updated ${Object.keys(newTools).length} tools for version ${versionKey}` +
+            (newUI ? ` and ${Object.keys(newUI).length} UIs` : "")
+        );
+      },
     };
 
     versionApps.set(versionKey, versionApp);
@@ -1278,6 +1332,15 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
 
     getVersions: (): string[] => {
       return Array.from(versionApps.keys());
+    },
+
+    updateTools: (newTools: ToolDefs): void => {
+      // For multi-version apps, update all versions with the same tools
+      // This is useful for development hot reload scenarios where all versions
+      // share the same tool implementations
+      for (const versionApp of versionApps.values()) {
+        versionApp.updateTools(newTools);
+      }
     },
   };
 

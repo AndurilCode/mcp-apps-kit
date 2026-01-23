@@ -8,13 +8,24 @@
  */
 
 import * as path from "node:path";
+import { createJiti } from "jiti";
 import { runCodegen } from "./generator.js";
 import { loadConfig } from "./config.js";
+import { createStandaloneWatcher } from "./watcher.js";
+import type { ToolDefs } from "@mcp-apps-kit/core";
 
 interface ServeOptions {
   port?: number;
   watch?: boolean;
   configPath?: string;
+}
+
+/**
+ * App instance type with updateTools method for hot reload
+ */
+interface AppWithHotReload {
+  start: (opts: { port: number }) => Promise<void>;
+  updateTools: (newTools: ToolDefs) => void;
 }
 
 /**
@@ -59,12 +70,18 @@ async function serve(options: ServeOptions = {}): Promise<void> {
   // Step 2: Load config
   const config = await loadConfig(configPath, projectRoot);
 
-  // Step 3: Dynamic import the manifest and core
-  const manifestPath = path.resolve(projectRoot, outDir, "app-manifest.js");
+  // Step 3: Import the manifest using jiti (supports TypeScript)
+  const manifestPath = path.resolve(projectRoot, outDir, "app-manifest.ts");
+
+  // Create jiti instance for importing TypeScript files
+  const jiti = createJiti(projectRoot, {
+    interopDefault: true,
+    moduleCache: false, // Disable cache for hot reload
+  });
 
   // Import the generated manifest
-  const cacheBuster = `?t=${Date.now()}`;
-  const manifest = (await import(`file://${manifestPath}${cacheBuster}`)) as {
+  const manifestModule = await jiti.import(manifestPath);
+  const manifest = manifestModule as {
     tools: Record<string, unknown>;
     workflows: Record<string, unknown>;
   };
@@ -73,9 +90,7 @@ async function serve(options: ServeOptions = {}): Promise<void> {
   const coreModule = await import("@mcp-apps-kit/core");
   const createFileBasedApp = coreModule.createFileBasedApp as unknown as (
     config: Record<string, unknown>
-  ) => {
-    start: (opts: { port: number }) => Promise<void>;
-  };
+  ) => AppWithHotReload;
 
   // Step 4: Create and start the app
   const app = createFileBasedApp({
@@ -105,7 +120,116 @@ Endpoints:
   - Health:  http://localhost:${port}/health
 `);
 
-  // TODO: Add watch mode support if options.watch is true
+  // Step 5: Set up watch mode if requested
+  if (options.watch) {
+    // eslint-disable-next-line no-console
+    console.log("[mcp-serve] Watch mode enabled - hot reload active\n");
+
+    const watcher = await createStandaloneWatcher({
+      projectRoot,
+      directories: config.directories,
+      onRegenerate: async () => {
+        try {
+          // Regenerate the manifest
+          await runCodegen({
+            projectRoot,
+            configPath,
+            outDir,
+          });
+
+          // Clear Node's module cache for the tools/workflows directories
+          // This ensures jiti reimports fresh versions of modified files
+          // Note: require.cache only exists in CJS context, may be undefined in ESM
+          const toolsDir = path.resolve(projectRoot, config.directories?.tools ?? "tools");
+          const workflowsDir = path.resolve(
+            projectRoot,
+            config.directories?.workflows ?? "workflows"
+          );
+
+          const cache = typeof require !== "undefined" ? require.cache : undefined;
+          if (cache) {
+            for (const key of Object.keys(cache)) {
+              if (
+                key.startsWith(toolsDir) ||
+                key.startsWith(workflowsDir) ||
+                key.startsWith(manifestPath)
+              ) {
+                Reflect.deleteProperty(cache, key);
+              }
+            }
+          }
+
+          // Re-import the manifest using jiti (fresh instance for cache bypass)
+          // Use cache-busting query string to force reimport of all dependencies
+          const freshJiti = createJiti(projectRoot, {
+            interopDefault: true,
+            moduleCache: false,
+            fsCache: false,
+          });
+          const cacheBustPath = `${manifestPath}?t=${Date.now()}`;
+          const newManifestModule = await freshJiti.import(cacheBustPath);
+          const moduleObj = newManifestModule as Record<string, unknown>;
+
+          // Handle both default export and named exports
+          const rawManifest = moduleObj.default ?? moduleObj;
+          const newManifest = rawManifest as {
+            tools?: Record<string, unknown>;
+            workflows?: Record<string, unknown>;
+          };
+
+          const tools = newManifest.tools ?? {};
+          const workflows = newManifest.workflows ?? {};
+
+          // Validate tools before hot reload
+          if (typeof tools !== "object" || tools === null) {
+            throw new Error(`Invalid tools object: ${typeof tools}`);
+          }
+
+          // Check for undefined tool values (failed imports)
+          for (const [name, tool] of Object.entries(tools)) {
+            if (tool === undefined || tool === null) {
+              throw new Error(`Tool "${name}" is undefined - import may have failed`);
+            }
+          }
+
+          // Hot reload the tools
+          app.updateTools(tools as ToolDefs);
+
+          // Log what was reloaded
+          const newWorkflowNames = Object.keys(workflows);
+          const newToolOnlyNames = Object.keys(tools).filter(
+            (name) => !newWorkflowNames.includes(name)
+          );
+
+          // eslint-disable-next-line no-console
+          console.log(
+            `[mcp-serve] Hot reloaded: ${newToolOnlyNames.length} tools, ${newWorkflowNames.length} workflows`
+          );
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error(
+            "[mcp-serve] Hot reload failed:",
+            error instanceof Error ? error.message : String(error)
+          );
+          if (error instanceof Error && error.stack) {
+            // eslint-disable-next-line no-console
+            console.error(error.stack);
+          }
+        }
+      },
+    });
+
+    // Handle graceful shutdown
+    const cleanup = () => {
+      // eslint-disable-next-line no-console
+      console.log("\n[mcp-serve] Shutting down...");
+      watcher.close();
+      process.exit(0);
+    };
+
+    process.on("SIGINT", cleanup);
+    process.on("SIGTERM", cleanup);
+  }
 }
 
 // Run the server

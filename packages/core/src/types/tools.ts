@@ -616,6 +616,36 @@ export interface App<T extends ToolDefs = ToolDefs> {
    * ```
    */
   getVersions(): string[];
+
+  // ---------------------------------------------------------------------------
+  // HOT RELOAD (Development)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Update tool definitions at runtime (hot reload support)
+   *
+   * Replaces the current tool definitions with new ones without restarting
+   * the HTTP server. Active connections are preserved.
+   *
+   * This is primarily used for development hot reload scenarios where tool
+   * implementations are modified and reloaded without full server restart.
+   *
+   * **Note:** This recreates the underlying MCP server, so any in-flight
+   * requests may fail. New requests will use the updated tools.
+   *
+   * @param newTools - New tool definitions to register
+   *
+   * @example
+   * ```typescript
+   * // Watch for file changes and update tools
+   * watcher.on('change', async () => {
+   *   const { tools } = await import('./manifest.js?t=' + Date.now());
+   *   app.updateTools(tools);
+   *   console.log('Tools hot-reloaded');
+   * });
+   * ```
+   */
+  updateTools(newTools: ToolDefs): void;
 }
 
 // =============================================================================

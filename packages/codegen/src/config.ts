@@ -2,10 +2,12 @@
  * Configuration file loader
  *
  * Loads and validates mcp.config.ts files for file-based app development.
+ * Uses jiti for native TypeScript support without requiring tsx.
  */
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { createJiti } from "jiti";
 import type { FileBasedConfig, PluginLogger } from "./types";
 
 /**
@@ -189,7 +191,7 @@ export function validateConfig(config: unknown): asserts config is FileBasedConf
  * Load configuration from a file path
  *
  * Supports TypeScript and JavaScript config files.
- * Uses dynamic import to load the config module.
+ * Uses jiti for native TypeScript support - no tsx/ts-node required.
  *
  * @param configPath - Path to the config file
  * @param projectRoot - Project root directory
@@ -212,15 +214,22 @@ export async function loadConfig(
 
   logger.info(`Loading config from ${configPath}`);
 
-  // Dynamic import the config file
-  // For TypeScript files, we rely on the runtime (tsx, ts-node, or Vite's transform)
-  // to handle the transpilation
   try {
-    // Add timestamp to bust cache during development
-    const cacheBuster = `?t=${Date.now()}`;
-    const importPath = `file://${absolutePath}${cacheBuster}`;
-    const module = (await import(importPath)) as { default?: unknown };
-    const config: unknown = module.default ?? module;
+    // Use jiti for TypeScript support
+    // This allows loading .ts config files without tsx/ts-node
+    const jiti = createJiti(projectRoot, {
+      // Enable TypeScript interop for ESM default exports
+      interopDefault: true,
+      // Disable caching for hot reload support
+      moduleCache: false,
+    });
+
+    const module = await jiti.import(absolutePath);
+
+    // Extract the config - handle both default export and module itself
+    // jiti with interopDefault should unwrap, but we handle both cases
+    const moduleObj = module as { default?: unknown };
+    const config: unknown = moduleObj.default ?? module;
 
     // Validate the configuration
     validateConfig(config);
