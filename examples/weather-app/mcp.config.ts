@@ -6,10 +6,14 @@
  */
 
 import { defineConfig } from "@mcp-apps-kit/codegen";
+import { iconFromFile } from "@mcp-apps-kit/core";
 
 export default defineConfig({
   name: "weather-app",
   version: "0.1.0",
+
+  // Server icon - displayed in MCP client UIs
+  icon: iconFromFile("./logo.png").src,
 
   // Directory configuration
   directories: {
