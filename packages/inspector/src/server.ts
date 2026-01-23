@@ -20,6 +20,13 @@ import {
   createClearHistoryTool,
   createRunTestSuiteTool,
   createGetConnectionStatusTool,
+  createListUIWidgetsTool,
+  createGetUIWidgetTool,
+  createInspectToolUITool,
+  createGetUIMetadataTool,
+  createPreviewUITool,
+  createScreenshotWidgetTool,
+  createTestWidgetInteractionTool,
 } from "./tools";
 
 /**
@@ -53,6 +60,15 @@ export function createInspectorServer(options: InspectorServerOptions = {}): App
     clear_history: createClearHistoryTool(connectionManager),
     run_test_suite: createRunTestSuiteTool(connectionManager),
     get_connection_status: createGetConnectionStatusTool(connectionManager),
+    // UI Inspection tools
+    list_ui_widgets: createListUIWidgetsTool(connectionManager),
+    get_ui_widget: createGetUIWidgetTool(connectionManager),
+    inspect_tool_ui: createInspectToolUITool(connectionManager),
+    get_ui_metadata: createGetUIMetadataTool(connectionManager),
+    // UI Rendering tools
+    preview_ui: createPreviewUITool(connectionManager),
+    screenshot_widget: createScreenshotWidgetTool(connectionManager),
+    test_widget_interaction: createTestWidgetInteractionTool(connectionManager),
   };
 
   const app = createApp({

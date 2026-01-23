@@ -14,7 +14,7 @@ export default defineConfig([
     clean: true,
     treeshake: true,
     minify: false,
-    external: ["zod", "@mcp-apps-kit/core", "@mcp-apps-kit/testing"],
+    external: ["zod", "@mcp-apps-kit/core", "@mcp-apps-kit/testing", "playwright", "jsdom"],
   },
   // CLI build (ESM only, executable)
   {
@@ -24,7 +24,7 @@ export default defineConfig([
     sourcemap: true,
     treeshake: true,
     minify: false,
-    external: ["zod", "@mcp-apps-kit/core", "@mcp-apps-kit/testing"],
+    external: ["zod", "@mcp-apps-kit/core", "@mcp-apps-kit/testing", "playwright", "jsdom"],
     banner: {
       js: "#!/usr/bin/env node",
     },

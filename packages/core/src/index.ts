@@ -323,6 +323,9 @@ export type {
   ToolBuilderConfigurable,
 } from "./builder/tool-builder";
 
+// Constants
+export { MCP_WIDGET_MIME_TYPE, OPENAI_WIDGET_MIME_TYPE } from "./constants";
+
 // =============================================================================
 // WORKFLOW ENGINE
 // =============================================================================
