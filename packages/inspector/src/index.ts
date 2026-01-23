@@ -44,6 +44,28 @@ export type {
   RunTestSuiteOutput,
   TestCaseResultOutput,
   ConnectionStatusOutput,
+  // UI Inspection types
+  UIProtocol,
+  UIWidgetInfo,
+  ListUIWidgetsOutput,
+  GetUIWidgetInput,
+  GetUIWidgetOutput,
+  UIWidgetMetadata,
+  UIWidgetCSP,
+  InspectToolUIInput,
+  InspectToolUIOutput,
+  UIBinding,
+  GetUIMetadataInput,
+  GetUIMetadataOutput,
+  // Preview/Rendering types
+  ElementInfo,
+  PreviewUIInput,
+  PreviewUIOutput,
+  ScreenshotWidgetInput,
+  ScreenshotWidgetOutput,
+  InteractionAction,
+  TestWidgetInteractionInput,
+  TestWidgetInteractionOutput,
 } from "./types";
 
 // =============================================================================
@@ -70,4 +92,13 @@ export {
   createClearHistoryTool,
   createRunTestSuiteTool,
   createGetConnectionStatusTool,
+  // UI Inspection tools
+  createListUIWidgetsTool,
+  createGetUIWidgetTool,
+  createInspectToolUITool,
+  createGetUIMetadataTool,
+  // UI Rendering tools
+  createPreviewUITool,
+  createScreenshotWidgetTool,
+  createTestWidgetInteractionTool,
 } from "./tools";
