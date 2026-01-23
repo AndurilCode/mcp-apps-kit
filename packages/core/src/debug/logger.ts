@@ -75,6 +75,9 @@ const LogLevelValue: Record<DebugLogLevel, number> = {
 /**
  * Check if a log level should be output given the minimum level
  *
+ * @param level - The log level to check
+ * @param minLevel - The minimum log level threshold
+ * @returns True if the level should be logged, false otherwise
  * @internal
  */
 export function shouldLog(level: DebugLogLevel, minLevel: DebugLogLevel): boolean {
@@ -104,6 +107,8 @@ function getCircularReplacer(): (key: string, value: unknown) => unknown {
 /**
  * Safely stringify data, handling circular references
  *
+ * @param data - The data to stringify
+ * @returns Stringified representation of the data
  * @internal
  */
 export function safeStringify(data: unknown): string {
@@ -141,6 +146,8 @@ export function safeStringify(data: unknown): string {
 /**
  * Safely serialize data for transport, handling circular references
  *
+ * @param data - The data to serialize
+ * @returns Serialized representation of the data
  * @internal
  */
 export function safeSerialize(data: unknown): unknown {
@@ -337,6 +344,7 @@ export const debugLogger = new DebugLogger({ level: "info" });
 /**
  * Configure the global debug logger
  *
+ * @param config - Debug configuration to apply
  * @internal
  */
 export function configureDebugLogger(config: DebugConfig): void {
