@@ -144,6 +144,13 @@ function isInWatchedDirectory(
   }
 
   // Check optional directories
+  if (directories.uiWidgets) {
+    const uiWidgetsDir = path.resolve(projectRoot, directories.uiWidgets);
+    if (absolutePath.startsWith(uiWidgetsDir + path.sep) || absolutePath === uiWidgetsDir) {
+      return true;
+    }
+  }
+
   if (directories.middleware) {
     const middlewareDir = path.resolve(projectRoot, directories.middleware);
     if (absolutePath.startsWith(middlewareDir + path.sep) || absolutePath === middlewareDir) {
@@ -197,6 +204,9 @@ export function setupWatcher(server: ViteDevServer, options: WatcherOptions): ()
     const uiDir = path.resolve(projectRoot, directories.ui ?? "ui");
     dirsToWatch = [toolsDir, workflowsDir, uiDir];
     // Add optional directories if configured
+    if (directories.uiWidgets) {
+      dirsToWatch.push(path.resolve(projectRoot, directories.uiWidgets));
+    }
     if (directories.middleware) {
       dirsToWatch.push(path.resolve(projectRoot, directories.middleware));
     }
@@ -335,6 +345,9 @@ export async function createStandaloneWatcher(
     const uiDir = path.resolve(projectRoot, directories.ui ?? "ui");
     dirsToWatch = [toolsDir, workflowsDir, uiDir];
     // Add optional directories if configured
+    if (directories.uiWidgets) {
+      dirsToWatch.push(path.resolve(projectRoot, directories.uiWidgets));
+    }
     if (directories.middleware) {
       dirsToWatch.push(path.resolve(projectRoot, directories.middleware));
     }
