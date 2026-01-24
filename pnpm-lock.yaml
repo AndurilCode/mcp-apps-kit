@@ -56,6 +56,9 @@ importers:
       nx:
         specifier: ^22.4.1
         version: 22.4.1
+      playwright:
+        specifier: ^1.58.0
+        version: 1.58.0
       prettier:
         specifier: ^3.8.1
         version: 3.8.1
@@ -7223,7 +7226,7 @@ snapshots:
 
   '@types/jsdom@21.1.7':
     dependencies:
-      '@types/node': 25.0.7
+      '@types/node': 25.0.10
       '@types/tough-cookie': 4.0.5
       parse5: 7.3.0
 
@@ -9572,15 +9575,13 @@ snapshots:
       mlly: 1.8.0
       pathe: 2.0.3
 
-  playwright-core@1.58.0:
-    optional: true
+  playwright-core@1.58.0: {}
 
   playwright@1.58.0:
     dependencies:
       playwright-core: 1.58.0
     optionalDependencies:
       fsevents: 2.3.2
-    optional: true
 
   postcss-load-config@6.0.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.21.0)(yaml@2.8.2):
     dependencies:

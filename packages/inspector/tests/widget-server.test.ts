@@ -140,7 +140,30 @@ describe("WidgetServer", () => {
       expect(body).toContain("OpenAI Widget Host");
       expect(body).toContain("iframe");
       expect(body).toContain(result.widgetUrl);
-      expect(body).toContain("72");
+      // The tool result is now injected into the widget HTML, not the host page
+      expect(body).toContain("openai:callTool"); // Check for runtime message handling
+    });
+
+    it("should inject OpenAI runtime into widget HTML", async () => {
+      server = new WidgetServer();
+      await server.start();
+
+      const result = server.createSession(
+        "<html><head></head><body>Widget</body></html>",
+        { temperature: 72 },
+        "get_weather",
+        "openai"
+      );
+
+      const response = await fetch(result.widgetUrl);
+      expect(response.status).toBe(200);
+
+      const body = await response.text();
+      // Check that runtime bootstrap script is injected
+      expect(body).toContain("openai-runtime-bootstrap");
+      expect(body).toContain("window.openai");
+      expect(body).toContain("72"); // Tool result should be in the widget HTML
+      expect(body).toContain("get_weather"); // Tool name should be in the widget HTML
     });
 
     it("should return 404 for unknown session", async () => {

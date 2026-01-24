@@ -197,11 +197,17 @@ export class WidgetServer {
       return;
     }
 
+    // For OpenAI protocol, inject the runtime bootstrap script directly into the widget HTML
+    let html = session.html;
+    if (session.protocol === "openai") {
+      html = this.injectOpenAIRuntime(html, session);
+    }
+
     res.writeHead(200, {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
     });
-    res.end(session.html);
+    res.end(html);
   }
 
   /**
@@ -347,10 +353,9 @@ export class WidgetServer {
 
   /**
    * Generate OpenAI host page HTML
+   * Simpler now since the runtime is injected directly into the widget HTML
    */
   private generateOpenAIHostPage(session: WidgetSession): string {
-    const toolResultJson = JSON.stringify(session.toolResult);
-    const toolNameJson = JSON.stringify(session.toolName);
     const widgetUrl = `http://127.0.0.1:${this.port}/widget/${session.id}`;
 
     return `<!DOCTYPE html>
@@ -368,127 +373,39 @@ export class WidgetServer {
 <body>
   <iframe id="widget-frame" src="${widgetUrl}" sandbox="allow-scripts allow-same-origin"></iframe>
   <script>
-    (function() {
-      const toolResult = ${toolResultJson};
-      const toolName = ${toolNameJson};
-      const iframe = document.getElementById('widget-frame');
+    // Simple host that listens for widget messages
+    const iframe = document.getElementById('widget-frame');
 
-      // Listen for ready event from the widget
-      window.addEventListener('message', function(event) {
-        // Only accept messages from our iframe
-        if (event.source !== iframe.contentWindow) return;
+    window.addEventListener('message', function(event) {
+      // Only accept messages from our iframe
+      if (event.source !== iframe.contentWindow) return;
 
-        const message = event.data;
-        console.log('[OpenAI Host] Received:', JSON.stringify(message));
+      const message = event.data;
+      console.log('[OpenAI Host] Received:', JSON.stringify(message));
 
-        // Handle ready event
-        if (message && message.type === 'ready') {
-          // Send context
-          iframe.contentWindow.postMessage({
-            type: 'context',
-            data: {
-              theme: 'light',
-              displayMode: 'inline',
-              locale: 'en-US',
-              maxHeight: 600,
-              safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
-            },
-          }, '*');
+      // Handle widget tool calls
+      if (message && message.type === 'openai:callTool') {
+        console.log('[WIDGET_TOOL_CALL]', message.toolName, message.args);
+        // Return mock result
+        iframe.contentWindow.postMessage({
+          type: 'openai:callTool:response',
+          callId: message.callId,
+          result: { output: '{"mock": true}' }
+        }, '*');
+      }
 
-          // Send tool output
-          iframe.contentWindow.postMessage({
-            type: 'output',
-            data: {
-              toolOutput: JSON.stringify(toolResult),
-              toolResponseMetadata: { toolName: toolName },
-            },
-          }, '*');
+      // Handle state changes
+      if (message && message.type === 'openai:setWidgetState') {
+        console.log('[OpenAI Host] Widget state changed:', message.state);
+      }
 
-          console.log('[OpenAI Host] Sent context and output');
-        }
+      // Handle resize
+      if (message && message.type === 'openai:resize') {
+        console.log('[OpenAI Host] Widget height:', message.height);
+      }
+    });
 
-        // Handle tool calls
-        if (message && message.type === 'callTool') {
-          console.log('[WIDGET_TOOL_CALL] ' + JSON.stringify({
-            name: message.name,
-            args: message.args,
-          }));
-
-          // Return mock result
-          iframe.contentWindow.postMessage({
-            type: 'callToolResult',
-            id: message.id,
-            result: { output: '{"mock": true}' },
-          }, '*');
-        }
-
-        // Handle state changes
-        if (message && message.type === 'setState') {
-          console.log('[OpenAI Host] State changed:', message.state);
-        }
-      });
-
-      // Also inject SDK into iframe once loaded (for widgets that use window.openai directly)
-      iframe.addEventListener('load', function() {
-        try {
-          // Dispatch set_globals event to iframe
-          const script = \`
-            window.openai = {
-              toolOutput: \${JSON.stringify(JSON.stringify(toolResult))},
-              getToolOutput: function() { return this.toolOutput; },
-              toolResponseMetadata: { toolName: \${JSON.stringify(toolName)} },
-              theme: 'light',
-              displayMode: 'inline',
-              locale: 'en-US',
-              maxHeight: 600,
-              safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
-              _state: null,
-              getState: function() { return this._state; },
-              setState: function(s) {
-                this._state = s;
-                window.parent.postMessage({ type: 'setState', state: s }, '*');
-              },
-              setWidgetState: function(s) { this.setState(s); },
-              callTool: async function(name, args) {
-                return new Promise(function(resolve) {
-                  const id = Date.now().toString();
-                  window.parent.postMessage({ type: 'callTool', id: id, name: name, args: args }, '*');
-                  window.addEventListener('message', function handler(e) {
-                    if (e.data && e.data.type === 'callToolResult' && e.data.id === id) {
-                      window.removeEventListener('message', handler);
-                      resolve(e.data.result);
-                    }
-                  });
-                });
-              },
-              notifyIntrinsicHeight: function() {},
-              requestDisplayMode: async function(o) { return { mode: o.mode }; },
-              openExternal: async function() {},
-              close: function() {},
-              uploadFile: async function() { return { fileId: 'mock' }; },
-              getFileDownloadUrl: async function() { return { downloadUrl: 'https://example.com/mock' }; },
-              sendFollowUpMessage: async function() {},
-            };
-            window.dispatchEvent(new CustomEvent('openai:set_globals', {
-              detail: {
-                globals: {
-                  toolOutput: \${JSON.stringify(toolResult)},
-                  toolResponseMetadata: { toolName: \${JSON.stringify(toolName)} },
-                  theme: 'light',
-                  displayMode: 'inline',
-                  locale: 'en-US',
-                },
-              },
-            }));
-          \`;
-          // Note: This injection only works if same-origin. For cross-origin, we rely on postMessage.
-        } catch (e) {
-          // Expected if cross-origin restrictions apply
-        }
-      });
-
-      console.log('[OpenAI Host] Ready, waiting for widget...');
-    })();
+    console.log('[OpenAI Host] Ready');
   </script>
 </body>
 </html>`;
@@ -521,6 +438,148 @@ export class WidgetServer {
     if (this.options.debug) {
       // eslint-disable-next-line no-console
       console.log(`[WidgetServer] ${message}`);
+    }
+  }
+
+  /**
+   * Inject OpenAI runtime bootstrap script into widget HTML
+   * This creates the window.openai object that widgets expect
+   */
+  private injectOpenAIRuntime(html: string, session: WidgetSession): string {
+    const toolResultJson = JSON.stringify(session.toolResult);
+    const toolNameJson = JSON.stringify(session.toolName);
+
+    // Create the runtime bootstrap script that will be injected into the widget
+    const runtimeScript = `
+<script id="openai-runtime-bootstrap">
+(function() {
+  // OpenAI Runtime Bootstrap for ${session.toolName}
+  const toolOutput = ${toolResultJson};
+  const toolName = ${toolNameJson};
+  const toolResponseMetadata = { toolName: toolName };
+
+  // Create the window.openai SDK object
+  const openaiAPI = {
+    toolInput: {},
+    toolOutput: toolOutput,
+    toolResponseMetadata: toolResponseMetadata,
+    displayMode: 'inline',
+    theme: 'light',
+    locale: 'en-US',
+    maxHeight: null,
+    safeArea: { insets: { top: 0, bottom: 0, left: 0, right: 0 } },
+    userAgent: {
+      device: { type: 'desktop' },
+      capabilities: { hover: true, touch: false }
+    },
+    view: { mode: 'inline', params: {} },
+    widgetState: null,
+    _callId: 0,
+
+    setWidgetState(state) {
+      this.widgetState = state;
+      window.parent.postMessage({ type: 'openai:setWidgetState', state: state }, '*');
+    },
+
+    callTool(toolName, args = {}) {
+      const callId = ++this._callId;
+      return new Promise((resolve, reject) => {
+        const handler = (event) => {
+          if (event.data?.type === 'openai:callTool:response' && event.data.callId === callId) {
+            window.removeEventListener('message', handler);
+            event.data.error ? reject(new Error(event.data.error)) : resolve(event.data.result);
+          }
+        };
+        window.addEventListener('message', handler);
+        window.parent.postMessage({
+          type: 'openai:callTool',
+          callId: callId,
+          toolName: toolName,
+          args: args
+        }, '*');
+        setTimeout(() => {
+          window.removeEventListener('message', handler);
+          reject(new Error('Tool call timeout'));
+        }, 30000);
+      });
+    },
+
+    sendFollowUpMessage(opts) {
+      const prompt = typeof opts === 'string' ? opts : opts?.prompt || '';
+      window.parent.postMessage({ type: 'openai:sendFollowup', message: prompt }, '*');
+    },
+
+    requestDisplayMode(options = {}) {
+      const mode = options.mode || 'inline';
+      this.displayMode = mode;
+      window.parent.postMessage({ type: 'openai:requestDisplayMode', mode: mode, maxHeight: options.maxHeight }, '*');
+      return { mode: mode };
+    },
+
+    requestClose() {
+      window.parent.postMessage({ type: 'openai:requestClose' }, '*');
+    },
+
+    openExternal(options) {
+      const href = typeof options === 'string' ? options : options?.href;
+      if (!href) throw new Error('href is required for openExternal');
+      window.parent.postMessage({ type: 'openai:openExternal', href: href }, '*');
+    },
+
+    notifyIntrinsicHeight(height) {
+      if (typeof height === 'number' && height > 0) {
+        window.parent.postMessage({ type: 'openai:resize', height: Math.round(height) }, '*');
+      }
+    },
+
+    uploadFile: async function() { return { fileId: 'mock-file-id' }; },
+    getFileDownloadUrl: async function() { return { downloadUrl: 'https://example.com/mock' }; },
+  };
+
+  // Define window.openai as non-writable
+  Object.defineProperty(window, 'openai', {
+    value: openaiAPI,
+    writable: false,
+    configurable: false,
+    enumerable: true
+  });
+
+  // Dispatch openai:set_globals event
+  setTimeout(() => {
+    try {
+      window.dispatchEvent(new CustomEvent('openai:set_globals', {
+        detail: {
+          globals: {
+            displayMode: openaiAPI.displayMode,
+            maxHeight: openaiAPI.maxHeight,
+            theme: openaiAPI.theme,
+            locale: openaiAPI.locale,
+            safeArea: openaiAPI.safeArea,
+            userAgent: openaiAPI.userAgent,
+            toolOutput: toolOutput,
+            toolResponseMetadata: toolResponseMetadata
+          }
+        }
+      }));
+    } catch (err) {
+      console.error('[OpenAI Runtime] Failed to dispatch globals event:', err);
+    }
+  }, 0);
+
+  console.log('[OpenAI Runtime] Initialized for tool:', toolName);
+})();
+</script>
+`;
+
+    // Inject the runtime script right after <head> tag or at the start of <body>
+    // Priority: After <head>, or at start of <body>, or at start of document
+    if (html.includes("</head>")) {
+      return html.replace("</head>", `${runtimeScript}\n</head>`);
+    } else if (html.includes("<body")) {
+      return html.replace(/<body([^>]*)>/, `<body$1>\n${runtimeScript}`);
+    } else {
+      // Fallback: prepend to the HTML
+      return runtimeScript + "\n" + html;
     }
   }
 }
