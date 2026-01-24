@@ -17,7 +17,7 @@ import { OAuthConfigSchema } from "../server/oauth/types.js";
  */
 export const ProtocolSchema = z
   .enum(["mcp", "openai"], {
-    message: "must be 'mcp' or 'openai'",
+    error: "must be 'mcp' or 'openai'",
   })
   .nullable()
   .optional()
@@ -37,14 +37,14 @@ export const CorsSchema = z
  * Debug log levels
  */
 export const DebugLevelSchema = z.enum(["debug", "info", "warn", "error"], {
-  message: "must be one of: 'debug', 'info', 'warn', 'error'",
+  error: "must be one of: 'debug', 'info', 'warn', 'error'",
 });
 
 /**
  * Debug transport types
  */
 export const DebugTransportSchema = z.enum(["builtin", "tool", "api"], {
-  message: "must be one of: 'builtin', 'tool', 'api'",
+  error: "must be one of: 'builtin', 'tool', 'api'",
 });
 
 /**
@@ -59,7 +59,9 @@ export const DebugConfigSchema = z
     transport: DebugTransportSchema.nullable().optional(),
     apiEndpoint: z
       .string()
-      .startsWith("/", { message: 'apiEndpoint must start with "/"' })
+      .refine((endpoint) => endpoint.startsWith("/"), {
+        error: 'apiEndpoint must start with "/"',
+      })
       .nullable()
       .optional(),
   })
@@ -72,9 +74,11 @@ export const DebugConfigSchema = z
  */
 export const ServerRouteSchema = z
   .string()
-  .startsWith("/", { message: 'serverRoute must start with "/"' })
+  .refine((route) => route.startsWith("/"), {
+    error: 'serverRoute must start with "/"',
+  })
   .refine((route) => route !== "/health", {
-    message: 'serverRoute cannot be "/health" as it conflicts with the health check endpoint',
+    error: 'serverRoute cannot be "/health" as it conflicts with the health check endpoint',
   })
   .nullable()
   .optional()

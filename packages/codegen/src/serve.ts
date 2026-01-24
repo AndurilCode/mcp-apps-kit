@@ -17,49 +17,6 @@ import type { FileBasedConfig } from "./types.js";
 import type { ToolDefs } from "@mcp-apps-kit/core";
 
 /**
- * Tracks loaded modules for proper cleanup during hot reload
- * Uses WeakRef where possible to avoid preventing garbage collection
- */
-const loadedModulePaths = new Set<string>();
-
-/**
- * Recursively clear module cache for a path and its dependencies
- * Properly handles circular references to avoid memory leaks
- */
-function clearModuleCacheRecursive(modulePath: string, visited = new Set<string>()): void {
-  if (visited.has(modulePath)) {
-    return; // Avoid infinite loops on circular dependencies
-  }
-  visited.add(modulePath);
-
-  const cache = typeof require !== "undefined" ? require.cache : undefined;
-  if (!cache) {
-    return;
-  }
-
-  const cached = cache[modulePath];
-  if (!cached) {
-    return;
-  }
-
-  // Recursively clear children first
-  if (cached.children) {
-    for (const child of cached.children) {
-      // Only clear children that are within tracked paths
-      if (loadedModulePaths.has(child.id)) {
-        clearModuleCacheRecursive(child.id, visited);
-      }
-    }
-    // Clear children array to help GC
-    cached.children.length = 0;
-  }
-
-  // Remove from cache
-  Reflect.deleteProperty(cache, modulePath);
-  loadedModulePaths.delete(modulePath);
-}
-
-/**
  * Validate tools object before hot reload
  *
  * Validates that each tool has:
@@ -329,39 +286,6 @@ Endpoints:
             configPath,
             outDir,
           });
-
-          // Clear Node's module cache for the tools/workflows directories
-          // This ensures jiti reimports fresh versions of modified files
-          // Uses recursive cleanup to properly handle circular dependencies
-          const toolsDir = path.resolve(projectRoot, config.directories?.tools ?? "tools");
-          const workflowsDir = path.resolve(
-            projectRoot,
-            config.directories?.workflows ?? "workflows"
-          );
-          const uiWidgetsDir = config.directories?.uiWidgets
-            ? path.resolve(projectRoot, config.directories.uiWidgets)
-            : null;
-
-          const cache = typeof require !== "undefined" ? require.cache : undefined;
-          if (cache) {
-            // Collect paths to clear (avoid modifying while iterating)
-            const pathsToClear: string[] = [];
-            for (const key of Object.keys(cache)) {
-              if (
-                key.startsWith(toolsDir) ||
-                key.startsWith(workflowsDir) ||
-                key.startsWith(manifestPath) ||
-                (uiWidgetsDir && key.startsWith(uiWidgetsDir))
-              ) {
-                pathsToClear.push(key);
-                loadedModulePaths.add(key);
-              }
-            }
-            // Clear with proper dependency handling
-            for (const modulePath of pathsToClear) {
-              clearModuleCacheRecursive(modulePath);
-            }
-          }
 
           // Re-import the manifest using jiti (fresh instance for cache bypass)
           // Use cache-busting query string to force reimport of all dependencies.
