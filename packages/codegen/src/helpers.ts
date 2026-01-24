@@ -137,6 +137,62 @@ export function defineOrderedMiddleware(
 }
 
 // =============================================================================
+// MIDDLEWARE SORTING UTILITIES
+// =============================================================================
+
+/**
+ * Default order for middleware without explicit order property.
+ * Lower values run first.
+ */
+export const DEFAULT_MIDDLEWARE_ORDER = 100;
+
+/**
+ * A middleware item that can be either a plain middleware function
+ * or an ordered middleware object with explicit order property.
+ */
+export type MiddlewareItem = Middleware | OrderedMiddleware;
+
+/**
+ * Type guard to check if an item is an ordered middleware with explicit order
+ *
+ * @param item - The middleware item to check
+ * @returns True if the item has order and middleware properties
+ */
+export function isOrderedMiddleware(item: unknown): item is OrderedMiddleware {
+  return typeof item === "object" && item !== null && "middleware" in item && "order" in item;
+}
+
+/**
+ * Extract the order value from a middleware item
+ *
+ * @param item - The middleware item
+ * @returns The order value (defaults to DEFAULT_MIDDLEWARE_ORDER)
+ */
+export function getMiddlewareOrder(item: MiddlewareItem): number {
+  return isOrderedMiddleware(item) ? item.order : DEFAULT_MIDDLEWARE_ORDER;
+}
+
+/**
+ * Extract the middleware function from a middleware item
+ *
+ * @param item - The middleware item
+ * @returns The underlying middleware function
+ */
+export function getMiddlewareFn(item: MiddlewareItem): Middleware {
+  return isOrderedMiddleware(item) ? item.middleware : item;
+}
+
+/**
+ * Sort middleware items by their order property (lower runs first)
+ *
+ * @param middlewareList - Array of middleware items to sort
+ * @returns Sorted array of middleware items
+ */
+export function sortMiddleware<T extends MiddlewareItem>(middlewareList: T[]): T[] {
+  return [...middlewareList].sort((a, b) => getMiddlewareOrder(a) - getMiddlewareOrder(b));
+}
+
+// =============================================================================
 // EVENT CONSTANTS
 // =============================================================================
 

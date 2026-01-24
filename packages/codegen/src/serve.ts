@@ -12,6 +12,7 @@ import { createJiti } from "jiti";
 import { runCodegen } from "./generator.js";
 import { loadConfigWithFallback, isVersionedConfig } from "./config.js";
 import { createStandaloneWatcher } from "./watcher.js";
+import { sortMiddleware, getMiddlewareFn } from "./helpers.js";
 import type { FileBasedConfig } from "./types.js";
 import type { ToolDefs } from "@mcp-apps-kit/core";
 
@@ -222,22 +223,10 @@ async function serve(options: ServeOptions = {}): Promise<void> {
   });
 
   // Register file-based middleware (sorted by order property)
-  // Default order for middleware without explicit order (lower = runs first)
-  const DEFAULT_MIDDLEWARE_ORDER = 100;
-
-  // Type guard to check if item is ordered middleware
-  const isOrderedMiddleware = (item: unknown): item is { middleware: unknown; order: number } =>
-    typeof item === "object" && item !== null && "middleware" in item && "order" in item;
-
   const middlewareList = manifest.middleware ?? [];
-  const sortedMiddleware = [...middlewareList].sort((a, b) => {
-    const orderA = isOrderedMiddleware(a) ? a.order : DEFAULT_MIDDLEWARE_ORDER;
-    const orderB = isOrderedMiddleware(b) ? b.order : DEFAULT_MIDDLEWARE_ORDER;
-    return orderA - orderB;
-  });
+  const sortedMiddleware = sortMiddleware(middlewareList as Parameters<typeof sortMiddleware>[0]);
   for (const mw of sortedMiddleware) {
-    const middlewareFn = isOrderedMiddleware(mw) ? mw.middleware : mw;
-    app.use(middlewareFn);
+    app.use(getMiddlewareFn(mw));
   }
 
   // Register file-based event handlers

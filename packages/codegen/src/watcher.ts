@@ -464,28 +464,37 @@ export async function createStandaloneWatcher(
     }, 100);
   };
 
-  // Filter to only include directories that exist
-  const fs = await import("node:fs");
-  const existingDirs = dirsToWatch.filter((dir) => {
-    try {
-      return fs.existsSync(dir);
-    } catch {
-      return false;
-    }
-  });
+  // Filter to only include directories that exist (async to avoid blocking event loop)
+  const fsPromises = await import("node:fs/promises");
+  const existenceChecks = await Promise.all(
+    dirsToWatch.map(async (dir) => {
+      try {
+        await fsPromises.access(dir);
+        return { dir, exists: true };
+      } catch {
+        return { dir, exists: false };
+      }
+    })
+  );
+  const existingDirs = existenceChecks.filter((check) => check.exists).map((check) => check.dir);
 
   // Create chokidar watcher with cross-platform settings
+  // Use pattern-based ignoring to avoid synchronous file operations
   const watcher: ChokidarFSWatcher = chokidar.watch(existingDirs, {
-    ignored: (filePath: string) => {
-      // Skip files we shouldn't process
+    ignored: (filePath: string, stats) => {
+      // Skip files we shouldn't process (e.g., hidden files, node_modules)
       if (shouldSkipFile(filePath)) return true;
-      // Only watch files with valid extensions (or directories)
-      const isDir = fs.existsSync(filePath) && fs.statSync(filePath).isDirectory();
-      if (!isDir && !hasValidExtension(filePath)) return true;
+      // If stats are provided, use them to check if it's a directory (avoids sync fs call)
+      // Directories are always watched, only filter out non-matching file extensions
+      if (stats?.isDirectory()) return false;
+      // For files without stats, only filter by extension (safe since chokidar resolves dirs)
+      if (!hasValidExtension(filePath)) return true;
       return false;
     },
     persistent: true,
     ignoreInitial: true, // Don't fire events for existing files on startup
+    // Enable stats to avoid sync file operations in ignored callback
+    alwaysStat: true,
   });
 
   // Handle file add/unlink events

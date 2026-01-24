@@ -129,6 +129,37 @@ export const VersionDirectoriesSchema = z
   .optional();
 
 /**
+ * Plugin schema for validating plugin objects
+ *
+ * Plugins must have a name and optionally a version.
+ * All hooks are optional functions.
+ */
+export const PluginSchema = z.object({
+  name: z.string().min(1, { message: "Plugin name is required" }),
+  version: z.string().optional(),
+  config: z.unknown().optional(),
+  configSchema: z.unknown().optional(),
+  // Lifecycle hooks
+  onInit: z.function().optional(),
+  onStart: z.function().optional(),
+  onShutdown: z.function().optional(),
+  // Tool execution hooks
+  beforeToolCall: z.function().optional(),
+  afterToolCall: z.function().optional(),
+  onToolError: z.function().optional(),
+  // HTTP hooks
+  onRequest: z.function().optional(),
+  onResponse: z.function().optional(),
+  // UI hooks
+  onUILoad: z.function().optional(),
+});
+
+/**
+ * Plugins array schema for validating plugin arrays in configuration
+ */
+export const PluginsArraySchema = z.array(PluginSchema).optional();
+
+/**
  * Helper type for validation result
  */
 export type ValidationResult<T> =

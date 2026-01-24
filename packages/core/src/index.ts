@@ -189,6 +189,8 @@ export {
   OpenAIConfigSchema,
   GlobalConfigSchema,
   VersionDirectoriesSchema,
+  PluginSchema,
+  PluginsArraySchema,
   validateGlobalConfigSchema,
   formatZodError as formatConfigZodError,
 } from "./utils/config-schemas.js";

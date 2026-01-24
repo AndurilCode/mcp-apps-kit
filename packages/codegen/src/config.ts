@@ -11,6 +11,7 @@ import { createJiti } from "jiti";
 import {
   GlobalConfigSchema,
   VersionDirectoriesSchema,
+  PluginsArraySchema,
   formatConfigZodError,
 } from "@mcp-apps-kit/core";
 import type {
@@ -165,6 +166,20 @@ function validateVersionDirectoriesConfig(dirs: Record<string, unknown>, prefix:
 }
 
 /**
+ * Validate plugins array configuration using shared Zod schema
+ *
+ * @param plugins - The plugins array to validate
+ * @param prefix - Error message prefix (e.g., "Configuration" or "Version 'v1'")
+ * @throws Error if plugins array is invalid
+ */
+function validatePluginsConfig(plugins: unknown, prefix: string): void {
+  const result = PluginsArraySchema.safeParse(plugins);
+  if (!result.success) {
+    throw new Error(formatConfigZodError(result.error, `${prefix} 'plugins'`));
+  }
+}
+
+/**
  * Validate a single version configuration
  */
 function validateVersionConfig(
@@ -203,11 +218,9 @@ function validateVersionConfig(
     validateGlobalConfigFields(globalConfig, `Version '${versionKey}' 'config'`);
   }
 
-  // Optional: plugins
+  // Optional: plugins (validated with shared schema)
   if (cfg.plugins !== undefined) {
-    if (!Array.isArray(cfg.plugins)) {
-      throw new Error(`Version '${versionKey}' 'plugins' must be an array`);
-    }
+    validatePluginsConfig(cfg.plugins, `Version '${versionKey}'`);
   }
 }
 
@@ -267,11 +280,9 @@ export function validateVersionedConfig(
     validateGlobalConfigFields(globalConfig, "Configuration 'config'");
   }
 
-  // Optional: plugins
+  // Optional: plugins (validated with shared schema)
   if (cfg.plugins !== undefined) {
-    if (!Array.isArray(cfg.plugins)) {
-      throw new Error("Configuration 'plugins' must be an array");
-    }
+    validatePluginsConfig(cfg.plugins, "Configuration");
   }
 
   // Optional: icon
@@ -354,11 +365,9 @@ export function validateConfig(config: unknown): asserts config is FileBasedConf
     validateGlobalConfigFields(globalConfig, "Configuration 'config'");
   }
 
-  // Optional plugins
+  // Optional plugins (validated with shared schema)
   if (cfg.plugins !== undefined) {
-    if (!Array.isArray(cfg.plugins)) {
-      throw new Error("Configuration 'plugins' must be an array");
-    }
+    validatePluginsConfig(cfg.plugins, "Configuration");
   }
 
   // Optional icon

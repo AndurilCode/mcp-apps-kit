@@ -627,24 +627,76 @@ export async function generateManifest(options: GenerateManifestOptions): Promis
     };
   }
 
-  // Analyze each file for exports
+  // Analyze all files in parallel for better performance with large codebases
+  const [
+    toolAnalysisResults,
+    workflowAnalysisResults,
+    uiAnalysisResults,
+    uiWidgetAnalysisResults,
+    middlewareAnalysisResults,
+    handlerAnalysisResults,
+  ] = await Promise.all([
+    // Analyze tool files
+    Promise.all(
+      toolFiles.map(async (file) => ({
+        file,
+        analysis: await analyzeFile(file.filePath),
+      }))
+    ),
+    // Analyze workflow files
+    Promise.all(
+      workflowFiles.map(async (file) => ({
+        file,
+        analysis: await analyzeFile(file.filePath),
+      }))
+    ),
+    // Analyze UI files
+    Promise.all(
+      uiFiles.map(async (file) => ({
+        file,
+        analysis: await analyzeFile(file.filePath),
+      }))
+    ),
+    // Analyze UI widget files
+    Promise.all(
+      uiWidgetFiles.map(async (file) => ({
+        file,
+        analysis: await analyzeFile(file.filePath),
+      }))
+    ),
+    // Analyze middleware files
+    Promise.all(
+      middlewareFiles.map(async (file) => ({
+        file,
+        analysis: await analyzeFile(file.filePath),
+      }))
+    ),
+    // Analyze handler files
+    Promise.all(
+      handlerFiles.map(async (file) => ({
+        file,
+        analysis: await analyzeFile(file.filePath),
+      }))
+    ),
+  ]);
+
+  // Process tool analysis results
   const validTools: DiscoveredFile[] = [];
-  for (const file of toolFiles) {
-    const { hasDefaultExport, hasUiExport } = await analyzeFile(file.filePath);
-    if (!hasDefaultExport) {
+  for (const { file, analysis } of toolAnalysisResults) {
+    if (!analysis.hasDefaultExport) {
       warnings.push(`Skipping ${file.relativePath}: no default export found`);
       logger.warn(`Skipping tools/${file.relativePath}: no default export found`);
       continue;
     }
     file.hasDefaultExport = true;
-    file.hasUiExport = hasUiExport;
+    file.hasUiExport = analysis.hasUiExport;
     validTools.push(file);
   }
 
+  // Process workflow analysis results
   const validWorkflows: DiscoveredFile[] = [];
-  for (const file of workflowFiles) {
-    const { hasDefaultExport } = await analyzeFile(file.filePath);
-    if (!hasDefaultExport) {
+  for (const { file, analysis } of workflowAnalysisResults) {
+    if (!analysis.hasDefaultExport) {
       warnings.push(`Skipping ${file.relativePath}: no default export found`);
       logger.warn(`Skipping workflows/${file.relativePath}: no default export found`);
       continue;
@@ -653,10 +705,10 @@ export async function generateManifest(options: GenerateManifestOptions): Promis
     validWorkflows.push(file);
   }
 
+  // Process UI analysis results
   const validUis: DiscoveredFile[] = [];
-  for (const file of uiFiles) {
-    const { hasDefaultExport } = await analyzeFile(file.filePath);
-    if (!hasDefaultExport) {
+  for (const { file, analysis } of uiAnalysisResults) {
+    if (!analysis.hasDefaultExport) {
       warnings.push(`Skipping ${file.relativePath}: no default export found`);
       logger.warn(`Skipping ui/${file.relativePath}: no default export found`);
       continue;
@@ -665,27 +717,25 @@ export async function generateManifest(options: GenerateManifestOptions): Promis
     validUis.push(file);
   }
 
-  // Analyze UI widget files
+  // Process UI widget analysis results
   // Widget files can export UI definition as default OR as named 'ui' export
   // (named export allows colocating React component as default for vite plugin)
   const validUiWidgets: DiscoveredFile[] = [];
-  for (const file of uiWidgetFiles) {
-    const { hasDefaultExport, hasUiExport } = await analyzeFile(file.filePath);
-    if (!hasDefaultExport && !hasUiExport) {
+  for (const { file, analysis } of uiWidgetAnalysisResults) {
+    if (!analysis.hasDefaultExport && !analysis.hasUiExport) {
       warnings.push(`Skipping ${file.relativePath}: no default or ui export found`);
       logger.warn(`Skipping uiWidgets/${file.relativePath}: no default or ui export found`);
       continue;
     }
-    file.hasDefaultExport = hasDefaultExport;
-    file.hasUiExport = hasUiExport;
+    file.hasDefaultExport = analysis.hasDefaultExport;
+    file.hasUiExport = analysis.hasUiExport;
     validUiWidgets.push(file);
   }
 
-  // Analyze middleware files
+  // Process middleware analysis results
   const validMiddleware: DiscoveredFile[] = [];
-  for (const file of middlewareFiles) {
-    const { hasDefaultExport } = await analyzeFile(file.filePath);
-    if (!hasDefaultExport) {
+  for (const { file, analysis } of middlewareAnalysisResults) {
+    if (!analysis.hasDefaultExport) {
       warnings.push(`Skipping ${file.relativePath}: no default export found`);
       logger.warn(`Skipping middleware/${file.relativePath}: no default export found`);
       continue;
@@ -694,11 +744,10 @@ export async function generateManifest(options: GenerateManifestOptions): Promis
     validMiddleware.push(file);
   }
 
-  // Analyze handler files
+  // Process handler analysis results
   const validHandlers: DiscoveredFile[] = [];
-  for (const file of handlerFiles) {
-    const { hasDefaultExport } = await analyzeFile(file.filePath);
-    if (!hasDefaultExport) {
+  for (const { file, analysis } of handlerAnalysisResults) {
+    if (!analysis.hasDefaultExport) {
       warnings.push(`Skipping ${file.relativePath}: no default export found`);
       logger.warn(`Skipping handlers/${file.relativePath}: no default export found`);
       continue;
@@ -804,40 +853,19 @@ function generateServerCode(configPath: string, port: number = 3000): string {
 // Generated by @mcp-apps-kit/codegen
 
 import { createFileBasedApp } from "@mcp-apps-kit/core";
-import type { Middleware } from "@mcp-apps-kit/core";
+import {
+  sortMiddleware,
+  getMiddlewareFn,
+  type MiddlewareItem,
+} from "@mcp-apps-kit/codegen";
 import config from "${configImportPath}";
 import { tools, middleware, handlers } from "./app-manifest.js";
-
-// Type for ordered middleware (has { middleware, order } shape)
-type OrderedMiddleware = { middleware: Middleware; order: number };
-// Middleware can be either a plain function or an ordered middleware object
-type MiddlewareItem = Middleware | OrderedMiddleware;
-
-// Default order for middleware without explicit order (lower = runs first)
-const DEFAULT_MIDDLEWARE_ORDER = 100;
-
-// Type guard to check if item is ordered middleware
-function isOrderedMiddleware(item: MiddlewareItem): item is OrderedMiddleware {
-  return typeof item === "object" && item !== null && "middleware" in item && "order" in item;
-}
-
-// Extract the order value from a middleware item
-function getMiddlewareOrder(item: MiddlewareItem): number {
-  return isOrderedMiddleware(item) ? item.order : DEFAULT_MIDDLEWARE_ORDER;
-}
-
-// Extract the middleware function from a middleware item
-function getMiddlewareFn(item: MiddlewareItem): Middleware {
-  return isOrderedMiddleware(item) ? item.middleware : item;
-}
 
 // Cast config to expected type (defineConfig returns a union type)
 export const app = createFileBasedApp({ ...config, tools } as Parameters<typeof createFileBasedApp>[0]);
 
 // Register file-based middleware (sorted by order property)
-const sortedMiddleware = ([...middleware] as MiddlewareItem[]).sort(
-  (a, b) => getMiddlewareOrder(a) - getMiddlewareOrder(b)
-);
+const sortedMiddleware = sortMiddleware([...middleware] as MiddlewareItem[]);
 for (const mw of sortedMiddleware) {
   app.use(getMiddlewareFn(mw));
 }
@@ -1084,6 +1112,7 @@ function generateVersionedServerCode(
 
 import { createApp } from "@mcp-apps-kit/core";
 import type { VersionsConfig } from "@mcp-apps-kit/core";
+import { sortMiddleware, getMiddlewareFn } from "@mcp-apps-kit/codegen";
 import config from "${configImportPath}";
 import { versions } from "./versions-manifest.js";
 
@@ -1115,14 +1144,9 @@ export const app = createApp(versionedConfig);
 
 // Register file-based middleware from all versions (sorted by order property)
 const allMiddleware = Object.values(versions).flatMap((v) => [...v.middleware]);
-const sortedMiddleware = [...allMiddleware].sort((a, b) => {
-  const orderA = typeof a === "object" && "order" in a ? a.order : 100;
-  const orderB = typeof b === "object" && "order" in b ? b.order : 100;
-  return orderA - orderB;
-});
+const sortedMiddleware = sortMiddleware(allMiddleware);
 for (const mw of sortedMiddleware) {
-  const middlewareFn = typeof mw === "object" && "middleware" in mw ? mw.middleware : mw;
-  app.use(middlewareFn);
+  app.use(getMiddlewareFn(mw));
 }
 
 // Register file-based event handlers from all versions

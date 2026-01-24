@@ -225,7 +225,8 @@ describe("config", () => {
         plugins: "not-an-array",
       };
 
-      expect(() => validateConfig(config)).toThrow("Configuration 'plugins' must be an array");
+      // Zod validation now provides detailed type error
+      expect(() => validateConfig(config)).toThrow("Configuration 'plugins': Invalid input");
     });
 
     it("should validate icon string", () => {

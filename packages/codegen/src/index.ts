@@ -109,7 +109,18 @@ export {
 } from "./naming";
 
 // File-based middleware and event handler helpers
-export { defineMiddleware, defineOrderedMiddleware, defineHandler, Events } from "./helpers";
+export {
+  defineMiddleware,
+  defineOrderedMiddleware,
+  defineHandler,
+  Events,
+  // Middleware sorting utilities
+  DEFAULT_MIDDLEWARE_ORDER,
+  isOrderedMiddleware,
+  getMiddlewareOrder,
+  getMiddlewareFn,
+  sortMiddleware,
+} from "./helpers";
 export type {
   MiddlewareDefinition,
   BeforeHook,
@@ -118,6 +129,7 @@ export type {
   FileBasedMiddlewareDefinition,
   OrderedMiddleware,
   HandlerDefinition,
+  MiddlewareItem,
 } from "./helpers";
 
 /**
