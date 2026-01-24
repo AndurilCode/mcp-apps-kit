@@ -349,8 +349,11 @@ describe("generator", () => {
       });
 
       expect(result.errors).toHaveLength(0);
-      // Check that UI widget import is generated
-      expect(result.code).toContain('import greet_ui from "../ui/widgets/greet.js";');
+      // Check that UI widget import is generated (with raw import and html path inference)
+      expect(result.code).toContain('import _greet_ui_raw from "../ui/widgets/greet.js";');
+      expect(result.code).toContain(
+        'const greet_ui = { ..._greet_ui_raw, html: _greet_ui_raw.html ?? "./ui/dist/greet.html" };'
+      );
       // Check that binding code is generated using _setUi()
       expect(result.code).toContain("greet._setUi(greet_ui);");
       // Check that uiWidgets export is generated

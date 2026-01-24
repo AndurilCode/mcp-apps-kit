@@ -4,8 +4,18 @@
 </p>
 
 <p align="center">
+  <strong>Build interactive AI apps for MCP Apps and ChatGPT. The Modern TypeScript Way.</strong>
+</p>
+
+<p align="center">
   <a href="https://github.com/AndurilCode/mcp-apps-kit/actions/workflows/publish.yml">
     <img src="https://github.com/AndurilCode/mcp-apps-kit/actions/workflows/publish.yml/badge.svg?branch=main" alt="Publish to npm">
+  </a>
+  <a href="https://www.npmjs.com/package/@mcp-apps-kit/core">
+    <img src="https://img.shields.io/npm/v/%40mcp-apps-kit%2Fcore?logo=npm&label=core" alt="npm @mcp-apps-kit/core">
+  </a>
+  <a href="https://www.npmjs.com/package/@mcp-apps-kit/codegen">
+    <img src="https://img.shields.io/npm/v/%40mcp-apps-kit%2Fcodegen?logo=npm&label=codegen" alt="npm @mcp-apps-kit/codegen">
   </a>
   <a href="https://www.npmjs.com/package/@mcp-apps-kit/core">
     <img src="https://img.shields.io/node/v/%40mcp-apps-kit%2Fcore?label=node&logo=node.js&logoColor=white" alt="Node >=18">
@@ -16,29 +26,27 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@mcp-apps-kit/core">
-    <img src="https://img.shields.io/npm/v/%40mcp-apps-kit%2Fcore?label=%40mcp-apps-kit%2Fcore&logo=npm" alt="npm @mcp-apps-kit/core">
-  </a>
-  <a href="https://www.npmjs.com/package/@mcp-apps-kit/ui">
-    <img src="https://img.shields.io/npm/v/%40mcp-apps-kit%2Fui?label=%40mcp-apps-kit%2Fui&logo=npm" alt="npm @mcp-apps-kit/ui">
-  </a>
-  <a href="https://www.npmjs.com/package/@mcp-apps-kit/ui-react">
-    <img src="https://img.shields.io/npm/v/%40mcp-apps-kit%2Fui-react?label=%40mcp-apps-kit%2Fui-react&logo=npm" alt="npm @mcp-apps-kit/ui-react">
-  </a>
-  <a href="https://www.npmjs.com/package/@mcp-apps-kit/ui-react-builder">
-    <img src="https://img.shields.io/npm/v/%40mcp-apps-kit%2Fui-react-builder?label=%40mcp-apps-kit%2Fui-react-builder&logo=npm" alt="npm @mcp-apps-kit/ui-react-builder">
-  </a>
-  <a href="https://www.npmjs.com/package/@mcp-apps-kit/create-app">
-    <img src="https://img.shields.io/npm/v/%40mcp-apps-kit%2Fcreate-app?label=%40mcp-apps-kit%2Fcreate-app&logo=npm" alt="npm @mcp-apps-kit/create-app">
-  </a>
-  <a href="https://www.npmjs.com/package/@mcp-apps-kit/testing">
-    <img src="https://img.shields.io/npm/v/%40mcp-apps-kit%2Ftesting?label=%40mcp-apps-kit%2Ftesting&logo=npm" alt="npm @mcp-apps-kit/testing">
-  </a>
+  <a href="#quick-start">Quick Start</a> •
+  <a href="https://andurilcode.github.io/mcp-apps-kit/">Documentation</a> •
+  <a href="#examples">Examples</a> •
+  <a href="https://github.com/AndurilCode/mcp-apps-kit/issues">Issues</a>
 </p>
 
-<p align="center">
-  <strong>Build interactive AI apps for <a href="https://blog.modelcontextprotocol.io/posts/2025-11-21-mcp-apps/">MCP Apps</a> and <a href="https://developers.openai.com/apps-sdk">ChatGPT</a> from a single codebase.</strong>
-</p>
+---
+
+## Features at a Glance
+
+| Feature                           | Description                                                        |
+| --------------------------------- | ------------------------------------------------------------------ |
+| **File-Based Development**        | Tools, widgets, and workflows auto-discovered from your filesystem |
+| **Convention over Configuration** | `tools/get-weather.ts` → `getWeather` tool, automatically          |
+| **Colocated Widgets**             | React UIs in `ui/widgets/` auto-bind to matching tools             |
+| **Type-Safe End-to-End**          | Full TypeScript inference from inputs to UI props                  |
+| **Dual Platform**                 | Single codebase deploys to MCP Apps & ChatGPT                      |
+| **Hot Module Reload**             | Vite-powered dev server with instant feedback                      |
+| **Zero Boilerplate**              | No manifest files to maintain — codegen handles it                 |
+
+---
 
 ## Quick Start
 
@@ -47,302 +55,342 @@ npx @mcp-apps-kit/create-app@latest my-app
 cd my-app && npm run dev
 ```
 
-## Features
+Or manually set up a file-based project:
 
-- 🔌 **Single codebase** — Define tools and UI once, deploy to MCP Apps & ChatGPT
-- 🎯 **Type-safe** — Full TypeScript inference for inputs, outputs, and UI access
-- ⚛️ **React bindings** — First-class hooks, context, and component UIs
-- 🔐 **OAuth 2.1** — JWT validation and JWKS discovery built-in
-- 🧪 **Testing utilities** — Property-based testing, UI mocks, and LLM evaluation
-- 📦 **Flexible deployment** — Express server, serverless, or stdio
-- 🔀 **API versioning** — Expose multiple versions from a single app
-- 🔄 **Workflow engine** — Compose multi-step workflows with parallel execution, branching, and retry policies
-
-## Table of Contents
-
-- [Packages](#packages)
-- [Install](#install)
-- [Usage](#usage)
-- [Deployment](#deployment)
-- [Platform Support](#platform-support)
-- [Examples](#examples)
-- [API](#api)
-- [Contributing](#contributing)
+```bash
+npm install @mcp-apps-kit/core @mcp-apps-kit/codegen zod
+```
 
 ---
 
-## Background
+## How It Works
 
-MCP AppsKit is a TypeScript framework for building interactive applications with shared tool and UI definitions. [MCP Apps](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/1865) enables servers to deliver interactive UIs to MCP hosts. [OpenAI Apps SDK](https://openai.com/index/introducing-apps-in-chatgpt/) powers apps inside ChatGPT. This framework abstracts both protocols, providing a server runtime, client SDK, React bindings, and a scaffolding CLI.
+MCP AppsKit uses **file-based conventions** to eliminate boilerplate. Drop files in the right directories and everything wires up automatically.
 
-**Best for:** One codebase serving MCP Apps + ChatGPT, type-safe tools with Zod, tool-to-UI rendering patterns.
+### Project Structure
 
-**May not fit:** Single protocol with low-level control needs, or custom transport/session behavior beyond the built-in server.
-
-## Packages
-
-| Package                          | Description                        |
-| -------------------------------- | ---------------------------------- |
-| `@mcp-apps-kit/core`             | Server-side framework              |
-| `@mcp-apps-kit/ui`               | Client-side SDK (vanilla JS)       |
-| `@mcp-apps-kit/ui-react`         | React bindings                     |
-| `@mcp-apps-kit/ui-react-builder` | Build tool for React component UIs |
-| `@mcp-apps-kit/create-app`       | CLI scaffolding tool               |
-| `@mcp-apps-kit/testing`          | Testing utilities for MCP apps     |
-
-## Compatibility
-
-- **Node.js**: >= 18 (runtime packages), >= 20 (`@mcp-apps-kit/create-app` CLI and monorepo development)
-- **React**: 18.x or 19.x (peer dependency)
-- **Zod**: ^4.0.0 required
-
-## Install
-
-```bash
-# Server framework
-npm install @mcp-apps-kit/core zod
-
-# React UI (includes @mcp-apps-kit/ui)
-npm install @mcp-apps-kit/ui-react
+```
+my-app/
+├── mcp.config.ts              # App configuration (single source of truth)
+├── tools/
+│   ├── get-weather.ts         # → getWeather tool
+│   └── search-location.ts     # → searchLocation tool
+├── workflows/
+│   └── daily-briefing.ts      # → dailyBriefing workflow
+├── ui/widgets/
+│   ├── get-weather.tsx        # → Auto-bound to getWeather tool
+│   └── daily-briefing.tsx     # → Auto-bound to dailyBriefing
+├── middleware/
+│   └── logging.ts             # Runs on every tool call
+├── handlers/
+│   └── app-lifecycle.ts       # Server events (start, shutdown)
+└── __generated__/             # Auto-generated (gitignored)
+    └── app-manifest.ts
 ```
 
-See [Packages](#packages) for all available packages.
-
-## Usage
-
-### Server
+### Configuration
 
 ```typescript
-import { createApp, defineTool, defineUI } from "@mcp-apps-kit/core";
-import { z } from "zod";
+// mcp.config.ts
+import { defineConfig } from "@mcp-apps-kit/codegen";
 
-// Define a UI resource for the tool
-const greetingUI = defineUI({
-  name: "Greeting Widget",
-  html: "./ui/dist/greeting.html",
-  prefersBorder: true,
-});
-
-const app = createApp({
-  name: "my-app",
+export default defineConfig({
+  name: "weather-app",
   version: "1.0.0",
-  tools: {
-    greet: defineTool({
-      title: "Greet User",
-      description: "Generate a personalized greeting",
-      input: z.object({
-        name: z.string().describe("Name to greet"),
-      }),
-      output: z.object({
-        message: z.string(),
-        timestamp: z.string(),
-      }),
-      ui: greetingUI,
-      handler: async ({ name }) => ({
-        message: `Hello, ${name}!`,
-        timestamp: new Date().toISOString(),
-      }),
-    }),
+  directories: {
+    tools: "tools",
+    workflows: "workflows",
+    uiWidgets: "ui/widgets",
+    middleware: "middleware",
+    handlers: "handlers",
+  },
+  config: {
+    protocol: "mcp", // or "openai" for ChatGPT
+    cors: { origin: true },
   },
 });
-
-await app.start({ port: 3000 });
 ```
 
-### React UI
+### Define a Tool
 
-Wrap your app with `AppsProvider` and use hooks to access tool results:
+```typescript
+// tools/get-weather.ts
+import { tool } from "@mcp-apps-kit/core";
+import { z } from "zod";
 
-```tsx
-// App.tsx
-import { AppsProvider } from "@mcp-apps-kit/ui-react";
-import { GreetingWidget } from "./GreetingWidget";
-
-export function App() {
-  return (
-    <AppsProvider>
-      <GreetingWidget />
-    </AppsProvider>
-  );
-}
+export default tool
+  .describe("Get current weather for a location")
+  .input({
+    location: z.string().describe("City name"),
+  })
+  .output(
+    z.object({
+      temperature: z.number(),
+      conditions: z.string(),
+      humidity: z.number(),
+    })
+  )
+  .handle(async ({ location }) => {
+    const data = await fetchWeather(location);
+    return {
+      temperature: data.temp,
+      conditions: data.weather,
+      humidity: data.humidity,
+    };
+  });
 ```
 
+### Create a Widget
+
+Widgets in `ui/widgets/` automatically bind to tools with matching filenames:
+
 ```tsx
-// GreetingWidget.tsx
+// ui/widgets/get-weather.tsx
 import { useToolResult, useHostContext } from "@mcp-apps-kit/ui-react";
+import type { WidgetMetadata } from "@mcp-apps-kit/core";
 
-interface GreetingResult {
-  message: string;
-  timestamp: string;
-}
-
-export function GreetingWidget() {
-  const result = useToolResult<GreetingResult>();
+export default function WeatherWidget() {
+  const result = useToolResult<{ temperature: number; conditions: string }>();
   const { theme } = useHostContext();
 
-  if (!result) {
-    return <div>Loading...</div>;
-  }
+  if (!result) return <div>Loading...</div>;
 
   return (
-    <div style={{ background: theme === "dark" ? "#1a1a1a" : "#fff" }}>
-      <h2>{result.message}</h2>
-      <p>Generated at: {new Date(result.timestamp).toLocaleString()}</p>
+    <div className={theme === "dark" ? "dark" : ""}>
+      <h2>{result.temperature}°C</h2>
+      <p>{result.conditions}</p>
     </div>
   );
 }
+
+// Widget metadata (optional)
+export const ui: WidgetMetadata = {
+  name: "Weather Display",
+  prefersBorder: true,
+};
 ```
 
-For complete examples including API versioning, React component UIs, and advanced patterns, see the [Examples](#examples) section.
+### Run Your App
 
-### Workflow Engine
+```bash
+npm run dev
+```
 
-Compose multi-step workflows as MCP tools with parallel execution, conditional branching, and retry policies:
+The codegen watches for changes and regenerates the manifest. Your tools and widgets are instantly available.
+
+---
+
+## Naming Conventions
+
+Files are automatically converted to camelCase identifiers:
+
+| File                     | Tool Name                       |
+| ------------------------ | ------------------------------- |
+| `get-current-weather.ts` | `getCurrentWeather`             |
+| `search_locations.ts`    | `searchLocations`               |
+| `DailyBriefing.ts`       | `dailyBriefing`                 |
+| `_shared.ts`             | _(ignored — underscore prefix)_ |
+
+---
+
+## Packages
+
+| Package                                                                 | Description                                  |
+| ----------------------------------------------------------------------- | -------------------------------------------- |
+| [`@mcp-apps-kit/core`](packages/core/README.md)                         | Server framework with tool/workflow builders |
+| [`@mcp-apps-kit/codegen`](packages/codegen/)                            | File-based discovery and manifest generation |
+| [`@mcp-apps-kit/ui`](packages/ui/README.md)                             | Client SDK (vanilla JS)                      |
+| [`@mcp-apps-kit/ui-react`](packages/ui-react/README.md)                 | React bindings and hooks                     |
+| [`@mcp-apps-kit/ui-react-builder`](packages/ui-react-builder/README.md) | Vite plugin for widget bundling              |
+| [`@mcp-apps-kit/create-app`](packages/create-app/README.md)             | CLI scaffolding tool                         |
+| [`@mcp-apps-kit/testing`](packages/testing/README.md)                   | Test utilities and mocks                     |
+
+---
+
+## Advanced Features
+
+### Middleware
+
+Add cross-cutting concerns like logging, auth, or metrics:
 
 ```typescript
-import { createApp, workflow, toolStep, customStep } from "@mcp-apps-kit/core";
-import { z } from "zod";
+// middleware/logging.ts
+import { defineMiddleware } from "@mcp-apps-kit/codegen";
 
-const orderWorkflow = workflow("process_order")
-  .describe("Process a customer order end-to-end")
-  .input({
-    orderId: z.string(),
-    customerId: z.string(),
-  })
-  .output({
-    success: z.boolean(),
-    receiptId: z.string().optional(),
-  })
-  // Sequential steps
-  .step("validate", toolStep("validate_order"))
-  .step("payment", toolStep("process_payment"), {
-    retry: { maxAttempts: 3, delay: 1000, backoff: "exponential" },
-  })
-  // Parallel execution
-  .parallel("notify", [toolStep("send_email"), toolStep("send_sms")])
-  // Conditional branching
-  .branch("shipping", {
-    when: (ctx) => ctx.outputs.validate.isDigital,
-    then: [customStep(async () => ({ delivered: true }))],
-    else: [toolStep("create_shipment")],
-  })
-  .build();
-
-const app = createApp({
-  name: "order-service",
-  version: "1.0.0",
-  tools: {
-    validate_order: defineTool({
-      /* ... */
-    }),
-    process_payment: defineTool({
-      /* ... */
-    }),
-    send_email: defineTool({
-      /* ... */
-    }),
-    send_sms: defineTool({
-      /* ... */
-    }),
-    create_shipment: defineTool({
-      /* ... */
-    }),
-    // Register the workflow as a tool
-    process_order: orderWorkflow,
+export default defineMiddleware({
+  before: async (ctx) => {
+    ctx.state.set("startTime", Date.now());
+    console.log(`Tool called: ${ctx.toolName}`);
+  },
+  after: async (ctx) => {
+    const duration = Date.now() - ctx.state.get("startTime");
+    console.log(`Completed in ${duration}ms`);
   },
 });
 ```
 
-Features include:
+### Event Handlers
 
-- **Sequential steps** with `step()` for ordered execution
-- **Parallel execution** with `parallel()` for concurrent operations
-- **Conditional branching** with `branch()` for dynamic flow control
-- **Retry policies** with exponential/linear backoff
-- **Timeout handling** per step
-- **External MCP calls** to other MCP servers with `externalStep()`
-- **Production-ready** lifecycle management for servers and edge functions
-
-## Deployment
-
-### Express (default)
+React to server lifecycle events:
 
 ```typescript
-await app.start({ port: 3000 });
-```
+// handlers/app-lifecycle.ts
+import { defineHandler, Events } from "@mcp-apps-kit/codegen";
 
-### Custom Express
-
-```typescript
-import express from "express";
-const expressApp = express();
-expressApp.use("/mcp", app.handler());
-expressApp.listen(3000);
-```
-
-### Stdio
-
-```typescript
-await app.start({ transport: "stdio" });
-```
-
-### Serverless
-
-```typescript
-export default {
-  async fetch(request) {
-    return app.handleRequest(request);
+export default defineHandler({
+  event: Events.APP_START,
+  handler: async ({ port }) => {
+    console.log(`Server started on port ${port}`);
   },
-};
+});
 ```
+
+### Multi-Version APIs
+
+Support multiple API versions from a single codebase:
+
+```typescript
+// mcp.config.ts
+export default defineConfig({
+  name: "my-api",
+  versions: {
+    v1: {
+      version: "1.0.0",
+      // Uses versions/v1/tools, versions/v1/workflows, etc.
+    },
+    v2: {
+      version: "2.0.0",
+      config: { debug: { level: "debug" } },
+    },
+  },
+});
+```
+
+### Workflow Engine
+
+Compose multi-step operations:
+
+```typescript
+// workflows/order-process.ts
+import { workflow, toolStep } from "@mcp-apps-kit/core";
+import { z } from "zod";
+
+export default workflow("process_order")
+  .input({ orderId: z.string() })
+  .output({ success: z.boolean() })
+  .step("validate", toolStep("validate_order"))
+  .step("payment", toolStep("process_payment"), {
+    retry: { maxAttempts: 3, backoff: "exponential" },
+  })
+  .parallel("notify", [toolStep("send_email"), toolStep("send_sms")])
+  .build();
+```
+
+---
 
 ## Platform Support
 
 | Feature           | MCP Apps | ChatGPT Apps |
 | ----------------- | -------- | ------------ |
 | Tool Calling      | Yes      | Yes          |
-| Structured Data   | Yes      | Yes          |
-| OAuth 2.1 Auth    | Yes      | Yes          |
+| Structured Output | Yes      | Yes          |
+| React Widgets     | Yes      | Yes          |
+| OAuth 2.1         | Yes      | Yes          |
 | Theme Support     | Yes      | Yes          |
-| Display Modes     | Yes      | Yes          |
 | Persisted State   | No       | Yes          |
-| File Upload       | No       | Yes          |
 | Tool Cancellation | Yes      | No           |
-| Debug Logging     | Yes      | Yes          |
+
+---
 
 ## Examples
 
-Kanban demo repository (tool calling, React widgets, plugins, middleware, events):
+### Weather App
+
+Full-featured example with tools, widgets, middleware, and workflows:
+
+```bash
+git clone https://github.com/AndurilCode/mcp-apps-kit.git
+cd mcp-apps-kit/examples/weather-app
+pnpm install && pnpm dev
+```
+
+### Kanban Demo
+
+Production-ready example with tool calling, React widgets, plugins, middleware, and events:
 
 ```bash
 git clone https://github.com/AndurilCode/kanban-mcp-example.git
 cd kanban-mcp-example
-npm install
-npm run dev
+npm install && npm run dev
 ```
 
-Local examples:
+---
 
-- [examples/minimal](examples/minimal/) - minimal server with API versioning
-- [examples/weather-app](examples/weather-app/) - weather tools with React UI (Open-Meteo API)
-- [examples/restaurant-finder](examples/restaurant-finder/) - search functionality with UI
+## Deployment
 
-## API
+### Express (default)
 
-📖 **[API Reference](https://andurilcode.github.io/mcp-apps-kit/)** - Full TypeDoc-generated documentation
+```typescript
+// Handled automatically by codegen
+npm run start
+```
 
-Detailed package documentation:
+### Stdio Mode
 
-- [packages/core/README.md](packages/core/README.md)
-- [packages/ui/README.md](packages/ui/README.md)
-- [packages/ui-react/README.md](packages/ui-react/README.md)
-- [packages/ui-react-builder/README.md](packages/ui-react-builder/README.md)
-- [packages/create-app/README.md](packages/create-app/README.md)
-- [packages/testing/README.md](packages/testing/README.md)
+```typescript
+// mcp.config.ts
+export default defineConfig({
+  // ...
+  config: {
+    transport: "stdio",
+  },
+});
+```
+
+### Serverless
+
+```typescript
+import { createFileBasedApp } from "@mcp-apps-kit/codegen";
+
+const app = await createFileBasedApp();
+
+export default {
+  async fetch(request: Request) {
+    return app.handleRequest(request);
+  },
+};
+```
+
+---
+
+## Compatibility
+
+- **Node.js**: >= 18 (runtime), >= 20 (development/CLI)
+- **React**: 18.x or 19.x
+- **Zod**: ^4.0.0
+- **Vite**: 5.x, 6.x, or 7.x
+
+---
+
+## API Reference
+
+**[Full Documentation](https://andurilcode.github.io/mcp-apps-kit/)** — TypeDoc-generated API reference
+
+Package documentation:
+
+- [Core API](packages/core/README.md)
+- [UI SDK](packages/ui/README.md)
+- [React Hooks](packages/ui-react/README.md)
+- [Widget Builder](packages/ui-react-builder/README.md)
+- [Testing](packages/testing/README.md)
+
+---
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines. Issues and pull requests are welcome.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup. Issues and pull requests welcome.
+
+---
 
 ## License
 

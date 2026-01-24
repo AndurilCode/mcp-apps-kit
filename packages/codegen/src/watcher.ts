@@ -376,9 +376,7 @@ export async function createStandaloneWatcher(
     } catch (error) {
       // Directory doesn't exist - that's OK, but log other errors
       const isENOENT =
-        error instanceof Error &&
-        "code" in error &&
-        (error as NodeJS.ErrnoException).code === "ENOENT";
+        error instanceof Error && "code" in error && (error as { code?: string }).code === "ENOENT";
       if (!isENOENT) {
         logger.warn(
           `Failed to watch directory ${dir}: ${error instanceof Error ? error.message : String(error)}`

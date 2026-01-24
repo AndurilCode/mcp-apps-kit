@@ -168,12 +168,15 @@ export function composeMiddleware(middleware: Middleware[]): Middleware {
       if (index < middleware.length) {
         const fn = middleware[index++];
         if (fn) {
+          // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
           return await fn(context, dispatch as () => Promise<void>);
         }
       }
+      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
       return await next();
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
     return await dispatch();
   }) as Middleware;
 }
@@ -194,6 +197,7 @@ export function createErrorHandler(
 ): Middleware {
   return (async (context, next) => {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
       return await next();
     } catch (error) {
       await handler(error as Error, context);
@@ -215,8 +219,10 @@ export function createConditionalMiddleware(
 ): Middleware {
   return (async (context, next) => {
     if (condition(context)) {
+      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
       return await middleware(context, next);
     } else {
+      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
       return await next();
     }
   }) as Middleware;
@@ -239,6 +245,7 @@ export function createTimeoutMiddleware(timeoutMs: number): Middleware {
     });
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
       return await Promise.race([next(), timeoutPromise]);
     } finally {
       if (timerId !== undefined) {

@@ -92,22 +92,34 @@ async function processPostCSS(
       try {
         await fs.access(configPath);
         // Config exists, try to load it
-        const configModule = await import(/* @vite-ignore */ `file://${configPath}`);
-        const config = configModule.default || configModule;
+        const configModule = (await import(/* @vite-ignore */ `file://${configPath}`)) as {
+          default?: unknown;
+          [key: string]: unknown;
+        };
+        const config = (configModule.default ?? configModule) as {
+          plugins?: AcceptedPlugin[] | Record<string, unknown>;
+        };
 
         if (config.plugins) {
           // Handle different plugin formats
           if (Array.isArray(config.plugins)) {
-            plugins = config.plugins as AcceptedPlugin[];
+            plugins = config.plugins;
           } else if (typeof config.plugins === "object") {
             // Object format: { '@tailwindcss/postcss': {} }
             for (const [pluginName, pluginOptions] of Object.entries(config.plugins)) {
               try {
-                const pluginModule = await import(/* @vite-ignore */ pluginName);
-                const plugin = pluginModule.default || pluginModule;
-                plugins.push(
-                  (typeof plugin === "function" ? plugin(pluginOptions) : plugin) as AcceptedPlugin
-                );
+                const pluginModule = (await import(/* @vite-ignore */ pluginName)) as {
+                  default?: unknown;
+                  [key: string]: unknown;
+                };
+                const rawPlugin = pluginModule.default ?? pluginModule;
+                const plugin = rawPlugin as AcceptedPlugin | ((options: unknown) => AcceptedPlugin);
+                const loadedPlugin: AcceptedPlugin =
+                  typeof plugin === "function"
+                    ? // @ts-expect-error - PostCSS plugin APIs vary; some take 1 arg, some take 2
+                      (plugin(pluginOptions) as AcceptedPlugin)
+                    : (plugin as AcceptedPlugin);
+                plugins.push(loadedPlugin);
               } catch (pluginError) {
                 logger.warn(
                   `[mcp-react-ui] Could not load PostCSS plugin "${pluginName}": ${
@@ -495,6 +507,9 @@ async function discoverWidgetFiles(
     return discovered;
   }
 
+  // Resolve root real path once for boundary checks
+  const rootRealPath = await fs.realpath(root);
+
   // Filter to .tsx files only
   const tsxFiles = files.filter((f) => f.endsWith(".tsx"));
 
@@ -521,6 +536,15 @@ async function discoverWidgetFiles(
 
       // Resolve real path for symlink safety
       const componentPath = await fs.realpath(filePath);
+
+      // Verify the resolved path stays within the project root
+      if (!isPathWithinRoot(rootRealPath, componentPath)) {
+        logger.warn(
+          `[mcp-react-ui] Refusing to build widget outside project root. ` +
+            `widget="${file}", resolved="${componentPath}"`
+        );
+        continue;
+      }
 
       discovered.push({
         componentName: baseName,

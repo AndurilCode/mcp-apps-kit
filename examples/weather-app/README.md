@@ -54,7 +54,7 @@ Files are automatically converted to camelCase tool names:
 
 - `get-current-weather.ts` → `getCurrentWeather`
 - `daily-briefing.ts` → `dailyBriefing`
-- `SearchResults.tsx` → `searchResults`
+- `search-results.tsx` → `searchResults`
 - Files starting with `_` are ignored (e.g., `_shared.ts`)
 
 ## Development

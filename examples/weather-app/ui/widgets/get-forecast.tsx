@@ -11,6 +11,7 @@ import {
   useDocumentTheme,
   useHostStyleVariables,
 } from "@mcp-apps-kit/ui-react";
+import type { WidgetMetadata } from "@mcp-apps-kit/core";
 import type { WeatherForecast } from "../../services/weatherService.js";
 
 export default function ForecastWidget() {
@@ -81,8 +82,6 @@ export default function ForecastWidget() {
  * UI metadata for convention-based binding.
  * The html path is auto-inferred from the file name.
  */
-import type { WidgetMetadata } from "@mcp-apps-kit/core";
-
 export const ui: WidgetMetadata = {
   name: "Weather Forecast Widget",
   description: "Displays multi-day weather forecast with daily temperatures and conditions",
