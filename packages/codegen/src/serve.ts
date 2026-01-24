@@ -41,11 +41,27 @@ function parseArgs(): ServeOptions {
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--port" || arg === "-p") {
-      options.port = parseInt(args[++i] ?? "3000", 10);
+      const nextArg = args[i + 1];
+      if (!nextArg || nextArg.startsWith("-")) {
+        console.error(`[mcp-serve] Error: ${arg} requires a port number`); // eslint-disable-line no-console
+        process.exit(1);
+      }
+      i++;
+      options.port = parseInt(nextArg, 10);
+      if (isNaN(options.port)) {
+        console.error(`[mcp-serve] Error: Invalid port number: ${nextArg}`); // eslint-disable-line no-console
+        process.exit(1);
+      }
     } else if (arg === "--watch" || arg === "-w") {
       options.watch = true;
     } else if (arg === "--config" || arg === "-c") {
-      options.configPath = args[++i];
+      const nextArg = args[i + 1];
+      if (!nextArg || nextArg.startsWith("-")) {
+        console.error(`[mcp-serve] Error: ${arg} requires a config file path`); // eslint-disable-line no-console
+        process.exit(1);
+      }
+      i++;
+      options.configPath = nextArg;
     }
   }
 

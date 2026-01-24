@@ -56,8 +56,11 @@ export function validateDebug(debug: unknown, prefix = "Config"): void {
 
     // Validate level
     if (debugConfig.level !== undefined && debugConfig.level !== null) {
+      if (typeof debugConfig.level !== "string") {
+        throw new AppError(ErrorCode.INVALID_CONFIG, `${prefix}.debug.level must be a string`);
+      }
       const validLevels = ["debug", "info", "warn", "error"];
-      if (!validLevels.includes(debugConfig.level as string)) {
+      if (!validLevels.includes(debugConfig.level)) {
         throw new AppError(
           ErrorCode.INVALID_CONFIG,
           `${prefix}.debug.level must be one of: ${validLevels.join(", ")}`
@@ -87,8 +90,11 @@ export function validateDebug(debug: unknown, prefix = "Config"): void {
 
     // Validate transport
     if (debugConfig.transport !== undefined && debugConfig.transport !== null) {
+      if (typeof debugConfig.transport !== "string") {
+        throw new AppError(ErrorCode.INVALID_CONFIG, `${prefix}.debug.transport must be a string`);
+      }
       const validTransports = ["builtin", "tool", "api"];
-      if (!validTransports.includes(debugConfig.transport as string)) {
+      if (!validTransports.includes(debugConfig.transport)) {
         throw new AppError(
           ErrorCode.INVALID_CONFIG,
           `${prefix}.debug.transport must be one of: ${validTransports.join(", ")}`

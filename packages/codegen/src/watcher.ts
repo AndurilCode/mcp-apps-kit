@@ -348,9 +348,20 @@ export async function createStandaloneWatcher(
   };
 
   // Set up watchers for each directory
+  // Note: fs.watch with { recursive: true } is not supported on Linux
+  const supportsRecursive = process.platform !== "linux";
+
+  if (!supportsRecursive) {
+    logger.warn(
+      "Recursive file watching is not supported on Linux. " +
+        "Consider using a tool like chokidar for cross-platform recursive watching."
+    );
+  }
+
   for (const dir of dirsToWatch) {
     try {
-      const watcher = fs.watch(dir, { recursive: true }, (_eventType, filename) => {
+      const watchOptions = supportsRecursive ? { recursive: true } : {};
+      const watcher = fs.watch(dir, watchOptions, (_eventType, filename) => {
         if (!filename) return;
 
         const filePath = path.join(dir, filename);
@@ -362,8 +373,17 @@ export async function createStandaloneWatcher(
       });
 
       watchers.push(watcher);
-    } catch {
-      // Directory doesn't exist - that's OK
+    } catch (error) {
+      // Directory doesn't exist - that's OK, but log other errors
+      const isENOENT =
+        error instanceof Error &&
+        "code" in error &&
+        (error as NodeJS.ErrnoException).code === "ENOENT";
+      if (!isENOENT) {
+        logger.warn(
+          `Failed to watch directory ${dir}: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }
   }
 

@@ -25,7 +25,19 @@ export default function CurrentWeatherWidget() {
   const rawResult = result as Record<string, unknown> | undefined;
   const data = (rawResult?.getCurrentWeather ?? rawResult) as CurrentWeather | undefined;
 
-  if (!data || !("temperature" in data)) {
+  // Validate all required fields before rendering
+  const isValidWeatherData = (d: unknown): d is CurrentWeather => {
+    if (!d || typeof d !== "object") return false;
+    const obj = d as Record<string, unknown>;
+    if (!("temperature" in obj) || typeof obj.temperature !== "number") return false;
+    if (!("location" in obj) || typeof obj.location !== "object" || obj.location === null)
+      return false;
+    if (!("windDirection" in obj) || typeof obj.windDirection !== "number") return false;
+    if (!("windSpeed" in obj) || typeof obj.windSpeed !== "number") return false;
+    return true;
+  };
+
+  if (!isValidWeatherData(data)) {
     return (
       <div className="weather-card waiting">
         <span className="waiting-icon animate-float">🌤️</span>
@@ -35,7 +47,9 @@ export default function CurrentWeatherWidget() {
   }
 
   const windDirections = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
-  const windDir = windDirections[Math.round(data.windDirection / 45) % 8];
+  // Normalize windDirection to [0, 360) to handle negative or >= 360 values
+  const normalizedAngle = ((data.windDirection % 360) + 360) % 360;
+  const windDir = windDirections[Math.round(normalizedAngle / 45) % 8];
 
   return (
     <div className="widget-container">

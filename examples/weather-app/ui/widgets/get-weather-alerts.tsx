@@ -25,7 +25,19 @@ export default function AlertsWidget() {
   const rawResult = result as Record<string, unknown> | undefined;
   const data = (rawResult?.getWeatherAlerts ?? rawResult) as WeatherAlertsResponse | undefined;
 
-  if (!data || !("alerts" in data) || !Array.isArray(data.alerts)) {
+  // Validate all required fields including location before rendering
+  const isValidAlertsData = (d: unknown): d is WeatherAlertsResponse => {
+    if (!d || typeof d !== "object") return false;
+    const obj = d as Record<string, unknown>;
+    if (!("alerts" in obj) || !Array.isArray(obj.alerts)) return false;
+    if (!("location" in obj) || typeof obj.location !== "object" || obj.location === null)
+      return false;
+    const loc = obj.location as Record<string, unknown>;
+    if (!("name" in loc) || typeof loc.name !== "string") return false;
+    return true;
+  };
+
+  if (!isValidAlertsData(data)) {
     return (
       <div className="weather-card waiting">
         <span className="waiting-icon animate-float">⚠️</span>

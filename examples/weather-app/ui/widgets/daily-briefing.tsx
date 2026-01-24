@@ -31,7 +31,20 @@ export default function DailyBriefingWidget() {
   const rawResult = result as Record<string, unknown> | undefined;
   const data = (rawResult?.dailyBriefing ?? rawResult) as DailyBriefingResult | undefined;
 
-  if (!data || !("briefing" in data) || typeof data.briefing !== "string") {
+  // Validate all required fields before rendering
+  const isValidData = (d: unknown): d is DailyBriefingResult => {
+    if (!d || typeof d !== "object") return false;
+    const obj = d as Record<string, unknown>;
+    if (!("briefing" in obj) || typeof obj.briefing !== "string") return false;
+    if (!("location" in obj) || typeof obj.location !== "string") return false;
+    if (!("generatedAt" in obj)) return false;
+    // Validate generatedAt is a parsable date
+    const date = new Date(obj.generatedAt as string | number);
+    if (isNaN(date.getTime())) return false;
+    return true;
+  };
+
+  if (!isValidData(data)) {
     return (
       <div className="weather-card waiting">
         <span className="waiting-icon animate-float">📋</span>

@@ -79,11 +79,20 @@ export async function defineApp(options: CreateAppOptions): Promise<FileBasedApp
   const manifestPath = path.resolve(projectRoot, outDir, "app-manifest.js");
 
   // Dynamic import the manifest
-  const cacheBuster = `?t=${Date.now()}`;
-  const manifest = (await import(`file://${manifestPath}${cacheBuster}`)) as {
+  let manifest: {
     tools: Record<string, unknown>;
     workflows: Record<string, unknown>;
   };
+  try {
+    const cacheBuster = `?t=${Date.now()}`;
+    manifest = (await import(`file://${manifestPath}${cacheBuster}`)) as typeof manifest;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Failed to load manifest from ${manifestPath}: ${message}. ` +
+        `Run codegen first to generate the manifest.`
+    );
+  }
 
   // Dynamic import createFileBasedApp from core
   const coreModule = await import("@mcp-apps-kit/core");

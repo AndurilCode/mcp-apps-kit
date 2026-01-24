@@ -73,7 +73,8 @@ export type {
   // Re-export from core for convenience (avoid needing to import from both packages)
   GlobalConfig,
   Icon,
-  Plugin,
+  // Renamed to avoid collision with Vite's Plugin type
+  Plugin as McpPlugin,
 } from "./types";
 
 // Deprecated aliases - re-exported for backwards compatibility
