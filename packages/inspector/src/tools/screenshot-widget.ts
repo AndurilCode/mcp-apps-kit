@@ -2,6 +2,7 @@
  * screenshot_widget tool
  *
  * Renders a tool's UI widget in a browser (Playwright) and captures a screenshot.
+ * Can use an existing session or create a new one.
  */
 
 import { z } from "zod";
@@ -14,8 +15,15 @@ import type { ScreenshotWidgetOutput } from "../types";
 import { UIHostManager, detectProtocolFromMimeType, type DetectedProtocol } from "../ui-host";
 
 export const screenshotWidgetInputSchema = z.object({
-  tool: z.string().describe("Name of the tool to screenshot"),
-  arguments: z.record(z.string(), z.unknown()).describe("Arguments to pass to the tool"),
+  sessionId: z
+    .string()
+    .optional()
+    .describe("Use existing widget session instead of creating new one"),
+  tool: z.string().optional().describe("Name of the tool to screenshot (required if no sessionId)"),
+  arguments: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe("Arguments to pass to the tool (required if no sessionId)"),
   protocol: z
     .enum(["mcp", "openai", "auto"])
     .optional()
@@ -52,10 +60,82 @@ const SCREENSHOTS_DIR = join(tmpdir(), "mcp-inspector-screenshots");
 export function createScreenshotWidgetTool(connectionManager: ConnectionManager) {
   return defineTool({
     description:
-      "Take a screenshot of a tool's UI widget by calling the tool and rendering its result in a browser. Saves the screenshot to a temp file and returns the file path.",
+      "Take a screenshot of a tool's UI widget. Can use an existing widget session (via sessionId) or call the tool and render a new widget. Saves the screenshot to a temp file and returns the file path.",
     input: screenshotWidgetInputSchema,
     output: screenshotWidgetOutputSchema,
     handler: async (input): Promise<ScreenshotWidgetOutput> => {
+      const format = input.format ?? "png";
+      const viewport = input.viewport ?? { width: 800, height: 600 };
+
+      // Check if using existing session
+      if (input.sessionId) {
+        const sessionManager = connectionManager.getWidgetSessionManager();
+        const session = sessionManager.getSession(input.sessionId);
+
+        if (!session) {
+          return {
+            hasUI: false,
+            noUIReason: `Session not found: ${input.sessionId}`,
+            errors: [`Session ${input.sessionId} does not exist or has expired`],
+          };
+        }
+
+        try {
+          const { page, protocol } = session;
+
+          // Target the widget iframe for screenshot (unless fullPage is requested)
+          const frame = page.frame({ url: /\/widget\// });
+          let screenshotResult: { data: Buffer; format: "png" | "jpeg" };
+
+          if (frame && !input.fullPage) {
+            // Screenshot widget iframe content only
+            const body = frame.locator("body");
+            const data = await body.screenshot({ type: format });
+            screenshotResult = { data, format };
+          } else {
+            // Fallback to full page (includes host frame)
+            const data = await page.screenshot({
+              type: format,
+              fullPage: input.fullPage,
+            });
+            screenshotResult = { data, format };
+          }
+
+          // Save screenshot to temp file
+          await mkdir(SCREENSHOTS_DIR, { recursive: true });
+          const timestamp = Date.now();
+          const filename = `${session.toolName}-${timestamp}.${format}`;
+          const screenshotPath = join(SCREENSHOTS_DIR, filename);
+          await writeFile(screenshotPath, screenshotResult.data);
+
+          return {
+            hasUI: true,
+            protocol,
+            screenshotPath,
+            format,
+            dimensions: viewport,
+            errors: [],
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return {
+            hasUI: true,
+            protocol: session.protocol,
+            errors: [`Screenshot failed: ${message}`],
+          };
+        }
+      }
+
+      // Validate required fields for standalone mode
+      if (!input.tool || !input.arguments) {
+        return {
+          hasUI: false,
+          noUIReason: "Either sessionId or both tool and arguments must be provided",
+          errors: ["Missing required parameters"],
+        };
+      }
+
+      // Standalone mode: call tool and render widget
       const client = connectionManager.getClient();
       const rawClient = client.raw;
 
@@ -112,9 +192,6 @@ export function createScreenshotWidgetTool(connectionManager: ConnectionManager)
         if (!protocol) continue;
 
         // Check if URI matches tool name
-        // UI resources typically use patterns like:
-        // - ui://server/__ui_toolname?v=hash
-        // - ui://server/toolname?v=hash
         const toolNamePatterns = [
           `__ui_${input.tool}`,
           `/${input.tool}?`,
@@ -177,7 +254,6 @@ export function createScreenshotWidgetTool(connectionManager: ConnectionManager)
 
       // Step 5: Render in browser and take screenshot
       const uiHostManager = new UIHostManager(client);
-      const viewport = input.viewport ?? { width: 800, height: 600 };
       const environmentState = connectionManager.getEnvironmentState();
 
       try {
@@ -191,7 +267,6 @@ export function createScreenshotWidgetTool(connectionManager: ConnectionManager)
         );
 
         const { page, errors } = renderResult;
-        const format = input.format ?? "png";
 
         // Target the widget iframe for screenshot (unless fullPage is requested)
         const frame = page.frame({ url: /\/widget\// });

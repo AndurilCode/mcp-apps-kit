@@ -28,8 +28,15 @@ const interactionActionSchema = z.object({
 });
 
 export const testWidgetInteractionInputSchema = z.object({
-  tool: z.string().describe("Name of the tool"),
-  arguments: z.record(z.string(), z.unknown()).describe("Arguments to pass to the tool"),
+  sessionId: z
+    .string()
+    .optional()
+    .describe("Use existing widget session instead of creating new one"),
+  tool: z.string().optional().describe("Name of the tool (required if no sessionId)"),
+  arguments: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe("Arguments to pass to the tool (required if no sessionId)"),
   interactions: z.array(interactionActionSchema).describe("List of interactions to perform"),
   protocol: z
     .enum(["mcp", "openai", "auto"])
@@ -73,10 +80,149 @@ export const testWidgetInteractionOutputSchema = z.object({
 export function createTestWidgetInteractionTool(connectionManager: ConnectionManager) {
   return defineTool({
     description:
-      "Test widget interactions by performing a sequence of actions (click, type, hover, wait) and capturing DOM snapshots. Returns snapshots after snapshot actions, plus any tool calls and state changes made by the widget.",
+      "Test widget interactions by performing a sequence of actions (click, type, hover, wait) and capturing DOM snapshots. Can use an existing session. Returns snapshots after snapshot actions, plus any tool calls and state changes made by the widget.",
     input: testWidgetInteractionInputSchema,
     output: testWidgetInteractionOutputSchema,
     handler: async (input): Promise<TestWidgetInteractionOutput> => {
+      const snapshots: Array<{ afterAction: number; dom: string; textContent: string }> = [];
+      const toolCalls: Array<{ name: string; args: unknown }> = [];
+      const stateChanges: Array<{ state: unknown; timestamp: number }> = [];
+      const errors: string[] = [];
+
+      // Check if using existing session
+      if (input.sessionId) {
+        const sessionManager = connectionManager.getWidgetSessionManager();
+        const session = sessionManager.getSession(input.sessionId);
+
+        if (!session) {
+          return {
+            hasUI: false,
+            noUIReason: `Session not found: ${input.sessionId}`,
+            snapshots: [],
+            toolCalls: [],
+            stateChanges: [],
+            errors: [`Session ${input.sessionId} does not exist or has expired`],
+          };
+        }
+
+        try {
+          const { page, protocol } = session;
+
+          // Get the widget iframe for interactions
+          const frame = page.frame({ url: /\/widget\// });
+          if (!frame) {
+            return {
+              hasUI: true,
+              protocol,
+              snapshots: [],
+              toolCalls: [],
+              stateChanges: [],
+              errors: ["Widget iframe not found"],
+            };
+          }
+
+          // Perform each interaction
+          for (let i = 0; i < input.interactions.length; i++) {
+            const actionItem = input.interactions[i];
+            if (!actionItem) continue;
+
+            const actionType = actionItem.action;
+            const selector = actionItem.selector;
+            const text = actionItem.text;
+            const ms = actionItem.ms;
+            const position = actionItem.position;
+
+            try {
+              switch (actionType) {
+                case "click":
+                  if (selector) {
+                    await frame.click(selector);
+                  } else if (position) {
+                    await page.mouse.click(position.x, position.y);
+                  }
+                  break;
+
+                case "type":
+                  if (selector && text) {
+                    await frame.fill(selector, text);
+                  }
+                  break;
+
+                case "hover":
+                  if (selector) {
+                    await frame.hover(selector);
+                  }
+                  break;
+
+                case "wait":
+                  if (ms) {
+                    await page.waitForTimeout(ms);
+                  }
+                  break;
+
+                case "scroll":
+                  if (selector) {
+                    await frame.locator(selector).scrollIntoViewIfNeeded();
+                  } else if (position) {
+                    await frame.evaluate(({ x, y }) => {
+                      // eslint-disable-next-line no-undef
+                      window.scrollTo(x, y);
+                    }, position);
+                  }
+                  break;
+
+                case "snapshot":
+                  {
+                    const dom = await frame.content();
+                    const textContent = (await frame.textContent("body")) ?? "";
+                    snapshots.push({
+                      afterAction: i,
+                      dom,
+                      textContent,
+                    });
+                  }
+                  break;
+              }
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              errors.push(`Action ${i} (${actionType}) failed: ${message}`);
+            }
+          }
+
+          return {
+            hasUI: true,
+            protocol,
+            snapshots,
+            toolCalls,
+            stateChanges,
+            errors,
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return {
+            hasUI: true,
+            protocol: session.protocol,
+            snapshots: [],
+            toolCalls: [],
+            stateChanges: [],
+            errors: [`Interaction test failed: ${message}`],
+          };
+        }
+      }
+
+      // Validate required fields for standalone mode
+      if (!input.tool || !input.arguments) {
+        return {
+          hasUI: false,
+          noUIReason: "Either sessionId or both tool and arguments must be provided",
+          snapshots: [],
+          toolCalls: [],
+          stateChanges: [],
+          errors: ["Missing required parameters"],
+        };
+      }
+
+      // Standalone mode: call tool and render widget
       const client = connectionManager.getClient();
       const rawClient = client.raw;
 
@@ -212,8 +358,6 @@ export function createTestWidgetInteractionTool(connectionManager: ConnectionMan
       const uiHostManager = new UIHostManager(client);
       const viewport = input.viewport ?? { width: 800, height: 600 };
       const environmentState = connectionManager.getEnvironmentState();
-      const errors: string[] = [];
-      const snapshots: Array<{ afterAction: number; dom: string; textContent: string }> = [];
 
       try {
         const renderResult = await uiHostManager.renderInBrowser(
@@ -229,9 +373,6 @@ export function createTestWidgetInteractionTool(connectionManager: ConnectionMan
         errors.push(...renderResult.errors);
 
         // Capture tool calls from console messages (host page logs them)
-        const toolCalls: Array<{ name: string; args: unknown }> = [];
-        const stateChanges: Array<{ state: unknown; timestamp: number }> = [];
-
         page.on("console", (msg) => {
           const text = msg.text();
           if (text.startsWith("[WIDGET_TOOL_CALL] ")) {

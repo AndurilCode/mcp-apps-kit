@@ -24,6 +24,14 @@ export { createGetUIMetadataTool } from "./get-ui-metadata";
 export { createPreviewUITool } from "./preview-ui";
 export { createScreenshotWidgetTool } from "./screenshot-widget";
 export { createTestWidgetInteractionTool } from "./test-widget-interaction";
+export { createGetConsoleLogsTool } from "./get-console-logs";
+
+// Session Management tools
+export {
+  createListSessionsTool,
+  createCloseSessionTool,
+  createCloseAllSessionsTool,
+} from "./session-management";
 
 // Environment Configuration tools
 export { createSetGlobalsTool, createGetGlobalsTool, createResetGlobalsTool } from "./set-globals";
