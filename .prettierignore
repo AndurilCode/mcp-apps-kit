@@ -4,6 +4,7 @@ node_modules/
 # Build outputs
 dist/
 build/
+__generated__/
 
 # Lock files
 package-lock.json

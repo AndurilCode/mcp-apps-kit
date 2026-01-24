@@ -32,7 +32,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && chmod +x dist/cli.js dist/serve.js",
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest",
