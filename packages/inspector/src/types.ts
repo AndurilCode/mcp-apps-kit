@@ -4,6 +4,9 @@
 
 import type { TestClient } from "@mcp-apps-kit/testing";
 
+// Export session types
+export type { ActiveWidgetSession, SessionInfo } from "./widget-session-manager";
+
 // =============================================================================
 // SERVER OPTIONS
 // =============================================================================
@@ -136,6 +139,7 @@ export interface CallToolOutput {
   structuredContent?: unknown;
   error?: { code: string; message: string };
   duration: number;
+  sessionId?: string;
 }
 
 /**
@@ -441,10 +445,12 @@ export interface ElementInfo {
  * Input for preview_ui tool
  */
 export interface PreviewUIInput {
-  /** Tool name to preview */
-  tool: string;
-  /** Arguments to pass to the tool */
-  arguments: Record<string, unknown>;
+  /** Use existing widget session (optional) */
+  sessionId?: string;
+  /** Tool name to preview (required if no sessionId) */
+  tool?: string;
+  /** Arguments to pass to the tool (required if no sessionId) */
+  arguments?: Record<string, unknown>;
   /** Protocol to use (auto-detect if not specified) */
   protocol?: "mcp" | "openai" | "auto";
   /** Time to wait for render (ms, default: 100) */
@@ -481,10 +487,12 @@ export interface PreviewUIOutput {
  * Input for screenshot_widget tool
  */
 export interface ScreenshotWidgetInput {
-  /** Tool name */
-  tool: string;
-  /** Tool arguments */
-  arguments: Record<string, unknown>;
+  /** Use existing widget session (optional) */
+  sessionId?: string;
+  /** Tool name (required if no sessionId) */
+  tool?: string;
+  /** Tool arguments (required if no sessionId) */
+  arguments?: Record<string, unknown>;
   /** Protocol */
   protocol?: "mcp" | "openai" | "auto";
   /** Screenshot format */
@@ -526,10 +534,12 @@ export interface InteractionAction {
  * Input for test_widget_interaction tool
  */
 export interface TestWidgetInteractionInput {
-  /** Tool name */
-  tool: string;
-  /** Tool arguments */
-  arguments: Record<string, unknown>;
+  /** Use existing widget session (optional) */
+  sessionId?: string;
+  /** Tool name (required if no sessionId) */
+  tool?: string;
+  /** Tool arguments (required if no sessionId) */
+  arguments?: Record<string, unknown>;
   /** Interactions to perform */
   interactions: InteractionAction[];
   /** Protocol */
@@ -555,6 +565,69 @@ export interface TestWidgetInteractionOutput {
   toolCalls: Array<{ name: string; args: unknown }>;
   /** State changes (OpenAI setState calls) */
   stateChanges: Array<{ state: unknown; timestamp: number }>;
+  errors: string[];
+}
+
+/**
+ * Console log entry captured from the browser
+ */
+export interface ConsoleLogEntry {
+  /** Log level (log, info, warn, error, debug) */
+  level: "log" | "info" | "warn" | "error" | "debug";
+  /** The message text */
+  text: string;
+  /** Source of the log (widget, host, or unknown) */
+  source: "widget" | "host" | "unknown";
+  /** Timestamp when the log was captured */
+  timestamp: number;
+  /** Optional URL where the log originated */
+  url?: string;
+  /** Optional line number */
+  lineNumber?: number;
+}
+
+/**
+ * Input for get_console_logs tool
+ */
+export interface GetConsoleLogsInput {
+  /** Use existing widget session (optional) */
+  sessionId?: string;
+  /** Tool name to render (required if no sessionId) */
+  tool?: string;
+  /** Arguments to pass to the tool (required if no sessionId) */
+  arguments?: Record<string, unknown>;
+  /** Protocol to use (auto-detect if not specified) */
+  protocol?: "mcp" | "openai" | "auto";
+  /** Time to wait for widget to render and log (default: 500ms) */
+  waitMs?: number;
+  /** Viewport size */
+  viewport?: { width: number; height: number };
+}
+
+/**
+ * Output from get_console_logs tool
+ */
+export interface GetConsoleLogsOutput {
+  /** Whether the UI was rendered successfully */
+  hasUI: boolean;
+  /** Reason if no UI found */
+  noUIReason?: string;
+  /** Detected/used protocol */
+  protocol?: "mcp" | "openai";
+  /** Array of console log entries */
+  logs: ConsoleLogEntry[];
+  /** Summary counts by level */
+  summary: {
+    total: number;
+    log: number;
+    info: number;
+    warn: number;
+    error: number;
+    debug: number;
+  };
+  /** Page errors (uncaught exceptions) */
+  pageErrors: string[];
+  /** Any errors during the process */
   errors: string[];
 }
 

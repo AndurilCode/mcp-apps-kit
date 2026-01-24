@@ -6,10 +6,15 @@ import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
 import type { ConnectionManager } from "../connection";
 import type { CallToolOutput } from "../types";
+import { UIHostManager, detectProtocolFromMimeType, type DetectedProtocol } from "../ui-host";
 
 export const callToolInputSchema = z.object({
   name: z.string().describe("Name of the tool to call"),
   arguments: z.record(z.string(), z.unknown()).describe("Arguments to pass to the tool"),
+  renderWidget: z
+    .boolean()
+    .optional()
+    .describe("If true, render the UI widget and return a sessionId for subsequent operations"),
 });
 
 export const callToolOutputSchema = z.object({
@@ -30,12 +35,13 @@ export const callToolOutputSchema = z.object({
     })
     .optional(),
   duration: z.number(),
+  sessionId: z.string().optional().describe("Widget session ID (when renderWidget=true)"),
 });
 
 export function createCallToolTool(connectionManager: ConnectionManager) {
   return defineTool({
     description:
-      "Call a tool on the connected MCP server with the specified arguments. Returns the tool result including content blocks, errors, and execution duration.",
+      "Call a tool on the connected MCP server with the specified arguments. Returns the tool result including content blocks, errors, and execution duration. Optionally renders the UI widget and returns a session ID for subsequent inspection operations.",
     input: callToolInputSchema,
     output: callToolOutputSchema,
     handler: async (input): Promise<CallToolOutput> => {
@@ -72,11 +78,131 @@ export function createCallToolTool(connectionManager: ConnectionManager) {
           };
         }
 
-        return {
+        // Prepare base response
+        const baseResponse = {
           content,
           isError: false,
           structuredContent: result.structuredContent,
           duration,
+        };
+
+        // If renderWidget is false or not provided, return without session
+        if (!input.renderWidget) {
+          return baseResponse;
+        }
+
+        // Render widget and create session
+        let sessionId: string | undefined;
+        try {
+          // Extract tool result for widget
+          let toolResult: unknown;
+          if (result.structuredContent) {
+            toolResult = result.structuredContent;
+          } else if (content.length > 0) {
+            const textContent = content.find((c) => c.type === "text");
+            if (textContent?.text) {
+              try {
+                toolResult = JSON.parse(textContent.text);
+              } catch {
+                toolResult = textContent.text;
+              }
+            }
+          }
+
+          // Find UI resource for this tool
+          const rawClient = client.raw;
+          const resourcesResult = await rawClient.listResources();
+
+          let uiResource: {
+            uri: string;
+            mimeType: string;
+            protocol: DetectedProtocol;
+          } | null = null;
+
+          for (const resource of resourcesResult.resources) {
+            const mimeType = resource.mimeType;
+            if (!mimeType) continue;
+
+            const protocol = detectProtocolFromMimeType(mimeType);
+            if (!protocol) continue;
+
+            // Check if URI matches tool name
+            const toolNamePatterns = [
+              `__ui_${input.name}`,
+              `/${input.name}?`,
+              `/${input.name}`,
+              `toolName=${input.name}`,
+            ];
+            const uriMatchesTool = toolNamePatterns.some(
+              (pattern) =>
+                resource.uri.includes(pattern) || resource.uri.endsWith(pattern.replace("?", ""))
+            );
+            if (uriMatchesTool) {
+              uiResource = {
+                uri: resource.uri,
+                mimeType,
+                protocol,
+              };
+              break;
+            }
+          }
+
+          if (uiResource) {
+            // Fetch widget HTML
+            const contentResult = await rawClient.readResource({ uri: uiResource.uri });
+            let html = "";
+            for (const contentBlock of contentResult.contents) {
+              if ("text" in contentBlock && typeof contentBlock.text === "string") {
+                html += contentBlock.text;
+              }
+            }
+
+            if (html) {
+              // Render widget in browser
+              const uiHostManager = new UIHostManager(client);
+              const environmentState = connectionManager.getEnvironmentState();
+              const viewport = environmentState.viewport;
+
+              const renderResult = await uiHostManager.renderInBrowser(
+                html,
+                uiResource.protocol,
+                toolResult,
+                input.name,
+                environmentState,
+                viewport
+              );
+
+              const { page } = renderResult;
+
+              // Get widget session ID from renderResult (from WidgetServer)
+              // The session ID is in the URL path
+              const pageUrl = page.url();
+              const urlMatch = pageUrl.match(/\/host\/([a-f0-9-]+)/);
+              const widgetSessionId = urlMatch?.[1] ?? "";
+
+              // Create widget session in session manager
+              const sessionManager = connectionManager.getWidgetSessionManager();
+              const session = await sessionManager.createSession(
+                input.name,
+                input.arguments,
+                toolResult,
+                page,
+                widgetSessionId,
+                uiResource.protocol
+              );
+
+              sessionId = session.id;
+            }
+          }
+        } catch (error) {
+          // Widget rendering failed, but tool call succeeded
+          // Continue without session
+          console.warn(`[call_tool] Failed to render widget:`, error);
+        }
+
+        return {
+          ...baseResponse,
+          sessionId,
         };
       } catch (error) {
         const duration = Date.now() - startTime;

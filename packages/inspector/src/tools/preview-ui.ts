@@ -12,8 +12,15 @@ import type { PreviewUIOutput } from "../types";
 import { UIHostManager, detectProtocolFromMimeType, type DetectedProtocol } from "../ui-host";
 
 export const previewUIInputSchema = z.object({
-  tool: z.string().describe("Name of the tool to preview"),
-  arguments: z.record(z.string(), z.unknown()).describe("Arguments to pass to the tool"),
+  sessionId: z
+    .string()
+    .optional()
+    .describe("Use existing widget session instead of creating new one"),
+  tool: z.string().optional().describe("Name of the tool to preview (required if no sessionId)"),
+  arguments: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe("Arguments to pass to the tool (required if no sessionId)"),
   protocol: z
     .enum(["mcp", "openai", "auto"])
     .optional()
@@ -48,11 +55,85 @@ export const previewUIOutputSchema = z.object({
 export function createPreviewUITool(connectionManager: ConnectionManager) {
   return defineTool({
     description:
-      "Preview a tool's UI widget by calling the tool and rendering its result in the associated UI widget. Returns a DOM snapshot with extracted elements and text content.",
+      "Preview a tool's UI widget by calling the tool and rendering its result in the associated UI widget. Can use an existing session. Returns a DOM snapshot with extracted elements and text content.",
     input: previewUIInputSchema,
     output: previewUIOutputSchema,
     handler: async (input): Promise<PreviewUIOutput> => {
       const startTime = Date.now();
+
+      // Check if using existing session
+      if (input.sessionId) {
+        const sessionManager = connectionManager.getWidgetSessionManager();
+        const session = sessionManager.getSession(input.sessionId);
+
+        if (!session) {
+          return {
+            hasUI: false,
+            noUIReason: `Session not found: ${input.sessionId}`,
+            errors: [`Session ${input.sessionId} does not exist or has expired`],
+          };
+        }
+
+        try {
+          const { page, protocol, toolResult } = session;
+
+          // Get DOM from the widget iframe
+          const frame = page.frame({ url: /\/widget\// });
+          if (!frame) {
+            return {
+              hasUI: true,
+              protocol,
+              errors: ["Widget iframe not found"],
+            };
+          }
+
+          const dom = await frame.content();
+          const textContent = await frame.textContent("body");
+
+          const renderDuration = Date.now() - startTime;
+
+          // Check if tool result data appears in the rendered DOM
+          const toolResultStr = JSON.stringify(toolResult);
+          const toolResultDisplayed =
+            textContent?.includes(toolResultStr) ??
+            // Check for partial matches (common values from result)
+            (typeof toolResult === "object" &&
+              toolResult !== null &&
+              Object.values(toolResult as Record<string, unknown>).some(
+                (v) => typeof v === "string" && v.length > 3 && textContent?.includes(v)
+              ));
+
+          return {
+            hasUI: true,
+            protocol,
+            resourceUri: undefined, // Not available from session
+            dom,
+            textContent: textContent ?? undefined,
+            elements: undefined, // Would require DOM parsing
+            toolResultDisplayed,
+            errors: [],
+            renderDuration,
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return {
+            hasUI: true,
+            protocol: session.protocol,
+            errors: [`Preview failed: ${message}`],
+          };
+        }
+      }
+
+      // Validate required fields for standalone mode
+      if (!input.tool || !input.arguments) {
+        return {
+          hasUI: false,
+          noUIReason: "Either sessionId or both tool and arguments must be provided",
+          errors: ["Missing required parameters"],
+        };
+      }
+
+      // Standalone mode: call tool and render widget
       const client = connectionManager.getClient();
       const rawClient = client.raw;
 

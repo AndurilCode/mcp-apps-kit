@@ -13,6 +13,7 @@ import type {
   HistoryEntry,
   EnvironmentState,
 } from "./types";
+import { WidgetSessionManager } from "./widget-session-manager";
 
 /**
  * Get default environment state
@@ -51,12 +52,17 @@ export class ConnectionManager {
   private readonly maxHistorySize: number;
   private readonly defaultTimeout: number;
   private readonly debug: boolean;
+  private widgetSessionManager: WidgetSessionManager;
 
   constructor(options: InspectorServerOptions = {}) {
     this.maxHistorySize = options.maxHistorySize ?? 1000;
     this.defaultTimeout = options.defaultTimeout ?? 30000;
     this.debug = options.debug ?? false;
     this.environmentState = getDefaultEnvironmentState();
+    this.widgetSessionManager = new WidgetSessionManager({
+      ttl: 5 * 60 * 1000, // 5 minutes
+      debug: this.debug,
+    });
   }
 
   /**
@@ -182,6 +188,9 @@ export class ConnectionManager {
    */
   async disconnect(): Promise<string | null> {
     const previousUrl = this.state.serverUrl;
+
+    // Close all widget sessions
+    await this.widgetSessionManager.closeAllSessions();
 
     if (this.state.client) {
       try {
@@ -336,5 +345,12 @@ export class ConnectionManager {
     }
 
     return { ...this.environmentState };
+  }
+
+  /**
+   * Get the widget session manager
+   */
+  getWidgetSessionManager(): WidgetSessionManager {
+    return this.widgetSessionManager;
   }
 }

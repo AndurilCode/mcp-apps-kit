@@ -27,9 +27,13 @@ import {
   createPreviewUITool,
   createScreenshotWidgetTool,
   createTestWidgetInteractionTool,
+  createGetConsoleLogsTool,
   createSetGlobalsTool,
   createGetGlobalsTool,
   createResetGlobalsTool,
+  createListSessionsTool,
+  createCloseSessionTool,
+  createCloseAllSessionsTool,
 } from "./tools";
 
 /**
@@ -72,10 +76,15 @@ export function createInspectorServer(options: InspectorServerOptions = {}): App
     preview_ui: createPreviewUITool(connectionManager),
     screenshot_widget: createScreenshotWidgetTool(connectionManager),
     test_widget_interaction: createTestWidgetInteractionTool(connectionManager),
+    get_console_logs: createGetConsoleLogsTool(connectionManager),
     // Environment Configuration tools
     set_globals: createSetGlobalsTool(connectionManager),
     get_globals: createGetGlobalsTool(connectionManager),
     reset_globals: createResetGlobalsTool(connectionManager),
+    // Session Management tools
+    list_sessions: createListSessionsTool(connectionManager),
+    close_session: createCloseSessionTool(connectionManager),
+    close_all_sessions: createCloseAllSessionsTool(connectionManager),
   };
 
   const app = createApp({
