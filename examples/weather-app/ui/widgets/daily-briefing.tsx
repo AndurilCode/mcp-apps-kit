@@ -29,7 +29,7 @@ export default function DailyBriefingWidget() {
 
   // Handle both wrapped and unwrapped result formats
   const rawResult = result as Record<string, unknown> | undefined;
-  const data = (rawResult?.daily_briefing ?? rawResult) as DailyBriefingResult | undefined;
+  const data = (rawResult?.dailyBriefing ?? rawResult) as DailyBriefingResult | undefined;
 
   if (!data || !("briefing" in data) || typeof data.briefing !== "string") {
     return (

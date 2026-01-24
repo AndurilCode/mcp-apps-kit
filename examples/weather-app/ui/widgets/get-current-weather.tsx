@@ -23,7 +23,7 @@ export default function CurrentWeatherWidget() {
 
   // Handle both wrapped and unwrapped result formats
   const rawResult = result as Record<string, unknown> | undefined;
-  const data = (rawResult?.get_current_weather ?? rawResult) as CurrentWeather | undefined;
+  const data = (rawResult?.getCurrentWeather ?? rawResult) as CurrentWeather | undefined;
 
   if (!data || !("temperature" in data)) {
     return (

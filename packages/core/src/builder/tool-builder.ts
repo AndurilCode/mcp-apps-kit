@@ -209,4 +209,18 @@ export interface ToolBuilderComplete<
    * Build the tool definition.
    */
   build(): ToolDef<TInput, TOutput>;
+
+  /**
+   * Set the tool name if not already set.
+   * Used internally by codegen for filename-based name inference.
+   * @internal
+   */
+  _setName(name: string): this;
+
+  /**
+   * Set the UI binding if not already set.
+   * Used internally by codegen for convention-based UI binding.
+   * @internal
+   */
+  _setUi(uiDef: UIDef): this;
 }

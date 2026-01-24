@@ -110,6 +110,29 @@ export function pathToIdentifier(relativePath: string): string {
 }
 
 /**
+ * Convert a relative file path to a camelCase tool name
+ *
+ * Uses pathToIdentifier internally and converts snake_case to camelCase.
+ *
+ * @param relativePath - Relative path from the resource directory (e.g., "admin/delete-user.ts")
+ * @returns camelCase tool name (e.g., "adminDeleteUser")
+ *
+ * @example
+ * ```typescript
+ * pathToToolName("greet.ts"); // "greet"
+ * pathToToolName("get-current-weather.ts"); // "getCurrentWeather"
+ * pathToToolName("SearchResults.tsx"); // "searchResults"
+ * pathToToolName("admin/delete-user.ts"); // "adminDeleteUser"
+ * pathToToolName("api/v1/GetUsers.ts"); // "apiV1GetUsers"
+ * ```
+ */
+export function pathToToolName(relativePath: string): string {
+  const snakeCase = pathToIdentifier(relativePath);
+  // Convert snake_case to camelCase
+  return snakeCase.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
+}
+
+/**
  * Validate that an identifier is a valid JavaScript identifier
  *
  * @param identifier - The identifier to validate

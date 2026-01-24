@@ -49,30 +49,30 @@ describe("Weather App MCP Server", () => {
 
       // 4 weather tools + 1 log_debug tool (from debug.logTool config)
       expect(tools.length).toBe(5);
-      // File-based naming: get-current-weather.ts -> get_current_weather
-      expect(tools.some((t) => t.name === "get_current_weather")).toBe(true);
-      expect(tools.some((t) => t.name === "get_forecast")).toBe(true);
-      expect(tools.some((t) => t.name === "get_weather_alerts")).toBe(true);
-      expect(tools.some((t) => t.name === "daily_briefing")).toBe(true);
+      // File-based naming: get-current-weather.ts -> getCurrentWeather (camelCase)
+      expect(tools.some((t) => t.name === "getCurrentWeather")).toBe(true);
+      expect(tools.some((t) => t.name === "getForecast")).toBe(true);
+      expect(tools.some((t) => t.name === "getWeatherAlerts")).toBe(true);
+      expect(tools.some((t) => t.name === "dailyBriefing")).toBe(true);
     });
 
     it("should have correct tool descriptions", async () => {
       const tools = await env.client.listTools();
 
-      const currentWeatherTool = tools.find((t) => t.name === "get_current_weather");
+      const currentWeatherTool = tools.find((t) => t.name === "getCurrentWeather");
       expect(currentWeatherTool?.description).toContain("current weather conditions");
 
-      const forecastTool = tools.find((t) => t.name === "get_forecast");
+      const forecastTool = tools.find((t) => t.name === "getForecast");
       expect(forecastTool?.description).toContain("forecast");
 
-      const alertsTool = tools.find((t) => t.name === "get_weather_alerts");
+      const alertsTool = tools.find((t) => t.name === "getWeatherAlerts");
       expect(alertsTool?.description).toContain("alerts");
     });
   });
 
   describe("getCurrentWeather Tool", () => {
     it("should return current weather for a valid location", async () => {
-      const result = await env.client.callTool("get_current_weather", {
+      const result = await env.client.callTool("getCurrentWeather", {
         location: "New York",
       });
 
@@ -95,7 +95,7 @@ describe("Weather App MCP Server", () => {
     });
 
     it("should include wind information", async () => {
-      const result = await env.client.callTool("get_current_weather", {
+      const result = await env.client.callTool("getCurrentWeather", {
         location: "London",
       });
 
@@ -113,7 +113,7 @@ describe("Weather App MCP Server", () => {
     });
 
     it("should include feels like temperature", async () => {
-      const result = await env.client.callTool("get_current_weather", {
+      const result = await env.client.callTool("getCurrentWeather", {
         location: "Tokyo",
       });
 
@@ -129,7 +129,7 @@ describe("Weather App MCP Server", () => {
     });
 
     it("should include timestamp", async () => {
-      const result = await env.client.callTool("get_current_weather", {
+      const result = await env.client.callTool("getCurrentWeather", {
         location: "Paris",
       });
 
@@ -143,7 +143,7 @@ describe("Weather App MCP Server", () => {
 
   describe("getForecast Tool", () => {
     it("should return forecast with default 7 days", async () => {
-      const result = await env.client.callTool("get_forecast", {
+      const result = await env.client.callTool("getForecast", {
         location: "Berlin",
       });
 
@@ -162,7 +162,7 @@ describe("Weather App MCP Server", () => {
     });
 
     it("should return forecast for specified number of days", async () => {
-      const result = await env.client.callTool("get_forecast", {
+      const result = await env.client.callTool("getForecast", {
         location: "Sydney",
         days: 3,
       });
@@ -177,7 +177,7 @@ describe("Weather App MCP Server", () => {
     });
 
     it("should include temperature range for each day", async () => {
-      const result = await env.client.callTool("get_forecast", {
+      const result = await env.client.callTool("getForecast", {
         location: "Madrid",
         days: 1,
       });
@@ -198,7 +198,7 @@ describe("Weather App MCP Server", () => {
     });
 
     it("should include precipitation probability", async () => {
-      const result = await env.client.callTool("get_forecast", {
+      const result = await env.client.callTool("getForecast", {
         location: "Seattle",
         days: 1,
       });
@@ -218,7 +218,7 @@ describe("Weather App MCP Server", () => {
     });
 
     it("should include sunrise and sunset times", async () => {
-      const result = await env.client.callTool("get_forecast", {
+      const result = await env.client.callTool("getForecast", {
         location: "Rome",
         days: 1,
       });
@@ -240,7 +240,7 @@ describe("Weather App MCP Server", () => {
 
   describe("getWeatherAlerts Tool", () => {
     it("should return alerts response for a location", async () => {
-      const result = await env.client.callTool("get_weather_alerts", {
+      const result = await env.client.callTool("getWeatherAlerts", {
         location: "Miami",
       });
 
@@ -262,7 +262,7 @@ describe("Weather App MCP Server", () => {
       // Run multiple times to get alerts (random in mock)
       let alertsFound = false;
       for (let i = 0; i < 10 && !alertsFound; i++) {
-        const result = await env.client.callTool("get_weather_alerts", {
+        const result = await env.client.callTool("getWeatherAlerts", {
           location: "Test City",
         });
 
@@ -301,14 +301,14 @@ describe("Weather App MCP Server", () => {
     it("should track tool call history", async () => {
       env.client.clearHistory();
 
-      await env.client.callTool("get_current_weather", { location: "Chicago" });
-      await env.client.callTool("get_forecast", { location: "Chicago", days: 3 });
+      await env.client.callTool("getCurrentWeather", { location: "Chicago" });
+      await env.client.callTool("getForecast", { location: "Chicago", days: 3 });
 
       const history = env.client.getCallHistory();
 
       expect(history.length).toBe(2);
-      expect(history[0].name).toBe("get_current_weather");
-      expect(history[1].name).toBe("get_forecast");
+      expect(history[0].name).toBe("getCurrentWeather");
+      expect(history[1].name).toBe("getForecast");
     });
   });
 });

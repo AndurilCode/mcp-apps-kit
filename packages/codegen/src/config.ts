@@ -504,3 +504,105 @@ export function getDefaultConfig(): FileBasedConfig {
     },
   };
 }
+
+// =============================================================================
+// PACKAGE.JSON FALLBACK
+// =============================================================================
+
+/**
+ * Check if a file exists
+ */
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Load default configuration from package.json
+ *
+ * Provides sensible defaults when mcp.config.ts is not present:
+ * - name: from package.json name (strips scope if present)
+ * - version: from package.json version
+ * - directories: default tools/workflows/ui
+ * - config: default protocol and CORS settings
+ *
+ * @param projectRoot - Project root directory
+ * @returns Configuration from package.json or null if not found
+ */
+async function loadPackageJsonFallback(projectRoot: string): Promise<FileBasedConfig | null> {
+  const pkgPath = path.resolve(projectRoot, "package.json");
+
+  try {
+    const pkgContent = await fs.readFile(pkgPath, "utf-8");
+    const pkg = JSON.parse(pkgContent) as { name?: string; version?: string };
+
+    // Extract name (strip scope like @org/ if present)
+    const rawName = pkg.name ?? path.basename(projectRoot);
+    const name = rawName.replace(/^@[^/]+\//, "");
+
+    return {
+      name,
+      version: pkg.version ?? "0.0.0",
+      directories: {
+        tools: "tools",
+        workflows: "workflows",
+      },
+      config: {
+        protocol: "mcp",
+        cors: { origin: true },
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Load configuration with fallback to package.json defaults
+ *
+ * Tries to load mcp.config.ts first. If not found, falls back to
+ * inferring configuration from package.json.
+ *
+ * @param configPath - Path to the config file (e.g., "./mcp.config.ts")
+ * @param projectRoot - Project root directory
+ * @param logger - Logger instance
+ * @returns Loaded configuration (from config file or package.json fallback)
+ *
+ * @example
+ * ```typescript
+ * // With mcp.config.ts present:
+ * const config = await loadConfigWithFallback("./mcp.config.ts", projectRoot, logger);
+ * // → Loads from mcp.config.ts
+ *
+ * // Without mcp.config.ts:
+ * const config = await loadConfigWithFallback("./mcp.config.ts", projectRoot, logger);
+ * // → Infers from package.json with defaults
+ * ```
+ */
+export async function loadConfigWithFallback(
+  configPath: string,
+  projectRoot: string,
+  logger: PluginLogger = defaultLogger
+): Promise<FileBasedConfigInput> {
+  const configFile = path.resolve(projectRoot, configPath);
+
+  // Try loading the config file first
+  if (await fileExists(configFile)) {
+    return await loadConfig(configPath, projectRoot, logger);
+  }
+
+  // Fall back to package.json
+  logger.info(`No ${configPath} found, using package.json defaults`);
+
+  const fallback = await loadPackageJsonFallback(projectRoot);
+  if (!fallback) {
+    throw new Error(`No configuration found. Create ${configPath} or ensure package.json exists.`);
+  }
+
+  logger.info(`Using inferred config: name="${fallback.name}", version="${fallback.version}"`);
+  return fallback;
+}

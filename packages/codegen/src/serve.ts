@@ -10,7 +10,7 @@
 import * as path from "node:path";
 import { createJiti } from "jiti";
 import { runCodegen } from "./generator.js";
-import { loadConfig, isVersionedConfig } from "./config.js";
+import { loadConfigWithFallback, isVersionedConfig } from "./config.js";
 import { createStandaloneWatcher } from "./watcher.js";
 import type { FileBasedConfig } from "./types.js";
 import type { ToolDefs } from "@mcp-apps-kit/core";
@@ -70,8 +70,8 @@ async function serve(options: ServeOptions = {}): Promise<void> {
     outDir,
   });
 
-  // Step 2: Load config
-  const loadedConfig = await loadConfig(configPath, projectRoot);
+  // Step 2: Load config (with fallback to package.json if mcp.config.ts not found)
+  const loadedConfig = await loadConfigWithFallback(configPath, projectRoot);
 
   // Check for versioned config - serve command doesn't support it yet
   if (isVersionedConfig(loadedConfig)) {

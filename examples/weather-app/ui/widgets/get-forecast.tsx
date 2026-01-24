@@ -23,7 +23,7 @@ export default function ForecastWidget() {
 
   // Handle both wrapped and unwrapped result formats
   const rawResult = result as Record<string, unknown> | undefined;
-  const data = (rawResult?.get_forecast ?? rawResult) as WeatherForecast | undefined;
+  const data = (rawResult?.getForecast ?? rawResult) as WeatherForecast | undefined;
 
   if (!data || !("daily" in data) || !Array.isArray(data.daily)) {
     return (

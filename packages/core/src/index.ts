@@ -293,7 +293,8 @@ export function defineFileBasedConfig(
 ): FileBasedConfigDefinition {
   return config;
 }
-export { tool } from "./builder";
+export { tool, TOOL_BUILDER_SYMBOL } from "./builder";
+export { isToolBuilder, ensureBuilt } from "./builder/ensure-built";
 export type {
   ToolBuilderInitial,
   ToolBuilderWithDescription,

@@ -23,7 +23,7 @@ export default function AlertsWidget() {
 
   // Handle both wrapped and unwrapped result formats
   const rawResult = result as Record<string, unknown> | undefined;
-  const data = (rawResult?.get_weather_alerts ?? rawResult) as WeatherAlertsResponse | undefined;
+  const data = (rawResult?.getWeatherAlerts ?? rawResult) as WeatherAlertsResponse | undefined;
 
   if (!data || !("alerts" in data) || !Array.isArray(data.alerts)) {
     return (

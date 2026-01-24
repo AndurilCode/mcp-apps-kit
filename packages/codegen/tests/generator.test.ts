@@ -351,9 +351,8 @@ describe("generator", () => {
       expect(result.errors).toHaveLength(0);
       // Check that UI widget import is generated
       expect(result.code).toContain('import greet_ui from "../ui/widgets/greet.js";');
-      // Check that binding code is generated
-      expect(result.code).toContain("if (!greet.ui) {");
-      expect(result.code).toContain("greet.ui = greet_ui;");
+      // Check that binding code is generated using _setUi()
+      expect(result.code).toContain("greet._setUi(greet_ui);");
       // Check that uiWidgets export is generated
       expect(result.code).toContain("export const uiWidgets = {");
       expect(result.code).toContain("greet_ui,");
@@ -419,12 +418,11 @@ describe("generator", () => {
       // 2 tools + 2 widgets
       expect(result.files).toHaveLength(4);
 
-      // Check binding for greet
-      expect(result.code).toContain("if (!greet.ui) {");
-      expect(result.code).toContain("greet.ui = greet_ui;");
+      // Check binding for greet using _setUi()
+      expect(result.code).toContain("greet._setUi(greet_ui);");
 
       // No binding for farewell (no matching widget)
-      expect(result.code).not.toContain("if (!farewell.ui) {");
+      expect(result.code).not.toContain("farewell._setUi(");
 
       // Orphan widget is still exported but not bound
       expect(result.code).toContain("orphan_widget_ui,");
@@ -450,9 +448,8 @@ describe("generator", () => {
       });
 
       expect(result.errors).toHaveLength(0);
-      // Both should resolve to get_current_weather
-      expect(result.code).toContain("if (!get_current_weather.ui) {");
-      expect(result.code).toContain("get_current_weather.ui = get_current_weather_ui;");
+      // Both should resolve to get_current_weather and use _setUi()
+      expect(result.code).toContain("get_current_weather._setUi(get_current_weather_ui);");
     });
 
     it("should handle nested directory matching", async () => {
@@ -475,9 +472,8 @@ describe("generator", () => {
       });
 
       expect(result.errors).toHaveLength(0);
-      // Both should resolve to admin_delete_user
-      expect(result.code).toContain("if (!admin_delete_user.ui) {");
-      expect(result.code).toContain("admin_delete_user.ui = admin_delete_user_ui;");
+      // Both should resolve to admin_delete_user and use _setUi()
+      expect(result.code).toContain("admin_delete_user._setUi(admin_delete_user_ui);");
     });
 
     it("should detect UI widget name collisions", async () => {
