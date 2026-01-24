@@ -202,10 +202,7 @@ export class WidgetSessionManager {
           }
         }, hostContext);
       } else {
-        // OpenAI protocol: use Playwright's frame API to update DOM directly
-        const theme = environmentState.theme;
-
-        // Find the widget iframe - try multiple approaches
+        // OpenAI protocol: dispatch openai:set_globals CustomEvent that the SDK listens for
         const frames = page.frames();
         // Find the frame that's not the main frame (should be the widget iframe)
         const widgetFrame = frames.find((f) => f !== page.mainFrame());
@@ -219,14 +216,42 @@ export class WidgetSessionManager {
           return false;
         }
 
-        // Update body class directly in the widget frame
+        // Build globals object from environment state
+        const globals = {
+          theme: environmentState.theme,
+          displayMode: environmentState.displayMode,
+          locale: environmentState.locale,
+          maxHeight: environmentState.maxHeight,
+          safeArea: environmentState.safeAreaInsets,
+          userAgent: environmentState.userAgent,
+          userLocation: environmentState.userLocation,
+        };
+
+        // Update window.openai properties and dispatch the CustomEvent
         /* eslint-disable no-undef */
-        await widgetFrame.evaluate((newTheme) => {
-          document.body.classList.remove("light", "dark");
-          document.body.classList.add(newTheme);
+        await widgetFrame.evaluate((globalsData) => {
+          // Update window.openai properties if available
+          const openai = (window as { openai?: Record<string, unknown> }).openai;
+          if (openai) {
+            if (globalsData.theme !== undefined) openai.theme = globalsData.theme;
+            if (globalsData.displayMode !== undefined) openai.displayMode = globalsData.displayMode;
+            if (globalsData.locale !== undefined) openai.locale = globalsData.locale;
+            if (globalsData.maxHeight !== undefined) openai.maxHeight = globalsData.maxHeight;
+            if (globalsData.safeArea !== undefined) openai.safeArea = globalsData.safeArea;
+            if (globalsData.userAgent !== undefined) openai.userAgent = globalsData.userAgent;
+            if (globalsData.userLocation !== undefined)
+              openai.userLocation = globalsData.userLocation;
+          }
+
+          // Dispatch the CustomEvent that the OpenAI adapter listens for
+          window.dispatchEvent(
+            new CustomEvent("openai:set_globals", {
+              detail: { globals: globalsData },
+            })
+          );
           // eslint-disable-next-line no-console
-          console.log("[OpenAI Host] Updated body class to", newTheme);
-        }, theme);
+          console.log("[OpenAI Host] Dispatched openai:set_globals", globalsData);
+        }, globals);
         /* eslint-enable no-undef */
       }
 

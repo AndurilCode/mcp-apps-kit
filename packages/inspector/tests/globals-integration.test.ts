@@ -2,7 +2,7 @@
  * Integration tests for set_globals tool
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import {
   createSetGlobalsTool,
@@ -359,6 +359,70 @@ describe("set_globals tool integration", () => {
       expect(result.currentState.locale).toBe("zh-CN");
       expect(result.currentState.timeZone).toBe("Asia/Shanghai");
       expect(result.currentState.userLocation?.city).toBe("Shanghai");
+    });
+  });
+
+  describe("dynamic propagation to active sessions", () => {
+    it("should propagate theme changes to active widget sessions", async () => {
+      const setTool = createSetGlobalsTool(manager);
+      const sessionManager = manager.getWidgetSessionManager();
+
+      // Mock a widget session (we won't actually render, just verify the method is called)
+      const updateAllSessionGlobalsSpy = vi.spyOn(sessionManager, "updateAllSessionGlobals");
+
+      // Initial state is light theme
+      const initialState = await createGetGlobalsTool(manager).handler({}, {} as never);
+      expect(initialState.currentState.theme).toBe("light");
+
+      // Change to dark theme
+      const result = await setTool.handler({ theme: "dark" }, {} as never);
+
+      expect(result.updated).toBe(true);
+      expect(result.currentState.theme).toBe("dark");
+
+      // Verify that updateAllSessionGlobals was called
+      expect(updateAllSessionGlobalsSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          theme: "dark",
+        })
+      );
+
+      updateAllSessionGlobalsSpy.mockRestore();
+    });
+
+    it("should report number of sessions updated in message", async () => {
+      const setTool = createSetGlobalsTool(manager);
+      const sessionManager = manager.getWidgetSessionManager();
+
+      // Mock updateAllSessionGlobals to return 2 sessions updated
+      const updateAllSessionGlobalsSpy = vi
+        .spyOn(sessionManager, "updateAllSessionGlobals")
+        .mockResolvedValue(2);
+
+      const result = await setTool.handler({ theme: "dark", locale: "fr-FR" }, {} as never);
+
+      expect(result.updated).toBe(true);
+      expect(result.message).toContain("2 active session(s)");
+      expect(result.message).toContain("2 setting(s)");
+
+      updateAllSessionGlobalsSpy.mockRestore();
+    });
+
+    it("should handle zero active sessions gracefully", async () => {
+      const setTool = createSetGlobalsTool(manager);
+      const sessionManager = manager.getWidgetSessionManager();
+
+      // Mock updateAllSessionGlobals to return 0 sessions updated
+      const updateAllSessionGlobalsSpy = vi
+        .spyOn(sessionManager, "updateAllSessionGlobals")
+        .mockResolvedValue(0);
+
+      const result = await setTool.handler({ displayMode: "fullscreen" }, {} as never);
+
+      expect(result.updated).toBe(true);
+      expect(result.message).toContain("0 active session(s)");
+
+      updateAllSessionGlobalsSpy.mockRestore();
     });
   });
 });

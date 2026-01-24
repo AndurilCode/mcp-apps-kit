@@ -132,10 +132,14 @@ export function createSetGlobalsTool(connectionManager: ConnectionManager) {
 
       const currentState = connectionManager.setEnvironmentState(updatePayload);
 
+      // Propagate changes to all active widget sessions
+      const sessionManager = connectionManager.getWidgetSessionManager();
+      const updatedSessions = await sessionManager.updateAllSessionGlobals(currentState);
+
       const changedFields = Object.keys(updatePayload);
       const message =
         changedFields.length > 0
-          ? `Updated ${changedFields.length} setting(s): ${changedFields.join(", ")}`
+          ? `Updated ${changedFields.length} setting(s): ${changedFields.join(", ")}. Propagated to ${updatedSessions} active session(s).`
           : "No settings were changed";
 
       return {
