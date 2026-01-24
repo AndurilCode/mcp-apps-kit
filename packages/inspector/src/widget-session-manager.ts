@@ -10,6 +10,7 @@ import { randomUUID } from "node:crypto";
 import type { ConsoleLogEntry } from "./tools/get-console-logs";
 import type { DetectedProtocol } from "./ui-host";
 import type { EnvironmentState } from "./types";
+import { mapConsoleTypeToLogLevel, getLogSourceFromUrl } from "./tools/helpers";
 
 /**
  * Active widget session with persistent Playwright page
@@ -103,46 +104,13 @@ export class WidgetSessionManager {
 
     // Set up console log listener
     page.on("console", (msg) => {
-      const type = msg.type();
-      let level: ConsoleLogEntry["level"];
-
-      switch (type) {
-        case "log":
-          level = "log";
-          break;
-        case "info":
-          level = "info";
-          break;
-        case "warning":
-          level = "warn";
-          break;
-        case "error":
-          level = "error";
-          break;
-        case "debug":
-          level = "debug";
-          break;
-        default:
-          level = "log";
-      }
-
       const location = msg.location();
-      const url = location.url;
-
-      // Determine source based on URL
-      let source: ConsoleLogEntry["source"] = "unknown";
-      if (url.includes("/widget/")) {
-        source = "widget";
-      } else if (url.includes("/host/") || url.includes("host-page")) {
-        source = "host";
-      }
-
       session.consoleLogs.push({
-        level,
+        level: mapConsoleTypeToLogLevel(msg.type()),
         text: msg.text(),
-        source,
+        source: getLogSourceFromUrl(location.url),
         timestamp: Date.now(),
-        url: url || undefined,
+        url: location.url || undefined,
         lineNumber: location.lineNumber || undefined,
       });
     });
@@ -218,6 +186,7 @@ export class WidgetSessionManager {
         };
 
         await page.evaluate((ctx) => {
+          // eslint-disable-next-line no-undef
           const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
           if (iframe?.contentWindow) {
             const message = {
@@ -251,14 +220,14 @@ export class WidgetSessionManager {
         }
 
         // Update body class directly in the widget frame
+        /* eslint-disable no-undef */
         await widgetFrame.evaluate((newTheme) => {
-          // eslint-disable-next-line no-undef
           document.body.classList.remove("light", "dark");
-          // eslint-disable-next-line no-undef
           document.body.classList.add(newTheme);
-          // eslint-disable-next-line no-console, no-undef
+          // eslint-disable-next-line no-console
           console.log("[OpenAI Host] Updated body class to", newTheme);
         }, theme);
+        /* eslint-enable no-undef */
       }
 
       if (this.debug) {

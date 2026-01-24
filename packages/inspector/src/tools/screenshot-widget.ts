@@ -12,7 +12,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ConnectionManager } from "../connection";
 import type { ScreenshotWidgetOutput } from "../types";
-import { UIHostManager, detectProtocolFromMimeType, type DetectedProtocol } from "../ui-host";
+import { UIHostManager, type DetectedProtocol } from "../ui-host";
+import {
+  extractToolResult,
+  findUIResourceForTool,
+  fetchWidgetHTML,
+  resolveProtocol,
+} from "./helpers";
 
 export const screenshotWidgetInputSchema = z.object({
   sessionId: z
@@ -146,26 +152,7 @@ export function createScreenshotWidgetTool(connectionManager: ConnectionManager)
           name: input.tool,
           arguments: input.arguments,
         });
-
-        // Extract structured content or parse from text
-        if (callResult.structuredContent) {
-          toolResult = callResult.structuredContent;
-        } else if (
-          callResult.content &&
-          Array.isArray(callResult.content) &&
-          callResult.content.length > 0
-        ) {
-          const textContent = callResult.content.find(
-            (c: { type: string }) => c.type === "text"
-          ) as { type: string; text?: string } | undefined;
-          if (textContent?.text) {
-            try {
-              toolResult = JSON.parse(textContent.text);
-            } catch {
-              toolResult = textContent.text;
-            }
-          }
-        }
+        toolResult = extractToolResult(callResult);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return {
@@ -176,42 +163,7 @@ export function createScreenshotWidgetTool(connectionManager: ConnectionManager)
       }
 
       // Step 2: Find the UI resource for this tool
-      const resourcesResult = await rawClient.listResources();
-
-      let uiResource: {
-        uri: string;
-        mimeType: string;
-        protocol: DetectedProtocol;
-      } | null = null;
-
-      for (const resource of resourcesResult.resources) {
-        const mimeType = resource.mimeType;
-        if (!mimeType) continue;
-
-        const protocol = detectProtocolFromMimeType(mimeType);
-        if (!protocol) continue;
-
-        // Check if URI matches tool name
-        const toolNamePatterns = [
-          `__ui_${input.tool}`,
-          `/${input.tool}?`,
-          `/${input.tool}`,
-          `toolName=${input.tool}`,
-        ];
-        const uriMatchesTool = toolNamePatterns.some(
-          (pattern) =>
-            resource.uri.includes(pattern) || resource.uri.endsWith(pattern.replace("?", ""))
-        );
-        if (uriMatchesTool) {
-          uiResource = {
-            uri: resource.uri,
-            mimeType,
-            protocol,
-          };
-          break;
-        }
-      }
-
+      const uiResource = await findUIResourceForTool(rawClient, input.tool);
       if (!uiResource) {
         return {
           hasUI: false,
@@ -221,21 +173,12 @@ export function createScreenshotWidgetTool(connectionManager: ConnectionManager)
       }
 
       // Step 3: Determine protocol to use
-      let protocol: DetectedProtocol = uiResource.protocol;
-      if (input.protocol && input.protocol !== "auto") {
-        protocol = input.protocol;
-      }
+      const protocol: DetectedProtocol = resolveProtocol(uiResource.protocol, input.protocol);
 
       // Step 4: Fetch the widget HTML
       let html: string;
       try {
-        const contentResult = await rawClient.readResource({ uri: uiResource.uri });
-        html = "";
-        for (const content of contentResult.contents) {
-          if ("text" in content && typeof content.text === "string") {
-            html += content.text;
-          }
-        }
+        html = await fetchWidgetHTML(rawClient, uiResource.uri);
         if (!html) {
           return {
             hasUI: false,
