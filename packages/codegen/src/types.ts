@@ -22,6 +22,14 @@ export interface DirectoriesConfig {
   ui?: string;
   /** Directory containing UI widget files for convention-based binding. Default: undefined (disabled) */
   uiWidgets?: string;
+  /**
+   * Directory where built UI widget HTML files are output.
+   * Used to infer the `html` path for widgets that don't specify it.
+   * Default: undefined (inferred from uiWidgets as sibling "dist" directory)
+   *
+   * @example "ui/dist" - widget "my-widget.tsx" → "ui/dist/my-widget.html"
+   */
+  uiWidgetsOutDir?: string;
   /** Directory containing middleware files. Default: undefined (disabled) */
   middleware?: string;
   /** Directory containing event handler files. Default: undefined (disabled) */
@@ -148,6 +156,13 @@ export interface VersionDirectoriesConfig {
    * Default: undefined (disabled)
    */
   uiWidgets?: string;
+
+  /**
+   * Directory where built UI widget HTML files are output.
+   * Used to infer the `html` path for widgets that don't specify it.
+   * Default: undefined (inferred from uiWidgets as sibling "dist" directory)
+   */
+  uiWidgetsOutDir?: string;
 
   /**
    * Directory containing middleware files for this version.

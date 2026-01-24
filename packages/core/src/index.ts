@@ -47,7 +47,7 @@ export type {
 } from "./types/tools";
 
 // UI types
-export type { CSPConfig, UIDef, UIDefs } from "./types/ui";
+export type { CSPConfig, UIDef, UIDefs, WidgetMetadata } from "./types/ui";
 
 // Config types
 import type { GlobalConfig, Icon } from "./types/config";

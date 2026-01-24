@@ -103,9 +103,14 @@ export default function AlertsWidget() {
  * UI metadata for convention-based binding.
  * Exported as plain object to avoid importing server-side code.
  */
-export const ui = {
+/**
+ * UI metadata for convention-based binding.
+ * The html path is auto-inferred from the file name.
+ */
+import type { WidgetMetadata } from "@mcp-apps-kit/core";
+
+export const ui: WidgetMetadata = {
   name: "Weather Alerts Widget",
   description: "Displays active weather alerts and warnings with severity levels",
-  html: "./ui/dist/alerts-widget.html",
   prefersBorder: true,
 };

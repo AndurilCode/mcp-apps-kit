@@ -79,11 +79,12 @@ export default function ForecastWidget() {
 
 /**
  * UI metadata for convention-based binding.
- * Exported as plain object to avoid importing server-side code.
+ * The html path is auto-inferred from the file name.
  */
-export const ui = {
+import type { WidgetMetadata } from "@mcp-apps-kit/core";
+
+export const ui: WidgetMetadata = {
   name: "Weather Forecast Widget",
   description: "Displays multi-day weather forecast with daily temperatures and conditions",
-  html: "./ui/dist/forecast-widget.html",
   prefersBorder: true,
 };

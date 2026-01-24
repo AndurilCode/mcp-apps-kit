@@ -186,6 +186,9 @@ function validateVersionDirectoriesConfig(dirs: Record<string, unknown>, prefix:
   if (dirs.uiWidgets !== undefined && typeof dirs.uiWidgets !== "string") {
     throw new Error(`${prefix}.uiWidgets must be a string`);
   }
+  if (dirs.uiWidgetsOutDir !== undefined && typeof dirs.uiWidgetsOutDir !== "string") {
+    throw new Error(`${prefix}.uiWidgetsOutDir must be a string`);
+  }
 }
 
 /**
@@ -360,6 +363,9 @@ export function validateConfig(config: unknown): asserts config is FileBasedConf
     }
     if (dirs.uiWidgets !== undefined && typeof dirs.uiWidgets !== "string") {
       throw new Error("Configuration 'directories.uiWidgets' must be a string");
+    }
+    if (dirs.uiWidgetsOutDir !== undefined && typeof dirs.uiWidgetsOutDir !== "string") {
+      throw new Error("Configuration 'directories.uiWidgetsOutDir' must be a string");
     }
   }
 

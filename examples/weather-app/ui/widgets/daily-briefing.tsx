@@ -81,10 +81,15 @@ export default function DailyBriefingWidget() {
  * UI metadata for convention-based binding.
  * Exported as plain object to avoid importing server-side code.
  */
-export const ui = {
+/**
+ * UI metadata for convention-based binding.
+ * The html path is auto-inferred from the file name.
+ */
+import type { WidgetMetadata } from "@mcp-apps-kit/core";
+
+export const ui: WidgetMetadata = {
   name: "Daily Briefing Widget",
   description:
     "Displays comprehensive daily weather briefing with current conditions, forecast, and alerts",
-  html: "./ui/dist/daily-briefing-widget.html",
   prefersBorder: true,
 };

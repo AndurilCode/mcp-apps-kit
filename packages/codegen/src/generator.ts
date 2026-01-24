@@ -206,7 +206,9 @@ function generateManifestCode(
   handlerFiles: DiscoveredFile[],
   toolUiBindings: Map<string, string>,
   outDir: string,
-  projectRoot: string
+  projectRoot: string,
+  uiWidgetsDir: string | undefined,
+  uiWidgetsOutDir: string | undefined
 ): string {
   const lines: string[] = [
     "// AUTO-GENERATED - DO NOT EDIT",
@@ -254,19 +256,42 @@ function generateManifestCode(
   if (uiWidgets.length > 0) {
     lines.push("");
     lines.push("// UI widget imports (from uiWidgets directory)");
+    lines.push("// html paths are auto-inferred from widget filename when not specified");
     for (const widget of uiWidgets) {
       // For widget files, check if they're TSX/JSX (React) files
       // TSX files need to keep their extension for jiti/tsx runtime loading
       const isTsxFile = widget.filePath.endsWith(".tsx") || widget.filePath.endsWith(".jsx");
       const importPath = getRelativeImportPath(outDir, widget.filePath, projectRoot, !isTsxFile);
       const uiIdentifier = `${widget.identifier}_ui`;
-      // Use named 'ui' export if available (allows colocating React component as default)
-      // Otherwise fall back to default export
+      const rawIdentifier = `_${uiIdentifier}_raw`;
+
+      // Import the raw ui object
       if (widget.hasUiExport) {
-        lines.push(`import { ui as ${uiIdentifier} } from "${importPath}";`);
+        lines.push(`import { ui as ${rawIdentifier} } from "${importPath}";`);
       } else {
-        lines.push(`import ${uiIdentifier} from "${importPath}";`);
+        lines.push(`import ${rawIdentifier} from "${importPath}";`);
       }
+
+      // Compute the inferred html path for this widget
+      // Use uiWidgetsOutDir if specified, otherwise infer from uiWidgets directory (sibling "dist")
+      const widgetBaseName = path.basename(widget.filePath).replace(/\.(tsx?|jsx?)$/, "");
+      let inferredHtmlPath: string;
+      if (uiWidgetsOutDir) {
+        inferredHtmlPath = `./${uiWidgetsOutDir}/${widgetBaseName}.html`;
+      } else if (uiWidgetsDir) {
+        // Default: assume dist is sibling to the widgets source directory
+        // e.g., uiWidgets="ui/widgets" → output goes to "ui/dist"
+        const parentDir = path.dirname(uiWidgetsDir);
+        inferredHtmlPath = `./${parentDir}/dist/${widgetBaseName}.html`;
+      } else {
+        // Fallback if neither is specified (shouldn't happen in practice)
+        inferredHtmlPath = `./dist/${widgetBaseName}.html`;
+      }
+
+      // Create the augmented ui object with html fallback
+      lines.push(
+        `const ${uiIdentifier} = { ...${rawIdentifier}, html: ${rawIdentifier}.html ?? "${inferredHtmlPath}" };`
+      );
     }
   }
 
@@ -629,7 +654,9 @@ export async function generateManifest(options: GenerateManifestOptions): Promis
     validHandlers,
     toolUiBindings,
     outDir,
-    projectRoot
+    projectRoot,
+    directories.uiWidgets,
+    directories.uiWidgetsOutDir
   );
 
   const uiWidgetBindingsCount = toolUiBindings.size;

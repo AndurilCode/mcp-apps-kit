@@ -93,11 +93,12 @@ export default function CurrentWeatherWidget() {
 
 /**
  * UI metadata for convention-based binding.
- * Exported as plain object to avoid importing server-side code.
+ * The html path is auto-inferred from the file name.
  */
-export const ui = {
+import type { WidgetMetadata } from "@mcp-apps-kit/core";
+
+export const ui: WidgetMetadata = {
   name: "Current Weather Widget",
   description: "Displays current weather conditions with temperature, humidity, and wind",
-  html: "./ui/dist/current-weather-widget.html",
   prefersBorder: true,
 };

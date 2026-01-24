@@ -4,8 +4,8 @@ import { mcpReactUI } from "@mcp-apps-kit/ui-react-builder/vite";
 export default defineConfig({
   plugins: [
     mcpReactUI({
-      // Scan widget index file for defineReactUI calls
-      serverEntry: "./ui/widgets/index.ts",
+      // File-based discovery: scan widgets directory
+      widgetsDir: "./ui/widgets",
       // Output directory for built HTML files
       outDir: "./ui/dist",
       // Global CSS to include in all UIs
