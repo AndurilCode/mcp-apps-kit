@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as os from "node:os";
-import { generateManifest, writeManifest } from "../src/generator";
+import { generateManifest, writeManifest, generateVersionedManifests } from "../src/generator";
 
 describe("generator", () => {
   let tempDir: string;
@@ -597,6 +597,206 @@ describe("generator", () => {
       const manifestPath = path.join(tempDir, "deep/nested/__generated__", "app-manifest.ts");
       const content = await fs.readFile(manifestPath, "utf-8");
       expect(content).toBe(code);
+    });
+  });
+
+  describe("parse failure logging", () => {
+    it("should log warning when file has syntax errors", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      // Create a file with syntax errors
+      await fs.writeFile(
+        path.join(tempDir, "tools", "broken.ts"),
+        `export default { this is not valid syntax }`
+      );
+
+      const warnings: string[] = [];
+      const logCapture = {
+        info: () => {},
+        warn: (msg: string) => warnings.push(msg),
+        error: () => {},
+      };
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        outDir: "__generated__",
+        logger: logCapture,
+      });
+
+      // File should be skipped and a warning should be logged about parse failure
+      expect(result.files).toHaveLength(0);
+      expect(warnings.some((w) => w.includes("Failed to parse"))).toBe(true);
+    });
+
+    it("should still discover valid files when some have syntax errors", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      // Create a valid file
+      await fs.writeFile(
+        path.join(tempDir, "tools", "valid.ts"),
+        `export default { description: "Valid tool" };`
+      );
+      // Create a file with syntax errors
+      await fs.writeFile(
+        path.join(tempDir, "tools", "broken.ts"),
+        `export default { invalid syntax here }`
+      );
+
+      const warnings: string[] = [];
+      const logCapture = {
+        info: () => {},
+        warn: (msg: string) => warnings.push(msg),
+        error: () => {},
+      };
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        outDir: "__generated__",
+        logger: logCapture,
+      });
+
+      // Valid file should be discovered
+      expect(result.files).toHaveLength(1);
+      expect(result.files[0]?.identifier).toBe("valid");
+      // Parse failure should be logged
+      expect(warnings.some((w) => w.includes("Failed to parse"))).toBe(true);
+    });
+  });
+
+  describe("versioned manifest generation", () => {
+    it("should generate manifests for multiple versions", async () => {
+      // Create v1 tools using the default version structure
+      await fs.mkdir(path.join(tempDir, "versions", "v1", "tools"), { recursive: true });
+      await fs.writeFile(
+        path.join(tempDir, "versions", "v1", "tools", "greet.ts"),
+        `export default { description: "V1 greet" };`
+      );
+
+      // Create v2 tools using the default version structure
+      await fs.mkdir(path.join(tempDir, "versions", "v2", "tools"), { recursive: true });
+      await fs.writeFile(
+        path.join(tempDir, "versions", "v2", "tools", "greet.ts"),
+        `export default { description: "V2 greet" };`
+      );
+      await fs.writeFile(
+        path.join(tempDir, "versions", "v2", "tools", "farewell.ts"),
+        `export default { description: "V2 farewell" };`
+      );
+
+      const silentLogger = {
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+      };
+
+      const result = await generateVersionedManifests(
+        {
+          versions: {
+            v1: { version: "1.0.0" },
+            v2: { version: "2.0.0" },
+          },
+        },
+        tempDir,
+        "__generated__",
+        silentLogger
+      );
+
+      expect(result.errors).toHaveLength(0);
+      expect(Object.keys(result.versions)).toHaveLength(2);
+      expect(result.versions.v1?.files).toHaveLength(1);
+      expect(result.versions.v2?.files).toHaveLength(2);
+    });
+
+    it("should prefix warnings with version key", async () => {
+      await fs.mkdir(path.join(tempDir, "versions", "v1", "tools"), { recursive: true });
+      // Create a file without default export to trigger a warning
+      await fs.writeFile(
+        path.join(tempDir, "versions", "v1", "tools", "no-export.ts"),
+        `export const helper = () => {};`
+      );
+
+      const silentLogger = {
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+      };
+
+      const result = await generateVersionedManifests(
+        {
+          versions: {
+            v1: { version: "1.0.0" },
+          },
+        },
+        tempDir,
+        "__generated__",
+        silentLogger
+      );
+
+      expect(result.warnings.length).toBeGreaterThan(0);
+      expect(result.warnings[0]).toContain("[v1]");
+    });
+  });
+
+  describe("widget HTML path inference", () => {
+    it("should infer HTML path using widget basename", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.mkdir(path.join(tempDir, "ui", "widgets", "nested"), { recursive: true });
+
+      await fs.writeFile(
+        path.join(tempDir, "tools", "nested-deep-tool.ts"),
+        `export default { description: "Deep tool" };`
+      );
+      await fs.writeFile(
+        path.join(tempDir, "ui", "widgets", "nested", "deep-tool.ts"),
+        `export default { name: "Deep Widget" };`
+      );
+
+      const silentLogger = {
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+      };
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        directories: { uiWidgets: "ui/widgets" },
+        outDir: "__generated__",
+        logger: silentLogger,
+      });
+
+      expect(result.errors).toHaveLength(0);
+      // The path inference uses only the widget basename (without nested path)
+      expect(result.code).toContain("./ui/dist/deep-tool.html");
+    });
+
+    it("should use explicit html property if provided", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.mkdir(path.join(tempDir, "ui", "widgets"), { recursive: true });
+
+      await fs.writeFile(
+        path.join(tempDir, "tools", "greet.ts"),
+        `export default { description: "Greet tool" };`
+      );
+      // Widget with explicit html path
+      await fs.writeFile(
+        path.join(tempDir, "ui", "widgets", "greet.ts"),
+        `export default { name: "Greet Widget", html: "./custom/path.html" };`
+      );
+
+      const silentLogger = {
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+      };
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        directories: { uiWidgets: "ui/widgets" },
+        outDir: "__generated__",
+        logger: silentLogger,
+      });
+
+      expect(result.errors).toHaveLength(0);
+      // The code should use the nullish coalescing to prefer explicit html
+      expect(result.code).toContain("_greet_ui_raw.html ??");
     });
   });
 });

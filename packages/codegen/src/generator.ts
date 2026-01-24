@@ -205,9 +205,13 @@ async function getParser(): Promise<typeof TSESParse> {
  * Uses AST parsing to reliably detect:
  * - Default exports (export default ...)
  * - Named 'ui' exports (export const ui = ...)
+ *
+ * @param filePath - The absolute path to the file
+ * @param logger - Logger for warnings (optional, defaults to defaultLogger)
  */
 async function analyzeFile(
-  filePath: string
+  filePath: string,
+  logger: PluginLogger = defaultLogger
 ): Promise<{ hasDefaultExport: boolean; hasUiExport: boolean }> {
   let hasDefaultExport = false;
   let hasUiExport = false;
@@ -266,9 +270,11 @@ async function analyzeFile(
         }
       }
     }
-  } catch {
-    // If we can't parse the file, assume no exports
-    // The warning will be logged by the caller
+  } catch (error) {
+    // Log parse failures to help debug syntax errors in tools
+    logger.warn(
+      `Failed to parse ${filePath}: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 
   return { hasDefaultExport, hasUiExport };
@@ -640,42 +646,42 @@ export async function generateManifest(options: GenerateManifestOptions): Promis
     Promise.all(
       toolFiles.map(async (file) => ({
         file,
-        analysis: await analyzeFile(file.filePath),
+        analysis: await analyzeFile(file.filePath, logger),
       }))
     ),
     // Analyze workflow files
     Promise.all(
       workflowFiles.map(async (file) => ({
         file,
-        analysis: await analyzeFile(file.filePath),
+        analysis: await analyzeFile(file.filePath, logger),
       }))
     ),
     // Analyze UI files
     Promise.all(
       uiFiles.map(async (file) => ({
         file,
-        analysis: await analyzeFile(file.filePath),
+        analysis: await analyzeFile(file.filePath, logger),
       }))
     ),
     // Analyze UI widget files
     Promise.all(
       uiWidgetFiles.map(async (file) => ({
         file,
-        analysis: await analyzeFile(file.filePath),
+        analysis: await analyzeFile(file.filePath, logger),
       }))
     ),
     // Analyze middleware files
     Promise.all(
       middlewareFiles.map(async (file) => ({
         file,
-        analysis: await analyzeFile(file.filePath),
+        analysis: await analyzeFile(file.filePath, logger),
       }))
     ),
     // Analyze handler files
     Promise.all(
       handlerFiles.map(async (file) => ({
         file,
-        analysis: await analyzeFile(file.filePath),
+        analysis: await analyzeFile(file.filePath, logger),
       }))
     ),
   ]);

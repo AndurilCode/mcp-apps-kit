@@ -62,6 +62,11 @@ function clearModuleCacheRecursive(modulePath: string, visited = new Set<string>
 /**
  * Validate tools object before hot reload
  *
+ * Validates that each tool has:
+ * - An execute, build, or handler function
+ * - A description string
+ * - A valid input schema (Zod schema with _def or parse method)
+ *
  * @param tools - The tools object to validate
  * @throws Error if validation fails
  */
@@ -92,6 +97,28 @@ function validateToolsForHotReload(tools: Record<string, unknown>): void {
     if (!hasExecute && !hasBuild && !hasHandler) {
       throw new Error(
         `Tool "${name}" is missing execute/build/handler function - may not be a valid tool definition`
+      );
+    }
+
+    // Validate description is present and is a string
+    if (typeof toolObj.description !== "string" || toolObj.description.trim() === "") {
+      throw new Error(
+        `Tool "${name}" is missing or has invalid description - expected non-empty string`
+      );
+    }
+
+    // Validate input schema is present and looks like a Zod schema
+    // Zod schemas have a _def property (internal) or a parse method
+    const input = toolObj.input as Record<string, unknown> | undefined;
+    if (!input || typeof input !== "object") {
+      throw new Error(`Tool "${name}" is missing input schema - expected Zod schema`);
+    }
+
+    const hasZodDef = "_def" in input;
+    const hasParseMethod = typeof input.parse === "function";
+    if (!hasZodDef && !hasParseMethod) {
+      throw new Error(
+        `Tool "${name}" has invalid input schema - expected Zod schema with _def or parse method`
       );
     }
   }
@@ -337,7 +364,13 @@ Endpoints:
           }
 
           // Re-import the manifest using jiti (fresh instance for cache bypass)
-          // Use cache-busting query string to force reimport of all dependencies
+          // Use cache-busting query string to force reimport of all dependencies.
+          //
+          // NOTE: The query string approach is a jiti-specific technique that works by
+          // making each import URL unique. While non-standard for ESM imports, jiti
+          // uses the full URL (including query string) as the cache key, so this
+          // effectively bypasses its module cache. This is combined with moduleCache:false
+          // and fsCache:false for complete cache invalidation during hot reload.
           const freshJiti = createJiti(projectRoot, {
             interopDefault: true,
             moduleCache: false,
