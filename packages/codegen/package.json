@@ -33,6 +33,7 @@
   ],
   "scripts": {
     "build": "tsup && chmod +x dist/cli.js dist/serve.js",
+    "postbuild": "test -f ../../pnpm-workspace.yaml && cd ../.. && pnpm install --offline --ignore-scripts --reporter=silent || true",
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest",
