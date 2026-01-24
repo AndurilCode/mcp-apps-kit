@@ -8,6 +8,11 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { createJiti } from "jiti";
+import {
+  GlobalConfigSchema,
+  VersionDirectoriesSchema,
+  formatConfigZodError,
+} from "@mcp-apps-kit/core";
 import type {
   FileBasedConfig,
   FileBasedConfigInput,
@@ -106,92 +111,25 @@ export function isVersionedConfig(
 const VERSION_KEY_PATTERN = /^v\d+$/;
 
 /**
- * Validate global config fields (protocol, cors, debug, serverRoute)
+ * Validate global config fields using shared Zod schemas from @mcp-apps-kit/core
  *
- * This is a lightweight version for the codegen package that uses plain Error
- * instead of AppError from core. This avoids importing error infrastructure
- * for simple CLI tooling.
- *
- * NOTE: This validation logic is duplicated from @mcp-apps-kit/core
- * (packages/core/src/utils/config-validation.ts). If validation rules change,
- * both locations must be updated to stay in sync.
- *
- * TODO: Refactor to use Zod v4 schemas (already in project stack) to eliminate
- * duplication. Create shared schemas in a common location that:
- * - Define validation rules once using Zod
- * - Can be imported by both codegen (throws plain Error) and core (throws AppError)
- * - Provide automatic TypeScript type inference
- * See: packages/core uses Zod for OAuthConfigSchema as a reference pattern.
+ * Uses shared schemas to ensure consistent validation between codegen and core.
+ * Converts Zod errors to plain Error (vs AppError in core).
  */
 function validateGlobalConfigFields(globalConfig: Record<string, unknown>, prefix: string): void {
-  // Validate protocol
-  if (globalConfig.protocol !== undefined) {
-    if (globalConfig.protocol !== "mcp" && globalConfig.protocol !== "openai") {
-      throw new Error(`${prefix}.protocol must be 'mcp' or 'openai'`);
-    }
-  }
-
-  // Validate cors
-  if (globalConfig.cors !== undefined && globalConfig.cors !== null) {
-    if (typeof globalConfig.cors !== "object") {
-      throw new Error(`${prefix}.cors must be an object`);
-    }
-  }
-
-  // Validate debug
-  if (globalConfig.debug !== undefined && globalConfig.debug !== null) {
-    if (typeof globalConfig.debug !== "object") {
-      throw new Error(`${prefix}.debug must be an object`);
-    }
-
-    const debug = globalConfig.debug as Record<string, unknown>;
-    if (debug.level !== undefined) {
-      const validLevels = ["debug", "info", "warn", "error"];
-      if (!validLevels.includes(debug.level as string)) {
-        throw new Error(`${prefix}.debug.level must be one of: ${validLevels.join(", ")}`);
-      }
-    }
-
-    if (debug.transport !== undefined) {
-      const validTransports = ["builtin", "tool", "api"];
-      if (!validTransports.includes(debug.transport as string)) {
-        throw new Error(`${prefix}.debug.transport must be one of: ${validTransports.join(", ")}`);
-      }
-    }
-  }
-
-  // Validate serverRoute
-  if (globalConfig.serverRoute !== undefined) {
-    if (typeof globalConfig.serverRoute !== "string") {
-      throw new Error(`${prefix}.serverRoute must be a string`);
-    }
-    if (!globalConfig.serverRoute.startsWith("/")) {
-      throw new Error(`${prefix}.serverRoute must start with '/'`);
-    }
+  const result = GlobalConfigSchema.safeParse(globalConfig);
+  if (!result.success) {
+    throw new Error(formatConfigZodError(result.error, prefix));
   }
 }
 
 /**
- * Validate version directories configuration
+ * Validate version directories configuration using shared Zod schema
  */
 function validateVersionDirectoriesConfig(dirs: Record<string, unknown>, prefix: string): void {
-  if (dirs.root !== undefined && typeof dirs.root !== "string") {
-    throw new Error(`${prefix}.root must be a string`);
-  }
-  if (dirs.tools !== undefined && typeof dirs.tools !== "string") {
-    throw new Error(`${prefix}.tools must be a string`);
-  }
-  if (dirs.workflows !== undefined && typeof dirs.workflows !== "string") {
-    throw new Error(`${prefix}.workflows must be a string`);
-  }
-  if (dirs.ui !== undefined && typeof dirs.ui !== "string") {
-    throw new Error(`${prefix}.ui must be a string`);
-  }
-  if (dirs.uiWidgets !== undefined && typeof dirs.uiWidgets !== "string") {
-    throw new Error(`${prefix}.uiWidgets must be a string`);
-  }
-  if (dirs.uiWidgetsOutDir !== undefined && typeof dirs.uiWidgetsOutDir !== "string") {
-    throw new Error(`${prefix}.uiWidgetsOutDir must be a string`);
+  const result = VersionDirectoriesSchema.safeParse(dirs);
+  if (!result.success) {
+    throw new Error(formatConfigZodError(result.error, prefix));
   }
 }
 

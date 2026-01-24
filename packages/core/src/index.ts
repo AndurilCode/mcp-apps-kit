@@ -177,6 +177,23 @@ export type {
 export { AppError, ErrorCode, formatZodError, wrapError } from "./utils/errors";
 export type { ErrorCodeType } from "./utils/errors";
 
+// Config validation schemas (shared with @mcp-apps-kit/codegen)
+export {
+  ProtocolSchema,
+  CorsSchema,
+  DebugLevelSchema,
+  DebugTransportSchema,
+  DebugConfigSchema,
+  ServerRouteSchema,
+  DomainChallengeSchema,
+  OpenAIConfigSchema,
+  GlobalConfigSchema,
+  VersionDirectoriesSchema,
+  validateGlobalConfigSchema,
+  formatZodError as formatConfigZodError,
+} from "./utils/config-schemas.js";
+export type { ValidationResult } from "./utils/config-schemas.js";
+
 // Metadata utilities
 export {
   mapVisibilityToMcp,
