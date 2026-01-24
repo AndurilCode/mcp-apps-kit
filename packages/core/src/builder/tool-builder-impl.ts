@@ -19,6 +19,16 @@ import type {
 } from "./tool-builder";
 
 // =============================================================================
+// BUILDER MARKER SYMBOL
+// =============================================================================
+
+/**
+ * Symbol used to identify tool builder instances.
+ * Using Symbol.for() for cross-module detection (same symbol across imports).
+ */
+export const TOOL_BUILDER_SYMBOL = Symbol.for("@mcp-apps-kit/core/ToolBuilder");
+
+// =============================================================================
 // INTERNAL HELPERS
 // =============================================================================
 
@@ -67,9 +77,51 @@ function normalizeVisibility(value: ToolVisibilityInput): Visibility {
 // =============================================================================
 
 export class ToolBuilderImpl<TName extends string> implements ToolBuilderInitial<TName> {
-  private config: ToolBuilderConfig = {};
+  /**
+   * Marker symbol for identifying tool builder instances.
+   */
+  readonly [TOOL_BUILDER_SYMBOL] = true as const;
 
-  constructor(private readonly name: TName) {}
+  private config: ToolBuilderConfig = {};
+  private _name?: TName;
+
+  constructor(name?: TName) {
+    this._name = name;
+  }
+
+  /**
+   * Set the tool name if not already set.
+   * Used by ensureBuilt() for inferring names from filenames.
+   *
+   * @param name - The name to set
+   * @returns this builder for chaining
+   */
+  _setName(name: string): this {
+    this._name ??= name as TName;
+    return this;
+  }
+
+  /**
+   * Set the UI binding if not already set.
+   * Used by convention-based UI binding in generated manifests.
+   *
+   * @param uiDef - The UI definition object
+   * @returns this builder for chaining
+   */
+  _setUi(uiDef: UIDef): this {
+    this.config.ui ??= defineUI(uiDef);
+    return this;
+  }
+
+  /**
+   * Get the tool name, throwing if not set.
+   */
+  private get name(): TName {
+    if (!this._name) {
+      throw new Error("Tool name not set. Call _setName() or provide name in constructor.");
+    }
+    return this._name;
+  }
 
   describe(description: string): ToolBuilderWithDescription<TName> {
     this.config.description = description;

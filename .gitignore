@@ -51,3 +51,9 @@ specs/
 .claude
 .vercel/
 .cursor/
+.ralph/
+.devcontainer/
+.pnpm-store/
+.agent/
+ralph.yml
+PROMPT.md

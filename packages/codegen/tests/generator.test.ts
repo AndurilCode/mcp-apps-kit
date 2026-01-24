@@ -1,0 +1,802 @@
+/**
+ * Tests for manifest generation
+ */
+
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
+import * as os from "node:os";
+import { generateManifest, writeManifest, generateVersionedManifests } from "../src/generator";
+
+describe("generator", () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    // Create a temporary directory for tests
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "mcp-vite-plugin-test-"));
+  });
+
+  afterEach(async () => {
+    // Clean up temporary directory
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  describe("generateManifest", () => {
+    it("should generate empty manifest for empty directories", async () => {
+      // Create empty directories
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.mkdir(path.join(tempDir, "workflows"), { recursive: true });
+      await fs.mkdir(path.join(tempDir, "ui"), { recursive: true });
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        outDir: "__generated__",
+      });
+
+      expect(result.errors).toHaveLength(0);
+      expect(result.files).toHaveLength(0);
+      expect(result.code).toContain("export const tools = {");
+      expect(result.code).toContain("} as const;");
+    });
+
+    it("should discover tool files with default export", async () => {
+      // Create tools directory with a simple tool
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.writeFile(
+        path.join(tempDir, "tools", "greet.ts"),
+        `export default { description: "Greet a user" };`
+      );
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        outDir: "__generated__",
+      });
+
+      expect(result.errors).toHaveLength(0);
+      expect(result.files).toHaveLength(1);
+      const greetFile = result.files.find((f) => f.identifier === "greet");
+      expect(greetFile).toBeDefined();
+      expect(result.code).toContain('import greet from "../tools/greet.js";');
+      expect(result.code).toContain("greet,");
+    });
+
+    it("should skip files without default export", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.writeFile(
+        path.join(tempDir, "tools", "helpers.ts"),
+        `export const helper = () => {};`
+      );
+
+      const silentLogger = {
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+      };
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        outDir: "__generated__",
+        logger: silentLogger,
+      });
+
+      expect(result.errors).toHaveLength(0);
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0]).toContain("no default export");
+      expect(result.files).toHaveLength(0);
+    });
+
+    it("should detect name collisions", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.mkdir(path.join(tempDir, "tools", "admin"), { recursive: true });
+
+      // Create two files that will have the same identifier
+      await fs.writeFile(
+        path.join(tempDir, "tools", "greet.ts"),
+        `export default { description: "Greet" };`
+      );
+      await fs.writeFile(
+        path.join(tempDir, "tools", "admin", "greet.ts"),
+        `export default { description: "Admin greet" };`
+      );
+
+      // Create a third tool that has a different name to verify collision
+      // doesn't occur with unique names
+      // Note: admin/greet.ts becomes admin_greet, not greet
+      // So there's actually no collision here - let me fix the test
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        outDir: "__generated__",
+      });
+
+      // admin/greet.ts becomes admin_greet, tools/greet.ts becomes greet
+      // So there's no collision - both are different identifiers
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it("should detect actual name collisions", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.mkdir(path.join(tempDir, "tools", "admin"), { recursive: true });
+
+      // Create a file that will collide with another
+      // tools/admin_greet.ts -> admin_greet
+      // tools/admin/greet.ts -> admin_greet (collision!)
+      await fs.writeFile(
+        path.join(tempDir, "tools", "admin_greet.ts"),
+        `export default { description: "Greet" };`
+      );
+      await fs.writeFile(
+        path.join(tempDir, "tools", "admin", "greet.ts"),
+        `export default { description: "Admin greet" };`
+      );
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        outDir: "__generated__",
+      });
+
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain("Tool name collision");
+      expect(result.errors[0]).toContain("admin_greet");
+    });
+
+    it("should skip underscore-prefixed files", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.writeFile(
+        path.join(tempDir, "tools", "_helpers.ts"),
+        `export default { description: "Helpers" };`
+      );
+      await fs.writeFile(
+        path.join(tempDir, "tools", "greet.ts"),
+        `export default { description: "Greet" };`
+      );
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        outDir: "__generated__",
+      });
+
+      expect(result.errors).toHaveLength(0);
+      expect(result.files).toHaveLength(1);
+      const greetFile = result.files.find((f) => f.identifier === "greet");
+      expect(greetFile).toBeDefined();
+    });
+
+    it("should skip index files", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.writeFile(
+        path.join(tempDir, "tools", "index.ts"),
+        `export default { description: "Index" };`
+      );
+      await fs.writeFile(
+        path.join(tempDir, "tools", "greet.ts"),
+        `export default { description: "Greet" };`
+      );
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        outDir: "__generated__",
+      });
+
+      expect(result.errors).toHaveLength(0);
+      expect(result.files).toHaveLength(1);
+      const greetFile = result.files.find((f) => f.identifier === "greet");
+      expect(greetFile).toBeDefined();
+    });
+
+    it("should handle nested directories", async () => {
+      await fs.mkdir(path.join(tempDir, "tools", "admin"), { recursive: true });
+      await fs.writeFile(
+        path.join(tempDir, "tools", "admin", "delete-user.ts"),
+        `export default { description: "Delete user" };`
+      );
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        outDir: "__generated__",
+      });
+
+      expect(result.errors).toHaveLength(0);
+      expect(result.files).toHaveLength(1);
+      const deleteUserFile = result.files.find((f) => f.identifier === "admin_delete_user");
+      expect(deleteUserFile).toBeDefined();
+      expect(result.code).toContain(
+        'import admin_delete_user from "../tools/admin/delete-user.js";'
+      );
+    });
+
+    it("should convert kebab-case to snake_case", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.writeFile(
+        path.join(tempDir, "tools", "search-restaurants.ts"),
+        `export default { description: "Search restaurants" };`
+      );
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        outDir: "__generated__",
+      });
+
+      expect(result.errors).toHaveLength(0);
+      const searchFile = result.files.find((f) => f.identifier === "search_restaurants");
+      expect(searchFile).toBeDefined();
+    });
+
+    it("should convert PascalCase to snake_case for UI files", async () => {
+      await fs.mkdir(path.join(tempDir, "ui"), { recursive: true });
+      await fs.writeFile(
+        path.join(tempDir, "ui", "SearchResults.tsx"),
+        `export default { component: () => null };`
+      );
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        directories: { ui: "ui" }, // UI directory must be explicitly configured
+        outDir: "__generated__",
+      });
+
+      expect(result.errors).toHaveLength(0);
+      const searchResultsFile = result.files.find((f) => f.identifier === "search_results");
+      expect(searchResultsFile).toBeDefined();
+    });
+
+    it("should generate type exports", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.writeFile(
+        path.join(tempDir, "tools", "greet.ts"),
+        `export default { description: "Greet" };`
+      );
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        outDir: "__generated__",
+      });
+
+      expect(result.code).toContain("export type AppTools = typeof tools;");
+      expect(result.code).toContain("export type AppWorkflows = typeof workflows;");
+      expect(result.code).toContain("export type AppUI = typeof ui;");
+    });
+
+    it("should handle missing directories gracefully", async () => {
+      // Don't create any directories
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        outDir: "__generated__",
+      });
+
+      expect(result.errors).toHaveLength(0);
+      expect(result.files).toHaveLength(0);
+      expect(result.code).toContain("export const tools = {");
+    });
+
+    it("should use custom directory configuration", async () => {
+      await fs.mkdir(path.join(tempDir, "src", "tools"), { recursive: true });
+      await fs.writeFile(
+        path.join(tempDir, "src", "tools", "greet.ts"),
+        `export default { description: "Greet" };`
+      );
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        directories: { tools: "src/tools" },
+        outDir: "__generated__",
+      });
+
+      expect(result.errors).toHaveLength(0);
+      expect(result.files).toHaveLength(1);
+    });
+
+    it("should ignore non-TypeScript/JavaScript files", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.writeFile(path.join(tempDir, "tools", "data.json"), `{ "key": "value" }`);
+      await fs.writeFile(
+        path.join(tempDir, "tools", "greet.ts"),
+        `export default { description: "Greet" };`
+      );
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        outDir: "__generated__",
+      });
+
+      expect(result.errors).toHaveLength(0);
+      expect(result.files).toHaveLength(1);
+      const greetFile = result.files.find((f) => f.identifier === "greet");
+      expect(greetFile).toBeDefined();
+    });
+  });
+
+  describe("convention-based UI binding", () => {
+    it("should discover UI widget files", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.mkdir(path.join(tempDir, "ui", "widgets"), { recursive: true });
+
+      await fs.writeFile(
+        path.join(tempDir, "tools", "greet.ts"),
+        `export default { description: "Greet a user" };`
+      );
+      await fs.writeFile(
+        path.join(tempDir, "ui", "widgets", "greet.ts"),
+        `export default { name: "Greet Widget", html: "<div>Hello</div>" };`
+      );
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        directories: { uiWidgets: "ui/widgets" },
+        outDir: "__generated__",
+      });
+
+      expect(result.errors).toHaveLength(0);
+      expect(result.files).toHaveLength(2);
+
+      const toolFile = result.files.find((f) => f.type === "tool");
+      const widgetFile = result.files.find((f) => f.type === "ui-widget");
+
+      expect(toolFile?.identifier).toBe("greet");
+      expect(widgetFile?.identifier).toBe("greet");
+    });
+
+    it("should generate UI widget imports and bindings", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.mkdir(path.join(tempDir, "ui", "widgets"), { recursive: true });
+
+      await fs.writeFile(
+        path.join(tempDir, "tools", "greet.ts"),
+        `export default { description: "Greet a user" };`
+      );
+      await fs.writeFile(
+        path.join(tempDir, "ui", "widgets", "greet.ts"),
+        `export default { name: "Greet Widget", html: "<div>Hello</div>" };`
+      );
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        directories: { uiWidgets: "ui/widgets" },
+        outDir: "__generated__",
+      });
+
+      expect(result.errors).toHaveLength(0);
+      // Check that UI widget import is generated (with raw import and html path inference)
+      expect(result.code).toContain('import _greet_ui_raw from "../ui/widgets/greet.js";');
+      expect(result.code).toContain(
+        'const greet_ui = { ..._greet_ui_raw, html: _greet_ui_raw.html ?? "./ui/dist/greet.html" };'
+      );
+      // Check that binding code is generated using _setUi()
+      expect(result.code).toContain("greet._setUi(greet_ui);");
+      // Check that uiWidgets export is generated
+      expect(result.code).toContain("export const uiWidgets = {");
+      expect(result.code).toContain("greet_ui,");
+    });
+
+    it("should not bind widgets when uiWidgets directory is not configured", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.mkdir(path.join(tempDir, "ui", "widgets"), { recursive: true });
+
+      await fs.writeFile(
+        path.join(tempDir, "tools", "greet.ts"),
+        `export default { description: "Greet a user" };`
+      );
+      await fs.writeFile(
+        path.join(tempDir, "ui", "widgets", "greet.ts"),
+        `export default { name: "Greet Widget", html: "<div>Hello</div>" };`
+      );
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        // Note: uiWidgets is NOT configured
+        outDir: "__generated__",
+      });
+
+      expect(result.errors).toHaveLength(0);
+      // Only the tool should be discovered
+      expect(result.files).toHaveLength(1);
+      const toolFile = result.files.find((f) => f.type === "tool");
+      expect(toolFile).toBeDefined();
+      // No binding code should be generated
+      expect(result.code).not.toContain("greet_ui");
+    });
+
+    it("should only bind widgets that match tool identifiers", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.mkdir(path.join(tempDir, "ui", "widgets"), { recursive: true });
+
+      await fs.writeFile(
+        path.join(tempDir, "tools", "greet.ts"),
+        `export default { description: "Greet a user" };`
+      );
+      await fs.writeFile(
+        path.join(tempDir, "tools", "farewell.ts"),
+        `export default { description: "Say farewell" };`
+      );
+      // Only greet has a matching widget
+      await fs.writeFile(
+        path.join(tempDir, "ui", "widgets", "greet.ts"),
+        `export default { name: "Greet Widget", html: "<div>Hello</div>" };`
+      );
+      // This widget doesn't match any tool
+      await fs.writeFile(
+        path.join(tempDir, "ui", "widgets", "orphan-widget.ts"),
+        `export default { name: "Orphan Widget", html: "<div>Orphan</div>" };`
+      );
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        directories: { uiWidgets: "ui/widgets" },
+        outDir: "__generated__",
+      });
+
+      expect(result.errors).toHaveLength(0);
+      // 2 tools + 2 widgets
+      expect(result.files).toHaveLength(4);
+
+      // Check binding for greet using _setUi()
+      expect(result.code).toContain("greet._setUi(greet_ui);");
+
+      // No binding for farewell (no matching widget)
+      expect(result.code).not.toContain("farewell._setUi(");
+
+      // Orphan widget is still exported but not bound
+      expect(result.code).toContain("orphan_widget_ui,");
+    });
+
+    it("should handle kebab-case to snake_case matching", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.mkdir(path.join(tempDir, "ui", "widgets"), { recursive: true });
+
+      await fs.writeFile(
+        path.join(tempDir, "tools", "get-current-weather.ts"),
+        `export default { description: "Get current weather" };`
+      );
+      await fs.writeFile(
+        path.join(tempDir, "ui", "widgets", "get-current-weather.ts"),
+        `export default { name: "Weather Widget", html: "<div>Weather</div>" };`
+      );
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        directories: { uiWidgets: "ui/widgets" },
+        outDir: "__generated__",
+      });
+
+      expect(result.errors).toHaveLength(0);
+      // Both should resolve to get_current_weather and use _setUi()
+      expect(result.code).toContain("get_current_weather._setUi(get_current_weather_ui);");
+    });
+
+    it("should handle nested directory matching", async () => {
+      await fs.mkdir(path.join(tempDir, "tools", "admin"), { recursive: true });
+      await fs.mkdir(path.join(tempDir, "ui", "widgets", "admin"), { recursive: true });
+
+      await fs.writeFile(
+        path.join(tempDir, "tools", "admin", "delete-user.ts"),
+        `export default { description: "Delete user" };`
+      );
+      await fs.writeFile(
+        path.join(tempDir, "ui", "widgets", "admin", "delete-user.ts"),
+        `export default { name: "Delete User Widget", html: "<div>Delete</div>" };`
+      );
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        directories: { uiWidgets: "ui/widgets" },
+        outDir: "__generated__",
+      });
+
+      expect(result.errors).toHaveLength(0);
+      // Both should resolve to admin_delete_user and use _setUi()
+      expect(result.code).toContain("admin_delete_user._setUi(admin_delete_user_ui);");
+    });
+
+    it("should detect UI widget name collisions", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.mkdir(path.join(tempDir, "ui", "widgets", "admin"), { recursive: true });
+
+      await fs.writeFile(
+        path.join(tempDir, "tools", "greet.ts"),
+        `export default { description: "Greet" };`
+      );
+
+      // Create two widget files that will have the same identifier
+      await fs.writeFile(
+        path.join(tempDir, "ui", "widgets", "admin_greet.ts"),
+        `export default { name: "Widget 1" };`
+      );
+      await fs.writeFile(
+        path.join(tempDir, "ui", "widgets", "admin", "greet.ts"),
+        `export default { name: "Widget 2" };`
+      );
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        directories: { uiWidgets: "ui/widgets" },
+        outDir: "__generated__",
+      });
+
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain("UI widget name collision");
+      expect(result.errors[0]).toContain("admin_greet");
+    });
+
+    it("should skip UI widgets without default export", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.mkdir(path.join(tempDir, "ui", "widgets"), { recursive: true });
+
+      await fs.writeFile(
+        path.join(tempDir, "tools", "greet.ts"),
+        `export default { description: "Greet" };`
+      );
+      // This widget has no default export
+      await fs.writeFile(
+        path.join(tempDir, "ui", "widgets", "greet.ts"),
+        `export const widget = { name: "Greet Widget" };`
+      );
+
+      const silentLogger = {
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+      };
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        directories: { uiWidgets: "ui/widgets" },
+        outDir: "__generated__",
+        logger: silentLogger,
+      });
+
+      expect(result.errors).toHaveLength(0);
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0]).toContain("no default or ui export found");
+      // Only the tool should be valid
+      expect(result.files).toHaveLength(1);
+      const toolFile = result.files.find((f) => f.type === "tool");
+      expect(toolFile).toBeDefined();
+      // No binding should be generated
+      expect(result.code).not.toContain("greet_ui");
+    });
+
+    it("should generate AppUIWidgets type export", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.mkdir(path.join(tempDir, "ui", "widgets"), { recursive: true });
+
+      await fs.writeFile(
+        path.join(tempDir, "tools", "greet.ts"),
+        `export default { description: "Greet" };`
+      );
+      await fs.writeFile(
+        path.join(tempDir, "ui", "widgets", "greet.ts"),
+        `export default { name: "Widget" };`
+      );
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        directories: { uiWidgets: "ui/widgets" },
+        outDir: "__generated__",
+      });
+
+      expect(result.code).toContain("export type AppUIWidgets = typeof uiWidgets;");
+    });
+  });
+
+  describe("writeManifest", () => {
+    it("should write manifest to disk", async () => {
+      const code = "// Test manifest\nexport const tools = {} as const;";
+
+      await writeManifest(code, "__generated__", tempDir);
+
+      const manifestPath = path.join(tempDir, "__generated__", "app-manifest.ts");
+      const content = await fs.readFile(manifestPath, "utf-8");
+      expect(content).toBe(code);
+    });
+
+    it("should create output directory if it doesn't exist", async () => {
+      const code = "// Test manifest";
+
+      await writeManifest(code, "deep/nested/__generated__", tempDir);
+
+      const manifestPath = path.join(tempDir, "deep/nested/__generated__", "app-manifest.ts");
+      const content = await fs.readFile(manifestPath, "utf-8");
+      expect(content).toBe(code);
+    });
+  });
+
+  describe("parse failure logging", () => {
+    it("should log warning when file has syntax errors", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      // Create a file with syntax errors
+      await fs.writeFile(
+        path.join(tempDir, "tools", "broken.ts"),
+        `export default { this is not valid syntax }`
+      );
+
+      const warnings: string[] = [];
+      const logCapture = {
+        info: () => {},
+        warn: (msg: string) => warnings.push(msg),
+        error: () => {},
+      };
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        outDir: "__generated__",
+        logger: logCapture,
+      });
+
+      // File should be skipped and a warning should be logged about parse failure
+      expect(result.files).toHaveLength(0);
+      expect(warnings.some((w) => w.includes("Failed to parse"))).toBe(true);
+    });
+
+    it("should still discover valid files when some have syntax errors", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      // Create a valid file
+      await fs.writeFile(
+        path.join(tempDir, "tools", "valid.ts"),
+        `export default { description: "Valid tool" };`
+      );
+      // Create a file with syntax errors
+      await fs.writeFile(
+        path.join(tempDir, "tools", "broken.ts"),
+        `export default { invalid syntax here }`
+      );
+
+      const warnings: string[] = [];
+      const logCapture = {
+        info: () => {},
+        warn: (msg: string) => warnings.push(msg),
+        error: () => {},
+      };
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        outDir: "__generated__",
+        logger: logCapture,
+      });
+
+      // Valid file should be discovered
+      expect(result.files).toHaveLength(1);
+      expect(result.files[0]?.identifier).toBe("valid");
+      // Parse failure should be logged
+      expect(warnings.some((w) => w.includes("Failed to parse"))).toBe(true);
+    });
+  });
+
+  describe("versioned manifest generation", () => {
+    it("should generate manifests for multiple versions", async () => {
+      // Create v1 tools using the default version structure
+      await fs.mkdir(path.join(tempDir, "versions", "v1", "tools"), { recursive: true });
+      await fs.writeFile(
+        path.join(tempDir, "versions", "v1", "tools", "greet.ts"),
+        `export default { description: "V1 greet" };`
+      );
+
+      // Create v2 tools using the default version structure
+      await fs.mkdir(path.join(tempDir, "versions", "v2", "tools"), { recursive: true });
+      await fs.writeFile(
+        path.join(tempDir, "versions", "v2", "tools", "greet.ts"),
+        `export default { description: "V2 greet" };`
+      );
+      await fs.writeFile(
+        path.join(tempDir, "versions", "v2", "tools", "farewell.ts"),
+        `export default { description: "V2 farewell" };`
+      );
+
+      const silentLogger = {
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+      };
+
+      const result = await generateVersionedManifests(
+        {
+          versions: {
+            v1: { version: "1.0.0" },
+            v2: { version: "2.0.0" },
+          },
+        },
+        tempDir,
+        "__generated__",
+        silentLogger
+      );
+
+      expect(result.errors).toHaveLength(0);
+      expect(Object.keys(result.versions)).toHaveLength(2);
+      expect(result.versions.v1?.files).toHaveLength(1);
+      expect(result.versions.v2?.files).toHaveLength(2);
+    });
+
+    it("should prefix warnings with version key", async () => {
+      await fs.mkdir(path.join(tempDir, "versions", "v1", "tools"), { recursive: true });
+      // Create a file without default export to trigger a warning
+      await fs.writeFile(
+        path.join(tempDir, "versions", "v1", "tools", "no-export.ts"),
+        `export const helper = () => {};`
+      );
+
+      const silentLogger = {
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+      };
+
+      const result = await generateVersionedManifests(
+        {
+          versions: {
+            v1: { version: "1.0.0" },
+          },
+        },
+        tempDir,
+        "__generated__",
+        silentLogger
+      );
+
+      expect(result.warnings.length).toBeGreaterThan(0);
+      expect(result.warnings[0]).toContain("[v1]");
+    });
+  });
+
+  describe("widget HTML path inference", () => {
+    it("should infer HTML path using widget basename", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.mkdir(path.join(tempDir, "ui", "widgets", "nested"), { recursive: true });
+
+      await fs.writeFile(
+        path.join(tempDir, "tools", "nested-deep-tool.ts"),
+        `export default { description: "Deep tool" };`
+      );
+      await fs.writeFile(
+        path.join(tempDir, "ui", "widgets", "nested", "deep-tool.ts"),
+        `export default { name: "Deep Widget" };`
+      );
+
+      const silentLogger = {
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+      };
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        directories: { uiWidgets: "ui/widgets" },
+        outDir: "__generated__",
+        logger: silentLogger,
+      });
+
+      expect(result.errors).toHaveLength(0);
+      // The path inference uses only the widget basename (without nested path)
+      expect(result.code).toContain("./ui/dist/deep-tool.html");
+    });
+
+    it("should use explicit html property if provided", async () => {
+      await fs.mkdir(path.join(tempDir, "tools"), { recursive: true });
+      await fs.mkdir(path.join(tempDir, "ui", "widgets"), { recursive: true });
+
+      await fs.writeFile(
+        path.join(tempDir, "tools", "greet.ts"),
+        `export default { description: "Greet tool" };`
+      );
+      // Widget with explicit html path
+      await fs.writeFile(
+        path.join(tempDir, "ui", "widgets", "greet.ts"),
+        `export default { name: "Greet Widget", html: "./custom/path.html" };`
+      );
+
+      const silentLogger = {
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+      };
+
+      const result = await generateManifest({
+        projectRoot: tempDir,
+        directories: { uiWidgets: "ui/widgets" },
+        outDir: "__generated__",
+        logger: silentLogger,
+      });
+
+      expect(result.errors).toHaveLength(0);
+      // The code should use the nullish coalescing to prefer explicit html
+      expect(result.code).toContain("_greet_ui_raw.html ??");
+    });
+  });
+});

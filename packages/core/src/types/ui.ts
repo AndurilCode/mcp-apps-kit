@@ -204,3 +204,83 @@ export type UIDefs = Record<string, UIDef>;
 export function defineUI(definition: UIDef): UIDef {
   return definition;
 }
+
+// =============================================================================
+// FILE-BASED WIDGET METADATA
+// =============================================================================
+
+/**
+ * Widget metadata for file-based discovery mode.
+ *
+ * Use this type when defining widgets in colocated files where the React component
+ * and metadata live in the same file. The `html` path is automatically inferred
+ * from the file name and build output directory.
+ *
+ * @example
+ * ```typescript
+ * // ui/widgets/my-widget.tsx
+ * import type { WidgetMetadata } from "@mcp-apps-kit/core";
+ *
+ * export default function MyWidget() {
+ *   return <div>Hello World</div>;
+ * }
+ *
+ * export const ui: WidgetMetadata = {
+ *   name: "My Widget",
+ *   description: "A simple greeting widget",
+ *   prefersBorder: true,
+ *   // html is NOT specified - inferred as ./dist/my-widget.html
+ * };
+ * ```
+ */
+export interface WidgetMetadata {
+  /**
+   * Display name for the widget.
+   * Used in protocol metadata and for identification.
+   */
+  name?: string;
+
+  /**
+   * Description of what the widget displays or does.
+   * Used in protocol metadata.
+   */
+  description?: string;
+
+  /**
+   * Human-readable summary for the AI model (ChatGPT only).
+   *
+   * This description helps the model understand what the widget does
+   * and when to display it. Keep it concise and informative.
+   */
+  widgetDescription?: string;
+
+  /**
+   * Content Security Policy configuration.
+   * Controls what external resources the widget can access.
+   */
+  csp?: CSPConfig;
+
+  /**
+   * Request a visible border around the widget.
+   * Hint to the host platform - may not be honored.
+   */
+  prefersBorder?: boolean;
+
+  /**
+   * Enable automatic size change notifications.
+   *
+   * When enabled, the widget automatically reports its size changes to the host.
+   * MCP Apps only - ignored in ChatGPT.
+   *
+   * @default true
+   */
+  autoResize?: boolean;
+
+  /**
+   * Dedicated domain for widget isolation.
+   * Advanced feature for security-sensitive applications.
+   *
+   * ChatGPT only - ignored on MCP Apps.
+   */
+  domain?: string;
+}

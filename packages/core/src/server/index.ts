@@ -129,6 +129,17 @@ export interface ServerInstance {
   handler: () => ExpressMiddleware;
   /** Handle a single request (for serverless) */
   handleRequest: (req: globalThis.Request, env?: unknown) => Promise<globalThis.Response>;
+  /**
+   * Replace the MCP server with a new one (for hot reload)
+   *
+   * This recreates the MCP server with new tool definitions while keeping
+   * the HTTP server running. Existing connections will continue to use
+   * the old server until they complete.
+   *
+   * @param newTools - New tool definitions
+   * @param newUI - Optional new UI definitions
+   */
+  replaceMcpServer: (newTools: ToolDefs, newUI?: UIDefs) => void;
 }
 
 /**
@@ -138,6 +149,55 @@ export interface ServerInstance {
 type InternalAppConfig<T extends ToolDefs> = AppConfig<T> & {
   ui?: UIDefs;
 };
+
+/**
+ * Create and configure an MCP server with tools and UI resources
+ *
+ * This is an internal helper used by createServerInstance and replaceMcpServer.
+ */
+function buildMcpServer<T extends ToolDefs>(
+  config: InternalAppConfig<T>,
+  tools: ToolDefs,
+  ui: UIDefs | undefined,
+  adapter: ProtocolAdapter,
+  icons: Icon[] | undefined,
+  pluginManager: PluginManager,
+  getMiddlewareChain: () => MiddlewareChain<unknown> | undefined,
+  getEventEmitter: () => TypedEventEmitter<EventMap & Record<string, unknown>> | undefined
+): { mcpServer: McpServer; uiUriMap: Record<string, { uri: string; html: string }> } {
+  // Create MCP server with icons if provided
+  const mcpServer = new McpServer({
+    name: config.name,
+    version: config.version,
+    ...(icons && { icons }),
+  });
+
+  // Compute UI resource URIs with content hashes for cache busting
+  // Inject server config into UIs if provided
+  const uiUriMap = ui ? computeUIUris(config.name, ui, config.config?.serverConfig) : {};
+
+  // Register debug log tool if debug logging is enabled
+  registerDebugLogTool(mcpServer, config.config?.debug);
+
+  // Register tools with MCP server (pass UI URIs for correct binding and pluginManager)
+  registerTools(
+    mcpServer,
+    tools,
+    adapter,
+    config.name,
+    uiUriMap,
+    pluginManager,
+    getMiddlewareChain,
+    getEventEmitter
+  );
+
+  // Register UI resources with MCP server
+  if (ui) {
+    registerUIResources(mcpServer, ui, adapter, uiUriMap, pluginManager);
+  }
+
+  return { mcpServer, uiUriMap };
+}
 
 /**
  * Create an MCP server instance with tools registered
@@ -154,42 +214,26 @@ export function createServerInstance<T extends ToolDefs>(
   // Normalize icons from shorthand or array format
   const icons = normalizeIcons(config.icon, config.icons);
 
-  // Create MCP server with icons if provided
-  const mcpServer = new McpServer({
-    name: config.name,
-    version: config.version,
-    ...(icons && { icons }),
-  });
-
-  // Compute UI resource URIs with content hashes for cache busting
-  // Inject server config into UIs if provided
-  const uiUriMap = config.ui
-    ? computeUIUris(config.name, config.ui, config.config?.serverConfig)
-    : {};
-
   // Will be set by createApp
   let middlewareChainRef: MiddlewareChain<unknown> | undefined;
   let eventEmitterRef: TypedEventEmitter<EventMap & Record<string, unknown>> | undefined;
 
-  // Register debug log tool if debug logging is enabled
-  registerDebugLogTool(mcpServer, config.config?.debug);
+  // Mutable reference to current MCP server (for hot reload support)
+  // This allows replaceMcpServer to swap out the server without restarting HTTP
+  let currentMcpServer: McpServer;
 
-  // Register tools with MCP server (pass UI URIs for correct binding and pluginManager)
-  registerTools(
-    mcpServer,
+  // Build initial MCP server
+  const initial = buildMcpServer(
+    config,
     config.tools,
+    config.ui,
     adapter,
-    config.name,
-    uiUriMap,
+    icons,
     pluginManager,
     () => middlewareChainRef,
     () => eventEmitterRef
   );
-
-  // Register UI resources with MCP server
-  if (config.ui) {
-    registerUIResources(mcpServer, config.ui, adapter, uiUriMap, pluginManager);
-  }
+  currentMcpServer = initial.mcpServer;
 
   // Create Express app
   const expressApp = express();
@@ -273,6 +317,7 @@ export function createServerInstance<T extends ToolDefs>(
 
   // Setup stateless Streamable HTTP endpoint for MCP
   // Each request creates a fresh transport (no session management)
+  // Note: Uses currentMcpServer reference to support hot reload
   expressApp.post(serverRoute, async (req: Request, res: Response) => {
     // Call onRequest hook
     void pluginManager.executeHook("onRequest", {
@@ -293,8 +338,9 @@ export function createServerInstance<T extends ToolDefs>(
       void transport.close();
     });
 
-    // Connect transport to MCP server for this request
-    await mcpServer.connect(transport);
+    // Connect transport to current MCP server for this request
+    // Using currentMcpServer reference allows hot reload to swap the server
+    await currentMcpServer.connect(transport);
 
     // Handle the request
     await transport.handleRequest(req, res, req.body);
@@ -356,7 +402,10 @@ export function createServerInstance<T extends ToolDefs>(
   }
 
   const instance: ServerInstance = {
-    mcpServer,
+    // Getter returns current MCP server (supports hot reload)
+    get mcpServer() {
+      return currentMcpServer;
+    },
     expressApp,
     httpServer,
 
@@ -368,13 +417,30 @@ export function createServerInstance<T extends ToolDefs>(
       eventEmitterRef = emitter;
     },
 
+    replaceMcpServer: (newTools: ToolDefs, newUI?: UIDefs) => {
+      // Build a new MCP server with the new tools
+      const result = buildMcpServer(
+        config,
+        newTools,
+        newUI ?? config.ui,
+        adapter,
+        icons,
+        pluginManager,
+        () => middlewareChainRef,
+        () => eventEmitterRef
+      );
+
+      // Swap in the new server - subsequent requests will use it
+      currentMcpServer = result.mcpServer;
+    },
+
     start: async (options: StartOptions = {}) => {
       const { port = 3000, transport = "http" } = options;
 
       if (transport === "stdio") {
         // Use stdio transport
         const stdioTransport = new StdioServerTransport();
-        await mcpServer.connect(stdioTransport);
+        await currentMcpServer.connect(stdioTransport);
         return;
       }
 
@@ -483,7 +549,8 @@ export function createServerInstance<T extends ToolDefs>(
           enableJsonResponse: true,
         });
 
-        await mcpServer.connect(transport);
+        // Connect to current MCP server (supports hot reload)
+        await currentMcpServer.connect(transport);
 
         // Convert Web Request to Express-like request
         const body: unknown = req.method === "POST" ? await req.json() : undefined;

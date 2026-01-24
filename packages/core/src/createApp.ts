@@ -18,19 +18,18 @@ import type {
   VersionsConfig,
   VersionConfig,
   GlobalConfig,
-  VersionSpecificConfig,
   Icon,
 } from "./types/config";
 import type { UIDef, UIDefs } from "./types/ui";
 import type { Middleware } from "./middleware/types";
 import type { EventMap, EventHandler } from "./events/types";
 import { AppError, ErrorCode, wrapError } from "./utils/errors";
+import { validateGlobalConfig } from "./utils/config-validation";
 import { createServerInstance, type ServerInstance } from "./server/index";
 import { PluginManager } from "./plugins/PluginManager";
 import { MiddlewareChain } from "./middleware/MiddlewareChain";
 import { TypedEventEmitter } from "./events/EventEmitter";
 import { configureDebugLogger, debugLogger } from "./debug/logger";
-import { OAuthConfigSchema } from "./server/oauth/types.js";
 import { getJwksUri } from "./server/oauth/discovery.js";
 import { createJwksClient } from "./server/oauth/jwks-client.js";
 import type { JwksClient } from "jwks-rsa";
@@ -78,6 +77,43 @@ function extractColocatedUIs<T extends ToolDefs>(tools: T): { uiDefs: UIDefs; no
 }
 
 /**
+ * Apply tool updates for hot reload
+ *
+ * Extracts colocated UIs, updates config, and replaces the MCP server.
+ * Used by both single-version and multi-version apps.
+ *
+ * @param newTools - New tool definitions
+ * @param normalizedConfig - Config object to update
+ * @param serverInstance - Server instance to update
+ * @param versionKey - Optional version key for logging
+ */
+function applyToolUpdate<T extends ToolDefs>(
+  newTools: T,
+  normalizedConfig: AppConfig<T> & { ui?: UIDefs },
+  serverInstance: ServerInstance,
+  versionKey?: string
+): void {
+  // Extract colocated UIs from the new tools
+  const { uiDefs, normalizedTools } = extractColocatedUIs(newTools);
+  const newUI = Object.keys(uiDefs).length > 0 ? uiDefs : undefined;
+
+  // Update the stored config for any future getServer() calls
+  // Always update UI (even to undefined) to handle UI removal
+  normalizedConfig.tools = normalizedTools;
+  normalizedConfig.ui = newUI;
+
+  // Replace the MCP server in the running instance
+  serverInstance.replaceMcpServer(normalizedTools, newUI);
+
+  // Log the update
+  const versionSuffix = versionKey ? ` for version ${versionKey}` : "";
+  debugLogger.info(
+    `Hot reload: Updated ${Object.keys(newTools).length} tools${versionSuffix}` +
+      (newUI ? ` and ${Object.keys(newUI).length} UIs` : "")
+  );
+}
+
+/**
  * Check if config is a multi-version config
  */
 function isVersionsConfig<T extends ToolDefs>(
@@ -121,7 +157,10 @@ function validateVersionConfig<T extends ToolDefs>(
 
   // Validate version-specific config if provided
   if (versionConfig.config) {
-    validateGlobalConfig(versionConfig.config, `Version "${versionKey}".config`);
+    validateGlobalConfig(
+      versionConfig.config as Record<string, unknown>,
+      `Version "${versionKey}".config`
+    );
   }
 
   // Validate version-specific plugins if provided
@@ -136,145 +175,8 @@ function validateVersionConfig<T extends ToolDefs>(
 }
 
 /**
- * Validate global config
- * Accepts GlobalConfig, Partial<GlobalConfig>, or VersionSpecificConfig (which allows null values)
+ * Validate a single version config
  */
-function validateGlobalConfig(
-  config: GlobalConfig | Partial<GlobalConfig> | VersionSpecificConfig,
-  prefix = "Config"
-): void {
-  // Validate serverRoute if provided
-  if (config.serverRoute !== undefined) {
-    const serverRoute = config.serverRoute;
-    if (typeof serverRoute !== "string") {
-      throw new AppError(ErrorCode.INVALID_CONFIG, `${prefix}.serverRoute must be a string`);
-    }
-    if (!serverRoute.startsWith("/")) {
-      throw new AppError(
-        ErrorCode.INVALID_CONFIG,
-        `${prefix}.serverRoute must start with "/", got: "${serverRoute}"`
-      );
-    }
-    if (serverRoute === "/health") {
-      throw new AppError(
-        ErrorCode.INVALID_CONFIG,
-        `${prefix}.serverRoute cannot be "/health" as it conflicts with the health check endpoint`
-      );
-    }
-  }
-
-  // Validate debug config if provided (null is valid - means disable)
-  if (config.debug !== undefined && config.debug !== null) {
-    const debug = config.debug;
-    if (typeof debug !== "object") {
-      throw new AppError(ErrorCode.INVALID_CONFIG, `${prefix}.debug must be an object or null`);
-    }
-    // Note: Nested null values (e.g., logTool: null) are valid for deep merge
-    // and will be handled by deepMerge to remove the property
-    if (
-      debug.logTool !== undefined &&
-      debug.logTool !== null &&
-      typeof debug.logTool !== "boolean"
-    ) {
-      throw new AppError(
-        ErrorCode.INVALID_CONFIG,
-        `${prefix}.debug.logTool must be a boolean if provided`
-      );
-    }
-    if (debug.level !== undefined && debug.level !== null) {
-      const validLevels = ["debug", "info", "warn", "error"];
-      if (!validLevels.includes(debug.level)) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `${prefix}.debug.level must be one of: ${validLevels.join(", ")}`
-        );
-      }
-    }
-    if (debug.batchSize !== undefined && debug.batchSize !== null) {
-      if (typeof debug.batchSize !== "number" || debug.batchSize < 1) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `${prefix}.debug.batchSize must be a positive number`
-        );
-      }
-    }
-    if (debug.flushIntervalMs !== undefined && debug.flushIntervalMs !== null) {
-      if (typeof debug.flushIntervalMs !== "number" || debug.flushIntervalMs < 0) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `${prefix}.debug.flushIntervalMs must be a non-negative number`
-        );
-      }
-    }
-    if (debug.transport !== undefined && debug.transport !== null) {
-      const validTransports = ["builtin", "tool", "api"];
-      if (!validTransports.includes(debug.transport)) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `${prefix}.debug.transport must be one of: ${validTransports.join(", ")}`
-        );
-      }
-    }
-    if (debug.apiEndpoint !== undefined && debug.apiEndpoint !== null) {
-      if (typeof debug.apiEndpoint !== "string") {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `${prefix}.debug.apiEndpoint must be a string`
-        );
-      }
-      if (!debug.apiEndpoint.startsWith("/")) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `${prefix}.debug.apiEndpoint must start with "/", got: "${debug.apiEndpoint}"`
-        );
-      }
-    }
-  }
-
-  // Validate OAuth config if provided (null is valid - means disable)
-  if (config.oauth !== undefined && config.oauth !== null) {
-    try {
-      OAuthConfigSchema.parse(config.oauth);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `${prefix}.oauth: Invalid OAuth configuration: ${error.message}`
-        );
-      }
-      throw new AppError(ErrorCode.INVALID_CONFIG, `${prefix}.oauth: Invalid OAuth configuration`);
-    }
-  }
-
-  // Validate OpenAI config if provided (null is valid - means disable)
-  if (config.openai !== undefined && config.openai !== null) {
-    const openaiConfig = config.openai as Record<string, unknown>;
-    if (typeof openaiConfig !== "object") {
-      throw new AppError(ErrorCode.INVALID_CONFIG, `${prefix}.openai must be an object or null`);
-    }
-    if (openaiConfig.domain_challenge !== undefined) {
-      const token = openaiConfig.domain_challenge;
-      if (typeof token !== "string") {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `${prefix}.openai.domain_challenge must be a string`
-        );
-      }
-      if (token.length === 0) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `${prefix}.openai.domain_challenge cannot be an empty string`
-        );
-      }
-      if (token.length > 1000) {
-        throw new AppError(
-          ErrorCode.INVALID_CONFIG,
-          `${prefix}.openai.domain_challenge cannot exceed 1000 characters`
-        );
-      }
-    }
-  }
-}
 
 /**
  * Validate app configuration (supports both single and multi-version)
@@ -325,7 +227,7 @@ function validateConfig<T extends ToolDefs>(config: unknown): asserts config is 
 
     // Validate global config if provided
     if (versionsConfig.config) {
-      validateGlobalConfig(versionsConfig.config);
+      validateGlobalConfig(versionsConfig.config as Record<string, unknown>);
     }
 
     // Validate global plugins if provided
@@ -353,7 +255,7 @@ function validateConfig<T extends ToolDefs>(config: unknown): asserts config is 
     // Validate global config if provided
     const globalConfig = cfg.config as GlobalConfig | undefined;
     if (globalConfig) {
-      validateGlobalConfig(globalConfig);
+      validateGlobalConfig(globalConfig as Record<string, unknown>);
     }
   }
 }
@@ -789,6 +691,25 @@ function createSingleVersionApp<T extends ToolDefs>(config: AppConfig<T>): App<T
     getVersions: (): string[] => {
       return [];
     },
+
+    /**
+     * Update tool definitions at runtime (hot reload support)
+     *
+     * Replaces the current tool definitions without restarting the HTTP server.
+     */
+    updateTools: (newTools: ToolDefs): void => {
+      if (!serverInstance) {
+        // Server not started yet - extract colocated UIs and update the config
+        // The new tools will be used when the server starts
+        const { uiDefs, normalizedTools } = extractColocatedUIs(newTools as T);
+        const newUI = Object.keys(uiDefs).length > 0 ? uiDefs : undefined;
+        normalizedConfig.tools = normalizedTools;
+        normalizedConfig.ui = newUI;
+        return;
+      }
+
+      applyToolUpdate(newTools as T, normalizedConfig, serverInstance);
+    },
   };
 
   // Emit app:init event after app is created
@@ -1042,6 +963,10 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
       getVersions: (): string[] => {
         return Array.from(versionApps.keys());
       },
+
+      updateTools: (newTools: ToolDefs): void => {
+        applyToolUpdate(newTools as T, normalizedVersionConfig, versionServerInstance, versionKey);
+      },
     };
 
     versionApps.set(versionKey, versionApp);
@@ -1279,6 +1204,15 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
     getVersions: (): string[] => {
       return Array.from(versionApps.keys());
     },
+
+    updateTools: (newTools: ToolDefs): void => {
+      // For multi-version apps, update all versions with the same tools
+      // This is useful for development hot reload scenarios where all versions
+      // share the same tool implementations
+      for (const versionApp of versionApps.values()) {
+        versionApp.updateTools(newTools);
+      }
+    },
   };
 
   return mainApp;
@@ -1292,3 +1226,129 @@ export { tool } from "./builder";
 
 // Re-export defineUI from types/ui for convenience
 export { defineUI } from "./types/ui";
+
+// =============================================================================
+// FILE-BASED APP CREATION
+// =============================================================================
+
+import type { WorkflowDefinition } from "./workflow";
+
+/**
+ * Configuration for file-based MCP app
+ *
+ * Used with `createFileBasedApp()` and the generated manifest from
+ * `@mcp-apps-kit/codegen`.
+ *
+ * @typeParam T - The tool definitions type for type inference
+ *
+ * @example
+ * ```typescript
+ * import { createFileBasedApp } from "@mcp-apps-kit/core";
+ * import config from "../mcp.config";
+ * import { tools, workflows, ui } from "../__generated__/app-manifest";
+ *
+ * const app = createFileBasedApp({
+ *   ...config,
+ *   tools,
+ *   workflows,
+ *   ui,
+ * });
+ *
+ * await app.start({ port: 3000 });
+ * ```
+ */
+export interface FileBasedAppConfig<T extends ToolDefs = ToolDefs> {
+  /** App name */
+  name: string;
+
+  /** App version */
+  version: string;
+
+  /** Tool definitions from generated manifest */
+  tools: T;
+
+  /** Workflow definitions from generated manifest */
+  workflows?: Record<string, WorkflowDefinition>;
+
+  /** UI definitions from generated manifest */
+  ui?: UIDefs;
+
+  /** Global config */
+  config?: GlobalConfig;
+
+  /** Plugins array */
+  plugins?: Plugin[];
+
+  /** App icon (shorthand for single icon) */
+  icon?: string;
+
+  /** App icons for MCP client display */
+  icons?: Icon[];
+}
+
+/**
+ * Create a file-based MCP app from a generated manifest
+ *
+ * This is a convenience wrapper around `createApp()` that accepts the
+ * output from `@mcp-apps-kit/codegen`'s generated manifest.
+ *
+ * The main difference from `createApp()` is that tools, workflows, and UIs
+ * are provided as separate arguments (matching the manifest structure)
+ * rather than being nested in the tools definition.
+ *
+ * @param config - File-based app configuration with manifest imports
+ * @returns App instance for starting server or getting middleware
+ *
+ * @example
+ * ```typescript
+ * // server/index.ts
+ * import { createFileBasedApp } from "@mcp-apps-kit/core";
+ * import config from "../mcp.config";
+ * import { tools, workflows, ui } from "../__generated__/app-manifest";
+ *
+ * const app = createFileBasedApp({
+ *   ...config,
+ *   tools,
+ *   workflows,
+ *   ui,
+ * });
+ *
+ * await app.start({ port: 3000 });
+ *
+ * // Export for client type inference
+ * export type { AppTools } from "../__generated__/app-manifest";
+ * ```
+ */
+export function createFileBasedApp<T extends ToolDefs>(config: FileBasedAppConfig<T>): App<T> {
+  const { tools, workflows, ui, ...appConfig } = config;
+
+  // Log warnings for features that are discovered but not yet auto-registered
+  const workflowCount = workflows ? Object.keys(workflows).length : 0;
+  const standaloneUiCount = ui ? Object.keys(ui).length : 0;
+
+  /* eslint-disable no-console */
+  if (workflowCount > 0) {
+    console.warn(
+      `[mcp-apps-kit] Found ${workflowCount} workflow(s) in manifest. ` +
+        `Workflow auto-registration is not yet implemented. ` +
+        `Use WorkflowExecutor to execute workflows manually.`
+    );
+  }
+
+  if (standaloneUiCount > 0) {
+    console.warn(
+      `[mcp-apps-kit] Found ${standaloneUiCount} standalone UI(s) in manifest. ` +
+        `Standalone UI auto-registration is not yet implemented. ` +
+        `Colocate UIs with tools using 'export const ui = ...' for now.`
+    );
+  }
+  /* eslint-enable no-console */
+
+  // Create the app with the standard createApp
+  const normalizedConfig: AppConfig<T> = {
+    ...appConfig,
+    tools,
+  };
+
+  return createApp(normalizedConfig);
+}

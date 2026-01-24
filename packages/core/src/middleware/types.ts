@@ -161,22 +161,31 @@ export function createTypedMiddleware<TState extends Record<string, unknown>>(
  * @internal
  */
 export function composeMiddleware(middleware: Middleware[]): Middleware {
-  return async (context, next) => {
-    let index = 0;
-
-    const dispatch = async (): Promise<void> => {
-      if (index < middleware.length) {
-        const fn = middleware[index++];
+  return (async (context, next) => {
+    const dispatch = async (currentIndex: number): Promise<unknown> => {
+      if (currentIndex < middleware.length) {
+        const fn = middleware[currentIndex];
         if (fn) {
-          await fn(context, dispatch);
+          // Track whether next() has been called for this middleware
+          let nextCalled = false;
+          const guardedNext = async (): Promise<void> => {
+            if (nextCalled) {
+              throw new MultipleNextCallsError(currentIndex);
+            }
+            nextCalled = true;
+            await dispatch(currentIndex + 1);
+          };
+          // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
+          return await fn(context, guardedNext);
         }
-      } else {
-        await next();
       }
+      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
+      return await next();
     };
 
-    await dispatch();
-  };
+    // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
+    return await dispatch(0);
+  }) as Middleware;
 }
 
 // =============================================================================
@@ -193,14 +202,15 @@ export function composeMiddleware(middleware: Middleware[]): Middleware {
 export function createErrorHandler(
   handler: (error: Error, context: MiddlewareContext) => Promise<void> | void
 ): Middleware {
-  return async (context, next) => {
+  return (async (context, next) => {
     try {
-      await next();
+      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
+      return await next();
     } catch (error) {
       await handler(error as Error, context);
       throw error; // Re-throw unless handler wants to suppress
     }
-  };
+  }) as Middleware;
 }
 
 /**
@@ -214,13 +224,15 @@ export function createConditionalMiddleware(
   condition: (context: MiddlewareContext) => boolean,
   middleware: Middleware
 ): Middleware {
-  return async (context, next) => {
+  return (async (context, next) => {
     if (condition(context)) {
-      await middleware(context, next);
+      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
+      return await middleware(context, next);
     } else {
-      await next();
+      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
+      return await next();
     }
-  };
+  }) as Middleware;
 }
 
 /**
@@ -231,7 +243,7 @@ export function createConditionalMiddleware(
  * @internal
  */
 export function createTimeoutMiddleware(timeoutMs: number): Middleware {
-  return async (_context, next) => {
+  return (async (_context, next) => {
     let timerId: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
       timerId = setTimeout(() => {
@@ -240,11 +252,12 @@ export function createTimeoutMiddleware(timeoutMs: number): Middleware {
     });
 
     try {
-      await Promise.race([next(), timeoutPromise]);
+      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
+      return await Promise.race([next(), timeoutPromise]);
     } finally {
       if (timerId !== undefined) {
         clearTimeout(timerId);
       }
     }
-  };
+  }) as Middleware;
 }

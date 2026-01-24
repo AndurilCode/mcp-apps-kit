@@ -37,11 +37,142 @@
  */
 
 import type { Plugin, ResolvedConfig } from "vite";
+import type { AcceptedPlugin } from "postcss";
 import * as esbuild from "esbuild";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { generateHTML } from "./html";
 import { parseReactUIDefinitions } from "./ast-parser";
+import { parseWidgetFile } from "./widget-parser";
+
+/**
+ * Process CSS through PostCSS if available.
+ *
+ * This function dynamically imports postcss and loads the project's
+ * postcss.config.js to process Tailwind and other PostCSS plugins.
+ *
+ * @param css - Raw CSS content
+ * @param cssPath - Path to the CSS file (for source maps)
+ * @param root - Project root directory
+ * @param logger - Logger for warnings
+ * @returns Processed CSS or original if PostCSS not available
+ */
+async function processPostCSS(
+  css: string,
+  cssPath: string,
+  root: string,
+  logger: PluginLogger
+): Promise<string> {
+  try {
+    // Try to dynamically import postcss
+    const postcssModule = await import("postcss").catch(() => null);
+    if (!postcssModule) {
+      logger.warn(
+        "[mcp-react-ui] postcss not found. CSS will not be processed through Tailwind. " +
+          "Install postcss to enable CSS processing."
+      );
+      return css;
+    }
+
+    const postcss = postcssModule.default;
+
+    // Try to load postcss config from various locations
+    const configPaths = [
+      path.join(path.dirname(cssPath), "postcss.config.js"),
+      path.join(path.dirname(cssPath), "postcss.config.cjs"),
+      path.join(path.dirname(cssPath), "postcss.config.mjs"),
+      path.join(root, "postcss.config.js"),
+      path.join(root, "postcss.config.cjs"),
+      path.join(root, "postcss.config.mjs"),
+    ];
+
+    let plugins: AcceptedPlugin[] = [];
+
+    for (const configPath of configPaths) {
+      try {
+        await fs.access(configPath);
+        // Config exists, try to load it
+        const configModule = (await import(/* @vite-ignore */ `file://${configPath}`)) as {
+          default?: unknown;
+          [key: string]: unknown;
+        };
+        const config = (configModule.default ?? configModule) as {
+          plugins?: AcceptedPlugin[] | Record<string, unknown>;
+        };
+
+        if (config.plugins) {
+          // Handle different plugin formats
+          if (Array.isArray(config.plugins)) {
+            plugins = config.plugins;
+          } else if (typeof config.plugins === "object") {
+            // Object format: { '@tailwindcss/postcss': {} }
+            for (const [pluginName, pluginOptions] of Object.entries(config.plugins)) {
+              try {
+                const pluginModule = (await import(/* @vite-ignore */ pluginName)) as {
+                  default?: unknown;
+                  [key: string]: unknown;
+                };
+                const rawPlugin = pluginModule.default ?? pluginModule;
+                const plugin = rawPlugin as AcceptedPlugin | ((options: unknown) => AcceptedPlugin);
+                const loadedPlugin: AcceptedPlugin =
+                  typeof plugin === "function"
+                    ? // @ts-expect-error - PostCSS plugin APIs vary; some take 1 arg, some take 2
+                      (plugin(pluginOptions) as AcceptedPlugin)
+                    : (plugin as AcceptedPlugin);
+                plugins.push(loadedPlugin);
+              } catch (pluginError) {
+                logger.warn(
+                  `[mcp-react-ui] Could not load PostCSS plugin "${pluginName}": ${
+                    pluginError instanceof Error ? pluginError.message : String(pluginError)
+                  }`
+                );
+              }
+            }
+          }
+        }
+        break;
+      } catch {
+        // Config not found at this path, try next
+        continue;
+      }
+    }
+
+    if (plugins.length === 0) {
+      // No plugins found, try to load @tailwindcss/postcss directly
+      try {
+        const tailwindModule = await import("@tailwindcss/postcss").catch(() => null);
+        if (tailwindModule) {
+          const tailwind = tailwindModule.default || tailwindModule;
+          plugins = [(typeof tailwind === "function" ? tailwind({}) : tailwind) as AcceptedPlugin];
+        }
+      } catch {
+        // Tailwind postcss plugin not available
+      }
+    }
+
+    if (plugins.length === 0) {
+      logger.warn(
+        "[mcp-react-ui] No PostCSS plugins configured. CSS will not be processed through Tailwind."
+      );
+      return css;
+    }
+
+    // Process CSS through PostCSS
+    const result = await postcss(plugins).process(css, {
+      from: cssPath,
+      to: cssPath,
+    });
+
+    return result.css;
+  } catch (error) {
+    logger.warn(
+      `[mcp-react-ui] PostCSS processing failed: ${
+        error instanceof Error ? error.message : String(error)
+      }. Using raw CSS.`
+    );
+    return css;
+  }
+}
 
 /**
  * Logger interface for the MCP React UI plugin.
@@ -109,6 +240,9 @@ export type McpServerConfig = {
 
 /**
  * Options for the MCP React UI Vite plugin.
+ *
+ * Use either `serverEntry` (for defineReactUI-based discovery) or
+ * `widgetsDir` (for file-based discovery), but not both.
  */
 export interface McpReactUIOptions {
   /**
@@ -116,9 +250,27 @@ export interface McpReactUIOptions {
    * The plugin will parse this file and find all defineReactUI usages,
    * then resolve the component imports to their source files.
    *
+   * Mutually exclusive with `widgetsDir`.
+   *
    * @example "./src/index.ts"
    */
-  serverEntry: string;
+  serverEntry?: string;
+
+  /**
+   * Directory containing widget files for file-based discovery.
+   *
+   * The plugin will scan this directory for `.tsx` files that export:
+   * - `default`: A React component
+   * - `ui`: A WidgetMetadata object
+   *
+   * The HTML output path is inferred from the file name.
+   * For example, `my-widget.tsx` outputs to `{outDir}/my-widget.html`.
+   *
+   * Mutually exclusive with `serverEntry`.
+   *
+   * @example "./ui/widgets"
+   */
+  widgetsDir?: string;
 
   /**
    * Output directory for built HTML files.
@@ -329,6 +481,93 @@ async function discoverReactUIs(
 }
 
 /**
+ * Discover widget files from a directory.
+ *
+ * Scans the directory for .tsx files that export:
+ * - default: A React component
+ * - ui: A WidgetMetadata object
+ */
+async function discoverWidgetFiles(
+  widgetsDir: string,
+  root: string,
+  logger: PluginLogger
+): Promise<DiscoveredUI[]> {
+  const widgetsDirPath = path.resolve(root, widgetsDir);
+  const discovered: DiscoveredUI[] = [];
+
+  let files: string[];
+  try {
+    files = await fs.readdir(widgetsDirPath);
+  } catch (error) {
+    logger.warn(
+      `[mcp-react-ui] Could not read widgets directory: ${widgetsDirPath} - ${
+        error instanceof Error ? error.message : error
+      }`
+    );
+    return discovered;
+  }
+
+  // Resolve root real path once for boundary checks
+  const rootRealPath = await fs.realpath(root);
+
+  // Filter to .tsx files only
+  const tsxFiles = files.filter((f) => f.endsWith(".tsx"));
+
+  for (const file of tsxFiles) {
+    const filePath = path.join(widgetsDirPath, file);
+
+    try {
+      const content = await fs.readFile(filePath, "utf-8");
+      const parsed = parseWidgetFile(content);
+
+      if (!parsed.hasDefaultExport || !parsed.hasUIExport) {
+        // Not a valid widget file, skip silently
+        continue;
+      }
+
+      // Generate key from filename (kebab-case)
+      const baseName = path.basename(file, ".tsx");
+      const key = baseName;
+
+      // Use parsed metadata or fallback to filename-based name
+      const name =
+        parsed.uiMetadata.name ??
+        baseName.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+      // Resolve real path for symlink safety
+      const componentPath = await fs.realpath(filePath);
+
+      // Verify the resolved path stays within the project root
+      if (!isPathWithinRoot(rootRealPath, componentPath)) {
+        logger.warn(
+          `[mcp-react-ui] Refusing to build widget outside project root. ` +
+            `widget="${file}", resolved="${componentPath}"`
+        );
+        continue;
+      }
+
+      discovered.push({
+        componentName: baseName,
+        componentPath,
+        name,
+        key,
+        autoResize: parsed.uiMetadata.autoResize,
+      });
+
+      logger.info(`[mcp-react-ui] Discovered widget: ${file}`);
+    } catch (error) {
+      logger.warn(
+        `[mcp-react-ui] Could not parse widget file: ${file} - ${
+          error instanceof Error ? error.message : error
+        }`
+      );
+    }
+  }
+
+  return discovered;
+}
+
+/**
  * Build discovered React UI components.
  */
 async function buildDiscoveredUIs(
@@ -342,12 +581,14 @@ async function buildDiscoveredUIs(
   const outDir = options.outDir ?? "./dist/ui";
   const serverConfig = options.serverConfig ?? {};
 
-  // Load global CSS if specified
+  // Load and process global CSS if specified
   let globalCss: string | undefined;
   if (options.globalCss) {
     const globalCssPath = path.resolve(root, options.globalCss);
     try {
-      globalCss = await fs.readFile(globalCssPath, "utf-8");
+      const rawCss = await fs.readFile(globalCssPath, "utf-8");
+      // Process CSS through PostCSS (for Tailwind, etc.)
+      globalCss = await processPostCSS(rawCss, globalCssPath, root, logger);
     } catch (error) {
       logger.warn(
         `[mcp-react-ui] globalCss file not found or unreadable: ${globalCssPath} - ${
@@ -431,31 +672,52 @@ if (rootElement) {
 /**
  * Vite plugin that automatically discovers and builds React UI components.
  *
- * This plugin scans your server entry point for `defineReactUI` calls,
- * resolves the component imports, and builds them into self-contained HTML.
+ * Supports two discovery modes:
+ *
+ * 1. **serverEntry mode**: Scans a server entry file for `defineReactUI` calls
+ *    and resolves component imports.
+ *
+ * 2. **widgetsDir mode**: Scans a directory for widget files that export
+ *    a default React component and a `ui` metadata object. The HTML path
+ *    is automatically inferred from the file name.
  *
  * @param options - Plugin configuration
  * @returns Vite plugin
  *
- * @example
+ * @example serverEntry mode
  * ```typescript
- * // vite.config.ts
- * import { mcpReactUI } from "@mcp-apps-kit/ui-react-builder/vite";
+ * mcpReactUI({
+ *   serverEntry: "./src/index.ts",
+ *   outDir: "./src/ui/dist",
+ * })
+ * ```
  *
- * export default defineConfig({
- *   plugins: [
- *     mcpReactUI({
- *       serverEntry: "./src/index.ts",
- *       outDir: "./src/ui/dist",
- *     }),
- *   ],
- * });
+ * @example widgetsDir mode (file-based discovery)
+ * ```typescript
+ * mcpReactUI({
+ *   widgetsDir: "./ui/widgets",
+ *   outDir: "./ui/dist",
+ *   globalCss: "./ui/styles.css",
+ *   standalone: true,
+ * })
  * ```
  */
 export function mcpReactUI(options: McpReactUIOptions): Plugin {
   let config: ResolvedConfig;
 
   const standalone = options.standalone ?? false;
+
+  // Validate options: must have either serverEntry or widgetsDir, but not both
+  if (options.serverEntry && options.widgetsDir) {
+    throw new Error(
+      "[mcp-react-ui] Cannot use both 'serverEntry' and 'widgetsDir'. Choose one discovery mode."
+    );
+  }
+  if (!options.serverEntry && !options.widgetsDir) {
+    throw new Error(
+      "[mcp-react-ui] Must specify either 'serverEntry' or 'widgetsDir' for widget discovery."
+    );
+  }
 
   // Resolve logger: false = silent, undefined = default, custom = use provided
   const logger: PluginLogger =
@@ -473,17 +735,37 @@ export function mcpReactUI(options: McpReactUIOptions): Plugin {
       const root = config.root;
       const isProduction = config.mode === "production";
 
-      // Discover React UIs from server entry
-      const discovered = await discoverReactUIs(options.serverEntry, root, logger);
+      // Discover UIs based on configured mode
+      let discovered: DiscoveredUI[];
 
-      if (discovered.length === 0) {
-        logger.info("[mcp-react-ui] No defineReactUI calls found");
+      if (options.widgetsDir) {
+        // File-based discovery mode
+        discovered = await discoverWidgetFiles(options.widgetsDir, root, logger);
+
+        if (discovered.length === 0) {
+          logger.info("[mcp-react-ui] No widget files found in " + options.widgetsDir);
+          return;
+        }
+
+        logger.info(
+          `[mcp-react-ui] Found ${discovered.length} widget(s): ${discovered.map((d) => d.key).join(", ")}`
+        );
+      } else if (options.serverEntry) {
+        // serverEntry-based discovery mode
+        discovered = await discoverReactUIs(options.serverEntry, root, logger);
+
+        if (discovered.length === 0) {
+          logger.info("[mcp-react-ui] No defineReactUI calls found");
+          return;
+        }
+
+        logger.info(
+          `[mcp-react-ui] Found ${discovered.length} React UI(s): ${discovered.map((d) => d.componentName).join(", ")}`
+        );
+      } else {
+        // This should never happen due to validation at plugin creation
         return;
       }
-
-      logger.info(
-        `[mcp-react-ui] Found ${discovered.length} React UI(s): ${discovered.map((d) => d.componentName).join(", ")}`
-      );
 
       // Build discovered UIs
       await buildDiscoveredUIs(discovered, options, root, isProduction, logger);

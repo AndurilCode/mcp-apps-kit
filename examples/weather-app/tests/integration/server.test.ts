@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { startTestServer, createTestClient, expectToolResult } from "@mcp-apps-kit/testing";
 import type { TestEnvironment } from "@mcp-apps-kit/testing";
-import { app } from "../../server/index.js";
+import { app } from "../../__generated__/server.js";
 
 describe("Weather App MCP Server", () => {
   let env: TestEnvironment;
@@ -47,10 +47,13 @@ describe("Weather App MCP Server", () => {
     it("should list all weather tools", async () => {
       const tools = await env.client.listTools();
 
-      expect(tools.length).toBe(3);
+      // 4 weather tools + 1 log_debug tool (from debug.logTool config)
+      expect(tools.length).toBe(5);
+      // File-based naming: get-current-weather.ts -> getCurrentWeather (camelCase)
       expect(tools.some((t) => t.name === "getCurrentWeather")).toBe(true);
       expect(tools.some((t) => t.name === "getForecast")).toBe(true);
       expect(tools.some((t) => t.name === "getWeatherAlerts")).toBe(true);
+      expect(tools.some((t) => t.name === "dailyBriefing")).toBe(true);
     });
 
     it("should have correct tool descriptions", async () => {
