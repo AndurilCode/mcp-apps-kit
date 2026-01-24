@@ -13,12 +13,13 @@ import { OAuthConfigSchema } from "../server/oauth/types.js";
 
 /**
  * Validate protocol field
+ * Accepts null for versioned configs (inheritance/disable pattern)
  */
 export function validateProtocol(
   protocol: unknown,
   prefix = "Config"
-): asserts protocol is "mcp" | "openai" | undefined {
-  if (protocol !== undefined && protocol !== "mcp" && protocol !== "openai") {
+): asserts protocol is "mcp" | "openai" | null | undefined {
+  if (protocol !== undefined && protocol !== null && protocol !== "mcp" && protocol !== "openai") {
     throw new AppError(ErrorCode.INVALID_CONFIG, `${prefix}.protocol must be 'mcp' or 'openai'`);
   }
 }
@@ -125,9 +126,10 @@ export function validateDebug(debug: unknown, prefix = "Config"): void {
 
 /**
  * Validate serverRoute configuration
+ * Accepts null for versioned configs (inheritance/disable pattern)
  */
 export function validateServerRoute(serverRoute: unknown, prefix = "Config"): void {
-  if (serverRoute !== undefined) {
+  if (serverRoute !== undefined && serverRoute !== null) {
     if (typeof serverRoute !== "string") {
       throw new AppError(ErrorCode.INVALID_CONFIG, `${prefix}.serverRoute must be a string`);
     }

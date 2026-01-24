@@ -6,6 +6,7 @@
  */
 
 import * as path from "node:path";
+import { pathToFileURL } from "node:url";
 import type { FileBasedConfig } from "./types.js";
 
 /**
@@ -84,8 +85,10 @@ export async function defineApp(options: CreateAppOptions): Promise<FileBasedApp
     workflows: Record<string, unknown>;
   };
   try {
-    const cacheBuster = `?t=${Date.now()}`;
-    manifest = (await import(`file://${manifestPath}${cacheBuster}`)) as typeof manifest;
+    // Use pathToFileURL for cross-platform compatibility (Windows paths need conversion)
+    const fileUrl = pathToFileURL(manifestPath);
+    fileUrl.searchParams.set("t", String(Date.now())); // Cache busting
+    manifest = (await import(fileUrl.href)) as typeof manifest;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(

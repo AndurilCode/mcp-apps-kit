@@ -98,10 +98,9 @@ function applyToolUpdate<T extends ToolDefs>(
   const newUI = Object.keys(uiDefs).length > 0 ? uiDefs : undefined;
 
   // Update the stored config for any future getServer() calls
+  // Always update UI (even to undefined) to handle UI removal
   normalizedConfig.tools = normalizedTools;
-  if (newUI) {
-    normalizedConfig.ui = newUI;
-  }
+  normalizedConfig.ui = newUI;
 
   // Replace the MCP server in the running instance
   serverInstance.replaceMcpServer(normalizedTools, newUI);
@@ -700,9 +699,12 @@ function createSingleVersionApp<T extends ToolDefs>(config: AppConfig<T>): App<T
      */
     updateTools: (newTools: ToolDefs): void => {
       if (!serverInstance) {
-        // Server not started yet - just update the config
+        // Server not started yet - extract colocated UIs and update the config
         // The new tools will be used when the server starts
-        normalizedConfig.tools = newTools as T;
+        const { uiDefs, normalizedTools } = extractColocatedUIs(newTools as T);
+        const newUI = Object.keys(uiDefs).length > 0 ? uiDefs : undefined;
+        normalizedConfig.tools = normalizedTools;
+        normalizedConfig.ui = newUI;
         return;
       }
 

@@ -47,11 +47,20 @@ function parseArgs(): ServeOptions {
         process.exit(1);
       }
       i++;
-      options.port = parseInt(nextArg, 10);
-      if (isNaN(options.port)) {
-        console.error(`[mcp-serve] Error: Invalid port number: ${nextArg}`); // eslint-disable-line no-console
+      // Validate port is a valid integer string (no trailing characters, in range 1-65535)
+      const parsedPort = parseInt(nextArg, 10);
+      if (
+        isNaN(parsedPort) ||
+        String(parsedPort) !== nextArg ||
+        parsedPort < 1 ||
+        parsedPort > 65535
+      ) {
+        console.error(
+          `[mcp-serve] Error: Invalid port number: ${nextArg}. Must be an integer between 1 and 65535.`
+        ); // eslint-disable-line no-console
         process.exit(1);
       }
+      options.port = parsedPort;
     } else if (arg === "--watch" || arg === "-w") {
       options.watch = true;
     } else if (arg === "--config" || arg === "-c") {
@@ -162,7 +171,28 @@ async function serve(options: ServeOptions = {}): Promise<void> {
     }
   }
 
-  const port = options.port ?? parseInt(process.env.PORT ?? "3000", 10);
+  // Validate and determine port
+  let port = options.port;
+  if (port === undefined) {
+    const envPort = process.env.PORT;
+    if (envPort !== undefined) {
+      const parsedEnvPort = parseInt(envPort, 10);
+      if (
+        isNaN(parsedEnvPort) ||
+        String(parsedEnvPort) !== envPort ||
+        parsedEnvPort < 1 ||
+        parsedEnvPort > 65535
+      ) {
+        console.error(
+          `[mcp-serve] Error: Invalid PORT environment variable: ${envPort}. Must be an integer between 1 and 65535.`
+        ); // eslint-disable-line no-console
+        process.exit(1);
+      }
+      port = parsedEnvPort;
+    } else {
+      port = 3000;
+    }
+  }
   await app.start({ port });
 
   // Log startup info

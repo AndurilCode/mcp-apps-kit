@@ -54,7 +54,8 @@ describe("generator", () => {
 
       expect(result.errors).toHaveLength(0);
       expect(result.files).toHaveLength(1);
-      expect(result.files[0]?.identifier).toBe("greet");
+      const greetFile = result.files.find((f) => f.identifier === "greet");
+      expect(greetFile).toBeDefined();
       expect(result.code).toContain('import greet from "../tools/greet.js";');
       expect(result.code).toContain("greet,");
     });
@@ -157,7 +158,8 @@ describe("generator", () => {
 
       expect(result.errors).toHaveLength(0);
       expect(result.files).toHaveLength(1);
-      expect(result.files[0]?.identifier).toBe("greet");
+      const greetFile = result.files.find((f) => f.identifier === "greet");
+      expect(greetFile).toBeDefined();
     });
 
     it("should skip index files", async () => {
@@ -178,7 +180,8 @@ describe("generator", () => {
 
       expect(result.errors).toHaveLength(0);
       expect(result.files).toHaveLength(1);
-      expect(result.files[0]?.identifier).toBe("greet");
+      const greetFile = result.files.find((f) => f.identifier === "greet");
+      expect(greetFile).toBeDefined();
     });
 
     it("should handle nested directories", async () => {
@@ -195,7 +198,8 @@ describe("generator", () => {
 
       expect(result.errors).toHaveLength(0);
       expect(result.files).toHaveLength(1);
-      expect(result.files[0]?.identifier).toBe("admin_delete_user");
+      const deleteUserFile = result.files.find((f) => f.identifier === "admin_delete_user");
+      expect(deleteUserFile).toBeDefined();
       expect(result.code).toContain(
         'import admin_delete_user from "../tools/admin/delete-user.js";'
       );
@@ -214,7 +218,8 @@ describe("generator", () => {
       });
 
       expect(result.errors).toHaveLength(0);
-      expect(result.files[0]?.identifier).toBe("search_restaurants");
+      const searchFile = result.files.find((f) => f.identifier === "search_restaurants");
+      expect(searchFile).toBeDefined();
     });
 
     it("should convert PascalCase to snake_case for UI files", async () => {
@@ -231,7 +236,8 @@ describe("generator", () => {
       });
 
       expect(result.errors).toHaveLength(0);
-      expect(result.files[0]?.identifier).toBe("search_results");
+      const searchResultsFile = result.files.find((f) => f.identifier === "search_results");
+      expect(searchResultsFile).toBeDefined();
     });
 
     it("should generate type exports", async () => {
@@ -295,7 +301,8 @@ describe("generator", () => {
 
       expect(result.errors).toHaveLength(0);
       expect(result.files).toHaveLength(1);
-      expect(result.files[0]?.identifier).toBe("greet");
+      const greetFile = result.files.find((f) => f.identifier === "greet");
+      expect(greetFile).toBeDefined();
     });
   });
 
@@ -383,7 +390,8 @@ describe("generator", () => {
       expect(result.errors).toHaveLength(0);
       // Only the tool should be discovered
       expect(result.files).toHaveLength(1);
-      expect(result.files[0]?.type).toBe("tool");
+      const toolFile = result.files.find((f) => f.type === "tool");
+      expect(toolFile).toBeDefined();
       // No binding code should be generated
       expect(result.code).not.toContain("greet_ui");
     });
@@ -541,7 +549,8 @@ describe("generator", () => {
       expect(result.warnings[0]).toContain("no default or ui export found");
       // Only the tool should be valid
       expect(result.files).toHaveLength(1);
-      expect(result.files[0]?.type).toBe("tool");
+      const toolFile = result.files.find((f) => f.type === "tool");
+      expect(toolFile).toBeDefined();
       // No binding should be generated
       expect(result.code).not.toContain("greet_ui");
     });

@@ -162,14 +162,21 @@ export function createTypedMiddleware<TState extends Record<string, unknown>>(
  */
 export function composeMiddleware(middleware: Middleware[]): Middleware {
   return (async (context, next) => {
-    let index = 0;
-
-    const dispatch = async (): Promise<unknown> => {
-      if (index < middleware.length) {
-        const fn = middleware[index++];
+    const dispatch = async (currentIndex: number): Promise<unknown> => {
+      if (currentIndex < middleware.length) {
+        const fn = middleware[currentIndex];
         if (fn) {
+          // Track whether next() has been called for this middleware
+          let nextCalled = false;
+          const guardedNext = async (): Promise<void> => {
+            if (nextCalled) {
+              throw new MultipleNextCallsError(currentIndex);
+            }
+            nextCalled = true;
+            await dispatch(currentIndex + 1);
+          };
           // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
-          return await fn(context, dispatch as () => Promise<void>);
+          return await fn(context, guardedNext);
         }
       }
       // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
@@ -177,7 +184,7 @@ export function composeMiddleware(middleware: Middleware[]): Middleware {
     };
 
     // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
-    return await dispatch();
+    return await dispatch(0);
   }) as Middleware;
 }
 
