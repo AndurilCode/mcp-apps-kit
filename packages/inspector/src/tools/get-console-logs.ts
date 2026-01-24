@@ -7,7 +7,17 @@
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
 import type { ConnectionManager } from "../connection";
-import { UIHostManager, detectProtocolFromMimeType, type DetectedProtocol } from "../ui-host";
+import { UIHostManager, type DetectedProtocol } from "../ui-host";
+import {
+  extractToolResult,
+  findUIResourceForTool,
+  fetchWidgetHTML,
+  resolveProtocol,
+  mapConsoleTypeToLogLevel,
+  getLogSourceFromUrl,
+  createEmptyLogSummary,
+  calculateLogSummary,
+} from "./helpers";
 
 /**
  * Console message entry captured from the browser
@@ -132,16 +142,7 @@ export function createGetConsoleLogsTool(connectionManager: ConnectionManager) {
 
         // Return accumulated logs from session
         const { consoleLogs, pageErrors, protocol } = session;
-
-        // Calculate summary
-        const summary = {
-          total: consoleLogs.length,
-          log: consoleLogs.filter((l) => l.level === "log").length,
-          info: consoleLogs.filter((l) => l.level === "info").length,
-          warn: consoleLogs.filter((l) => l.level === "warn").length,
-          error: consoleLogs.filter((l) => l.level === "error").length,
-          debug: consoleLogs.filter((l) => l.level === "debug").length,
-        };
+        const summary = calculateLogSummary(consoleLogs);
 
         return {
           hasUI: true,
@@ -159,7 +160,7 @@ export function createGetConsoleLogsTool(connectionManager: ConnectionManager) {
           hasUI: false,
           noUIReason: "Either sessionId or both tool and arguments must be provided",
           logs: [],
-          summary: { total: 0, log: 0, info: 0, warn: 0, error: 0, debug: 0 },
+          summary: createEmptyLogSummary(),
           pageErrors: [],
           errors: ["Missing required parameters"],
         };
@@ -180,108 +181,45 @@ export function createGetConsoleLogsTool(connectionManager: ConnectionManager) {
           name: input.tool,
           arguments: input.arguments,
         });
-
-        // Extract structured content or parse from text
-        if (callResult.structuredContent) {
-          toolResult = callResult.structuredContent;
-        } else if (
-          callResult.content &&
-          Array.isArray(callResult.content) &&
-          callResult.content.length > 0
-        ) {
-          const textContent = callResult.content.find(
-            (c: { type: string }) => c.type === "text"
-          ) as { type: string; text?: string } | undefined;
-          if (textContent?.text) {
-            try {
-              toolResult = JSON.parse(textContent.text);
-            } catch {
-              toolResult = textContent.text;
-            }
-          }
-        }
+        toolResult = extractToolResult(callResult);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return {
           hasUI: false,
           noUIReason: `Tool call failed: ${message}`,
           logs: [],
-          summary: { total: 0, log: 0, info: 0, warn: 0, error: 0, debug: 0 },
+          summary: createEmptyLogSummary(),
           pageErrors: [],
           errors: [message],
         };
       }
 
       // Step 2: Find the UI resource for this tool
-      const resourcesResult = await rawClient.listResources();
-
-      let uiResource: {
-        uri: string;
-        mimeType: string;
-        protocol: DetectedProtocol;
-      } | null = null;
-
-      for (const resource of resourcesResult.resources) {
-        const mimeType = resource.mimeType;
-        if (!mimeType) continue;
-
-        const protocol = detectProtocolFromMimeType(mimeType);
-        if (!protocol) continue;
-
-        // Check if URI matches tool name
-        const toolNamePatterns = [
-          `__ui_${input.tool}`,
-          `/${input.tool}?`,
-          `/${input.tool}`,
-          `toolName=${input.tool}`,
-        ];
-        const uriMatchesTool = toolNamePatterns.some(
-          (pattern) =>
-            resource.uri.includes(pattern) || resource.uri.endsWith(pattern.replace("?", ""))
-        );
-        if (uriMatchesTool) {
-          uiResource = {
-            uri: resource.uri,
-            mimeType,
-            protocol,
-          };
-          break;
-        }
-      }
-
+      const uiResource = await findUIResourceForTool(rawClient, input.tool);
       if (!uiResource) {
         return {
           hasUI: false,
           noUIReason: `No UI resource found for tool: ${input.tool}`,
           logs: [],
-          summary: { total: 0, log: 0, info: 0, warn: 0, error: 0, debug: 0 },
+          summary: createEmptyLogSummary(),
           pageErrors: [],
           errors: [],
         };
       }
 
       // Step 3: Determine protocol to use
-      let protocol: DetectedProtocol = uiResource.protocol;
-      if (input.protocol && input.protocol !== "auto") {
-        protocol = input.protocol;
-      }
+      const protocol: DetectedProtocol = resolveProtocol(uiResource.protocol, input.protocol);
 
       // Step 4: Fetch the widget HTML
       let html: string;
       try {
-        const contentResult = await rawClient.readResource({ uri: uiResource.uri });
-        html = "";
-        for (const content of contentResult.contents) {
-          if ("text" in content && typeof content.text === "string") {
-            html += content.text;
-          }
-        }
+        html = await fetchWidgetHTML(rawClient, uiResource.uri);
         if (!html) {
           return {
             hasUI: false,
             noUIReason: `No HTML content in resource: ${uiResource.uri}`,
             logs: [],
-            summary: { total: 0, log: 0, info: 0, warn: 0, error: 0, debug: 0 },
+            summary: createEmptyLogSummary(),
             pageErrors: [],
             errors: [],
           };
@@ -292,7 +230,7 @@ export function createGetConsoleLogsTool(connectionManager: ConnectionManager) {
           hasUI: false,
           noUIReason: `Failed to fetch widget HTML: ${message}`,
           logs: [],
-          summary: { total: 0, log: 0, info: 0, warn: 0, error: 0, debug: 0 },
+          summary: createEmptyLogSummary(),
           pageErrors: [],
           errors: [message],
         };
@@ -317,41 +255,13 @@ export function createGetConsoleLogsTool(connectionManager: ConnectionManager) {
         const { page } = renderResult;
         errors.push(...renderResult.errors);
 
-        // Helper to convert console message type to our level
-        const getLogLevel = (type: string): ConsoleLogEntry["level"] => {
-          switch (type) {
-            case "log":
-              return "log";
-            case "info":
-              return "info";
-            case "warning":
-              return "warn";
-            case "error":
-              return "error";
-            case "debug":
-              return "debug";
-            default:
-              return "log";
-          }
-        };
-
-        // Helper to determine source from URL
-        const getSource = (url: string): ConsoleLogEntry["source"] => {
-          if (url.includes("/widget/")) {
-            return "widget";
-          } else if (url.includes("/host/") || url.includes("host-page")) {
-            return "host";
-          }
-          return "unknown";
-        };
-
         // Set up console message listener BEFORE reload
         page.on("console", (msg) => {
           const location = msg.location();
           logs.push({
-            level: getLogLevel(msg.type()),
+            level: mapConsoleTypeToLogLevel(msg.type()),
             text: msg.text(),
-            source: getSource(location.url),
+            source: getLogSourceFromUrl(location.url),
             timestamp: Date.now(),
             url: location.url || undefined,
             lineNumber: location.lineNumber || undefined,
@@ -375,21 +285,11 @@ export function createGetConsoleLogsTool(connectionManager: ConnectionManager) {
         // Dispose of the browser pool
         await uiHostManager.dispose();
 
-        // Calculate summary
-        const summary = {
-          total: logs.length,
-          log: logs.filter((l) => l.level === "log").length,
-          info: logs.filter((l) => l.level === "info").length,
-          warn: logs.filter((l) => l.level === "warn").length,
-          error: logs.filter((l) => l.level === "error").length,
-          debug: logs.filter((l) => l.level === "debug").length,
-        };
-
         return {
           hasUI: true,
           protocol,
           logs,
-          summary,
+          summary: calculateLogSummary(logs),
           pageErrors,
           errors,
         };
@@ -407,14 +307,7 @@ export function createGetConsoleLogsTool(connectionManager: ConnectionManager) {
           hasUI: true,
           protocol,
           logs,
-          summary: {
-            total: logs.length,
-            log: logs.filter((l) => l.level === "log").length,
-            info: logs.filter((l) => l.level === "info").length,
-            warn: logs.filter((l) => l.level === "warn").length,
-            error: logs.filter((l) => l.level === "error").length,
-            debug: logs.filter((l) => l.level === "debug").length,
-          },
+          summary: calculateLogSummary(logs),
           pageErrors,
           errors: [`Console capture failed: ${message}`],
         };

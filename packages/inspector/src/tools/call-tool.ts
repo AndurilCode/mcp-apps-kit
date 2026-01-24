@@ -6,7 +6,8 @@ import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
 import type { ConnectionManager } from "../connection";
 import type { CallToolOutput } from "../types";
-import { UIHostManager, detectProtocolFromMimeType, type DetectedProtocol } from "../ui-host";
+import { UIHostManager } from "../ui-host";
+import { findUIResourceForTool, fetchWidgetHTML } from "./helpers";
 
 export const callToolInputSchema = z.object({
   name: z.string().describe("Name of the tool to call"),
@@ -111,51 +112,11 @@ export function createCallToolTool(connectionManager: ConnectionManager) {
 
           // Find UI resource for this tool
           const rawClient = client.raw;
-          const resourcesResult = await rawClient.listResources();
-
-          let uiResource: {
-            uri: string;
-            mimeType: string;
-            protocol: DetectedProtocol;
-          } | null = null;
-
-          for (const resource of resourcesResult.resources) {
-            const mimeType = resource.mimeType;
-            if (!mimeType) continue;
-
-            const protocol = detectProtocolFromMimeType(mimeType);
-            if (!protocol) continue;
-
-            // Check if URI matches tool name
-            const toolNamePatterns = [
-              `__ui_${input.name}`,
-              `/${input.name}?`,
-              `/${input.name}`,
-              `toolName=${input.name}`,
-            ];
-            const uriMatchesTool = toolNamePatterns.some(
-              (pattern) =>
-                resource.uri.includes(pattern) || resource.uri.endsWith(pattern.replace("?", ""))
-            );
-            if (uriMatchesTool) {
-              uiResource = {
-                uri: resource.uri,
-                mimeType,
-                protocol,
-              };
-              break;
-            }
-          }
+          const uiResource = await findUIResourceForTool(rawClient, input.name);
 
           if (uiResource) {
             // Fetch widget HTML
-            const contentResult = await rawClient.readResource({ uri: uiResource.uri });
-            let html = "";
-            for (const contentBlock of contentResult.contents) {
-              if ("text" in contentBlock && typeof contentBlock.text === "string") {
-                html += contentBlock.text;
-              }
-            }
+            const html = await fetchWidgetHTML(rawClient, uiResource.uri);
 
             if (html) {
               // Render widget in browser

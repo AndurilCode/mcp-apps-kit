@@ -133,7 +133,7 @@ export function createSetGlobalsTool(connectionManager: ConnectionManager) {
       const currentState = connectionManager.setEnvironmentState(updatePayload);
 
       const changedFields = Object.keys(updatePayload);
-      let message =
+      const message =
         changedFields.length > 0
           ? `Updated ${changedFields.length} setting(s): ${changedFields.join(", ")}`
           : "No settings were changed";
