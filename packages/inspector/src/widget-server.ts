@@ -7,6 +7,7 @@
 
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
+import type { EnvironmentState } from "./types";
 
 /**
  * Widget session data
@@ -18,7 +19,8 @@ export interface WidgetSession {
   toolName: string;
   protocol: "mcp" | "openai";
   createdAt: number;
-  // Metadata fields for production parity
+  environmentState?: EnvironmentState;
+  // Metadata fields for production parity (legacy, kept for backward compat)
   subjectId?: string;
   sessionId?: string;
   locale?: string;
@@ -137,7 +139,8 @@ export class WidgetServer {
     html: string,
     toolResult: unknown,
     toolName: string,
-    protocol: "mcp" | "openai"
+    protocol: "mcp" | "openai",
+    environmentState?: EnvironmentState
   ): CreateSessionResult {
     const sessionId = randomUUID();
     const session: WidgetSession = {
@@ -147,11 +150,12 @@ export class WidgetServer {
       toolName,
       protocol,
       createdAt: Date.now(),
-      // Generate mock metadata for production parity
+      environmentState,
+      // Generate mock metadata for production parity (legacy support)
       subjectId: `mock-subject-${randomUUID().slice(0, 8)}`,
       sessionId: `mock-session-${randomUUID().slice(0, 8)}`,
-      locale: "en-US",
-      userLocation: {
+      locale: environmentState?.locale ?? "en-US",
+      userLocation: environmentState?.userLocation ?? {
         city: "Unknown",
         country: "US",
         timezone: "UTC",
@@ -260,6 +264,12 @@ export class WidgetServer {
     const toolResultJson = JSON.stringify(session.toolResult);
     const toolNameJson = JSON.stringify(session.toolName);
     const widgetUrl = `http://127.0.0.1:${this.port}/widget/${session.id}`;
+    const env = session.environmentState;
+    const theme = env?.theme ?? "light";
+    const displayMode = env?.displayMode ?? "inline";
+    const locale = env?.locale ?? "en-US";
+    const timeZone = env?.timeZone ?? "UTC";
+    const platform = env?.userAgent?.device?.type === "mobile" ? "mobile" : "desktop";
 
     return `<!DOCTYPE html>
 <html>
@@ -309,11 +319,13 @@ export class WidgetServer {
                 serverTools: {},
               },
               hostContext: {
-                theme: 'light',
-                displayMode: 'inline',
+                theme: '${theme}',
+                displayMode: '${displayMode}',
                 availableDisplayModes: ['inline', 'fullscreen'],
-                locale: 'en-US',
-                timeZone: 'UTC',
+                locale: '${locale}',
+                timeZone: '${timeZone}',
+                platform: '${platform}',
+                viewport: ${JSON.stringify(env?.viewport ?? { width: 800, height: 600 })},
                 toolInfo: {
                   tool: { name: toolName, inputSchema: { type: 'object' } },
                 },
@@ -533,10 +545,24 @@ export class WidgetServer {
     const sessionIdJson = JSON.stringify(
       session.sessionId ?? `mock-session-${randomUUID().slice(0, 8)}`
     );
-    const localeJson = JSON.stringify(session.locale ?? "en-US");
-    const userLocationJson = JSON.stringify(
-      session.userLocation ?? { city: "Unknown", country: "US", timezone: "UTC" }
+
+    // Use environment state if available, otherwise fall back to legacy session fields
+    const env = session.environmentState;
+    const localeJson = JSON.stringify(env?.locale ?? session.locale ?? "en-US");
+    const themeJson = JSON.stringify(env?.theme ?? "light");
+    const displayModeJson = JSON.stringify(env?.displayMode ?? "inline");
+    const maxHeightJson = env?.maxHeight ? String(env.maxHeight) : "null";
+    const safeAreaJson = JSON.stringify(
+      env?.safeAreaInsets ?? { top: 0, right: 0, bottom: 0, left: 0 }
     );
+    const userAgentJson = JSON.stringify(
+      env?.userAgent ?? { device: { type: "desktop" }, capabilities: { hover: true, touch: false } }
+    );
+    const userLocationJson = env?.userLocation
+      ? JSON.stringify(env.userLocation)
+      : session.userLocation
+        ? JSON.stringify(session.userLocation)
+        : JSON.stringify({ city: "Unknown", country: "US", timezone: "UTC" });
 
     // Create the runtime bootstrap script that will be injected into the widget
     const runtimeScript = `
@@ -552,16 +578,13 @@ export class WidgetServer {
     toolInput: {},
     toolOutput: toolOutput,
     toolResponseMetadata: toolResponseMetadata,
-    displayMode: 'inline',
-    theme: 'light',
+    displayMode: ${displayModeJson},
+    theme: ${themeJson},
     locale: ${localeJson},
-    maxHeight: null,
-    safeArea: { insets: { top: 0, bottom: 0, left: 0, right: 0 } },
-    userAgent: {
-      device: { type: 'desktop' },
-      capabilities: { hover: true, touch: false }
-    },
-    view: { mode: 'inline', params: {} },
+    maxHeight: ${maxHeightJson},
+    safeArea: ${safeAreaJson},
+    userAgent: ${userAgentJson},
+    view: { mode: ${displayModeJson}, params: {} },
     widgetState: null,
     widgetSessionId: '${session.id}',
     subjectId: ${subjectIdJson},
@@ -794,6 +817,7 @@ export class WidgetServer {
             locale: openaiAPI.locale,
             safeArea: openaiAPI.safeArea,
             userAgent: openaiAPI.userAgent,
+            userLocation: openaiAPI.userLocation,
             toolOutput: toolOutput,
             toolResponseMetadata: toolResponseMetadata
           }

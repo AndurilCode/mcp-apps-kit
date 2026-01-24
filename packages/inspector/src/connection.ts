@@ -11,7 +11,28 @@ import type {
   ServerInfo,
   InspectorServerOptions,
   HistoryEntry,
+  EnvironmentState,
 } from "./types";
+
+/**
+ * Get default environment state
+ */
+function getDefaultEnvironmentState(): EnvironmentState {
+  return {
+    theme: "light",
+    locale: "en-US",
+    timeZone: "UTC",
+    displayMode: "inline",
+    viewport: { width: 800, height: 600 },
+    maxHeight: undefined,
+    safeAreaInsets: { top: 0, right: 0, bottom: 0, left: 0 },
+    userAgent: {
+      device: { type: "desktop" },
+      capabilities: { hover: true, touch: false },
+    },
+    userLocation: undefined,
+  };
+}
 
 /**
  * Connection manager for the inspector server
@@ -26,6 +47,7 @@ export class ConnectionManager {
     client: null,
   };
 
+  private environmentState: EnvironmentState;
   private readonly maxHistorySize: number;
   private readonly defaultTimeout: number;
   private readonly debug: boolean;
@@ -34,6 +56,7 @@ export class ConnectionManager {
     this.maxHistorySize = options.maxHistorySize ?? 1000;
     this.defaultTimeout = options.defaultTimeout ?? 30000;
     this.debug = options.debug ?? false;
+    this.environmentState = getDefaultEnvironmentState();
   }
 
   /**
@@ -256,5 +279,62 @@ export class ConnectionManager {
    */
   isHistoryEnabled(): boolean {
     return this.state.historyEnabled;
+  }
+
+  /**
+   * Get the current environment state
+   */
+  getEnvironmentState(): EnvironmentState {
+    return { ...this.environmentState };
+  }
+
+  /**
+   * Update environment state (partial update, merges with current state)
+   */
+  setEnvironmentState(partial: Partial<EnvironmentState>): EnvironmentState {
+    // Merge partial update with current state
+    this.environmentState = {
+      ...this.environmentState,
+      ...partial,
+      // Handle nested objects properly
+      viewport: partial.viewport
+        ? { ...this.environmentState.viewport, ...partial.viewport }
+        : this.environmentState.viewport,
+      safeAreaInsets: partial.safeAreaInsets
+        ? { ...this.environmentState.safeAreaInsets, ...partial.safeAreaInsets }
+        : this.environmentState.safeAreaInsets,
+      userAgent: partial.userAgent
+        ? {
+            device: partial.userAgent.device
+              ? { ...this.environmentState.userAgent.device, ...partial.userAgent.device }
+              : this.environmentState.userAgent.device,
+            capabilities: partial.userAgent.capabilities
+              ? {
+                  ...this.environmentState.userAgent.capabilities,
+                  ...partial.userAgent.capabilities,
+                }
+              : this.environmentState.userAgent.capabilities,
+          }
+        : this.environmentState.userAgent,
+    };
+
+    if (this.debug) {
+      console.log(`[inspector] Environment state updated:`, partial);
+    }
+
+    return { ...this.environmentState };
+  }
+
+  /**
+   * Reset environment state to defaults
+   */
+  resetEnvironmentState(): EnvironmentState {
+    this.environmentState = getDefaultEnvironmentState();
+
+    if (this.debug) {
+      console.log(`[inspector] Environment state reset to defaults`);
+    }
+
+    return { ...this.environmentState };
   }
 }

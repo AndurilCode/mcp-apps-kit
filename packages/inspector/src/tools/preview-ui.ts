@@ -174,6 +174,7 @@ export function createPreviewUITool(connectionManager: ConnectionManager) {
 
       // Step 5: Render the widget using UIHostManager
       const uiHostManager = new UIHostManager(client);
+      const environmentState = connectionManager.getEnvironmentState();
 
       try {
         const renderResult = await uiHostManager.renderHeadless(
@@ -181,6 +182,7 @@ export function createPreviewUITool(connectionManager: ConnectionManager) {
           protocol,
           toolResult,
           input.tool,
+          environmentState,
           input.waitMs ?? 100
         );
 

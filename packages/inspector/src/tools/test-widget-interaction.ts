@@ -211,6 +211,7 @@ export function createTestWidgetInteractionTool(connectionManager: ConnectionMan
       // Step 5: Render in browser and perform interactions
       const uiHostManager = new UIHostManager(client);
       const viewport = input.viewport ?? { width: 800, height: 600 };
+      const environmentState = connectionManager.getEnvironmentState();
       const errors: string[] = [];
       const snapshots: Array<{ afterAction: number; dom: string; textContent: string }> = [];
 
@@ -220,6 +221,7 @@ export function createTestWidgetInteractionTool(connectionManager: ConnectionMan
           protocol,
           toolResult,
           input.tool,
+          environmentState,
           viewport
         );
 

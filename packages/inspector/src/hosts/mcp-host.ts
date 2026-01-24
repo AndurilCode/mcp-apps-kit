@@ -13,6 +13,19 @@ interface JSDOMInterface {
 }
 
 /**
+ * Environment settings for the emulator
+ */
+export interface MCPEnvironmentSettings {
+  theme?: "light" | "dark";
+  locale?: string;
+  timeZone?: string;
+  displayMode?: "inline" | "fullscreen" | "pip";
+  viewport?: { width: number; height: number };
+  maxHeight?: number;
+  platform?: "web" | "desktop" | "mobile";
+}
+
+/**
  * Options for configuring the MCP host emulator
  */
 export interface MCPHostEmulatorOptions {
@@ -22,6 +35,8 @@ export interface MCPHostEmulatorOptions {
   toolResult: unknown;
   /** Handle bidirectional tool calls from widget */
   onToolCall?: (name: string, args: unknown) => Promise<unknown>;
+  /** Environment settings (theme, locale, viewport, etc.) */
+  environment?: MCPEnvironmentSettings;
   /** Enable debug logging */
   debug?: boolean;
 }
@@ -88,6 +103,11 @@ export class MCPHostEmulator {
   getPlaywrightInitScript(): string {
     const toolResult = JSON.stringify(this.options.toolResult);
     const toolName = JSON.stringify(this.options.toolName);
+    const env = this.options.environment ?? {};
+    const theme = JSON.stringify(env.theme ?? "light");
+    const displayMode = JSON.stringify(env.displayMode ?? "inline");
+    const locale = JSON.stringify(env.locale ?? "en-US");
+    const timeZone = JSON.stringify(env.timeZone ?? "UTC");
 
     return `
       // MCP Host Emulator for Playwright
@@ -130,11 +150,11 @@ export class MCPHostEmulator {
                       serverTools: {},
                     },
                     hostContext: {
-                      theme: 'light',
-                      displayMode: 'inline',
+                      theme: ${theme},
+                      displayMode: ${displayMode},
                       availableDisplayModes: ['inline', 'fullscreen'],
-                      locale: 'en-US',
-                      timeZone: 'UTC',
+                      locale: ${locale},
+                      timeZone: ${timeZone},
                       toolInfo: {
                         tool: {
                           name: ${toolName},
@@ -293,12 +313,15 @@ export class MCPHostEmulator {
    * Build host context object
    */
   private buildHostContext(): Record<string, unknown> {
+    const env = this.options.environment ?? {};
     return {
-      theme: "light",
-      displayMode: "inline",
+      theme: env.theme ?? "light",
+      displayMode: env.displayMode ?? "inline",
       availableDisplayModes: ["inline", "fullscreen"],
-      locale: "en-US",
-      timeZone: "UTC",
+      locale: env.locale ?? "en-US",
+      timeZone: env.timeZone ?? "UTC",
+      platform: env.platform ?? "desktop",
+      viewport: env.viewport ?? { width: 800, height: 600 },
       toolInfo: {
         tool: {
           name: this.options.toolName,
