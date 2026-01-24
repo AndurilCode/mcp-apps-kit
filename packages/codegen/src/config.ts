@@ -28,6 +28,37 @@ import { defaultLogger as createDefaultLogger } from "./utils/logger";
 const defaultLogger: PluginLogger = createDefaultLogger;
 
 /**
+ * Allowed config file extensions for security
+ */
+const ALLOWED_CONFIG_EXTENSIONS = [".ts", ".mts", ".cts", ".js", ".mjs", ".cjs"];
+
+/**
+ * Validate that a config file path is safe to load
+ *
+ * @param configPath - The config file path (relative or absolute)
+ * @param projectRoot - The project root directory
+ * @throws Error if path is outside project root or has invalid extension
+ */
+function validateConfigPath(configPath: string, projectRoot: string): void {
+  const absolutePath = path.resolve(projectRoot, configPath);
+  const normalizedPath = path.normalize(absolutePath);
+  const normalizedRoot = path.normalize(projectRoot);
+
+  // Check path is within project root (path traversal protection)
+  if (!normalizedPath.startsWith(normalizedRoot + path.sep) && normalizedPath !== normalizedRoot) {
+    throw new Error(`Security error: Config path "${configPath}" resolves outside project root`);
+  }
+
+  // Check file extension is allowed
+  const ext = path.extname(normalizedPath).toLowerCase();
+  if (!ALLOWED_CONFIG_EXTENSIONS.includes(ext)) {
+    throw new Error(
+      `Security error: Config file must have one of these extensions: ${ALLOWED_CONFIG_EXTENSIONS.join(", ")}. Got: "${ext}"`
+    );
+  }
+}
+
+/**
  * Helper function to define a file-based app configuration with TypeScript autocomplete
  *
  * This is a simple identity function that provides type safety and IDE autocomplete
@@ -392,6 +423,9 @@ export async function loadConfig(
   projectRoot: string,
   logger: PluginLogger = defaultLogger
 ): Promise<FileBasedConfigInput> {
+  // Security: Validate config path before loading
+  validateConfigPath(configPath, projectRoot);
+
   const absolutePath = path.resolve(projectRoot, configPath);
 
   // Check if file exists

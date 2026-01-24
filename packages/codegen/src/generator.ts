@@ -8,6 +8,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-enum-comparison */
 
 import * as fs from "node:fs/promises";
+import * as fsSync from "node:fs";
 import * as path from "node:path";
 import type { parse as TSESParse } from "@typescript-eslint/typescript-estree";
 import type {
@@ -29,6 +30,43 @@ import {
 import { defaultLogger } from "./utils/logger";
 
 /**
+ * Maximum recursion depth for directory scanning
+ * Prevents stack overflow and excessive resource usage
+ */
+const MAX_RECURSION_DEPTH = 50;
+
+/**
+ * Validate that a path is within the project root (path traversal protection)
+ *
+ * Uses synchronous realpath to resolve symlinks for accurate comparison.
+ * This handles cases like macOS /var -> /private/var symlinks.
+ *
+ * @param resolvedPath - The resolved absolute path to validate
+ * @param projectRoot - The project root directory
+ * @throws Error if path is outside project root
+ */
+function validatePathWithinRoot(resolvedPath: string, projectRoot: string): void {
+  let normalizedPath: string;
+  let normalizedRoot: string;
+
+  try {
+    // Try to resolve real paths (handles symlinks like /var -> /private/var on macOS)
+    normalizedPath = path.normalize(fsSync.realpathSync(resolvedPath));
+    normalizedRoot = path.normalize(fsSync.realpathSync(projectRoot));
+  } catch {
+    // If realpath fails (path doesn't exist yet), use normalized paths
+    normalizedPath = path.normalize(resolvedPath);
+    normalizedRoot = path.normalize(projectRoot);
+  }
+
+  if (!normalizedPath.startsWith(normalizedRoot + path.sep) && normalizedPath !== normalizedRoot) {
+    throw new Error(
+      `Security error: Path "${resolvedPath}" is outside project root "${projectRoot}"`
+    );
+  }
+}
+
+/**
  * Check if a directory exists
  */
 async function directoryExists(dirPath: string): Promise<boolean> {
@@ -42,12 +80,31 @@ async function directoryExists(dirPath: string): Promise<boolean> {
 
 /**
  * Recursively discover files in a directory
+ *
+ * @param dirPath - Current directory being scanned
+ * @param basePath - Base path for calculating relative paths
+ * @param resourceType - Type of resource being discovered
+ * @param projectRoot - Project root for path validation (optional, uses basePath if not provided)
+ * @param depth - Current recursion depth (for security limits)
  */
 async function discoverFilesInDirectory(
   dirPath: string,
   basePath: string,
-  resourceType: "tool" | "workflow" | "ui" | "ui-widget" | "middleware" | "handler"
+  resourceType: "tool" | "workflow" | "ui" | "ui-widget" | "middleware" | "handler",
+  projectRoot?: string,
+  depth: number = 0
 ): Promise<DiscoveredFile[]> {
+  // Security: Enforce max recursion depth
+  if (depth > MAX_RECURSION_DEPTH) {
+    throw new Error(
+      `Security error: Maximum recursion depth (${MAX_RECURSION_DEPTH}) exceeded at "${dirPath}"`
+    );
+  }
+
+  // Security: Validate path is within project root
+  const root = projectRoot ?? basePath;
+  validatePathWithinRoot(dirPath, root);
+
   const files: DiscoveredFile[] = [];
 
   try {
@@ -55,11 +112,34 @@ async function discoverFilesInDirectory(
 
     for (const entry of entries) {
       const fullPath = path.join(dirPath, entry.name);
+
+      // Security: Validate each discovered path is within project root
+      validatePathWithinRoot(fullPath, root);
+
       const relativePath = path.relative(basePath, fullPath);
 
       if (entry.isDirectory()) {
-        // Recursively scan subdirectories
-        const subFiles = await discoverFilesInDirectory(fullPath, basePath, resourceType);
+        // Security: Skip symlinks that point outside project root
+        try {
+          const realFullPath = await fs.realpath(fullPath);
+          const realRoot = await fs.realpath(root);
+          if (!realFullPath.startsWith(realRoot + path.sep) && realFullPath !== realRoot) {
+            // Symlink points outside project root, skip it
+            continue;
+          }
+        } catch {
+          // If realpath fails, the directory doesn't exist or is inaccessible
+          // The recursive call will handle this gracefully
+        }
+
+        // Recursively scan subdirectories with incremented depth
+        const subFiles = await discoverFilesInDirectory(
+          fullPath,
+          basePath,
+          resourceType,
+          root,
+          depth + 1
+        );
         files.push(...subFiles);
       } else if (entry.isFile()) {
         // Check if this is a valid file to process
@@ -470,36 +550,36 @@ export async function generateManifest(options: GenerateManifestOptions): Promis
   const warnings: string[] = [];
   const errors: string[] = [];
 
-  // Discover files in each directory
+  // Discover files in each directory (with path traversal protection via projectRoot)
   const toolFiles = (await directoryExists(toolsDir))
-    ? await discoverFilesInDirectory(toolsDir, toolsDir, "tool")
+    ? await discoverFilesInDirectory(toolsDir, toolsDir, "tool", projectRoot)
     : [];
 
   const workflowFiles = (await directoryExists(workflowsDir))
-    ? await discoverFilesInDirectory(workflowsDir, workflowsDir, "workflow")
+    ? await discoverFilesInDirectory(workflowsDir, workflowsDir, "workflow", projectRoot)
     : [];
 
   const uiFiles =
     uiDir && (await directoryExists(uiDir))
-      ? await discoverFilesInDirectory(uiDir, uiDir, "ui")
+      ? await discoverFilesInDirectory(uiDir, uiDir, "ui", projectRoot)
       : [];
 
   // Discover UI widget files for convention-based binding
   const uiWidgetFiles =
     uiWidgetsDir && (await directoryExists(uiWidgetsDir))
-      ? await discoverFilesInDirectory(uiWidgetsDir, uiWidgetsDir, "ui-widget")
+      ? await discoverFilesInDirectory(uiWidgetsDir, uiWidgetsDir, "ui-widget", projectRoot)
       : [];
 
   // Discover middleware files
   const middlewareFiles =
     middlewareDir && (await directoryExists(middlewareDir))
-      ? await discoverFilesInDirectory(middlewareDir, middlewareDir, "middleware")
+      ? await discoverFilesInDirectory(middlewareDir, middlewareDir, "middleware", projectRoot)
       : [];
 
   // Discover handler files
   const handlerFiles =
     handlersDir && (await directoryExists(handlersDir))
-      ? await discoverFilesInDirectory(handlersDir, handlersDir, "handler")
+      ? await discoverFilesInDirectory(handlersDir, handlersDir, "handler", projectRoot)
       : [];
 
   // Check for name collisions within each category

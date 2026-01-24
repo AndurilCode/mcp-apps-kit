@@ -216,18 +216,29 @@ export function setupWatcher(server: ViteDevServer, options: WatcherOptions): ()
   }
 
   // Debounce regeneration to avoid multiple rapid regenerations
-  // Queue-based approach: if a regeneration is in progress and new changes come in,
-  // we mark that another regeneration is needed after the current one completes.
+  // Set-based approach: track pending file changes to ensure none are lost
   let regenerateTimeout: ReturnType<typeof setTimeout> | null = null;
   let isRegenerating = false;
-  let regenerationQueued = false;
+  const pendingChanges = new Set<string>();
+
+  // Retry configuration for error recovery
+  const MAX_RETRY_ATTEMPTS = 3;
+  const BASE_RETRY_DELAY_MS = 500;
+  let consecutiveFailures = 0;
 
   const executeRegeneration = async (): Promise<void> => {
     isRegenerating = true;
-    regenerationQueued = false;
+
+    // Capture and clear pending changes atomically
+    const changesToProcess = Array.from(pendingChanges);
+    pendingChanges.clear();
 
     try {
       await onRegenerate();
+
+      // Reset failure counter on success
+      consecutiveFailures = 0;
+
       // Trigger HMR by invalidating the manifest module(s)
       if (isVersioned) {
         // For versioned configs, invalidate the versions-manifest
@@ -251,27 +262,53 @@ export function setupWatcher(server: ViteDevServer, options: WatcherOptions): ()
         path: "*",
       });
     } catch (error: unknown) {
-      logger.error(
-        `Failed to regenerate manifest: ${error instanceof Error ? error.message : String(error)}`
-      );
+      consecutiveFailures++;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Failed to regenerate manifest: ${errorMessage}`);
+
+      // Exponential backoff retry
+      if (consecutiveFailures <= MAX_RETRY_ATTEMPTS) {
+        const retryDelay = BASE_RETRY_DELAY_MS * Math.pow(2, consecutiveFailures - 1);
+        logger.warn(
+          `Retrying regeneration in ${retryDelay}ms (attempt ${consecutiveFailures}/${MAX_RETRY_ATTEMPTS})`
+        );
+
+        // Re-add the changes that failed to process
+        for (const change of changesToProcess) {
+          pendingChanges.add(change);
+        }
+
+        // Schedule retry with exponential backoff
+        setTimeout(() => {
+          if (!isRegenerating && pendingChanges.size > 0) {
+            void executeRegeneration();
+          }
+        }, retryDelay);
+      } else {
+        logger.error(
+          `Regeneration failed after ${MAX_RETRY_ATTEMPTS} attempts. Manual restart may be required.`
+        );
+      }
     } finally {
       isRegenerating = false;
-      // If another regeneration was requested while we were running, execute it now
-      if (regenerationQueued) {
+      // If new changes arrived while we were processing, execute another regeneration
+      if (pendingChanges.size > 0) {
         void executeRegeneration();
       }
     }
   };
 
-  const debouncedRegenerate = () => {
+  const debouncedRegenerate = (filePath: string) => {
+    // Track the file change
+    pendingChanges.add(filePath);
+
     if (regenerateTimeout) {
       clearTimeout(regenerateTimeout);
     }
 
     regenerateTimeout = setTimeout(() => {
       if (isRegenerating) {
-        // A regeneration is already in progress, queue another one
-        regenerationQueued = true;
+        // Changes are already tracked in pendingChanges, they'll be processed next
         return;
       }
       void executeRegeneration();
@@ -297,7 +334,7 @@ export function setupWatcher(server: ViteDevServer, options: WatcherOptions): ()
 
     if (shouldTriggerRegeneration(eventType, filePath)) {
       logger.info(`File ${eventType}: ${path.relative(projectRoot, filePath)}`);
-      debouncedRegenerate();
+      debouncedRegenerate(filePath);
     }
   };
 
@@ -356,19 +393,74 @@ export async function createStandaloneWatcher(
     }
   }
 
-  // Debounce regeneration
+  // Debounce regeneration with retry support
   let regenerateTimeout: ReturnType<typeof setTimeout> | null = null;
+  let isRegenerating = false;
+  const pendingChanges = new Set<string>();
 
-  const debouncedRegenerate = () => {
+  // Retry configuration for error recovery
+  const MAX_RETRY_ATTEMPTS = 3;
+  const BASE_RETRY_DELAY_MS = 500;
+  let consecutiveFailures = 0;
+
+  const executeRegeneration = async (): Promise<void> => {
+    isRegenerating = true;
+
+    // Capture and clear pending changes atomically
+    const changesToProcess = Array.from(pendingChanges);
+    pendingChanges.clear();
+
+    try {
+      await onRegenerate();
+      consecutiveFailures = 0; // Reset on success
+    } catch (error: unknown) {
+      consecutiveFailures++;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Failed to regenerate manifest: ${errorMessage}`);
+
+      // Exponential backoff retry
+      if (consecutiveFailures <= MAX_RETRY_ATTEMPTS) {
+        const retryDelay = BASE_RETRY_DELAY_MS * Math.pow(2, consecutiveFailures - 1);
+        logger.warn(
+          `Retrying regeneration in ${retryDelay}ms (attempt ${consecutiveFailures}/${MAX_RETRY_ATTEMPTS})`
+        );
+
+        // Re-add the changes that failed to process
+        for (const change of changesToProcess) {
+          pendingChanges.add(change);
+        }
+
+        // Schedule retry with exponential backoff
+        setTimeout(() => {
+          if (!isRegenerating && pendingChanges.size > 0) {
+            void executeRegeneration();
+          }
+        }, retryDelay);
+      } else {
+        logger.error(
+          `Regeneration failed after ${MAX_RETRY_ATTEMPTS} attempts. Manual restart may be required.`
+        );
+      }
+    } finally {
+      isRegenerating = false;
+      // If new changes arrived while we were processing, execute another regeneration
+      if (pendingChanges.size > 0) {
+        void executeRegeneration();
+      }
+    }
+  };
+
+  const debouncedRegenerate = (filePath: string) => {
+    pendingChanges.add(filePath);
+
     if (regenerateTimeout) {
       clearTimeout(regenerateTimeout);
     }
     regenerateTimeout = setTimeout(() => {
-      void onRegenerate().catch((error: unknown) => {
-        logger.error(
-          `Failed to regenerate manifest: ${error instanceof Error ? error.message : String(error)}`
-        );
-      });
+      if (isRegenerating) {
+        return; // Changes are tracked in pendingChanges
+      }
+      void executeRegeneration();
     }, 100);
   };
 
@@ -399,12 +491,12 @@ export async function createStandaloneWatcher(
   // Handle file add/unlink events
   watcher.on("add", (filePath: string) => {
     logger.info(`File added: ${path.relative(projectRoot, filePath)}`);
-    debouncedRegenerate();
+    debouncedRegenerate(filePath);
   });
 
   watcher.on("unlink", (filePath: string) => {
     logger.info(`File removed: ${path.relative(projectRoot, filePath)}`);
-    debouncedRegenerate();
+    debouncedRegenerate(filePath);
   });
 
   watcher.on("error", (error: unknown) => {
