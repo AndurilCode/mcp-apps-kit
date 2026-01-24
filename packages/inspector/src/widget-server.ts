@@ -18,6 +18,16 @@ export interface WidgetSession {
   toolName: string;
   protocol: "mcp" | "openai";
   createdAt: number;
+  // Metadata fields for production parity
+  subjectId?: string;
+  sessionId?: string;
+  locale?: string;
+  userLocation?: {
+    city?: string;
+    region?: string;
+    country?: string;
+    timezone?: string;
+  };
 }
 
 /**
@@ -137,6 +147,15 @@ export class WidgetServer {
       toolName,
       protocol,
       createdAt: Date.now(),
+      // Generate mock metadata for production parity
+      subjectId: `mock-subject-${randomUUID().slice(0, 8)}`,
+      sessionId: `mock-session-${randomUUID().slice(0, 8)}`,
+      locale: "en-US",
+      userLocation: {
+        city: "Unknown",
+        country: "US",
+        timezone: "UTC",
+      },
     };
 
     this.sessions.set(sessionId, session);
@@ -402,6 +421,66 @@ export class WidgetServer {
       // Handle resize
       if (message && message.type === 'openai:resize') {
         console.log('[OpenAI Host] Widget height:', message.height);
+        // Track height changes for test assertions
+        window.__hostState = window.__hostState || {};
+        window.__hostState.heights = window.__hostState.heights || [];
+        window.__hostState.heights.push({ height: message.height, timestamp: Date.now() });
+      }
+
+      // Handle navigation
+      if (message && message.type === 'openai:navigation') {
+        console.log('[OpenAI Host] Navigation:', message.url, message.title);
+        window.__hostState = window.__hostState || {};
+        window.__hostState.navigations = window.__hostState.navigations || [];
+        window.__hostState.navigations.push({ url: message.url, title: message.title, timestamp: Date.now() });
+      }
+
+      // Handle CSP violations
+      if (message && message.type === 'openai:cspViolation') {
+        console.error('[OpenAI Host] CSP Violation:', message.violation);
+        window.__hostState = window.__hostState || {};
+        window.__hostState.cspViolations = window.__hostState.cspViolations || [];
+        window.__hostState.cspViolations.push(message.violation);
+      }
+
+      // Handle errors
+      if (message && message.type === 'openai:error') {
+        console.error('[OpenAI Host] Widget Error:', message.error);
+        window.__hostState = window.__hostState || {};
+        window.__hostState.errors = window.__hostState.errors || [];
+        window.__hostState.errors.push(message.error);
+      }
+
+      // Handle modal requests
+      if (message && message.type === 'openai:requestModal') {
+        console.log('[OpenAI Host] Modal requested:', message.params, message.template);
+        // Return empty result (inspector can't spawn real modals)
+        iframe.contentWindow.postMessage({
+          type: 'openai:modal:response',
+          modalId: message.modalId,
+          result: { dismissed: true, reason: 'inspector_mock' }
+        }, '*');
+      }
+
+      // Handle setOpenInAppUrl
+      if (message && message.type === 'openai:setOpenInAppUrl') {
+        console.log('[OpenAI Host] Open in app URL set:', message.href);
+        window.__hostState = window.__hostState || {};
+        window.__hostState.openInAppUrl = message.href;
+      }
+
+      // Handle storage changes
+      if (message && message.type === 'openai:storageChange') {
+        console.log('[OpenAI Host] Storage changed:', message.key, message.newValue);
+        window.__hostState = window.__hostState || {};
+        window.__hostState.storageChanges = window.__hostState.storageChanges || [];
+        window.__hostState.storageChanges.push({
+          key: message.key,
+          oldValue: message.oldValue,
+          newValue: message.newValue,
+          url: message.url,
+          timestamp: Date.now()
+        });
       }
     });
 
@@ -448,6 +527,16 @@ export class WidgetServer {
   private injectOpenAIRuntime(html: string, session: WidgetSession): string {
     const toolResultJson = JSON.stringify(session.toolResult);
     const toolNameJson = JSON.stringify(session.toolName);
+    const subjectIdJson = JSON.stringify(
+      session.subjectId ?? `mock-subject-${randomUUID().slice(0, 8)}`
+    );
+    const sessionIdJson = JSON.stringify(
+      session.sessionId ?? `mock-session-${randomUUID().slice(0, 8)}`
+    );
+    const localeJson = JSON.stringify(session.locale ?? "en-US");
+    const userLocationJson = JSON.stringify(
+      session.userLocation ?? { city: "Unknown", country: "US", timezone: "UTC" }
+    );
 
     // Create the runtime bootstrap script that will be injected into the widget
     const runtimeScript = `
@@ -465,7 +554,7 @@ export class WidgetServer {
     toolResponseMetadata: toolResponseMetadata,
     displayMode: 'inline',
     theme: 'light',
-    locale: 'en-US',
+    locale: ${localeJson},
     maxHeight: null,
     safeArea: { insets: { top: 0, bottom: 0, left: 0, right: 0 } },
     userAgent: {
@@ -474,7 +563,14 @@ export class WidgetServer {
     },
     view: { mode: 'inline', params: {} },
     widgetState: null,
+    widgetSessionId: '${session.id}',
+    subjectId: ${subjectIdJson},
+    sessionId: ${sessionIdJson},
+    userLocation: ${userLocationJson},
     _callId: 0,
+    _modalId: 0,
+    _openInAppUrl: null,
+    _uploadedFiles: new Map(),
 
     setWidgetState(state) {
       this.widgetState = state;
@@ -511,9 +607,26 @@ export class WidgetServer {
 
     requestDisplayMode(options = {}) {
       const mode = options.mode || 'inline';
+      const validModes = ['inline', 'fullscreen', 'pip'];
+      if (!validModes.includes(mode)) {
+        console.warn('[OpenAI Runtime] Invalid display mode:', mode);
+      }
       this.displayMode = mode;
-      window.parent.postMessage({ type: 'openai:requestDisplayMode', mode: mode, maxHeight: options.maxHeight }, '*');
+      this.view = { ...this.view, mode: mode };
+      window.parent.postMessage({ 
+        type: 'openai:requestDisplayMode', 
+        mode: mode, 
+        maxHeight: options.maxHeight,
+        pip: options.pip
+      }, '*');
       return { mode: mode };
+    },
+
+    setOpenInAppUrl(options) {
+      const href = typeof options === 'string' ? options : options?.href;
+      if (!href) throw new Error('href is required for setOpenInAppUrl');
+      this._openInAppUrl = href;
+      window.parent.postMessage({ type: 'openai:setOpenInAppUrl', href: href }, '*');
     },
 
     requestClose() {
@@ -532,9 +645,134 @@ export class WidgetServer {
       }
     },
 
-    uploadFile: async function() { return { fileId: 'mock-file-id' }; },
-    getFileDownloadUrl: async function() { return { downloadUrl: 'https://example.com/mock' }; },
+    notifyNavigation(options) {
+      const url = options?.url || window.location.href;
+      const title = options?.title || document.title;
+      window.parent.postMessage({ type: 'openai:navigation', url: url, title: title }, '*');
+    },
+
+    requestModal(options = {}) {
+      return new Promise((resolve, reject) => {
+        const modalId = ++this._modalId;
+        const handler = (event) => {
+          if (event.data?.type === 'openai:modal:response' && event.data.modalId === modalId) {
+            window.removeEventListener('message', handler);
+            event.data.error ? reject(new Error(event.data.error)) : resolve(event.data.result);
+          }
+        };
+        window.addEventListener('message', handler);
+        window.parent.postMessage({
+          type: 'openai:requestModal',
+          modalId: modalId,
+          params: options.params,
+          template: options.template
+        }, '*');
+        setTimeout(() => {
+          window.removeEventListener('message', handler);
+          reject(new Error('Modal request timeout'));
+        }, 30000);
+      });
+    },
+
+    uploadFile: async function(file) {
+      const fileId = 'file-' + Math.random().toString(36).slice(2, 10);
+      // Store file data for later download URL generation
+      const reader = new FileReader();
+      const dataUrl = await new Promise((resolve) => {
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      });
+      this._uploadedFiles.set(fileId, { 
+        name: file.name, 
+        type: file.type, 
+        size: file.size, 
+        dataUrl: dataUrl
+      });
+      return { fileId: fileId };
+    },
+    
+    getFileDownloadUrl: async function(options) {
+      const fileId = typeof options === 'string' ? options : options?.fileId;
+      const file = this._uploadedFiles.get(fileId);
+      if (file) {
+        // Return data URL for testing (works in browser)
+        return { downloadUrl: file.dataUrl };
+      }
+      // Return mock URL for unknown files
+      return { downloadUrl: 'https://example.com/mock-download/' + fileId };
+    },
   };
+
+  // Hook history methods for automatic navigation tracking
+  const originalPushState = history.pushState.bind(history);
+  const originalReplaceState = history.replaceState.bind(history);
+
+  history.pushState = function(state, title, url) {
+    originalPushState(state, title, url);
+    openaiAPI.notifyNavigation({ url: url?.toString(), title: title });
+  };
+
+  history.replaceState = function(state, title, url) {
+    originalReplaceState(state, title, url);
+    openaiAPI.notifyNavigation({ url: url?.toString(), title: title });
+  };
+
+  window.addEventListener('popstate', () => {
+    openaiAPI.notifyNavigation();
+  });
+
+  // Enhanced error reporting
+  document.addEventListener('securitypolicyviolation', (e) => {
+    const violation = {
+      blockedURI: e.blockedURI,
+      violatedDirective: e.violatedDirective,
+      originalPolicy: e.originalPolicy,
+      disposition: e.disposition,
+      timestamp: Date.now()
+    };
+    window.parent.postMessage({ type: 'openai:cspViolation', violation: violation }, '*');
+    console.error('[CSP Violation]', violation.violatedDirective, violation.blockedURI);
+  });
+
+  window.addEventListener('error', (e) => {
+    window.parent.postMessage({ 
+      type: 'openai:error', 
+      error: { message: e.message, filename: e.filename, lineno: e.lineno, colno: e.colno }
+    }, '*');
+  });
+
+  window.addEventListener('unhandledrejection', (e) => {
+    window.parent.postMessage({ 
+      type: 'openai:error', 
+      error: { message: String(e.reason), type: 'unhandledrejection' }
+    }, '*');
+  });
+
+  // Storage event sync - sync localStorage changes to host
+  window.addEventListener('storage', (e) => {
+    if (e.storageArea === localStorage) {
+      window.parent.postMessage({
+        type: 'openai:storageChange',
+        key: e.key,
+        oldValue: e.oldValue,
+        newValue: e.newValue,
+        url: e.url
+      }, '*');
+    }
+  });
+
+  // Listen for storage sync from host
+  window.addEventListener('message', (event) => {
+    if (event.data?.type === 'openai:syncStorage') {
+      const key = event.data.key;
+      const value = event.data.value;
+      if (value === null) {
+        localStorage.removeItem(key);
+      } else {
+        localStorage.setItem(key, value);
+      }
+    }
+  });
 
   // Define window.openai as non-writable
   Object.defineProperty(window, 'openai', {
@@ -565,6 +803,28 @@ export class WidgetServer {
       console.error('[OpenAI Runtime] Failed to dispatch globals event:', err);
     }
   }, 0);
+
+  // Auto-resize with ResizeObserver
+  try {
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const height = entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
+        if (height > 0) {
+          openaiAPI.notifyIntrinsicHeight(height);
+        }
+      }
+    });
+    
+    if (document.body) {
+      resizeObserver.observe(document.body);
+    } else {
+      document.addEventListener('DOMContentLoaded', () => {
+        resizeObserver.observe(document.body);
+      });
+    }
+  } catch (err) {
+    console.warn('[OpenAI Runtime] ResizeObserver not available:', err);
+  }
 
   console.log('[OpenAI Runtime] Initialized for tool:', toolName);
 })();
