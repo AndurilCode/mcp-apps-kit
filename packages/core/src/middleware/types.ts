@@ -161,22 +161,21 @@ export function createTypedMiddleware<TState extends Record<string, unknown>>(
  * @internal
  */
 export function composeMiddleware(middleware: Middleware[]): Middleware {
-  return async (context, next) => {
+  return (async (context, next) => {
     let index = 0;
 
-    const dispatch = async (): Promise<void> => {
+    const dispatch = async (): Promise<unknown> => {
       if (index < middleware.length) {
         const fn = middleware[index++];
         if (fn) {
-          await fn(context, dispatch);
+          return await fn(context, dispatch as () => Promise<void>);
         }
-      } else {
-        await next();
       }
+      return await next();
     };
 
-    await dispatch();
-  };
+    return await dispatch();
+  }) as Middleware;
 }
 
 // =============================================================================
@@ -193,14 +192,14 @@ export function composeMiddleware(middleware: Middleware[]): Middleware {
 export function createErrorHandler(
   handler: (error: Error, context: MiddlewareContext) => Promise<void> | void
 ): Middleware {
-  return async (context, next) => {
+  return (async (context, next) => {
     try {
-      await next();
+      return await next();
     } catch (error) {
       await handler(error as Error, context);
       throw error; // Re-throw unless handler wants to suppress
     }
-  };
+  }) as Middleware;
 }
 
 /**
@@ -214,13 +213,13 @@ export function createConditionalMiddleware(
   condition: (context: MiddlewareContext) => boolean,
   middleware: Middleware
 ): Middleware {
-  return async (context, next) => {
+  return (async (context, next) => {
     if (condition(context)) {
-      await middleware(context, next);
+      return await middleware(context, next);
     } else {
-      await next();
+      return await next();
     }
-  };
+  }) as Middleware;
 }
 
 /**
@@ -231,7 +230,7 @@ export function createConditionalMiddleware(
  * @internal
  */
 export function createTimeoutMiddleware(timeoutMs: number): Middleware {
-  return async (_context, next) => {
+  return (async (_context, next) => {
     let timerId: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
       timerId = setTimeout(() => {
@@ -240,11 +239,11 @@ export function createTimeoutMiddleware(timeoutMs: number): Middleware {
     });
 
     try {
-      await Promise.race([next(), timeoutPromise]);
+      return await Promise.race([next(), timeoutPromise]);
     } finally {
       if (timerId !== undefined) {
         clearTimeout(timerId);
       }
     }
-  };
+  }) as Middleware;
 }

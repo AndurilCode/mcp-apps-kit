@@ -20,6 +20,8 @@ export default defineConfig({
     tools: "tools",
     workflows: "workflows",
     uiWidgets: "ui/widgets",
+    middleware: "middleware",
+    handlers: "handlers",
   },
 
   // Server configuration

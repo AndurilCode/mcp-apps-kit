@@ -73,6 +73,12 @@ function getVersionedWatchDirs(config: VersionedFileBasedConfig, projectRoot: st
     if (versionDirs.uiWidgets) {
       dirs.push(path.resolve(projectRoot, versionDirs.uiWidgets));
     }
+    if (versionDirs.middleware) {
+      dirs.push(path.resolve(projectRoot, versionDirs.middleware));
+    }
+    if (versionDirs.handlers) {
+      dirs.push(path.resolve(projectRoot, versionDirs.handlers));
+    }
   }
 
   return dirs;
@@ -125,14 +131,34 @@ function isInWatchedDirectory(
 
   const absolutePath = path.resolve(filePath);
 
-  return (
+  // Check core directories
+  if (
     absolutePath.startsWith(toolsDir + path.sep) ||
     absolutePath === toolsDir ||
     absolutePath.startsWith(workflowsDir + path.sep) ||
     absolutePath === workflowsDir ||
     absolutePath.startsWith(uiDir + path.sep) ||
     absolutePath === uiDir
-  );
+  ) {
+    return true;
+  }
+
+  // Check optional directories
+  if (directories.middleware) {
+    const middlewareDir = path.resolve(projectRoot, directories.middleware);
+    if (absolutePath.startsWith(middlewareDir + path.sep) || absolutePath === middlewareDir) {
+      return true;
+    }
+  }
+
+  if (directories.handlers) {
+    const handlersDir = path.resolve(projectRoot, directories.handlers);
+    if (absolutePath.startsWith(handlersDir + path.sep) || absolutePath === handlersDir) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -170,6 +196,13 @@ export function setupWatcher(server: ViteDevServer, options: WatcherOptions): ()
     const workflowsDir = path.resolve(projectRoot, directories.workflows ?? "workflows");
     const uiDir = path.resolve(projectRoot, directories.ui ?? "ui");
     dirsToWatch = [toolsDir, workflowsDir, uiDir];
+    // Add optional directories if configured
+    if (directories.middleware) {
+      dirsToWatch.push(path.resolve(projectRoot, directories.middleware));
+    }
+    if (directories.handlers) {
+      dirsToWatch.push(path.resolve(projectRoot, directories.handlers));
+    }
   }
 
   // Debounce regeneration to avoid multiple rapid regenerations
@@ -289,6 +322,13 @@ export async function createStandaloneWatcher(
     const workflowsDir = path.resolve(projectRoot, directories.workflows ?? "workflows");
     const uiDir = path.resolve(projectRoot, directories.ui ?? "ui");
     dirsToWatch = [toolsDir, workflowsDir, uiDir];
+    // Add optional directories if configured
+    if (directories.middleware) {
+      dirsToWatch.push(path.resolve(projectRoot, directories.middleware));
+    }
+    if (directories.handlers) {
+      dirsToWatch.push(path.resolve(projectRoot, directories.handlers));
+    }
   }
 
   // Debounce regeneration

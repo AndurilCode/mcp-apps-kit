@@ -182,20 +182,26 @@ export interface DefineMiddlewareWithResult {
 export function defineMiddleware(definition: MiddlewareDefinition): Middleware {
   const { before, after } = definition;
 
-  return async (context, next) => {
+  // Note: We return the result from next() even though Middleware type says Promise<void>.
+  // This allows void-based middleware to work seamlessly with MiddlewareChain<TResult>.
+  // The type assertion is safe because JavaScript doesn't enforce return types at runtime.
+  return (async (context, next) => {
     // Run before hook
     if (before) {
       await before(context);
     }
 
-    // Call next (guaranteed!)
-    await next();
+    // Call next and capture result (guaranteed!)
+    const result = await next();
 
     // Run after hook
     if (after) {
       await after(context);
     }
-  };
+
+    // Pass through result for MiddlewareChain compatibility
+    return result;
+  }) as Middleware;
 }
 
 /**
@@ -211,10 +217,10 @@ export function defineMiddleware(definition: MiddlewareDefinition): Middleware {
  * ```
  */
 defineMiddleware.before = (hook: BeforeHook): Middleware => {
-  return async (context, next) => {
+  return (async (context, next) => {
     await hook(context);
-    await next();
-  };
+    return await next();
+  }) as Middleware;
 };
 
 /**
@@ -230,10 +236,11 @@ defineMiddleware.before = (hook: BeforeHook): Middleware => {
  * ```
  */
 defineMiddleware.after = (hook: AfterHook): Middleware => {
-  return async (context, next) => {
-    await next();
+  return (async (context, next) => {
+    const result = await next();
     await hook(context);
-  };
+    return result;
+  }) as Middleware;
 };
 
 /**

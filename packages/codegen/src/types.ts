@@ -22,6 +22,10 @@ export interface DirectoriesConfig {
   ui?: string;
   /** Directory containing UI widget files for convention-based binding. Default: undefined (disabled) */
   uiWidgets?: string;
+  /** Directory containing middleware files. Default: undefined (disabled) */
+  middleware?: string;
+  /** Directory containing event handler files. Default: undefined (disabled) */
+  handlers?: string;
 }
 
 // Re-export types from core for convenience
@@ -144,6 +148,18 @@ export interface VersionDirectoriesConfig {
    * Default: undefined (disabled)
    */
   uiWidgets?: string;
+
+  /**
+   * Directory containing middleware files for this version.
+   * Default: undefined (disabled)
+   */
+  middleware?: string;
+
+  /**
+   * Directory containing event handler files for this version.
+   * Default: undefined (disabled)
+   */
+  handlers?: string;
 }
 
 /**
@@ -316,7 +332,7 @@ export interface DiscoveredFile {
   /** Has a named 'ui' export (for colocated UI) */
   hasUiExport: boolean;
   /** Type of resource */
-  type: "tool" | "workflow" | "ui" | "ui-widget";
+  type: "tool" | "workflow" | "ui" | "ui-widget" | "middleware" | "handler";
 }
 
 /**

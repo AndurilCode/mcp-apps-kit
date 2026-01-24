@@ -27,6 +27,8 @@ interface ServeOptions {
 interface AppWithHotReload {
   start: (opts: { port: number }) => Promise<void>;
   updateTools: (newTools: ToolDefs) => void;
+  use: (middleware: unknown) => void;
+  on: (event: string, handler: unknown) => () => void;
 }
 
 /**
@@ -97,6 +99,8 @@ async function serve(options: ServeOptions = {}): Promise<void> {
   const manifest = manifestModule as {
     tools: Record<string, unknown>;
     workflows: Record<string, unknown>;
+    middleware: unknown[];
+    handlers: unknown[];
   };
 
   // Import createFileBasedApp from core
@@ -110,6 +114,37 @@ async function serve(options: ServeOptions = {}): Promise<void> {
     ...config,
     tools: manifest.tools,
   });
+
+  // Register file-based middleware (sorted by order property, then alphabetically)
+  const middlewareList = manifest.middleware ?? [];
+  const sortedMiddleware = [...middlewareList].sort((a, b) => {
+    const orderA =
+      typeof a === "object" && a !== null && "order" in a ? (a as { order: number }).order : 100;
+    const orderB =
+      typeof b === "object" && b !== null && "order" in b ? (b as { order: number }).order : 100;
+    return orderA - orderB;
+  });
+  for (const mw of sortedMiddleware) {
+    const middlewareFn =
+      typeof mw === "object" && mw !== null && "middleware" in mw
+        ? (mw as { middleware: unknown }).middleware
+        : mw;
+    app.use(middlewareFn);
+  }
+
+  // Register file-based event handlers
+  const handlersList = manifest.handlers ?? [];
+  for (const handler of handlersList) {
+    if (
+      typeof handler === "object" &&
+      handler !== null &&
+      "event" in handler &&
+      "handler" in handler
+    ) {
+      const h = handler as { event: string; handler: unknown };
+      app.on(h.event, h.handler);
+    }
+  }
 
   const port = options.port ?? parseInt(process.env.PORT ?? "3000", 10);
   await app.start({ port });

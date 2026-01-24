@@ -45,7 +45,7 @@ async function directoryExists(dirPath: string): Promise<boolean> {
 async function discoverFilesInDirectory(
   dirPath: string,
   basePath: string,
-  resourceType: "tool" | "workflow" | "ui" | "ui-widget"
+  resourceType: "tool" | "workflow" | "ui" | "ui-widget" | "middleware" | "handler"
 ): Promise<DiscoveredFile[]> {
   const files: DiscoveredFile[] = [];
 
@@ -201,6 +201,8 @@ function generateManifestCode(
   workflows: DiscoveredFile[],
   uis: DiscoveredFile[],
   uiWidgets: DiscoveredFile[],
+  middlewareFiles: DiscoveredFile[],
+  handlerFiles: DiscoveredFile[],
   toolUiBindings: Map<string, string>,
   outDir: string,
   projectRoot: string
@@ -262,6 +264,26 @@ function generateManifestCode(
       } else {
         lines.push(`import ${uiIdentifier} from "${importPath}";`);
       }
+    }
+  }
+
+  // Generate imports for middleware files
+  if (middlewareFiles.length > 0) {
+    lines.push("");
+    lines.push("// Middleware imports (from middleware directory)");
+    for (const middleware of middlewareFiles) {
+      const importPath = getRelativeImportPath(outDir, middleware.filePath, projectRoot);
+      lines.push(`import ${middleware.identifier}_middleware from "${importPath}";`);
+    }
+  }
+
+  // Generate imports for handler files
+  if (handlerFiles.length > 0) {
+    lines.push("");
+    lines.push("// Handler imports (from handlers directory)");
+    for (const handler of handlerFiles) {
+      const importPath = getRelativeImportPath(outDir, handler.filePath, projectRoot);
+      lines.push(`import ${handler.identifier}_handler from "${importPath}";`);
     }
   }
 
@@ -335,11 +357,43 @@ function generateManifestCode(
   lines.push("} as const;");
   lines.push("");
 
+  // Generate middleware export (sorted alphabetically by identifier)
+  if (middlewareFiles.length > 0) {
+    lines.push("// Middleware from middleware/ directory (sorted alphabetically)");
+  } else {
+    lines.push("// No middleware discovered in middleware directory");
+  }
+  lines.push("export const middleware = [");
+  // Sort middleware alphabetically by identifier for consistent ordering
+  const sortedMiddleware = [...middlewareFiles].sort((a, b) =>
+    a.identifier.localeCompare(b.identifier)
+  );
+  for (const mw of sortedMiddleware) {
+    lines.push(`  ${mw.identifier}_middleware,`);
+  }
+  lines.push("] as const;");
+  lines.push("");
+
+  // Generate handlers export
+  if (handlerFiles.length > 0) {
+    lines.push("// Event handlers from handlers/ directory");
+  } else {
+    lines.push("// No handlers discovered in handlers directory");
+  }
+  lines.push("export const handlers = [");
+  for (const handler of handlerFiles) {
+    lines.push(`  ${handler.identifier}_handler,`);
+  }
+  lines.push("] as const;");
+  lines.push("");
+
   // Generate type exports
   lines.push("export type AppTools = typeof tools;");
   lines.push("export type AppWorkflows = typeof workflows;");
   lines.push("export type AppUI = typeof ui;");
   lines.push("export type AppUIWidgets = typeof uiWidgets;");
+  lines.push("export type AppMiddleware = typeof middleware;");
+  lines.push("export type AppHandlers = typeof handlers;");
   lines.push("");
 
   return lines.join("\n");
@@ -376,6 +430,12 @@ export async function generateManifest(options: GenerateManifestOptions): Promis
   const uiWidgetsDir = directories.uiWidgets
     ? path.resolve(projectRoot, directories.uiWidgets)
     : null;
+  // Middleware directory (opt-in via directories.middleware)
+  const middlewareDir = directories.middleware
+    ? path.resolve(projectRoot, directories.middleware)
+    : null;
+  // Handlers directory (opt-in via directories.handlers)
+  const handlersDir = directories.handlers ? path.resolve(projectRoot, directories.handlers) : null;
 
   const warnings: string[] = [];
   const errors: string[] = [];
@@ -400,11 +460,25 @@ export async function generateManifest(options: GenerateManifestOptions): Promis
       ? await discoverFilesInDirectory(uiWidgetsDir, uiWidgetsDir, "ui-widget")
       : [];
 
+  // Discover middleware files
+  const middlewareFiles =
+    middlewareDir && (await directoryExists(middlewareDir))
+      ? await discoverFilesInDirectory(middlewareDir, middlewareDir, "middleware")
+      : [];
+
+  // Discover handler files
+  const handlerFiles =
+    handlersDir && (await directoryExists(handlersDir))
+      ? await discoverFilesInDirectory(handlersDir, handlersDir, "handler")
+      : [];
+
   // Check for name collisions within each category
   const toolCollisions = findNameCollisions(toolFiles);
   const workflowCollisions = findNameCollisions(workflowFiles);
   const uiCollisions = findNameCollisions(uiFiles);
   const uiWidgetCollisions = findNameCollisions(uiWidgetFiles);
+  const middlewareCollisions = findNameCollisions(middlewareFiles);
+  const handlerCollisions = findNameCollisions(handlerFiles);
 
   // Report collisions as errors
   for (const [identifier, paths] of toolCollisions) {
@@ -423,11 +497,21 @@ export async function generateManifest(options: GenerateManifestOptions): Promis
       `UI widget name collision: '${identifier}' is defined in both ${paths.join(" and ")}`
     );
   }
+  for (const [identifier, paths] of middlewareCollisions) {
+    errors.push(
+      `Middleware name collision: '${identifier}' is defined in both ${paths.join(" and ")}`
+    );
+  }
+  for (const [identifier, paths] of handlerCollisions) {
+    errors.push(
+      `Handler name collision: '${identifier}' is defined in both ${paths.join(" and ")}`
+    );
+  }
 
   if (errors.length > 0) {
     return {
       code: "",
-      files: [...toolFiles, ...workflowFiles, ...uiFiles],
+      files: [...toolFiles, ...workflowFiles, ...uiFiles, ...middlewareFiles, ...handlerFiles],
       warnings,
       errors,
     };
@@ -487,6 +571,32 @@ export async function generateManifest(options: GenerateManifestOptions): Promis
     validUiWidgets.push(file);
   }
 
+  // Analyze middleware files
+  const validMiddleware: DiscoveredFile[] = [];
+  for (const file of middlewareFiles) {
+    const { hasDefaultExport } = await analyzeFile(file.filePath);
+    if (!hasDefaultExport) {
+      warnings.push(`Skipping ${file.relativePath}: no default export found`);
+      logger.warn(`Skipping middleware/${file.relativePath}: no default export found`);
+      continue;
+    }
+    file.hasDefaultExport = true;
+    validMiddleware.push(file);
+  }
+
+  // Analyze handler files
+  const validHandlers: DiscoveredFile[] = [];
+  for (const file of handlerFiles) {
+    const { hasDefaultExport } = await analyzeFile(file.filePath);
+    if (!hasDefaultExport) {
+      warnings.push(`Skipping ${file.relativePath}: no default export found`);
+      logger.warn(`Skipping handlers/${file.relativePath}: no default export found`);
+      continue;
+    }
+    file.hasDefaultExport = true;
+    validHandlers.push(file);
+  }
+
   // Build identifier → UI widget map for convention-based binding
   const uiWidgetMap = new Map<string, DiscoveredFile>();
   for (const widget of validUiWidgets) {
@@ -510,20 +620,40 @@ export async function generateManifest(options: GenerateManifestOptions): Promis
     validWorkflows,
     validUis,
     validUiWidgets,
+    validMiddleware,
+    validHandlers,
     toolUiBindings,
     outDir,
     projectRoot
   );
 
   const uiWidgetBindingsCount = toolUiBindings.size;
-  logger.info(
-    `Generated manifest with ${validTools.length} tools, ${validWorkflows.length} workflows, ${validUis.length} UIs` +
-      (uiWidgetBindingsCount > 0 ? `, ${uiWidgetBindingsCount} UI widget bindings` : "")
-  );
+  const parts = [
+    `${validTools.length} tools`,
+    `${validWorkflows.length} workflows`,
+    `${validUis.length} UIs`,
+  ];
+  if (uiWidgetBindingsCount > 0) {
+    parts.push(`${uiWidgetBindingsCount} UI widget bindings`);
+  }
+  if (validMiddleware.length > 0) {
+    parts.push(`${validMiddleware.length} middleware`);
+  }
+  if (validHandlers.length > 0) {
+    parts.push(`${validHandlers.length} handlers`);
+  }
+  logger.info(`Generated manifest with ${parts.join(", ")}`);
 
   return {
     code,
-    files: [...validTools, ...validWorkflows, ...validUis, ...validUiWidgets],
+    files: [
+      ...validTools,
+      ...validWorkflows,
+      ...validUis,
+      ...validUiWidgets,
+      ...validMiddleware,
+      ...validHandlers,
+    ],
     warnings,
     errors,
   };
@@ -563,9 +693,31 @@ function generateServerCode(configPath: string, port: number = 3000): string {
 
 import { createFileBasedApp } from "@mcp-apps-kit/core";
 import config from "${configImportPath}";
-import { tools } from "./app-manifest.js";
+import { tools, middleware, handlers } from "./app-manifest.js";
 
 export const app = createFileBasedApp({ ...config, tools });
+
+// Register file-based middleware (sorted by order property, then alphabetically)
+const sortedMiddleware = [...middleware].sort((a, b) => {
+  // OrderedMiddleware has { middleware, order } shape
+  // Regular Middleware is just a function
+  const orderA = typeof a === "object" && "order" in a ? a.order : 100;
+  const orderB = typeof b === "object" && "order" in b ? b.order : 100;
+  return orderA - orderB;
+});
+for (const mw of sortedMiddleware) {
+  // Handle both OrderedMiddleware ({ middleware, order }) and plain Middleware
+  const middlewareFn = typeof mw === "object" && "middleware" in mw ? mw.middleware : mw;
+  app.use(middlewareFn);
+}
+
+// Register file-based event handlers
+for (const handler of handlers) {
+  // Handler has { event, handler } shape
+  if (typeof handler === "object" && "event" in handler && "handler" in handler) {
+    app.on(handler.event, handler.handler);
+  }
+}
 
 // Auto-start in non-test environments
 if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
@@ -582,7 +734,7 @@ Endpoints:
 }
 
 // Re-export types for client-side type inference
-export type { AppTools, AppUI } from "./app-manifest.js";
+export type { AppTools, AppUI, AppMiddleware, AppHandlers } from "./app-manifest.js";
 `;
 }
 
@@ -629,6 +781,8 @@ export function getVersionDirectories(
     workflows: dirs.workflows ?? `${root}/workflows`,
     ui: dirs.ui ?? `${root}/ui`,
     uiWidgets: dirs.uiWidgets,
+    middleware: dirs.middleware,
+    handlers: dirs.handlers,
   };
 }
 
@@ -723,7 +877,7 @@ function generateVersionsAggregatorCode(versionKeys: string[]): string {
   // Generate imports for each version
   for (const versionKey of sortedKeys) {
     lines.push(
-      `import { tools as ${versionKey}Tools, workflows as ${versionKey}Workflows, ui as ${versionKey}Ui, uiWidgets as ${versionKey}UiWidgets } from "./${versionKey}/app-manifest.js";`
+      `import { tools as ${versionKey}Tools, workflows as ${versionKey}Workflows, ui as ${versionKey}Ui, uiWidgets as ${versionKey}UiWidgets, middleware as ${versionKey}Middleware, handlers as ${versionKey}Handlers } from "./${versionKey}/app-manifest.js";`
     );
   }
 
@@ -739,6 +893,8 @@ function generateVersionsAggregatorCode(versionKeys: string[]): string {
     lines.push(`    workflows: ${versionKey}Workflows,`);
     lines.push(`    ui: ${versionKey}Ui,`);
     lines.push(`    uiWidgets: ${versionKey}UiWidgets,`);
+    lines.push(`    middleware: ${versionKey}Middleware,`);
+    lines.push(`    handlers: ${versionKey}Handlers,`);
     lines.push(`  },`);
   }
 
@@ -825,6 +981,26 @@ const versionedConfig: VersionsConfig = {
 };
 
 export const app = createApp(versionedConfig);
+
+// Register file-based middleware from all versions (sorted by order property)
+const allMiddleware = Object.values(versions).flatMap((v) => [...v.middleware]);
+const sortedMiddleware = [...allMiddleware].sort((a, b) => {
+  const orderA = typeof a === "object" && "order" in a ? a.order : 100;
+  const orderB = typeof b === "object" && "order" in b ? b.order : 100;
+  return orderA - orderB;
+});
+for (const mw of sortedMiddleware) {
+  const middlewareFn = typeof mw === "object" && "middleware" in mw ? mw.middleware : mw;
+  app.use(middlewareFn);
+}
+
+// Register file-based event handlers from all versions
+const allHandlers = Object.values(versions).flatMap((v) => [...v.handlers]);
+for (const handler of allHandlers) {
+  if (typeof handler === "object" && "event" in handler && "handler" in handler) {
+    app.on(handler.event, handler.handler);
+  }
+}
 
 // Auto-start in non-test environments
 if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
@@ -986,10 +1162,18 @@ async function runSingleVersionCodegen(
   const workflowCount = result.files.filter((f) => f.type === "workflow").length;
   const uiCount = result.files.filter((f) => f.type === "ui").length;
   const uiWidgetCount = result.files.filter((f) => f.type === "ui-widget").length;
+  const middlewareCount = result.files.filter((f) => f.type === "middleware").length;
+  const handlerCount = result.files.filter((f) => f.type === "handler").length;
 
   const summary = [`${toolCount} tools`, `${workflowCount} workflows`, `${uiCount} UIs`];
   if (uiWidgetCount > 0) {
     summary.push(`${uiWidgetCount} UI widgets`);
+  }
+  if (middlewareCount > 0) {
+    summary.push(`${middlewareCount} middleware`);
+  }
+  if (handlerCount > 0) {
+    summary.push(`${handlerCount} handlers`);
   }
   logger.info(`Generated manifest with ${summary.join(", ")}`);
   logger.info(`Written to: ${outDir}/`);
@@ -1046,10 +1230,18 @@ async function runVersionedCodegen(
     const workflowCount = result.files.filter((f) => f.type === "workflow").length;
     const uiCount = result.files.filter((f) => f.type === "ui").length;
     const uiWidgetCount = result.files.filter((f) => f.type === "ui-widget").length;
+    const middlewareCount = result.files.filter((f) => f.type === "middleware").length;
+    const handlerCount = result.files.filter((f) => f.type === "handler").length;
 
     const summary = [`${toolCount} tools`, `${workflowCount} workflows`, `${uiCount} UIs`];
     if (uiWidgetCount > 0) {
       summary.push(`${uiWidgetCount} UI widgets`);
+    }
+    if (middlewareCount > 0) {
+      summary.push(`${middlewareCount} middleware`);
+    }
+    if (handlerCount > 0) {
+      summary.push(`${handlerCount} handlers`);
     }
     logger.info(`[${versionKey}] Generated manifest with ${summary.join(", ")}`);
   }

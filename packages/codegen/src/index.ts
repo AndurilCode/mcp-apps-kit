@@ -107,6 +107,18 @@ export {
   VALID_EXTENSIONS,
 } from "./naming";
 
+// File-based middleware and event handler helpers
+export { defineMiddleware, defineOrderedMiddleware, defineHandler, Events } from "./helpers";
+export type {
+  MiddlewareDefinition,
+  BeforeHook,
+  AfterHook,
+  WrapMiddleware,
+  FileBasedMiddlewareDefinition,
+  OrderedMiddleware,
+  HandlerDefinition,
+} from "./helpers";
+
 /**
  * Vite plugin for file-based MCP application development
  *
