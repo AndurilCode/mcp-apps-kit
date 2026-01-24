@@ -116,8 +116,12 @@ const VERSION_KEY_PATTERN = /^v\d+$/;
  * (packages/core/src/utils/config-validation.ts). If validation rules change,
  * both locations must be updated to stay in sync.
  *
- * TODO: Consider creating a shared validation utility that can be configured
- * to throw different error types.
+ * TODO: Refactor to use Zod v4 schemas (already in project stack) to eliminate
+ * duplication. Create shared schemas in a common location that:
+ * - Define validation rules once using Zod
+ * - Can be imported by both codegen (throws plain Error) and core (throws AppError)
+ * - Provide automatic TypeScript type inference
+ * See: packages/core uses Zod for OAuthConfigSchema as a reference pattern.
  */
 function validateGlobalConfigFields(globalConfig: Record<string, unknown>, prefix: string): void {
   // Validate protocol

@@ -6,7 +6,7 @@
  */
 
 import * as path from "node:path";
-import type { FSWatcher } from "node:fs";
+import type { FSWatcher as ChokidarFSWatcher } from "chokidar";
 import type { ViteDevServer } from "vite";
 import type {
   DirectoriesConfig,
@@ -206,53 +206,65 @@ export function setupWatcher(server: ViteDevServer, options: WatcherOptions): ()
   }
 
   // Debounce regeneration to avoid multiple rapid regenerations
+  // Queue-based approach: if a regeneration is in progress and new changes come in,
+  // we mark that another regeneration is needed after the current one completes.
   let regenerateTimeout: ReturnType<typeof setTimeout> | null = null;
-  let pendingRegeneration = false;
+  let isRegenerating = false;
+  let regenerationQueued = false;
 
-  const debouncedRegenerate = async () => {
+  const executeRegeneration = async (): Promise<void> => {
+    isRegenerating = true;
+    regenerationQueued = false;
+
+    try {
+      await onRegenerate();
+      // Trigger HMR by invalidating the manifest module(s)
+      if (isVersioned) {
+        // For versioned configs, invalidate the versions-manifest
+        const versionsManifestModule = server.moduleGraph.getModuleById(
+          path.resolve(projectRoot, "__generated__/versions-manifest.ts")
+        );
+        if (versionsManifestModule) {
+          server.moduleGraph.invalidateModule(versionsManifestModule);
+        }
+      } else {
+        // For single-version, invalidate app-manifest
+        const manifestModule = server.moduleGraph.getModuleById(
+          path.resolve(projectRoot, "__generated__/app-manifest.ts")
+        );
+        if (manifestModule) {
+          server.moduleGraph.invalidateModule(manifestModule);
+        }
+      }
+      server.ws.send({
+        type: "full-reload",
+        path: "*",
+      });
+    } catch (error: unknown) {
+      logger.error(
+        `Failed to regenerate manifest: ${error instanceof Error ? error.message : String(error)}`
+      );
+    } finally {
+      isRegenerating = false;
+      // If another regeneration was requested while we were running, execute it now
+      if (regenerationQueued) {
+        void executeRegeneration();
+      }
+    }
+  };
+
+  const debouncedRegenerate = () => {
     if (regenerateTimeout) {
       clearTimeout(regenerateTimeout);
     }
 
     regenerateTimeout = setTimeout(() => {
-      if (pendingRegeneration) {
+      if (isRegenerating) {
+        // A regeneration is already in progress, queue another one
+        regenerationQueued = true;
         return;
       }
-      pendingRegeneration = true;
-
-      onRegenerate()
-        .then(() => {
-          // Trigger HMR by invalidating the manifest module(s)
-          if (isVersioned) {
-            // For versioned configs, invalidate the versions-manifest
-            const versionsManifestModule = server.moduleGraph.getModuleById(
-              path.resolve(projectRoot, "__generated__/versions-manifest.ts")
-            );
-            if (versionsManifestModule) {
-              server.moduleGraph.invalidateModule(versionsManifestModule);
-            }
-          } else {
-            // For single-version, invalidate app-manifest
-            const manifestModule = server.moduleGraph.getModuleById(
-              path.resolve(projectRoot, "__generated__/app-manifest.ts")
-            );
-            if (manifestModule) {
-              server.moduleGraph.invalidateModule(manifestModule);
-            }
-          }
-          server.ws.send({
-            type: "full-reload",
-            path: "*",
-          });
-        })
-        .catch((error: unknown) => {
-          logger.error(
-            `Failed to regenerate manifest: ${error instanceof Error ? error.message : String(error)}`
-          );
-        })
-        .finally(() => {
-          pendingRegeneration = false;
-        });
+      void executeRegeneration();
     }, 100);
   };
 
@@ -275,7 +287,7 @@ export function setupWatcher(server: ViteDevServer, options: WatcherOptions): ()
 
     if (shouldTriggerRegeneration(eventType, filePath)) {
       logger.info(`File ${eventType}: ${path.relative(projectRoot, filePath)}`);
-      void debouncedRegenerate();
+      debouncedRegenerate();
     }
   };
 
@@ -296,7 +308,7 @@ export function setupWatcher(server: ViteDevServer, options: WatcherOptions): ()
 /**
  * Create a standalone watcher (for use outside of Vite)
  *
- * Uses Node.js fs.watch for standalone watching.
+ * Uses chokidar for cross-platform file watching (including Linux).
  * This is useful for CLI tools or build scripts.
  * Supports both single-version and versioned configurations.
  *
@@ -308,8 +320,8 @@ export async function createStandaloneWatcher(
 ): Promise<{ close: () => void }> {
   const { projectRoot, directories = {}, config, onRegenerate, logger = defaultLogger } = options;
 
-  const fs = await import("node:fs");
-  const watchers: FSWatcher[] = [];
+  // Dynamically import chokidar for cross-platform file watching
+  const chokidar = await import("chokidar");
 
   // Determine directories to watch based on config type
   let dirsToWatch: string[];
@@ -347,52 +359,52 @@ export async function createStandaloneWatcher(
     }, 100);
   };
 
-  // Set up watchers for each directory
-  // Note: fs.watch with { recursive: true } is not supported on Linux
-  const supportsRecursive = process.platform !== "linux";
-
-  if (!supportsRecursive) {
-    logger.warn(
-      "Recursive file watching is not supported on Linux. " +
-        "Consider using a tool like chokidar for cross-platform recursive watching."
-    );
-  }
-
-  for (const dir of dirsToWatch) {
+  // Filter to only include directories that exist
+  const fs = await import("node:fs");
+  const existingDirs = dirsToWatch.filter((dir) => {
     try {
-      const watchOptions = supportsRecursive ? { recursive: true } : {};
-      const watcher = fs.watch(dir, watchOptions, (_eventType, filename) => {
-        if (!filename) return;
-
-        const filePath = path.join(dir, filename);
-
-        if (hasValidExtension(filePath) && !shouldSkipFile(filePath)) {
-          logger.info(`File changed: ${path.relative(projectRoot, filePath)}`);
-          debouncedRegenerate();
-        }
-      });
-
-      watchers.push(watcher);
-    } catch (error) {
-      // Directory doesn't exist - that's OK, but log other errors
-      const isENOENT =
-        error instanceof Error && "code" in error && (error as { code?: string }).code === "ENOENT";
-      if (!isENOENT) {
-        logger.warn(
-          `Failed to watch directory ${dir}: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
+      return fs.existsSync(dir);
+    } catch {
+      return false;
     }
-  }
+  });
+
+  // Create chokidar watcher with cross-platform settings
+  const watcher: ChokidarFSWatcher = chokidar.watch(existingDirs, {
+    ignored: (filePath: string) => {
+      // Skip files we shouldn't process
+      if (shouldSkipFile(filePath)) return true;
+      // Only watch files with valid extensions (or directories)
+      const isDir = fs.existsSync(filePath) && fs.statSync(filePath).isDirectory();
+      if (!isDir && !hasValidExtension(filePath)) return true;
+      return false;
+    },
+    persistent: true,
+    ignoreInitial: true, // Don't fire events for existing files on startup
+  });
+
+  // Handle file add/unlink events
+  watcher.on("add", (filePath: string) => {
+    logger.info(`File added: ${path.relative(projectRoot, filePath)}`);
+    debouncedRegenerate();
+  });
+
+  watcher.on("unlink", (filePath: string) => {
+    logger.info(`File removed: ${path.relative(projectRoot, filePath)}`);
+    debouncedRegenerate();
+  });
+
+  watcher.on("error", (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`Watcher error: ${message}`);
+  });
 
   return {
     close: () => {
       if (regenerateTimeout) {
         clearTimeout(regenerateTimeout);
       }
-      for (const watcher of watchers) {
-        watcher.close();
-      }
+      void watcher.close();
     },
   };
 }

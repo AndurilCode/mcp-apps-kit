@@ -140,20 +140,22 @@ async function serve(options: ServeOptions = {}): Promise<void> {
     tools: manifest.tools,
   });
 
-  // Register file-based middleware (sorted by order property, then alphabetically)
+  // Register file-based middleware (sorted by order property)
+  // Default order for middleware without explicit order (lower = runs first)
+  const DEFAULT_MIDDLEWARE_ORDER = 100;
+
+  // Type guard to check if item is ordered middleware
+  const isOrderedMiddleware = (item: unknown): item is { middleware: unknown; order: number } =>
+    typeof item === "object" && item !== null && "middleware" in item && "order" in item;
+
   const middlewareList = manifest.middleware ?? [];
   const sortedMiddleware = [...middlewareList].sort((a, b) => {
-    const orderA =
-      typeof a === "object" && a !== null && "order" in a ? (a as { order: number }).order : 100;
-    const orderB =
-      typeof b === "object" && b !== null && "order" in b ? (b as { order: number }).order : 100;
+    const orderA = isOrderedMiddleware(a) ? a.order : DEFAULT_MIDDLEWARE_ORDER;
+    const orderB = isOrderedMiddleware(b) ? b.order : DEFAULT_MIDDLEWARE_ORDER;
     return orderA - orderB;
   });
   for (const mw of sortedMiddleware) {
-    const middlewareFn =
-      typeof mw === "object" && mw !== null && "middleware" in mw
-        ? (mw as { middleware: unknown }).middleware
-        : mw;
+    const middlewareFn = isOrderedMiddleware(mw) ? mw.middleware : mw;
     app.use(middlewareFn);
   }
 

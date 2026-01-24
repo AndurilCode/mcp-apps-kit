@@ -733,21 +733,33 @@ type OrderedMiddleware = { middleware: Middleware; order: number };
 // Middleware can be either a plain function or an ordered middleware object
 type MiddlewareItem = Middleware | OrderedMiddleware;
 
+// Default order for middleware without explicit order (lower = runs first)
+const DEFAULT_MIDDLEWARE_ORDER = 100;
+
+// Type guard to check if item is ordered middleware
+function isOrderedMiddleware(item: MiddlewareItem): item is OrderedMiddleware {
+  return typeof item === "object" && item !== null && "middleware" in item && "order" in item;
+}
+
+// Extract the order value from a middleware item
+function getMiddlewareOrder(item: MiddlewareItem): number {
+  return isOrderedMiddleware(item) ? item.order : DEFAULT_MIDDLEWARE_ORDER;
+}
+
+// Extract the middleware function from a middleware item
+function getMiddlewareFn(item: MiddlewareItem): Middleware {
+  return isOrderedMiddleware(item) ? item.middleware : item;
+}
+
 // Cast config to expected type (defineConfig returns a union type)
 export const app = createFileBasedApp({ ...config, tools } as Parameters<typeof createFileBasedApp>[0]);
 
-// Register file-based middleware (sorted by order property, then alphabetically)
-const sortedMiddleware = ([...middleware] as MiddlewareItem[]).sort((a, b) => {
-  // OrderedMiddleware has { middleware, order } shape
-  // Regular Middleware is just a function
-  const orderA = typeof a === "object" && "order" in a ? a.order : 100;
-  const orderB = typeof b === "object" && "order" in b ? b.order : 100;
-  return orderA - orderB;
-});
+// Register file-based middleware (sorted by order property)
+const sortedMiddleware = ([...middleware] as MiddlewareItem[]).sort(
+  (a, b) => getMiddlewareOrder(a) - getMiddlewareOrder(b)
+);
 for (const mw of sortedMiddleware) {
-  // Handle both OrderedMiddleware ({ middleware, order }) and plain Middleware
-  const middlewareFn = typeof mw === "object" && "middleware" in mw ? mw.middleware : mw;
-  app.use(middlewareFn as Middleware);
+  app.use(getMiddlewareFn(mw));
 }
 
 // Register file-based event handlers
