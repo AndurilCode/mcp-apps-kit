@@ -178,6 +178,7 @@ export function createScreenshotWidgetTool(connectionManager: ConnectionManager)
       // Step 5: Render in browser and take screenshot
       const uiHostManager = new UIHostManager(client);
       const viewport = input.viewport ?? { width: 800, height: 600 };
+      const environmentState = connectionManager.getEnvironmentState();
 
       try {
         const renderResult = await uiHostManager.renderInBrowser(
@@ -185,6 +186,7 @@ export function createScreenshotWidgetTool(connectionManager: ConnectionManager)
           protocol,
           toolResult,
           input.tool,
+          environmentState,
           viewport
         );
 

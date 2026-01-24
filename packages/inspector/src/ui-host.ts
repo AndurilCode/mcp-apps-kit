@@ -9,10 +9,18 @@
 import type { TestClient } from "@mcp-apps-kit/testing";
 import { JSDOM } from "jsdom";
 import { MCP_WIDGET_MIME_TYPE, OPENAI_WIDGET_MIME_TYPE } from "@mcp-apps-kit/core";
-import { MCPHostEmulator, type MCPHostEmulatorOptions } from "./hosts/mcp-host";
-import { OpenAIHostEmulator, type OpenAIHostEmulatorOptions } from "./hosts/openai-host";
+import {
+  MCPHostEmulator,
+  type MCPHostEmulatorOptions,
+  type MCPEnvironmentSettings,
+} from "./hosts/mcp-host";
+import {
+  OpenAIHostEmulator,
+  type OpenAIHostEmulatorOptions,
+  type OpenAIEnvironmentSettings,
+} from "./hosts/openai-host";
 import { WidgetServer } from "./widget-server";
-import type { ElementInfo } from "./types";
+import type { ElementInfo, EnvironmentState } from "./types";
 
 // Playwright types - use dynamic import since it's optional
 type Browser = Awaited<ReturnType<(typeof import("playwright"))["chromium"]["launch"]>>;
@@ -308,6 +316,7 @@ export class UIHostManager {
     protocol: DetectedProtocol,
     toolResult: unknown,
     toolName: string,
+    environmentState?: EnvironmentState,
     waitMs = 100
   ): Promise<HeadlessRenderResult> {
     const errors: string[] = [];
@@ -328,17 +337,49 @@ export class UIHostManager {
     let openaiEmulator: OpenAIHostEmulator | undefined;
 
     if (protocol === "mcp") {
+      const mcpEnv: MCPEnvironmentSettings | undefined = environmentState
+        ? {
+            theme: environmentState.theme,
+            locale: environmentState.locale,
+            timeZone: environmentState.timeZone,
+            displayMode: environmentState.displayMode,
+            viewport: environmentState.viewport,
+            maxHeight: environmentState.maxHeight,
+            platform:
+              environmentState.userAgent?.device?.type === "mobile"
+                ? "mobile"
+                : environmentState.userAgent?.device?.type === "tablet"
+                  ? "web"
+                  : "desktop",
+          }
+        : undefined;
+
       const options: MCPHostEmulatorOptions = {
         toolName,
         toolResult,
+        environment: mcpEnv,
         debug: this.options.debug,
       };
       mcpEmulator = new MCPHostEmulator(options);
       mcpEmulator.injectIntoJSDOM({ window: win as unknown as Window });
     } else {
+      const openaiEnv: OpenAIEnvironmentSettings | undefined = environmentState
+        ? {
+            theme: environmentState.theme,
+            locale: environmentState.locale,
+            displayMode: environmentState.displayMode,
+            viewport: environmentState.viewport,
+            maxHeight: environmentState.maxHeight,
+            safeAreaInsets: environmentState.safeAreaInsets,
+            userAgent: environmentState.userAgent,
+            userLocation: environmentState.userLocation,
+          }
+        : undefined;
+
       const options: OpenAIHostEmulatorOptions = {
         toolName,
         toolResult,
+        environment: openaiEnv,
         debug: this.options.debug,
       };
       openaiEmulator = new OpenAIHostEmulator(options);
@@ -398,14 +439,18 @@ export class UIHostManager {
     protocol: DetectedProtocol,
     toolResult: unknown,
     toolName: string,
+    environmentState?: EnvironmentState,
     viewport?: { width: number; height: number }
   ): Promise<BrowserRenderResult> {
     const errors: string[] = [];
     const browser = await this.getBrowser();
     const page = await browser.newPage();
 
+    // Use viewport from environment state if provided, otherwise use parameter or default
+    const effectiveViewport = viewport ?? environmentState?.viewport ?? { width: 800, height: 600 };
+
     // Set viewport
-    await page.setViewportSize(viewport ?? { width: 800, height: 600 });
+    await page.setViewportSize(effectiveViewport);
 
     // Capture console errors
     page.on("pageerror", (err) => {
@@ -420,8 +465,14 @@ export class UIHostManager {
     // Get the widget server (lazy initialization)
     const server = await this.getWidgetServer();
 
-    // Create a session for this widget
-    const { hostUrl, sessionId } = server.createSession(html, toolResult, toolName, protocol);
+    // Create a session for this widget, passing environment state
+    const { hostUrl, sessionId } = server.createSession(
+      html,
+      toolResult,
+      toolName,
+      protocol,
+      environmentState
+    );
 
     // Navigate to the host page (which embeds the widget in an iframe)
     await page.goto(hostUrl, { waitUntil: "networkidle" });

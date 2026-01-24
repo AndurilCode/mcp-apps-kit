@@ -203,7 +203,7 @@ describe("OpenAIHostEmulator", () => {
       toolName: "weather_tool",
       toolResult: { temp: 68 },
       initialState: { count: 0 },
-      theme: "dark",
+      environment: { theme: "dark" },
     });
     dom = new JSDOM("<!DOCTYPE html><html><body></body></html>", {
       runScripts: "dangerously",

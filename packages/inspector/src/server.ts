@@ -27,6 +27,9 @@ import {
   createPreviewUITool,
   createScreenshotWidgetTool,
   createTestWidgetInteractionTool,
+  createSetGlobalsTool,
+  createGetGlobalsTool,
+  createResetGlobalsTool,
 } from "./tools";
 
 /**
@@ -69,6 +72,10 @@ export function createInspectorServer(options: InspectorServerOptions = {}): App
     preview_ui: createPreviewUITool(connectionManager),
     screenshot_widget: createScreenshotWidgetTool(connectionManager),
     test_widget_interaction: createTestWidgetInteractionTool(connectionManager),
+    // Environment Configuration tools
+    set_globals: createSetGlobalsTool(connectionManager),
+    get_globals: createGetGlobalsTool(connectionManager),
+    reset_globals: createResetGlobalsTool(connectionManager),
   };
 
   const app = createApp({

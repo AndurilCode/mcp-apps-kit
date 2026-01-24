@@ -14,6 +14,20 @@ interface JSDOMInterface {
 }
 
 /**
+ * Environment settings for the emulator
+ */
+export interface OpenAIEnvironmentSettings {
+  theme?: "light" | "dark";
+  locale?: string;
+  displayMode?: "inline" | "fullscreen" | "pip";
+  viewport?: { width: number; height: number };
+  maxHeight?: number;
+  safeAreaInsets?: { top: number; right: number; bottom: number; left: number };
+  userAgent?: { device?: { type?: string }; capabilities?: { hover?: boolean; touch?: boolean } };
+  userLocation?: { city?: string; region?: string; country?: string; timezone?: string };
+}
+
+/**
  * Options for configuring the OpenAI host emulator
  */
 export interface OpenAIHostEmulatorOptions {
@@ -23,12 +37,8 @@ export interface OpenAIHostEmulatorOptions {
   toolResult: unknown;
   /** Initial widget state */
   initialState?: unknown;
-  /** Theme (light or dark) */
-  theme?: "light" | "dark";
-  /** Display mode */
-  displayMode?: "inline" | "fullscreen" | "pip";
-  /** Locale */
-  locale?: string;
+  /** Environment settings (theme, locale, device, location, etc.) */
+  environment?: OpenAIEnvironmentSettings;
   /** Enable debug logging */
   debug?: boolean;
 }
@@ -98,9 +108,16 @@ export class OpenAIHostEmulator {
     const toolResult = JSON.stringify(this.options.toolResult);
     const toolName = JSON.stringify(this.options.toolName);
     const initialState = JSON.stringify(this.state);
-    const theme = JSON.stringify(this.options.theme ?? "light");
-    const displayMode = JSON.stringify(this.options.displayMode ?? "inline");
-    const locale = JSON.stringify(this.options.locale ?? "en-US");
+    const env = this.options.environment ?? {};
+    const theme = JSON.stringify(env.theme ?? "light");
+    const displayMode = JSON.stringify(env.displayMode ?? "inline");
+    const locale = JSON.stringify(env.locale ?? "en-US");
+    const maxHeight = env.maxHeight ?? null;
+    const safeArea = JSON.stringify(env.safeAreaInsets ?? { top: 0, right: 0, bottom: 0, left: 0 });
+    const userAgent = JSON.stringify(
+      env.userAgent ?? { device: { type: "desktop" }, capabilities: { hover: true, touch: false } }
+    );
+    const userLocation = env.userLocation ? JSON.stringify(env.userLocation) : "undefined";
 
     return `
       // OpenAI Host Emulator for Playwright
@@ -133,8 +150,10 @@ export class OpenAIHostEmulator {
           theme: ${theme},
           displayMode: ${displayMode},
           locale: ${locale},
-          maxHeight: 600,
-          safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
+          maxHeight: ${maxHeight},
+          safeArea: ${safeArea},
+          userAgent: ${userAgent},
+          userLocation: ${userLocation},
 
           // State management
           getState: function() {
@@ -208,6 +227,10 @@ export class OpenAIHostEmulator {
                 theme: ${theme},
                 displayMode: ${displayMode},
                 locale: ${locale},
+                maxHeight: ${maxHeight},
+                safeArea: ${safeArea},
+                userAgent: ${userAgent},
+                userLocation: ${userLocation},
               },
             },
           }));
@@ -221,6 +244,7 @@ export class OpenAIHostEmulator {
    */
   private createOpenAISDKForWindow(debug: boolean): Record<string, unknown> {
     const toolOutputStr = JSON.stringify(this.options.toolResult);
+    const env = this.options.environment ?? {};
 
     return {
       // Tool output as JSON string (ChatGPT convention)
@@ -235,11 +259,16 @@ export class OpenAIHostEmulator {
       },
 
       // Context properties
-      theme: this.options.theme ?? "light",
-      displayMode: this.options.displayMode ?? "inline",
-      locale: this.options.locale ?? "en-US",
-      maxHeight: 600,
-      safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
+      theme: env.theme ?? "light",
+      displayMode: env.displayMode ?? "inline",
+      locale: env.locale ?? "en-US",
+      maxHeight: env.maxHeight ?? null,
+      safeArea: env.safeAreaInsets ?? { top: 0, right: 0, bottom: 0, left: 0 },
+      userAgent: env.userAgent ?? {
+        device: { type: "desktop" },
+        capabilities: { hover: true, touch: false },
+      },
+      userLocation: env.userLocation,
 
       // State management (arrow functions preserve 'this' binding)
       getState: () => this.state,
@@ -315,6 +344,7 @@ export class OpenAIHostEmulator {
    * Uses the window's CustomEvent constructor for jsdom compatibility
    */
   private dispatchSetGlobals(win: Window): void {
+    const env = this.options.environment ?? {};
     // Use the window's CustomEvent constructor for jsdom compatibility
     const CustomEventCtor = (win as unknown as { CustomEvent: typeof CustomEvent }).CustomEvent;
     const event = new CustomEventCtor("openai:set_globals", {
@@ -322,9 +352,13 @@ export class OpenAIHostEmulator {
         globals: {
           toolOutput: this.options.toolResult,
           toolResponseMetadata: { toolName: this.options.toolName },
-          theme: this.options.theme ?? "light",
-          displayMode: this.options.displayMode ?? "inline",
-          locale: this.options.locale ?? "en-US",
+          theme: env.theme ?? "light",
+          displayMode: env.displayMode ?? "inline",
+          locale: env.locale ?? "en-US",
+          maxHeight: env.maxHeight,
+          safeArea: env.safeAreaInsets,
+          userAgent: env.userAgent,
+          userLocation: env.userLocation,
         },
       },
     });
