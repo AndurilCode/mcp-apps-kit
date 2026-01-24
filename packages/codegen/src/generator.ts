@@ -267,6 +267,7 @@ async function analyzeFile(
       loc: true,
       range: true,
       jsx: filePath.endsWith(".tsx") || filePath.endsWith(".jsx"),
+      sourceType: "module",
     });
 
     for (const node of ast.body) {
