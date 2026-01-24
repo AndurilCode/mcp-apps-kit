@@ -198,4 +198,367 @@ describe("WidgetServer", () => {
       expect(server.getPort()).toBeGreaterThan(0);
     });
   });
+
+  describe("new features - production parity", () => {
+    describe("auto-resize with ResizeObserver", () => {
+      it("should inject ResizeObserver into widget runtime", async () => {
+        server = new WidgetServer();
+        await server.start();
+
+        const result = server.createSession(
+          "<html><head></head><body>Widget</body></html>",
+          { temperature: 72 },
+          "get_weather",
+          "openai"
+        );
+
+        const response = await fetch(result.widgetUrl);
+        const body = await response.text();
+
+        expect(body).toContain("ResizeObserver");
+        expect(body).toContain("notifyIntrinsicHeight");
+      });
+    });
+
+    describe("navigation history tracking", () => {
+      it("should inject notifyNavigation API", async () => {
+        server = new WidgetServer();
+        await server.start();
+
+        const result = server.createSession(
+          "<html><head></head><body>Widget</body></html>",
+          {},
+          "test_tool",
+          "openai"
+        );
+
+        const response = await fetch(result.widgetUrl);
+        const body = await response.text();
+
+        expect(body).toContain("notifyNavigation");
+        expect(body).toContain("history.pushState");
+        expect(body).toContain("history.replaceState");
+        expect(body).toContain("popstate");
+      });
+
+      it("should track navigation in host page", async () => {
+        server = new WidgetServer();
+        await server.start();
+
+        const result = server.createSession(
+          "<html><body>Widget</body></html>",
+          {},
+          "test_tool",
+          "openai"
+        );
+
+        const response = await fetch(result.hostUrl);
+        const body = await response.text();
+
+        expect(body).toContain("openai:navigation");
+        expect(body).toContain("window.__hostState.navigations");
+      });
+    });
+
+    describe("enhanced error reporting", () => {
+      it("should inject CSP violation listener", async () => {
+        server = new WidgetServer();
+        await server.start();
+
+        const result = server.createSession(
+          "<html><head></head><body>Widget</body></html>",
+          {},
+          "test_tool",
+          "openai"
+        );
+
+        const response = await fetch(result.widgetUrl);
+        const body = await response.text();
+
+        expect(body).toContain("securitypolicyviolation");
+        expect(body).toContain("openai:cspViolation");
+      });
+
+      it("should inject error listeners", async () => {
+        server = new WidgetServer();
+        await server.start();
+
+        const result = server.createSession(
+          "<html><head></head><body>Widget</body></html>",
+          {},
+          "test_tool",
+          "openai"
+        );
+
+        const response = await fetch(result.widgetUrl);
+        const body = await response.text();
+
+        expect(body).toContain("addEventListener('error'");
+        expect(body).toContain("addEventListener('unhandledrejection'");
+        expect(body).toContain("openai:error");
+      });
+
+      it("should track errors in host page", async () => {
+        server = new WidgetServer();
+        await server.start();
+
+        const result = server.createSession(
+          "<html><body>Widget</body></html>",
+          {},
+          "test_tool",
+          "openai"
+        );
+
+        const response = await fetch(result.hostUrl);
+        const body = await response.text();
+
+        expect(body).toContain("openai:cspViolation");
+        expect(body).toContain("openai:error");
+        expect(body).toContain("window.__hostState.errors");
+        expect(body).toContain("window.__hostState.cspViolations");
+      });
+    });
+
+    describe("modal support", () => {
+      it("should inject requestModal API", async () => {
+        server = new WidgetServer();
+        await server.start();
+
+        const result = server.createSession(
+          "<html><head></head><body>Widget</body></html>",
+          {},
+          "test_tool",
+          "openai"
+        );
+
+        const response = await fetch(result.widgetUrl);
+        const body = await response.text();
+
+        expect(body).toContain("requestModal");
+        expect(body).toContain("_modalId");
+        expect(body).toContain("openai:requestModal");
+        expect(body).toContain("openai:modal:response");
+      });
+
+      it("should handle modal requests in host page", async () => {
+        server = new WidgetServer();
+        await server.start();
+
+        const result = server.createSession(
+          "<html><body>Widget</body></html>",
+          {},
+          "test_tool",
+          "openai"
+        );
+
+        const response = await fetch(result.hostUrl);
+        const body = await response.text();
+
+        expect(body).toContain("openai:requestModal");
+        expect(body).toContain("openai:modal:response");
+        expect(body).toContain("inspector_mock");
+      });
+    });
+
+    describe("display mode enhancements", () => {
+      it("should inject setOpenInAppUrl API", async () => {
+        server = new WidgetServer();
+        await server.start();
+
+        const result = server.createSession(
+          "<html><head></head><body>Widget</body></html>",
+          {},
+          "test_tool",
+          "openai"
+        );
+
+        const response = await fetch(result.widgetUrl);
+        const body = await response.text();
+
+        expect(body).toContain("setOpenInAppUrl");
+        expect(body).toContain("_openInAppUrl");
+        expect(body).toContain("openai:setOpenInAppUrl");
+      });
+
+      it("should enhance requestDisplayMode for all modes", async () => {
+        server = new WidgetServer();
+        await server.start();
+
+        const result = server.createSession(
+          "<html><head></head><body>Widget</body></html>",
+          {},
+          "test_tool",
+          "openai"
+        );
+
+        const response = await fetch(result.widgetUrl);
+        const body = await response.text();
+
+        expect(body).toContain("requestDisplayMode");
+        expect(body).toContain("inline");
+        expect(body).toContain("fullscreen");
+        expect(body).toContain("pip");
+      });
+
+      it("should track setOpenInAppUrl in host page", async () => {
+        server = new WidgetServer();
+        await server.start();
+
+        const result = server.createSession(
+          "<html><body>Widget</body></html>",
+          {},
+          "test_tool",
+          "openai"
+        );
+
+        const response = await fetch(result.hostUrl);
+        const body = await response.text();
+
+        expect(body).toContain("openai:setOpenInAppUrl");
+        expect(body).toContain("window.__hostState.openInAppUrl");
+      });
+    });
+
+    describe("user/session metadata", () => {
+      it("should inject session metadata into runtime", async () => {
+        server = new WidgetServer();
+        await server.start();
+
+        const result = server.createSession(
+          "<html><head></head><body>Widget</body></html>",
+          {},
+          "test_tool",
+          "openai"
+        );
+
+        const response = await fetch(result.widgetUrl);
+        const body = await response.text();
+
+        expect(body).toContain("widgetSessionId");
+        expect(body).toContain("subjectId");
+        expect(body).toContain("sessionId");
+        expect(body).toContain("userLocation");
+        expect(body).toContain("mock-subject-");
+        expect(body).toContain("mock-session-");
+      });
+
+      it("should include locale in metadata", async () => {
+        server = new WidgetServer();
+        await server.start();
+
+        const result = server.createSession(
+          "<html><head></head><body>Widget</body></html>",
+          {},
+          "test_tool",
+          "openai"
+        );
+
+        const response = await fetch(result.widgetUrl);
+        const body = await response.text();
+
+        expect(body).toContain("locale");
+        expect(body).toContain("en-US");
+      });
+
+      it("should include userLocation with default values", async () => {
+        server = new WidgetServer();
+        await server.start();
+
+        const result = server.createSession(
+          "<html><head></head><body>Widget</body></html>",
+          {},
+          "test_tool",
+          "openai"
+        );
+
+        const response = await fetch(result.widgetUrl);
+        const body = await response.text();
+
+        expect(body).toContain("userLocation");
+        expect(body).toContain("Unknown");
+        expect(body).toContain("US");
+        expect(body).toContain("UTC");
+      });
+    });
+
+    describe("storage event sync", () => {
+      it("should inject storage event listeners", async () => {
+        server = new WidgetServer();
+        await server.start();
+
+        const result = server.createSession(
+          "<html><head></head><body>Widget</body></html>",
+          {},
+          "test_tool",
+          "openai"
+        );
+
+        const response = await fetch(result.widgetUrl);
+        const body = await response.text();
+
+        expect(body).toContain("addEventListener('storage'");
+        expect(body).toContain("openai:storageChange");
+        expect(body).toContain("openai:syncStorage");
+      });
+
+      it("should track storage changes in host page", async () => {
+        server = new WidgetServer();
+        await server.start();
+
+        const result = server.createSession(
+          "<html><body>Widget</body></html>",
+          {},
+          "test_tool",
+          "openai"
+        );
+
+        const response = await fetch(result.hostUrl);
+        const body = await response.text();
+
+        expect(body).toContain("openai:storageChange");
+        expect(body).toContain("window.__hostState.storageChanges");
+      });
+    });
+
+    describe("enhanced file APIs", () => {
+      it("should inject enhanced uploadFile implementation", async () => {
+        server = new WidgetServer();
+        await server.start();
+
+        const result = server.createSession(
+          "<html><head></head><body>Widget</body></html>",
+          {},
+          "test_tool",
+          "openai"
+        );
+
+        const response = await fetch(result.widgetUrl);
+        const body = await response.text();
+
+        expect(body).toContain("uploadFile");
+        expect(body).toContain("_uploadedFiles");
+        expect(body).toContain("FileReader");
+        expect(body).toContain("readAsDataURL");
+      });
+
+      it("should inject enhanced getFileDownloadUrl implementation", async () => {
+        server = new WidgetServer();
+        await server.start();
+
+        const result = server.createSession(
+          "<html><head></head><body>Widget</body></html>",
+          {},
+          "test_tool",
+          "openai"
+        );
+
+        const response = await fetch(result.widgetUrl);
+        const body = await response.text();
+
+        expect(body).toContain("getFileDownloadUrl");
+        expect(body).toContain("_uploadedFiles.get");
+        expect(body).toContain("dataUrl");
+      });
+    });
+  });
 });
