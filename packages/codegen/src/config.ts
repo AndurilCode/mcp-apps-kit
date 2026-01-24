@@ -107,7 +107,17 @@ const VERSION_KEY_PATTERN = /^v\d+$/;
 
 /**
  * Validate global config fields (protocol, cors, debug, serverRoute)
- * Lightweight version for codegen package that uses plain Error instead of AppError
+ *
+ * This is a lightweight version for the codegen package that uses plain Error
+ * instead of AppError from core. This avoids importing error infrastructure
+ * for simple CLI tooling.
+ *
+ * NOTE: This validation logic is duplicated from @mcp-apps-kit/core
+ * (packages/core/src/utils/config-validation.ts). If validation rules change,
+ * both locations must be updated to stay in sync.
+ *
+ * TODO: Consider creating a shared validation utility that can be configured
+ * to throw different error types.
  */
 function validateGlobalConfigFields(globalConfig: Record<string, unknown>, prefix: string): void {
   // Validate protocol

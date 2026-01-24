@@ -5,7 +5,6 @@
  * Built by vite plugin into self-contained HTML.
  */
 
-import React from "react";
 import {
   useToolResult,
   useHostContext,

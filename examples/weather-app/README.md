@@ -12,12 +12,12 @@ This example showcases the file-based convention pattern where tools are discove
 
 ## Tools
 
-| Tool                  | File                           | Description                                                               |
-| --------------------- | ------------------------------ | ------------------------------------------------------------------------- |
-| `get_current_weather` | `tools/get-current-weather.ts` | Returns current temperature, humidity, wind, and conditions               |
-| `get_forecast`        | `tools/get-forecast.ts`        | Returns daily forecast with high/low temps, precipitation, sunrise/sunset |
-| `get_weather_alerts`  | `tools/get-weather-alerts.ts`  | Returns active weather warnings, watches, and advisories                  |
-| `daily_briefing`      | `tools/daily-briefing.ts`      | Generates comprehensive morning weather briefing                          |
+| Tool                | File                           | Description                                                               |
+| ------------------- | ------------------------------ | ------------------------------------------------------------------------- |
+| `getCurrentWeather` | `tools/get-current-weather.ts` | Returns current temperature, humidity, wind, and conditions               |
+| `getForecast`       | `tools/get-forecast.ts`        | Returns daily forecast with high/low temps, precipitation, sunrise/sunset |
+| `getWeatherAlerts`  | `tools/get-weather-alerts.ts`  | Returns active weather warnings, watches, and advisories                  |
+| `dailyBriefing`     | `workflows/daily-briefing.ts`  | Generates comprehensive morning weather briefing                          |
 
 ## Project Structure
 
@@ -26,11 +26,11 @@ weather-app/
 ├── mcp.config.ts              # App configuration
 ├── tools/
 │   ├── _shared.ts             # Shared schemas and services (not a tool)
-│   ├── get-current-weather.ts # → get_current_weather tool + UI
-│   ├── get-forecast.ts        # → get_forecast tool + UI
-│   └── get-weather-alerts.ts  # → get_weather_alerts tool + UI
+│   ├── get-current-weather.ts # → getCurrentWeather tool
+│   ├── get-forecast.ts        # → getForecast tool
+│   └── get-weather-alerts.ts  # → getWeatherAlerts tool
 ├── workflows/
-│   └── daily-briefing.ts      # → daily_briefing tool (workflow)
+│   └── daily-briefing.ts      # → dailyBriefing workflow
 ├── __generated__/             # Auto-generated (gitignored)
 │   └── app-manifest.ts        # Typed tool imports
 ├── server/
@@ -50,10 +50,11 @@ The `workflows/` directory is for organizing complex, multi-step tools separatel
 
 ## Naming Convention
 
-Files are automatically converted to tool names:
+Files are automatically converted to camelCase tool names:
 
-- `get-current-weather.ts` → `get_current_weather`
-- `daily-briefing.ts` → `daily_briefing`
+- `get-current-weather.ts` → `getCurrentWeather`
+- `daily-briefing.ts` → `dailyBriefing`
+- `SearchResults.tsx` → `searchResults`
 - Files starting with `_` are ignored (e.g., `_shared.ts`)
 
 ## Development

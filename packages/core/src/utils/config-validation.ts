@@ -1,8 +1,11 @@
 /**
  * Shared configuration validation utilities
  *
- * Used by both @mcp-apps-kit/core and @mcp-apps-kit/codegen to ensure
- * consistent validation logic across the framework.
+ * Used by @mcp-apps-kit/core for runtime configuration validation.
+ *
+ * NOTE: A lightweight version of this validation exists in @mcp-apps-kit/codegen
+ * (packages/codegen/src/config.ts) that uses plain Error instead of AppError.
+ * If validation rules change here, the codegen version must also be updated.
  */
 
 import { AppError, ErrorCode } from "./errors";
