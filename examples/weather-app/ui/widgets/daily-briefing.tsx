@@ -33,9 +33,9 @@ export default function DailyBriefingWidget() {
 
   if (!data || !("briefing" in data) || typeof data.briefing !== "string") {
     return (
-      <div className="weather-card flex flex-col items-center justify-center py-12 px-6 text-center">
-        <span className="text-6xl mb-4 animate-float">📋</span>
-        <p className="text-gray-500 dark:text-gray-400">Waiting for briefing data...</p>
+      <div className="weather-card waiting">
+        <span className="waiting-icon animate-float">📋</span>
+        <p>Waiting for briefing data...</p>
       </div>
     );
   }
@@ -43,32 +43,24 @@ export default function DailyBriefingWidget() {
   return (
     <div className="widget-container">
       <div className="weather-card">
-        <div className="flex items-baseline gap-2 mb-4">
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-            Daily Briefing
-          </h2>
-          <span className="text-sm text-gray-400">{data.location}</span>
+        <div className="weather-header">
+          <h2>Daily Briefing</h2>
+          <span className="country">{data.location}</span>
         </div>
 
-        <pre className="font-sans text-sm leading-relaxed text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-gray-700 p-4 rounded-lg whitespace-pre-wrap break-words overflow-x-auto">
-          {data.briefing}
-        </pre>
+        <pre className="briefing-content">{data.briefing}</pre>
 
         {data.hasAlerts && (
-          <div className="flex items-center gap-2 p-3 mt-3 bg-red-500/10 rounded-lg text-red-500 text-sm font-medium">
-            <span className="text-xl">⚠️</span>
+          <div className="alert-banner">
+            <span>⚠️</span>
             <span>Active weather alerts in this area</span>
           </div>
         )}
 
-        <p className="text-xs text-gray-400 text-center mt-3">
-          Generated: {new Date(data.generatedAt).toLocaleString()}
-        </p>
+        <p className="timestamp">Generated: {new Date(data.generatedAt).toLocaleString()}</p>
       </div>
 
-      <footer className="text-center text-xs text-gray-400 pt-4 mt-2 border-t border-gray-200 dark:border-gray-700">
-        Theme: {context.theme}
-      </footer>
+      <footer className="meta">Theme: {context.theme}</footer>
     </div>
   );
 }

@@ -37,11 +37,129 @@
  */
 
 import type { Plugin, ResolvedConfig } from "vite";
+import type { AcceptedPlugin } from "postcss";
 import * as esbuild from "esbuild";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { generateHTML } from "./html";
 import { parseReactUIDefinitions } from "./ast-parser";
+
+/**
+ * Process CSS through PostCSS if available.
+ *
+ * This function dynamically imports postcss and loads the project's
+ * postcss.config.js to process Tailwind and other PostCSS plugins.
+ *
+ * @param css - Raw CSS content
+ * @param cssPath - Path to the CSS file (for source maps)
+ * @param root - Project root directory
+ * @param logger - Logger for warnings
+ * @returns Processed CSS or original if PostCSS not available
+ */
+async function processPostCSS(
+  css: string,
+  cssPath: string,
+  root: string,
+  logger: PluginLogger
+): Promise<string> {
+  try {
+    // Try to dynamically import postcss
+    const postcssModule = await import("postcss").catch(() => null);
+    if (!postcssModule) {
+      logger.warn(
+        "[mcp-react-ui] postcss not found. CSS will not be processed through Tailwind. " +
+          "Install postcss to enable CSS processing."
+      );
+      return css;
+    }
+
+    const postcss = postcssModule.default;
+
+    // Try to load postcss config from various locations
+    const configPaths = [
+      path.join(path.dirname(cssPath), "postcss.config.js"),
+      path.join(path.dirname(cssPath), "postcss.config.cjs"),
+      path.join(path.dirname(cssPath), "postcss.config.mjs"),
+      path.join(root, "postcss.config.js"),
+      path.join(root, "postcss.config.cjs"),
+      path.join(root, "postcss.config.mjs"),
+    ];
+
+    let plugins: AcceptedPlugin[] = [];
+
+    for (const configPath of configPaths) {
+      try {
+        await fs.access(configPath);
+        // Config exists, try to load it
+        const configModule = await import(/* @vite-ignore */ `file://${configPath}`);
+        const config = configModule.default || configModule;
+
+        if (config.plugins) {
+          // Handle different plugin formats
+          if (Array.isArray(config.plugins)) {
+            plugins = config.plugins as AcceptedPlugin[];
+          } else if (typeof config.plugins === "object") {
+            // Object format: { '@tailwindcss/postcss': {} }
+            for (const [pluginName, pluginOptions] of Object.entries(config.plugins)) {
+              try {
+                const pluginModule = await import(/* @vite-ignore */ pluginName);
+                const plugin = pluginModule.default || pluginModule;
+                plugins.push(
+                  (typeof plugin === "function" ? plugin(pluginOptions) : plugin) as AcceptedPlugin
+                );
+              } catch (pluginError) {
+                logger.warn(
+                  `[mcp-react-ui] Could not load PostCSS plugin "${pluginName}": ${
+                    pluginError instanceof Error ? pluginError.message : String(pluginError)
+                  }`
+                );
+              }
+            }
+          }
+        }
+        break;
+      } catch {
+        // Config not found at this path, try next
+        continue;
+      }
+    }
+
+    if (plugins.length === 0) {
+      // No plugins found, try to load @tailwindcss/postcss directly
+      try {
+        const tailwindModule = await import("@tailwindcss/postcss").catch(() => null);
+        if (tailwindModule) {
+          const tailwind = tailwindModule.default || tailwindModule;
+          plugins = [(typeof tailwind === "function" ? tailwind({}) : tailwind) as AcceptedPlugin];
+        }
+      } catch {
+        // Tailwind postcss plugin not available
+      }
+    }
+
+    if (plugins.length === 0) {
+      logger.warn(
+        "[mcp-react-ui] No PostCSS plugins configured. CSS will not be processed through Tailwind."
+      );
+      return css;
+    }
+
+    // Process CSS through PostCSS
+    const result = await postcss(plugins).process(css, {
+      from: cssPath,
+      to: cssPath,
+    });
+
+    return result.css;
+  } catch (error) {
+    logger.warn(
+      `[mcp-react-ui] PostCSS processing failed: ${
+        error instanceof Error ? error.message : String(error)
+      }. Using raw CSS.`
+    );
+    return css;
+  }
+}
 
 /**
  * Logger interface for the MCP React UI plugin.
@@ -342,12 +460,14 @@ async function buildDiscoveredUIs(
   const outDir = options.outDir ?? "./dist/ui";
   const serverConfig = options.serverConfig ?? {};
 
-  // Load global CSS if specified
+  // Load and process global CSS if specified
   let globalCss: string | undefined;
   if (options.globalCss) {
     const globalCssPath = path.resolve(root, options.globalCss);
     try {
-      globalCss = await fs.readFile(globalCssPath, "utf-8");
+      const rawCss = await fs.readFile(globalCssPath, "utf-8");
+      // Process CSS through PostCSS (for Tailwind, etc.)
+      globalCss = await processPostCSS(rawCss, globalCssPath, root, logger);
     } catch (error) {
       logger.warn(
         `[mcp-react-ui] globalCss file not found or unreadable: ${globalCssPath} - ${

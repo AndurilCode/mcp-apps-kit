@@ -27,9 +27,9 @@ export default function CurrentWeatherWidget() {
 
   if (!data || !("temperature" in data)) {
     return (
-      <div className="weather-card flex flex-col items-center justify-center py-12 px-6 text-center">
-        <span className="text-6xl mb-4 animate-float">🌤️</span>
-        <p className="text-gray-500 dark:text-gray-400">Waiting for weather data...</p>
+      <div className="weather-card waiting">
+        <span className="waiting-icon animate-float">🌤️</span>
+        <p>Waiting for weather data...</p>
       </div>
     );
   }
@@ -40,37 +40,29 @@ export default function CurrentWeatherWidget() {
   return (
     <div className="widget-container">
       <div className="weather-card">
-        <div className="flex items-baseline gap-2 mb-4">
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-            {data.location.name}
-          </h2>
-          {data.location.country && (
-            <span className="text-sm text-gray-400">{data.location.country}</span>
-          )}
+        <div className="weather-header">
+          <h2>{data.location.name}</h2>
+          {data.location.country && <span className="country">{data.location.country}</span>}
         </div>
 
-        <div className="flex items-center gap-4 mb-3">
-          <span className="text-6xl leading-none">{data.icon}</span>
-          <div className="flex flex-col">
-            <span className="text-5xl font-bold leading-none text-gray-900 dark:text-gray-100">
-              {Math.round(data.temperature)}°C
-            </span>
-            <span className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Feels like {Math.round(data.feelsLike)}°C
-            </span>
+        <div className="weather-main">
+          <span className="weather-icon">{data.icon}</span>
+          <div className="temperature">
+            <span className="temp-value">{Math.round(data.temperature)}°C</span>
+            <span className="temp-feels">Feels like {Math.round(data.feelsLike)}°C</span>
           </div>
         </div>
 
-        <p className="text-lg text-gray-500 dark:text-gray-400 mb-4">{data.description}</p>
+        <p className="weather-description">{data.description}</p>
 
-        <div className="grid grid-cols-2 gap-3 p-4 bg-gray-100 dark:bg-gray-700 rounded-xl mb-3">
+        <div className="weather-details">
           <div className="detail-box">
-            <span className="text-2xl mb-1">💧</span>
+            <span className="detail-icon">💧</span>
             <span className="detail-label">Humidity</span>
             <span className="detail-value">{data.humidity}%</span>
           </div>
           <div className="detail-box">
-            <span className="text-2xl mb-1">💨</span>
+            <span className="detail-icon">💨</span>
             <span className="detail-label">Wind</span>
             <span className="detail-value">
               {Math.round(data.windSpeed)} km/h {windDir}
@@ -78,14 +70,10 @@ export default function CurrentWeatherWidget() {
           </div>
         </div>
 
-        <p className="text-xs text-gray-400 text-center mt-3">
-          Updated: {new Date(data.timestamp).toLocaleString()}
-        </p>
+        <p className="timestamp">Updated: {new Date(data.timestamp).toLocaleString()}</p>
       </div>
 
-      <footer className="text-center text-xs text-gray-400 pt-4 mt-2 border-t border-gray-200 dark:border-gray-700">
-        Theme: {context.theme}
-      </footer>
+      <footer className="meta">Theme: {context.theme}</footer>
     </div>
   );
 }

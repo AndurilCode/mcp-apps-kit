@@ -434,12 +434,18 @@ importers:
       '@mcp-apps-kit/ui-react':
         specifier: workspace:*
         version: link:../ui-react
+      '@tailwindcss/postcss':
+        specifier: ^4.1.18
+        version: 4.1.18
       '@types/react':
         specifier: ^19.2.8
         version: 19.2.8
       '@types/react-dom':
         specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.8)
+      postcss:
+        specifier: ^8.5.6
+        version: 8.5.6
       react:
         specifier: ^19.2.3
         version: 19.2.3
