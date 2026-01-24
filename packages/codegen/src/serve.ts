@@ -10,8 +10,9 @@
 import * as path from "node:path";
 import { createJiti } from "jiti";
 import { runCodegen } from "./generator.js";
-import { loadConfig } from "./config.js";
+import { loadConfig, isVersionedConfig } from "./config.js";
 import { createStandaloneWatcher } from "./watcher.js";
+import type { FileBasedConfig } from "./types.js";
 import type { ToolDefs } from "@mcp-apps-kit/core";
 
 interface ServeOptions {
@@ -68,7 +69,18 @@ async function serve(options: ServeOptions = {}): Promise<void> {
   });
 
   // Step 2: Load config
-  const config = await loadConfig(configPath, projectRoot);
+  const loadedConfig = await loadConfig(configPath, projectRoot);
+
+  // Check for versioned config - serve command doesn't support it yet
+  if (isVersionedConfig(loadedConfig)) {
+    throw new Error(
+      "mcp-serve does not support versioned configurations yet. " +
+        "Use single-version config or run the server directly from __generated__/server.ts"
+    );
+  }
+
+  // At this point we know it's a single-version config
+  const config: FileBasedConfig = loadedConfig;
 
   // Step 3: Import the manifest using jiti (supports TypeScript)
   const manifestPath = path.resolve(projectRoot, outDir, "app-manifest.ts");

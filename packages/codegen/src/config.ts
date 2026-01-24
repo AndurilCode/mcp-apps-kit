@@ -8,7 +8,13 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { createJiti } from "jiti";
-import type { FileBasedConfig, PluginLogger } from "./types";
+import type {
+  FileBasedConfig,
+  FileBasedConfigInput,
+  FileBasedVersionConfig,
+  PluginLogger,
+  VersionedFileBasedConfig,
+} from "./types";
 import { defaultLogger as createDefaultLogger } from "./utils/logger";
 
 /**
@@ -22,10 +28,10 @@ const defaultLogger: PluginLogger = createDefaultLogger;
  * This is a simple identity function that provides type safety and IDE autocomplete
  * when creating configuration files.
  *
- * @param config - The configuration object
+ * @param config - The configuration object (single-version or multi-version)
  * @returns The same configuration object (for type inference)
  *
- * @example
+ * @example Single-version configuration
  * ```typescript
  * // mcp.config.ts
  * import { defineConfig } from "@mcp-apps-kit/codegen";
@@ -45,10 +51,59 @@ const defaultLogger: PluginLogger = createDefaultLogger;
  *   },
  * });
  * ```
+ *
+ * @example Multi-version configuration
+ * ```typescript
+ * // mcp.config.ts
+ * import { defineConfig } from "@mcp-apps-kit/codegen";
+ *
+ * export default defineConfig({
+ *   name: "my-api",
+ *   config: {
+ *     cors: { origin: true },
+ *   },
+ *   versions: {
+ *     v1: { version: "1.0.0" },
+ *     v2: {
+ *       version: "2.0.0",
+ *       config: { debug: { level: "debug" } },
+ *     },
+ *   },
+ * });
+ * ```
  */
-export function defineConfig(config: FileBasedConfig): FileBasedConfig {
+export function defineConfig(config: FileBasedConfigInput): FileBasedConfigInput {
   return config;
 }
+
+/**
+ * Type guard to check if config is a versioned (multi-version) configuration
+ *
+ * @param config - Configuration to check
+ * @returns True if this is a VersionedFileBasedConfig (has `versions` but no `version`)
+ *
+ * @example
+ * ```typescript
+ * const config = await loadConfig("./mcp.config.ts", projectRoot);
+ * if (isVersionedConfig(config)) {
+ *   // config is VersionedFileBasedConfig
+ *   console.log("Versions:", Object.keys(config.versions));
+ * } else {
+ *   // config is FileBasedConfig
+ *   console.log("Version:", config.version);
+ * }
+ * ```
+ */
+export function isVersionedConfig(
+  config: FileBasedConfigInput
+): config is VersionedFileBasedConfig {
+  return "versions" in config && !("version" in config);
+}
+
+/**
+ * Regular expression pattern for valid version keys (v1, v2, v10, etc.)
+ */
+const VERSION_KEY_PATTERN = /^v\d+$/;
 
 /**
  * Validate global config fields (protocol, cors, debug, serverRoute)
@@ -103,7 +158,160 @@ function validateGlobalConfigFields(globalConfig: Record<string, unknown>, prefi
 }
 
 /**
- * Validate a configuration object
+ * Validate version directories configuration
+ */
+function validateVersionDirectoriesConfig(dirs: Record<string, unknown>, prefix: string): void {
+  if (dirs.root !== undefined && typeof dirs.root !== "string") {
+    throw new Error(`${prefix}.root must be a string`);
+  }
+  if (dirs.tools !== undefined && typeof dirs.tools !== "string") {
+    throw new Error(`${prefix}.tools must be a string`);
+  }
+  if (dirs.workflows !== undefined && typeof dirs.workflows !== "string") {
+    throw new Error(`${prefix}.workflows must be a string`);
+  }
+  if (dirs.ui !== undefined && typeof dirs.ui !== "string") {
+    throw new Error(`${prefix}.ui must be a string`);
+  }
+  if (dirs.uiWidgets !== undefined && typeof dirs.uiWidgets !== "string") {
+    throw new Error(`${prefix}.uiWidgets must be a string`);
+  }
+}
+
+/**
+ * Validate a single version configuration
+ */
+function validateVersionConfig(
+  versionConfig: unknown,
+  versionKey: string
+): asserts versionConfig is FileBasedVersionConfig {
+  if (typeof versionConfig !== "object" || versionConfig === null) {
+    throw new Error(`Version '${versionKey}' configuration must be an object`);
+  }
+
+  const cfg = versionConfig as Record<string, unknown>;
+
+  // Required: version field
+  if (typeof cfg.version !== "string" || cfg.version.length === 0) {
+    throw new Error(`Version '${versionKey}' requires a 'version' field (semantic version string)`);
+  }
+
+  // Optional: directories
+  if (cfg.directories !== undefined) {
+    if (typeof cfg.directories !== "object" || cfg.directories === null) {
+      throw new Error(`Version '${versionKey}' 'directories' must be an object`);
+    }
+    validateVersionDirectoriesConfig(
+      cfg.directories as Record<string, unknown>,
+      `Version '${versionKey}' 'directories'`
+    );
+  }
+
+  // Optional: config (allow null for disabling inherited config)
+  if (cfg.config !== undefined && cfg.config !== null) {
+    if (typeof cfg.config !== "object") {
+      throw new Error(`Version '${versionKey}' 'config' must be an object or null`);
+    }
+    // Note: VersionSpecificConfig allows null at any level, so we do light validation
+    const globalConfig = cfg.config as Record<string, unknown>;
+    validateGlobalConfigFields(globalConfig, `Version '${versionKey}' 'config'`);
+  }
+
+  // Optional: plugins
+  if (cfg.plugins !== undefined) {
+    if (!Array.isArray(cfg.plugins)) {
+      throw new Error(`Version '${versionKey}' 'plugins' must be an array`);
+    }
+  }
+}
+
+/**
+ * Validate a versioned (multi-version) configuration object
+ *
+ * @param config - Configuration to validate
+ * @throws Error if configuration is invalid
+ */
+export function validateVersionedConfig(
+  config: unknown
+): asserts config is VersionedFileBasedConfig {
+  if (typeof config !== "object" || config === null) {
+    throw new Error("Configuration must be an object");
+  }
+
+  const cfg = config as Record<string, unknown>;
+
+  // Required: name
+  if (typeof cfg.name !== "string" || cfg.name.length === 0) {
+    throw new Error("Configuration 'name' is required and must be a non-empty string");
+  }
+
+  // Required: versions
+  if (cfg.versions === undefined) {
+    throw new Error("Versioned configuration requires a 'versions' field");
+  }
+  if (typeof cfg.versions !== "object" || cfg.versions === null) {
+    throw new Error("Configuration 'versions' must be an object");
+  }
+
+  const versions = cfg.versions as Record<string, unknown>;
+  const versionKeys = Object.keys(versions);
+
+  if (versionKeys.length === 0) {
+    throw new Error("Configuration 'versions' must contain at least one version");
+  }
+
+  // Validate each version key and config
+  for (const versionKey of versionKeys) {
+    // Validate version key format (v1, v2, etc.)
+    if (!VERSION_KEY_PATTERN.test(versionKey)) {
+      throw new Error(
+        `Invalid version key '${versionKey}'. Version keys must match pattern 'v{number}' (e.g., v1, v2, v10)`
+      );
+    }
+
+    validateVersionConfig(versions[versionKey], versionKey);
+  }
+
+  // Optional: global config
+  if (cfg.config !== undefined) {
+    if (typeof cfg.config !== "object" || cfg.config === null) {
+      throw new Error("Configuration 'config' must be an object");
+    }
+    const globalConfig = cfg.config as Record<string, unknown>;
+    validateGlobalConfigFields(globalConfig, "Configuration 'config'");
+  }
+
+  // Optional: plugins
+  if (cfg.plugins !== undefined) {
+    if (!Array.isArray(cfg.plugins)) {
+      throw new Error("Configuration 'plugins' must be an array");
+    }
+  }
+
+  // Optional: icon
+  if (cfg.icon !== undefined && typeof cfg.icon !== "string") {
+    throw new Error("Configuration 'icon' must be a string");
+  }
+
+  // Optional: icons
+  if (cfg.icons !== undefined) {
+    if (!Array.isArray(cfg.icons)) {
+      throw new Error("Configuration 'icons' must be an array");
+    }
+    for (const icon of cfg.icons as unknown[]) {
+      if (typeof icon !== "object" || icon === null) {
+        throw new Error("Each icon must be an object");
+      }
+      const iconObj = icon as Record<string, unknown>;
+      if (typeof iconObj.src !== "string") {
+        throw new Error("Each icon must have a 'src' string property");
+      }
+    }
+  }
+}
+
+/**
+ * Validate a configuration object (single-version)
  *
  * @param config - Configuration to validate
  * @throws Error if configuration is invalid
@@ -187,21 +395,45 @@ export function validateConfig(config: unknown): asserts config is FileBasedConf
 }
 
 /**
+ * Validate a configuration object (either single-version or multi-version)
+ *
+ * Detects the config type and applies the appropriate validation.
+ *
+ * @param config - Configuration to validate
+ * @throws Error if configuration is invalid
+ */
+export function validateConfigInput(config: unknown): asserts config is FileBasedConfigInput {
+  if (typeof config !== "object" || config === null) {
+    throw new Error("Configuration must be an object");
+  }
+
+  const cfg = config as Record<string, unknown>;
+
+  // Check if this is a versioned config (has 'versions' but no 'version')
+  if ("versions" in cfg && !("version" in cfg)) {
+    validateVersionedConfig(config);
+  } else {
+    validateConfig(config);
+  }
+}
+
+/**
  * Load configuration from a file path
  *
  * Supports TypeScript and JavaScript config files.
  * Uses jiti for native TypeScript support - no tsx/ts-node required.
+ * Handles both single-version and multi-version configurations.
  *
  * @param configPath - Path to the config file
  * @param projectRoot - Project root directory
  * @param logger - Logger instance
- * @returns Loaded and validated configuration
+ * @returns Loaded and validated configuration (single-version or multi-version)
  */
 export async function loadConfig(
   configPath: string,
   projectRoot: string,
   logger: PluginLogger = defaultLogger
-): Promise<FileBasedConfig> {
+): Promise<FileBasedConfigInput> {
   const absolutePath = path.resolve(projectRoot, configPath);
 
   // Check if file exists
@@ -230,13 +462,23 @@ export async function loadConfig(
     const moduleObj = module as { default?: unknown };
     const config: unknown = moduleObj.default ?? module;
 
-    // Validate the configuration
-    validateConfig(config);
+    // Validate the configuration (handles both single and versioned)
+    validateConfigInput(config);
 
     return config;
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("Configuration")) {
       // Re-throw validation errors as-is
+      throw error;
+    }
+
+    if (
+      error instanceof Error &&
+      (error.message.startsWith("Version '") ||
+        error.message.startsWith("Versioned ") ||
+        error.message.startsWith("Invalid version"))
+    ) {
+      // Re-throw versioned validation errors as-is
       throw error;
     }
 

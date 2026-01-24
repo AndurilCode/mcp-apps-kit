@@ -8,8 +8,14 @@
 import * as path from "node:path";
 import type { FSWatcher } from "node:fs";
 import type { ViteDevServer } from "vite";
-import type { DirectoriesConfig, PluginLogger } from "./types";
+import type {
+  DirectoriesConfig,
+  PluginLogger,
+  VersionedFileBasedConfig,
+  FileBasedConfigInput,
+} from "./types";
 import { hasValidExtension, shouldSkipFile } from "./naming";
+import { getVersionDirectories } from "./generator";
 
 /**
  * Default logger
@@ -32,12 +38,44 @@ const defaultLogger: PluginLogger = {
 export interface WatcherOptions {
   /** Project root directory */
   projectRoot: string;
-  /** Directory configuration */
+  /** Directory configuration (for single-version) */
   directories?: DirectoriesConfig;
+  /** Full config (for versioned config detection) */
+  config?: FileBasedConfigInput;
   /** Callback when manifest needs regeneration */
   onRegenerate: () => Promise<void>;
   /** Logger */
   logger?: PluginLogger;
+}
+
+/**
+ * Check if config is versioned
+ */
+function isVersionedConfig(
+  config: FileBasedConfigInput | undefined
+): config is VersionedFileBasedConfig {
+  return config !== undefined && "versions" in config && !("version" in config);
+}
+
+/**
+ * Get all directories to watch for a versioned config
+ */
+function getVersionedWatchDirs(config: VersionedFileBasedConfig, projectRoot: string): string[] {
+  const dirs: string[] = [];
+
+  for (const [versionKey, versionConfig] of Object.entries(config.versions)) {
+    const versionDirs = getVersionDirectories(versionKey, versionConfig);
+    dirs.push(path.resolve(projectRoot, versionDirs.tools ?? `versions/${versionKey}/tools`));
+    dirs.push(
+      path.resolve(projectRoot, versionDirs.workflows ?? `versions/${versionKey}/workflows`)
+    );
+    dirs.push(path.resolve(projectRoot, versionDirs.ui ?? `versions/${versionKey}/ui`));
+    if (versionDirs.uiWidgets) {
+      dirs.push(path.resolve(projectRoot, versionDirs.uiWidgets));
+    }
+  }
+
+  return dirs;
 }
 
 /**
@@ -98,20 +136,41 @@ function isInWatchedDirectory(
 }
 
 /**
+ * Check if a path is within any of the versioned directories
+ */
+function isInVersionedWatchDirectory(filePath: string, watchDirs: string[]): boolean {
+  const absolutePath = path.resolve(filePath);
+
+  return watchDirs.some((dir) => absolutePath.startsWith(dir + path.sep) || absolutePath === dir);
+}
+
+/**
  * Set up file watching using Vite's built-in watcher
  *
  * Uses Vite's chokidar instance for consistency with other Vite plugins.
+ * Supports both single-version and versioned configurations.
  *
  * @param server - Vite dev server instance
  * @param options - Watcher options
  * @returns Cleanup function to stop watching
  */
 export function setupWatcher(server: ViteDevServer, options: WatcherOptions): () => void {
-  const { projectRoot, directories = {}, onRegenerate, logger = defaultLogger } = options;
+  const { projectRoot, directories = {}, config, onRegenerate, logger = defaultLogger } = options;
 
-  const toolsDir = path.resolve(projectRoot, directories.tools ?? "tools");
-  const workflowsDir = path.resolve(projectRoot, directories.workflows ?? "workflows");
-  const uiDir = path.resolve(projectRoot, directories.ui ?? "ui");
+  // Determine directories to watch based on config type
+  let dirsToWatch: string[];
+  let isVersioned = false;
+
+  if (isVersionedConfig(config)) {
+    isVersioned = true;
+    dirsToWatch = getVersionedWatchDirs(config, projectRoot);
+    logger.info(`Watching versioned directories: ${dirsToWatch.length} paths`);
+  } else {
+    const toolsDir = path.resolve(projectRoot, directories.tools ?? "tools");
+    const workflowsDir = path.resolve(projectRoot, directories.workflows ?? "workflows");
+    const uiDir = path.resolve(projectRoot, directories.ui ?? "ui");
+    dirsToWatch = [toolsDir, workflowsDir, uiDir];
+  }
 
   // Debounce regeneration to avoid multiple rapid regenerations
   let regenerateTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -130,17 +189,28 @@ export function setupWatcher(server: ViteDevServer, options: WatcherOptions): ()
 
       onRegenerate()
         .then(() => {
-          // Trigger HMR by invalidating the manifest module
-          const manifestModule = server.moduleGraph.getModuleById(
-            path.resolve(projectRoot, "__generated__/app-manifest.ts")
-          );
-          if (manifestModule) {
-            server.moduleGraph.invalidateModule(manifestModule);
-            server.ws.send({
-              type: "full-reload",
-              path: "*",
-            });
+          // Trigger HMR by invalidating the manifest module(s)
+          if (isVersioned) {
+            // For versioned configs, invalidate the versions-manifest
+            const versionsManifestModule = server.moduleGraph.getModuleById(
+              path.resolve(projectRoot, "__generated__/versions-manifest.ts")
+            );
+            if (versionsManifestModule) {
+              server.moduleGraph.invalidateModule(versionsManifestModule);
+            }
+          } else {
+            // For single-version, invalidate app-manifest
+            const manifestModule = server.moduleGraph.getModuleById(
+              path.resolve(projectRoot, "__generated__/app-manifest.ts")
+            );
+            if (manifestModule) {
+              server.moduleGraph.invalidateModule(manifestModule);
+            }
           }
+          server.ws.send({
+            type: "full-reload",
+            path: "*",
+          });
         })
         .catch((error: unknown) => {
           logger.error(
@@ -157,11 +227,16 @@ export function setupWatcher(server: ViteDevServer, options: WatcherOptions): ()
   const watcher = server.watcher;
 
   // Add directories to watch
-  watcher.add([toolsDir, workflowsDir, uiDir]);
+  watcher.add(dirsToWatch);
 
   // Handler for file changes
   const handleFileChange = (eventType: "add" | "unlink" | "change") => (filePath: string) => {
-    if (!isInWatchedDirectory(filePath, projectRoot, directories)) {
+    // Check if file is in watched directories
+    const inWatchedDir = isVersioned
+      ? isInVersionedWatchDirectory(filePath, dirsToWatch)
+      : isInWatchedDirectory(filePath, projectRoot, directories);
+
+    if (!inWatchedDir) {
       return;
     }
 
@@ -190,6 +265,7 @@ export function setupWatcher(server: ViteDevServer, options: WatcherOptions): ()
  *
  * Uses Node.js fs.watch for standalone watching.
  * This is useful for CLI tools or build scripts.
+ * Supports both single-version and versioned configurations.
  *
  * @param options - Watcher options
  * @returns Object with cleanup function
@@ -197,14 +273,23 @@ export function setupWatcher(server: ViteDevServer, options: WatcherOptions): ()
 export async function createStandaloneWatcher(
   options: WatcherOptions
 ): Promise<{ close: () => void }> {
-  const { projectRoot, directories = {}, onRegenerate, logger = defaultLogger } = options;
+  const { projectRoot, directories = {}, config, onRegenerate, logger = defaultLogger } = options;
 
   const fs = await import("node:fs");
   const watchers: FSWatcher[] = [];
 
-  const toolsDir = path.resolve(projectRoot, directories.tools ?? "tools");
-  const workflowsDir = path.resolve(projectRoot, directories.workflows ?? "workflows");
-  const uiDir = path.resolve(projectRoot, directories.ui ?? "ui");
+  // Determine directories to watch based on config type
+  let dirsToWatch: string[];
+
+  if (isVersionedConfig(config)) {
+    dirsToWatch = getVersionedWatchDirs(config, projectRoot);
+    logger.info(`Watching versioned directories: ${dirsToWatch.length} paths`);
+  } else {
+    const toolsDir = path.resolve(projectRoot, directories.tools ?? "tools");
+    const workflowsDir = path.resolve(projectRoot, directories.workflows ?? "workflows");
+    const uiDir = path.resolve(projectRoot, directories.ui ?? "ui");
+    dirsToWatch = [toolsDir, workflowsDir, uiDir];
+  }
 
   // Debounce regeneration
   let regenerateTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -223,8 +308,6 @@ export async function createStandaloneWatcher(
   };
 
   // Set up watchers for each directory
-  const dirsToWatch = [toolsDir, workflowsDir, uiDir];
-
   for (const dir of dirsToWatch) {
     try {
       const watcher = fs.watch(dir, { recursive: true }, (_eventType, filename) => {

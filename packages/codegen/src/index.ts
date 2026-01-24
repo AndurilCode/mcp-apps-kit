@@ -41,21 +41,35 @@
 
 import type { Plugin, ResolvedConfig, ViteDevServer } from "vite";
 import * as path from "node:path";
-import type { McpAppsPluginOptions, FileBasedConfig, McpAppsPlugin } from "./types";
-import { generateManifest, writeManifest } from "./generator";
+import type { McpAppsPluginOptions, FileBasedConfigInput, McpAppsPlugin } from "./types";
+import {
+  generateManifest,
+  writeManifest,
+  generateVersionedManifests,
+  writeVersionedManifests,
+  writeVersionsManifest,
+  writeVersionedServer,
+} from "./generator";
 import { setupWatcher } from "./watcher";
-import { loadConfig, defineConfig as defineConfigFn } from "./config";
+import { loadConfig, defineConfig as defineConfigFn, isVersionedConfig } from "./config";
 import { defaultLogger } from "./utils/logger";
 
 // Re-export types
 export type {
   McpAppsPluginOptions,
   FileBasedConfig,
+  FileBasedConfigInput,
   DirectoriesConfig,
   DiscoveredFile,
   ManifestResult,
   PluginLogger,
   McpAppsPlugin,
+  // Versioned config types
+  VersionKey,
+  VersionDirectoriesConfig,
+  FileBasedVersionConfig,
+  VersionedFileBasedConfig,
+  VersionSpecificConfig,
   // Re-export from core for convenience (avoid needing to import from both packages)
   GlobalConfig,
   Icon,
@@ -67,9 +81,20 @@ export type {
 export type { FileBasedGlobalConfig, IconConfig } from "./types";
 
 // Re-export utilities
-export { defineConfig } from "./config";
-export { generateManifest, writeManifest, runCodegen } from "./generator";
-export type { RunCodegenOptions } from "./generator";
+export { defineConfig, isVersionedConfig } from "./config";
+export {
+  generateManifest,
+  writeManifest,
+  runCodegen,
+  // Versioned manifest generation
+  generateVersionedManifests,
+  writeVersionedManifests,
+  writeVersionsManifest,
+  writeVersionedServer,
+  getVersionDirectories,
+} from "./generator";
+export type { GenerateManifestOptions } from "./generator";
+export type { RunCodegenOptions, VersionedManifestResult } from "./generator";
 export { defineApp } from "./app";
 export type { CreateAppOptions, FileBasedAppInstance } from "./app";
 export {
@@ -113,13 +138,15 @@ export function mcpAppsPlugin(options: McpAppsPluginOptions = {}): McpAppsPlugin
   const { configPath = "./mcp.config.ts", outDir = "__generated__", watch = true } = options;
 
   let config: ResolvedConfig;
-  let fileBasedConfig: FileBasedConfig | null = null;
+  let fileBasedConfig: FileBasedConfigInput | null = null;
   let cleanupWatcher: (() => void) | null = null;
 
   const logger = defaultLogger;
 
   /**
-   * Generate the manifest file
+   * Generate the manifest file(s)
+   *
+   * Handles both single-version and versioned configurations.
    */
   async function generate(): Promise<void> {
     if (!fileBasedConfig) {
@@ -129,22 +156,53 @@ export function mcpAppsPlugin(options: McpAppsPluginOptions = {}): McpAppsPlugin
 
     const projectRoot = config.root;
 
-    const result = await generateManifest({
-      projectRoot,
-      directories: fileBasedConfig.directories,
-      outDir,
-      logger,
-    });
+    // Handle versioned vs single-version config
+    if (isVersionedConfig(fileBasedConfig)) {
+      // Versioned config: generate per-version manifests + aggregator
+      const versionKeys = Object.keys(fileBasedConfig.versions);
+      logger.info(
+        `Generating manifests for ${versionKeys.length} version(s): ${versionKeys.join(", ")}`
+      );
 
-    if (result.errors.length > 0) {
-      for (const error of result.errors) {
-        logger.error(error);
+      const results = await generateVersionedManifests(
+        fileBasedConfig,
+        projectRoot,
+        outDir,
+        logger
+      );
+
+      if (results.errors.length > 0) {
+        for (const error of results.errors) {
+          logger.error(error);
+        }
+        throw new Error(`Manifest generation failed with ${results.errors.length} error(s)`);
       }
-      throw new Error(`Manifest generation failed with ${result.errors.length} error(s)`);
-    }
 
-    await writeManifest(result.code, outDir, projectRoot);
-    logger.info(`Wrote manifest to ${outDir}/app-manifest.ts`);
+      // Write all manifests
+      await writeVersionedManifests(results, outDir, projectRoot);
+      await writeVersionsManifest(versionKeys, outDir, projectRoot);
+      await writeVersionedServer(versionKeys, outDir, projectRoot, configPath);
+
+      logger.info(`Wrote versioned manifests to ${outDir}/`);
+    } else {
+      // Single-version config: generate single manifest
+      const result = await generateManifest({
+        projectRoot,
+        directories: fileBasedConfig.directories,
+        outDir,
+        logger,
+      });
+
+      if (result.errors.length > 0) {
+        for (const error of result.errors) {
+          logger.error(error);
+        }
+        throw new Error(`Manifest generation failed with ${result.errors.length} error(s)`);
+      }
+
+      await writeManifest(result.code, outDir, projectRoot);
+      logger.info(`Wrote manifest to ${outDir}/app-manifest.ts`);
+    }
   }
 
   const plugin: Plugin = {
@@ -173,7 +231,7 @@ export function mcpAppsPlugin(options: McpAppsPluginOptions = {}): McpAppsPlugin
         throw error;
       }
 
-      // Generate the initial manifest
+      // Generate the initial manifest(s)
       await generate();
     },
 
@@ -191,14 +249,25 @@ export function mcpAppsPlugin(options: McpAppsPluginOptions = {}): McpAppsPlugin
           return;
         }
 
+        // Pass the full config for version-aware watching
+        const directories = isVersionedConfig(fileBasedConfig)
+          ? undefined
+          : fileBasedConfig.directories;
+
         cleanupWatcher = setupWatcher(server, {
           projectRoot: config.root,
-          directories: fileBasedConfig.directories,
+          directories,
+          config: fileBasedConfig,
           onRegenerate: generate,
           logger,
         });
 
-        logger.info("File watcher started for tools/, workflows/, ui/");
+        if (isVersionedConfig(fileBasedConfig)) {
+          const versionKeys = Object.keys(fileBasedConfig.versions);
+          logger.info(`File watcher started for versions: ${versionKeys.join(", ")}`);
+        } else {
+          logger.info("File watcher started for tools/, workflows/, ui/");
+        }
       });
     },
 
@@ -216,9 +285,13 @@ export function mcpAppsPlugin(options: McpAppsPluginOptions = {}): McpAppsPlugin
      * Resolve virtual module for the generated manifest
      */
     resolveId(id) {
-      // Handle imports to the generated manifest
+      // Handle imports to the generated manifest (single-version)
       if (id === "@generated/app-manifest" || id === "~generated/app-manifest") {
         return path.resolve(config.root, outDir, "app-manifest.ts");
+      }
+      // Handle imports to the versions manifest (multi-version)
+      if (id === "@generated/versions-manifest" || id === "~generated/versions-manifest") {
+        return path.resolve(config.root, outDir, "versions-manifest.ts");
       }
       return null;
     },
