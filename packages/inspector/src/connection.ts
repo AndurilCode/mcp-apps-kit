@@ -4,6 +4,7 @@
  * Manages the connection lifecycle to target MCP servers using @mcp-apps-kit/testing.
  */
 
+import { EventEmitter } from "node:events";
 import { createTestClient, type TestClient, type ToolCall } from "@mcp-apps-kit/testing";
 import type {
   ConnectionState,
@@ -12,8 +13,19 @@ import type {
   InspectorServerOptions,
   HistoryEntry,
   EnvironmentState,
+  TargetServerSchema,
 } from "./types";
 import { WidgetSessionManager } from "./widget-session-manager";
+
+/**
+ * Events emitted by ConnectionManager
+ */
+export interface ConnectionManagerEvents {
+  /** Emitted when target server schema is updated (on connect) */
+  schemaUpdated: [schema: TargetServerSchema];
+  /** Emitted when disconnected from target server */
+  disconnected: [previousUrl: string | null];
+}
 
 /**
  * Get default environment state
@@ -37,8 +49,13 @@ function getDefaultEnvironmentState(): EnvironmentState {
 
 /**
  * Connection manager for the inspector server
+ *
+ * Extends EventEmitter to support schema update notifications for dual-mode proxy.
+ *
+ * @emits schemaUpdated - When target server schema is cached (after connect)
+ * @emits disconnected - When disconnected from target server
  */
-export class ConnectionManager {
+export class ConnectionManager extends EventEmitter {
   private state: ConnectionState = {
     connected: false,
     serverUrl: null,
@@ -54,7 +71,14 @@ export class ConnectionManager {
   private readonly debug: boolean;
   private widgetSessionManager: WidgetSessionManager;
 
+  /** Cached target server schema for proxy tool generation */
+  private targetSchema: TargetServerSchema | null = null;
+
+  /** Auth token for proxied requests (from OAuth flow) */
+  private authToken: string | null = null;
+
   constructor(options: InspectorServerOptions = {}) {
+    super();
     this.maxHistorySize = options.maxHistorySize ?? 1000;
     this.defaultTimeout = options.defaultTimeout ?? 30000;
     this.debug = options.debug ?? false;
@@ -175,6 +199,66 @@ export class ConnectionManager {
       );
     }
 
+    // Cache target schema with full metadata for proxy generation
+    // Use type assertions to access optional properties that may exist at runtime
+    type ExtendedTool = (typeof tools)[number] & {
+      title?: string;
+      outputSchema?: Record<string, unknown>;
+      _meta?: Record<string, unknown>;
+      annotations?: Record<string, unknown>;
+    };
+    type ExtendedResource = (typeof resources)[number] & {
+      mimeType?: string;
+      _meta?: Record<string, unknown>;
+      annotations?: Record<string, unknown>;
+    };
+    type ExtendedPrompt = (typeof prompts)[number] & {
+      arguments?: Array<{ name: string; description?: string; required?: boolean }>;
+      _meta?: Record<string, unknown>;
+    };
+
+    this.targetSchema = {
+      tools: tools.map((t) => {
+        const extended = t as ExtendedTool;
+        return {
+          name: extended.name,
+          title: extended.title,
+          description: extended.description,
+          inputSchema: extended.inputSchema,
+          outputSchema: extended.outputSchema,
+          // Preserve all MCP metadata (ui bindings, etc.)
+          _meta: extended._meta,
+          annotations: extended.annotations,
+        };
+      }),
+      resources: resources.map((r) => {
+        const extended = r as ExtendedResource;
+        return {
+          uri: extended.uri,
+          name: extended.name,
+          description: extended.description,
+          mimeType: extended.mimeType,
+          // Preserve resource metadata
+          _meta: extended._meta,
+          annotations: extended.annotations,
+        };
+      }),
+      prompts: prompts.map((p) => {
+        const extended = p as ExtendedPrompt;
+        return {
+          name: extended.name,
+          description: extended.description,
+          arguments: extended.arguments,
+          _meta: extended._meta,
+        };
+      }),
+      serverInfo,
+      capturedAt: Date.now(),
+    };
+
+    // Emit schemaUpdated event for proxy regeneration
+    this.emit("schemaUpdated", this.targetSchema);
+
     return {
       serverInfo,
       toolCount: tools.length,
@@ -212,9 +296,18 @@ export class ConnectionManager {
       client: null,
     };
 
+    // Clear cached schema
+    this.targetSchema = null;
+
+    // Clear auth token
+    this.authToken = null;
+
     if (this.debug) {
       console.log(`[inspector] Disconnected from ${previousUrl}`);
     }
+
+    // Emit disconnected event for proxy cleanup
+    this.emit("disconnected", previousUrl);
 
     return previousUrl;
   }
@@ -352,5 +445,65 @@ export class ConnectionManager {
    */
   getWidgetSessionManager(): WidgetSessionManager {
     return this.widgetSessionManager;
+  }
+
+  /**
+   * Get the cached target server schema
+   *
+   * @returns The cached schema or null if not connected
+   */
+  getTargetSchema(): TargetServerSchema | null {
+    return this.targetSchema;
+  }
+
+  /**
+   * Set the auth token for proxied requests (from OAuth flow)
+   *
+   * @param token - The OAuth token to use for proxied requests
+   */
+  setAuthToken(token: string): void {
+    this.authToken = token;
+    if (this.debug) {
+      console.log(`[inspector] Auth token set`);
+    }
+  }
+
+  /**
+   * Get the current auth token
+   *
+   * @returns The current auth token or null
+   */
+  getAuthToken(): string | null {
+    return this.authToken;
+  }
+
+  /**
+   * Read a resource from the target server
+   *
+   * @param uri - Resource URI to read
+   * @returns Resource content as string or null if not found
+   */
+  async readTargetResource(uri: string): Promise<string | null> {
+    if (!this.state.connected || !this.state.client) {
+      throw new Error("No active connection. Call connect_to_server first.");
+    }
+
+    try {
+      const result = await this.state.client.readResource(uri);
+      // Extract text content from resource response
+      const contents = result.contents;
+      if (contents && Array.isArray(contents) && contents.length > 0) {
+        const firstContent = contents[0];
+        if (firstContent && "text" in firstContent) {
+          return firstContent.text as string;
+        }
+      }
+      return null;
+    } catch (error) {
+      if (this.debug) {
+        console.warn(`[inspector] Error reading resource ${uri}:`, error);
+      }
+      return null;
+    }
   }
 }

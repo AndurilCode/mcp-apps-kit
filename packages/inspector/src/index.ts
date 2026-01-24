@@ -66,6 +66,14 @@ export type {
   InteractionAction,
   TestWidgetInteractionInput,
   TestWidgetInteractionOutput,
+  // Target server schema types (for dual-mode proxy)
+  TargetServerSchema,
+  TargetToolInfo,
+  TargetResourceInfo,
+  TargetPromptInfo,
+  // Session source tracking
+  SessionSource,
+  ProxyMetadata,
 } from "./types";
 
 // =============================================================================
@@ -75,6 +83,22 @@ export type {
 export { createInspectorServer } from "./server";
 export { ConnectionManager } from "./connection";
 export { WidgetServer, type WidgetSession, type CreateSessionResult } from "./widget-server";
+
+// =============================================================================
+// DUAL-MODE INSPECTOR (for real testing with ChatGPT)
+// =============================================================================
+
+export {
+  createDualInspectorServer,
+  type DualInspectorServer,
+  type DualInspectorServerOptions,
+} from "./dual-server";
+
+// Proxy tool generation (for advanced usage)
+export { generateProxyTools, hasTargetSchema } from "./proxy-tools";
+
+// Proxy resource generation (for advanced usage)
+export { registerProxyResources, hasUIResources, type ProxyResourceInfo } from "./proxy-resources";
 
 // =============================================================================
 // TOOL CREATORS (for advanced usage)

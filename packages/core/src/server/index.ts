@@ -6,6 +6,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   mcpAuthMetadataRouter,
@@ -498,7 +499,7 @@ export function createServerInstance<T extends ToolDefs>(
       req: globalThis.Request,
       _env?: unknown
     ): Promise<globalThis.Response> => {
-      // Serverless handler using Streamable HTTP transport
+      // Serverless handler using Web Standard Streamable HTTP transport
       try {
         const url = new URL(req.url);
 
@@ -543,8 +544,8 @@ export function createServerInstance<T extends ToolDefs>(
           );
         }
 
-        // For serverless, create a one-shot transport
-        const transport = new StreamableHTTPServerTransport({
+        // Use Web Standard transport for serverless - accepts Request, returns Response
+        const transport = new WebStandardStreamableHTTPServerTransport({
           sessionIdGenerator: undefined,
           enableJsonResponse: true,
         });
@@ -552,51 +553,13 @@ export function createServerInstance<T extends ToolDefs>(
         // Connect to current MCP server (supports hot reload)
         await currentMcpServer.connect(transport);
 
-        // Convert Web Request to Express-like request
-        const body: unknown = req.method === "POST" ? await req.json() : undefined;
+        // Handle the request directly - returns a Response
+        const response = await transport.handleRequest(req);
 
-        // Create a mock response object to capture the output
-        let responseBody = "";
-        let responseStatus = 200;
-        const responseHeaders: Record<string, string> = {};
-
-        const mockRes = {
-          status: (code: number) => {
-            responseStatus = code;
-            return mockRes;
-          },
-          setHeader: (name: string, value: string) => {
-            responseHeaders[name] = value;
-          },
-          json: (data: unknown) => {
-            responseBody = JSON.stringify(data);
-            responseHeaders["Content-Type"] = "application/json";
-          },
-          send: (data: string) => {
-            responseBody = data;
-          },
-          end: (): void => {
-            // No-op for serverless mock
-          },
-          on: () => mockRes,
-          write: (chunk: string) => {
-            responseBody += chunk;
-          },
-        };
-
-        const mockReq = { body, headers: Object.fromEntries(req.headers) };
-        await transport.handleRequest(
-          mockReq as unknown as Request,
-          mockRes as unknown as Response,
-          body
-        );
-
+        // Close transport after handling
         await transport.close();
 
-        return new globalThis.Response(responseBody, {
-          status: responseStatus,
-          headers: responseHeaders,
-        });
+        return response;
       } catch (error) {
         const appError = wrapError(error);
         return new globalThis.Response(JSON.stringify({ error: appError.message }), {
