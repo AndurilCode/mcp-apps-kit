@@ -130,20 +130,46 @@ export async function createTestClient(
 
     async listTools() {
       const tools = await client.listTools();
-      return tools.tools.map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-        inputSchema: tool.inputSchema as Record<string, unknown> | undefined,
-      }));
+      // Preserve all tool metadata for proxy scenarios
+      type ExtendedTool = (typeof tools.tools)[number] & {
+        title?: string;
+        outputSchema?: Record<string, unknown>;
+        _meta?: Record<string, unknown>;
+        annotations?: Record<string, unknown>;
+      };
+      return tools.tools.map((tool) => {
+        const extended = tool as ExtendedTool;
+        return {
+          name: extended.name,
+          title: extended.title,
+          description: extended.description,
+          inputSchema: extended.inputSchema as Record<string, unknown> | undefined,
+          outputSchema: extended.outputSchema,
+          _meta: extended._meta,
+          annotations: extended.annotations,
+        };
+      });
     },
 
     async listResources() {
       const resources = await client.listResources();
-      return resources.resources.map((resource) => ({
-        uri: resource.uri,
-        name: resource.name,
-        description: resource.description,
-      }));
+      // Extended resource type to capture all metadata from MCP protocol
+      type ExtendedResource = (typeof resources.resources)[number] & {
+        mimeType?: string;
+        _meta?: Record<string, unknown>;
+        annotations?: Record<string, unknown>;
+      };
+      return resources.resources.map((resource) => {
+        const extended = resource as ExtendedResource;
+        return {
+          uri: extended.uri,
+          name: extended.name,
+          description: extended.description,
+          mimeType: extended.mimeType,
+          _meta: extended._meta,
+          annotations: extended.annotations,
+        };
+      });
     },
 
     async readResource(uri: string) {

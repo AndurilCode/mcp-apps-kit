@@ -5,6 +5,7 @@
  */
 
 import { createInspectorServer } from "../server";
+import { createDualInspectorServer } from "../dual-server";
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -13,6 +14,7 @@ interface CLIOptions {
   port: number;
   debug: boolean;
   maxHistory: number;
+  dual: boolean;
 }
 
 function parseArgs(): CLIOptions {
@@ -20,6 +22,7 @@ function parseArgs(): CLIOptions {
     port: 6274,
     debug: false,
     maxHistory: 1000,
+    dual: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -39,6 +42,8 @@ function parseArgs(): CLIOptions {
       options.port = port;
     } else if (arg === "--debug" || arg === "-d") {
       options.debug = true;
+    } else if (arg === "--dual") {
+      options.dual = true;
     } else if (arg === "--max-history") {
       const value = args[++i];
       if (value === undefined) {
@@ -76,53 +81,84 @@ Usage: mcp-inspector [options]
 Options:
   -p, --port <number>      Port to listen on (default: 6274)
   -d, --debug              Enable debug logging
+  --dual                   Enable dual-endpoint mode for real ChatGPT testing
   --max-history <number>   Maximum call history entries (default: 1000)
   -h, --help               Show this help message
   -v, --version            Show version number
 
+Modes:
+  Single (default):
+    - One endpoint at /mcp with all inspector tools
+    - Use for development and debugging
+
+  Dual (--dual):
+    - /agent/mcp: Observation-only tools for coding agents
+    - /apps/mcp: Proxy tools for ChatGPT (available after connect_to_server)
+    - Use for real testing with ChatGPT
+
 Examples:
-  mcp-inspector                    Start on default port 6274
-  mcp-inspector --port 3001        Start on custom port
+  mcp-inspector                    Start in single mode on port 6274
+  mcp-inspector --dual             Start in dual mode for ChatGPT testing
+  mcp-inspector --dual --port 8080 Start in dual mode on custom port
   mcp-inspector --debug            Enable debug logging
-  mcp-inspector --max-history 500  Limit history to 500 entries
 
-Claude Desktop Configuration:
-  Add to claude_desktop_config.json:
-
-  {
-    "mcpServers": {
-      "mcp-inspector": {
-        "command": "npx",
-        "args": ["@mcp-apps-kit/inspector"]
-      }
-    }
-  }
+Dual Mode Usage:
+  1. Start: mcp-inspector --dual
+  2. Agent connects to http://localhost:6274/agent/mcp
+  3. Agent calls: connect_to_server("http://your-mcp-server:3000")
+  4. ChatGPT connects to http://localhost:6274/apps/mcp
+  5. ChatGPT sees proxied tools from target server
 `);
 }
 
 async function main(): Promise<void> {
   const options = parseArgs();
 
-  const app = createInspectorServer({
-    debug: options.debug,
-    maxHistorySize: options.maxHistory,
-  });
+  if (options.dual) {
+    // Dual mode: separate endpoints for agent and apps
+    const server = createDualInspectorServer({
+      port: options.port,
+      debug: options.debug,
+      maxHistorySize: options.maxHistory,
+    });
 
-  if (options.debug) {
-    console.log(`[inspector] Starting MCP Inspector Server...`);
-    console.log(`[inspector] Port: ${options.port}`);
-    console.log(`[inspector] Debug: ${options.debug}`);
-    console.log(`[inspector] Max History: ${options.maxHistory}`);
-  }
+    if (options.debug) {
+      console.log(`[inspector] Starting MCP Inspector Server (dual mode)...`);
+      console.log(`[inspector] Port: ${options.port}`);
+      console.log(`[inspector] Debug: ${options.debug}`);
+      console.log(`[inspector] Max History: ${options.maxHistory}`);
+    }
 
-  try {
-    await app.start({ port: options.port });
-    console.log(`MCP Inspector Server running at http://localhost:${options.port}`);
-    console.log(`MCP endpoint: http://localhost:${options.port}/mcp`);
-    console.log(`\nPress Ctrl+C to stop`);
-  } catch (error) {
-    console.error("Failed to start MCP Inspector Server:", error);
-    process.exit(1);
+    try {
+      await server.start(options.port);
+      console.log(`\nPress Ctrl+C to stop`);
+    } catch (error) {
+      console.error("Failed to start MCP Inspector Server:", error);
+      process.exit(1);
+    }
+  } else {
+    // Single mode: all tools on one endpoint
+    const app = createInspectorServer({
+      debug: options.debug,
+      maxHistorySize: options.maxHistory,
+    });
+
+    if (options.debug) {
+      console.log(`[inspector] Starting MCP Inspector Server...`);
+      console.log(`[inspector] Port: ${options.port}`);
+      console.log(`[inspector] Debug: ${options.debug}`);
+      console.log(`[inspector] Max History: ${options.maxHistory}`);
+    }
+
+    try {
+      await app.start({ port: options.port });
+      console.log(`MCP Inspector Server running at http://localhost:${options.port}`);
+      console.log(`MCP endpoint: http://localhost:${options.port}/mcp`);
+      console.log(`\nPress Ctrl+C to stop`);
+    } catch (error) {
+      console.error("Failed to start MCP Inspector Server:", error);
+      process.exit(1);
+    }
   }
 
   // Handle graceful shutdown

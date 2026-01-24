@@ -83,11 +83,28 @@ export interface TestClient {
 
   /** List available tools */
   listTools(): Promise<
-    Array<{ name: string; description?: string; inputSchema?: Record<string, unknown> }>
+    Array<{
+      name: string;
+      title?: string;
+      description?: string;
+      inputSchema?: Record<string, unknown>;
+      outputSchema?: Record<string, unknown>;
+      _meta?: Record<string, unknown>;
+      annotations?: Record<string, unknown>;
+    }>
   >;
 
   /** List available resources */
-  listResources(): Promise<Array<{ uri: string; name?: string; description?: string }>>;
+  listResources(): Promise<
+    Array<{
+      uri: string;
+      name?: string;
+      description?: string;
+      mimeType?: string;
+      _meta?: Record<string, unknown>;
+      annotations?: Record<string, unknown>;
+    }>
+  >;
 
   /** Read a resource by URI */
   readResource(uri: string): Promise<{ contents: ContentBlock[] }>;

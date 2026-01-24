@@ -13,6 +13,21 @@ import type { EnvironmentState } from "./types";
 import { mapConsoleTypeToLogLevel, getLogSourceFromUrl } from "./tools/helpers";
 
 /**
+ * Source endpoint that created the session
+ */
+export type SessionSource = "apps" | "agent";
+
+/**
+ * Proxy metadata for sessions created via /apps/mcp proxy
+ */
+export interface ProxyMetadata {
+  /** URL of the target server being proxied */
+  targetServerUrl: string;
+  /** Original tool name on target server */
+  targetToolName: string;
+}
+
+/**
  * Active widget session with persistent Playwright page
  */
 export interface ActiveWidgetSession {
@@ -36,6 +51,10 @@ export interface ActiveWidgetSession {
   createdAt: number;
   /** Protocol used (mcp or openai) */
   protocol: DetectedProtocol;
+  /** Which endpoint created this session (apps = ChatGPT proxy, agent = inspector tools) */
+  source: SessionSource;
+  /** Metadata for proxy sessions (when source is 'apps') */
+  proxyMetadata?: ProxyMetadata;
 }
 
 /**
@@ -48,6 +67,8 @@ export interface SessionInfo {
   createdAt: number;
   logCount: number;
   errorCount: number;
+  /** Which endpoint created this session */
+  source: SessionSource;
 }
 
 /**
@@ -79,6 +100,15 @@ export class WidgetSessionManager {
 
   /**
    * Create a new widget session
+   *
+   * @param toolName - Name of the tool that was called
+   * @param toolArgs - Arguments passed to the tool
+   * @param toolResult - Result returned by the tool
+   * @param page - Playwright page instance
+   * @param widgetSessionId - WidgetServer session ID
+   * @param protocol - Protocol used (mcp or openai)
+   * @param source - Which endpoint created this session (default: 'agent')
+   * @param proxyMetadata - Optional metadata for proxy sessions
    */
   async createSession(
     toolName: string,
@@ -86,7 +116,9 @@ export class WidgetSessionManager {
     toolResult: unknown,
     page: Page,
     widgetSessionId: string,
-    protocol: DetectedProtocol
+    protocol: DetectedProtocol,
+    source: SessionSource = "agent",
+    proxyMetadata?: ProxyMetadata
   ): Promise<ActiveWidgetSession> {
     const id = randomUUID();
     const session: ActiveWidgetSession = {
@@ -100,6 +132,8 @@ export class WidgetSessionManager {
       pageErrors: [],
       createdAt: Date.now(),
       protocol,
+      source,
+      proxyMetadata,
     };
 
     // Set up console log listener
@@ -147,6 +181,7 @@ export class WidgetSessionManager {
       createdAt: session.createdAt,
       logCount: session.consoleLogs.length,
       errorCount: session.pageErrors.length,
+      source: session.source,
     }));
   }
 
