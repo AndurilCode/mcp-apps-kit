@@ -36,6 +36,49 @@ import { defaultLogger } from "./utils/logger";
 const MAX_RECURSION_DEPTH = 50;
 
 /**
+ * Maximum concurrent file analysis operations
+ * Prevents excessive memory usage in very large codebases (>1000 files)
+ */
+const MAX_CONCURRENT_ANALYSIS = 50;
+
+/**
+ * Run promises with concurrency limit using a queue-based approach
+ *
+ * This prevents excessive memory usage when analyzing very large codebases
+ * by limiting the number of concurrent file analysis operations.
+ *
+ * @param items - Items to process
+ * @param limit - Maximum concurrent operations
+ * @param fn - Async function to run for each item
+ * @returns Array of results in the same order as items
+ */
+async function withConcurrencyLimit<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array<R>(items.length);
+  let currentIndex = 0;
+
+  // Worker function that processes items from the queue
+  const worker = async (): Promise<void> => {
+    while (currentIndex < items.length) {
+      const index = currentIndex++;
+      const item = items[index];
+      if (item !== undefined) {
+        results[index] = await fn(item, index);
+      }
+    }
+  };
+
+  // Start 'limit' workers in parallel
+  const workers = Array.from({ length: Math.min(limit, items.length) }, () => worker());
+  await Promise.all(workers);
+
+  return results;
+}
+
+/**
  * Validate that a path is within the project root (path traversal protection)
  *
  * Uses synchronous realpath to resolve symlinks for accurate comparison.
@@ -596,31 +639,59 @@ export async function generateManifest(options: GenerateManifestOptions): Promis
   const middlewareCollisions = findNameCollisions(middlewareFiles);
   const handlerCollisions = findNameCollisions(handlerFiles);
 
-  // Report collisions as errors
+  // Report collisions as errors with actionable suggestions
   for (const [identifier, paths] of toolCollisions) {
-    errors.push(`Tool name collision: '${identifier}' is defined in both ${paths.join(" and ")}`);
+    const suggestion =
+      paths.length === 2
+        ? "Rename one file or use subdirectories to create unique paths (e.g., 'tools/v1/get-user.ts' vs 'tools/v2/get-user.ts')"
+        : "Rename files or reorganize into subdirectories to create unique tool names";
+    errors.push(
+      `Tool name collision: '${identifier}' is defined in both ${paths.join(" and ")}. ${suggestion}`
+    );
   }
   for (const [identifier, paths] of workflowCollisions) {
+    const suggestion =
+      paths.length === 2
+        ? "Rename one file or use subdirectories to create unique paths"
+        : "Rename files or reorganize into subdirectories to create unique workflow names";
     errors.push(
-      `Workflow name collision: '${identifier}' is defined in both ${paths.join(" and ")}`
+      `Workflow name collision: '${identifier}' is defined in both ${paths.join(" and ")}. ${suggestion}`
     );
   }
   for (const [identifier, paths] of uiCollisions) {
-    errors.push(`UI name collision: '${identifier}' is defined in both ${paths.join(" and ")}`);
+    const suggestion =
+      paths.length === 2
+        ? "Rename one file or use subdirectories to create unique paths"
+        : "Rename files or reorganize into subdirectories to create unique UI component names";
+    errors.push(
+      `UI name collision: '${identifier}' is defined in both ${paths.join(" and ")}. ${suggestion}`
+    );
   }
   for (const [identifier, paths] of uiWidgetCollisions) {
+    const suggestion =
+      paths.length === 2
+        ? "Rename one file or use subdirectories to create unique paths"
+        : "Rename files or reorganize into subdirectories to create unique widget names";
     errors.push(
-      `UI widget name collision: '${identifier}' is defined in both ${paths.join(" and ")}`
+      `UI widget name collision: '${identifier}' is defined in both ${paths.join(" and ")}. ${suggestion}`
     );
   }
   for (const [identifier, paths] of middlewareCollisions) {
+    const suggestion =
+      paths.length === 2
+        ? "Rename one file or use subdirectories to create unique paths"
+        : "Rename files or reorganize into subdirectories to create unique middleware names";
     errors.push(
-      `Middleware name collision: '${identifier}' is defined in both ${paths.join(" and ")}`
+      `Middleware name collision: '${identifier}' is defined in both ${paths.join(" and ")}. ${suggestion}`
     );
   }
   for (const [identifier, paths] of handlerCollisions) {
+    const suggestion =
+      paths.length === 2
+        ? "Rename one file or use subdirectories to create unique paths"
+        : "Rename files or reorganize into subdirectories to create unique handler names";
     errors.push(
-      `Handler name collision: '${identifier}' is defined in both ${paths.join(" and ")}`
+      `Handler name collision: '${identifier}' is defined in both ${paths.join(" and ")}. ${suggestion}`
     );
   }
 
@@ -633,7 +704,7 @@ export async function generateManifest(options: GenerateManifestOptions): Promis
     };
   }
 
-  // Analyze all files in parallel for better performance with large codebases
+  // Analyze all files with concurrency limiting to prevent memory issues in large codebases
   const [
     toolAnalysisResults,
     workflowAnalysisResults,
@@ -642,48 +713,36 @@ export async function generateManifest(options: GenerateManifestOptions): Promis
     middlewareAnalysisResults,
     handlerAnalysisResults,
   ] = await Promise.all([
-    // Analyze tool files
-    Promise.all(
-      toolFiles.map(async (file) => ({
-        file,
-        analysis: await analyzeFile(file.filePath, logger),
-      }))
-    ),
-    // Analyze workflow files
-    Promise.all(
-      workflowFiles.map(async (file) => ({
-        file,
-        analysis: await analyzeFile(file.filePath, logger),
-      }))
-    ),
-    // Analyze UI files
-    Promise.all(
-      uiFiles.map(async (file) => ({
-        file,
-        analysis: await analyzeFile(file.filePath, logger),
-      }))
-    ),
-    // Analyze UI widget files
-    Promise.all(
-      uiWidgetFiles.map(async (file) => ({
-        file,
-        analysis: await analyzeFile(file.filePath, logger),
-      }))
-    ),
-    // Analyze middleware files
-    Promise.all(
-      middlewareFiles.map(async (file) => ({
-        file,
-        analysis: await analyzeFile(file.filePath, logger),
-      }))
-    ),
-    // Analyze handler files
-    Promise.all(
-      handlerFiles.map(async (file) => ({
-        file,
-        analysis: await analyzeFile(file.filePath, logger),
-      }))
-    ),
+    // Analyze tool files with concurrency limit
+    withConcurrencyLimit(toolFiles, MAX_CONCURRENT_ANALYSIS, async (file) => ({
+      file,
+      analysis: await analyzeFile(file.filePath, logger),
+    })),
+    // Analyze workflow files with concurrency limit
+    withConcurrencyLimit(workflowFiles, MAX_CONCURRENT_ANALYSIS, async (file) => ({
+      file,
+      analysis: await analyzeFile(file.filePath, logger),
+    })),
+    // Analyze UI files with concurrency limit
+    withConcurrencyLimit(uiFiles, MAX_CONCURRENT_ANALYSIS, async (file) => ({
+      file,
+      analysis: await analyzeFile(file.filePath, logger),
+    })),
+    // Analyze UI widget files with concurrency limit
+    withConcurrencyLimit(uiWidgetFiles, MAX_CONCURRENT_ANALYSIS, async (file) => ({
+      file,
+      analysis: await analyzeFile(file.filePath, logger),
+    })),
+    // Analyze middleware files with concurrency limit
+    withConcurrencyLimit(middlewareFiles, MAX_CONCURRENT_ANALYSIS, async (file) => ({
+      file,
+      analysis: await analyzeFile(file.filePath, logger),
+    })),
+    // Analyze handler files with concurrency limit
+    withConcurrencyLimit(handlerFiles, MAX_CONCURRENT_ANALYSIS, async (file) => ({
+      file,
+      analysis: await analyzeFile(file.filePath, logger),
+    })),
   ]);
 
   // Process tool analysis results

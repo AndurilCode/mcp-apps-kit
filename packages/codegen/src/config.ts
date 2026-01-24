@@ -329,27 +329,16 @@ export function validateConfig(config: unknown): asserts config is FileBasedConf
     throw new Error("Configuration 'version' is required and must be a non-empty string");
   }
 
-  // Optional directories
+  // Optional directories (use shared schema from @mcp-apps-kit/core)
   if (cfg.directories !== undefined) {
     if (typeof cfg.directories !== "object" || cfg.directories === null) {
       throw new Error("Configuration 'directories' must be an object");
     }
 
-    const dirs = cfg.directories as Record<string, unknown>;
-    if (dirs.tools !== undefined && typeof dirs.tools !== "string") {
-      throw new Error("Configuration 'directories.tools' must be a string");
-    }
-    if (dirs.workflows !== undefined && typeof dirs.workflows !== "string") {
-      throw new Error("Configuration 'directories.workflows' must be a string");
-    }
-    if (dirs.ui !== undefined && typeof dirs.ui !== "string") {
-      throw new Error("Configuration 'directories.ui' must be a string");
-    }
-    if (dirs.uiWidgets !== undefined && typeof dirs.uiWidgets !== "string") {
-      throw new Error("Configuration 'directories.uiWidgets' must be a string");
-    }
-    if (dirs.uiWidgetsOutDir !== undefined && typeof dirs.uiWidgetsOutDir !== "string") {
-      throw new Error("Configuration 'directories.uiWidgetsOutDir' must be a string");
+    // Validate using shared VersionDirectoriesSchema (works for both single and multi-version)
+    const result = VersionDirectoriesSchema.safeParse(cfg.directories);
+    if (!result.success) {
+      throw new Error(formatConfigZodError(result.error, "Configuration 'directories'"));
     }
   }
 

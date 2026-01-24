@@ -44,6 +44,9 @@ export function isToolBuilder(value: unknown): value is ToolBuilderImpl<string> 
  *
  * If the value is already a ToolDef, returns it unchanged.
  *
+ * Note: The type assertions are necessary due to TypeScript's limitations
+ * with conditional types and method constraints on fluent builder interfaces.
+ *
  * @param toolOrBuilder - Either a ToolBuilder or a ToolDef
  * @param inferredName - The name to set if not already provided (from filename)
  * @returns A built ToolDef
@@ -68,9 +71,12 @@ export function ensureBuilt<
   if (isToolBuilder(toolOrBuilder)) {
     // Set the inferred name if not already set, then build
     toolOrBuilder._setName(inferredName);
+    // Type assertion needed: build() has complex 'this' constraint that
+    // doesn't perfectly align with generic types at this call site
     return toolOrBuilder.build() as unknown as ToolDef<TInput, TOutput>;
   }
 
-  // Already a built tool def
+  // Already a built tool def - need cast because TypeScript can't narrow
+  // the union type automatically even after the type guard above
   return toolOrBuilder as ToolDef<TInput, TOutput>;
 }

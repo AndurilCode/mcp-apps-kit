@@ -116,12 +116,22 @@ function extractUIMetadata(node: TSESTree.ObjectExpression, metadata: WidgetUIMe
 
 /**
  * Check if a file is a valid widget file (has default export + ui export)
+ *
+ * @param content - File content to parse
+ * @param filePath - Optional file path for better error messages in development
+ * @returns true if the file has both default and ui exports
  */
-export function isValidWidgetFile(content: string): boolean {
+export function isValidWidgetFile(content: string, filePath?: string): boolean {
   try {
     const parsed = parseWidgetFile(content);
     return parsed.hasDefaultExport && parsed.hasUIExport;
-  } catch {
+  } catch (error) {
+    // In development mode, log parse errors to help developers debug widget files
+    if (process.env.NODE_ENV === "development" || process.env.DEBUG) {
+      const location = filePath ? ` in ${filePath}` : "";
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[ui-react-builder] Failed to parse widget file${location}: ${message}`); // eslint-disable-line no-console
+    }
     return false;
   }
 }

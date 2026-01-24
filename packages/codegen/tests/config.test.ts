@@ -117,7 +117,7 @@ describe("config", () => {
       };
 
       expect(() => validateConfig(config)).toThrow(
-        "Configuration 'directories.tools' must be a string"
+        "Configuration 'directories'.tools: Invalid input: expected string, received number"
       );
     });
 
@@ -141,7 +141,7 @@ describe("config", () => {
       };
 
       expect(() => validateConfig(config)).toThrow(
-        "Configuration 'directories.uiWidgets' must be a string"
+        "Configuration 'directories'.uiWidgets: Invalid input: expected string, received number"
       );
     });
 
