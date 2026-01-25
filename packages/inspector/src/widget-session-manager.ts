@@ -205,7 +205,8 @@ export class WidgetSessionManager {
 
       // Build the host context update based on protocol
       if (session.protocol === "mcp") {
-        // MCP protocol: send hostContext/changed notification via postMessage
+        // MCP protocol: send ui/notifications/host-context-changed notification via postMessage
+        // This matches the actual MCP Apps protocol method name
         const hostContext = {
           theme: environmentState.theme,
           displayMode: environmentState.displayMode,
@@ -224,16 +225,16 @@ export class WidgetSessionManager {
           // eslint-disable-next-line no-undef
           const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
           if (iframe?.contentWindow) {
+            // Use the correct MCP Apps protocol method name
+            // Params are flat (not wrapped in hostContext)
             const message = {
               jsonrpc: "2.0",
-              method: "hostContext/changed",
-              params: {
-                hostContext: ctx,
-              },
+              method: "ui/notifications/host-context-changed",
+              params: ctx,
             };
             iframe.contentWindow.postMessage(message, "*");
             // eslint-disable-next-line no-console
-            console.log("[MCP Host] Sent hostContext/changed", ctx);
+            console.log("[MCP Host] Sent ui/notifications/host-context-changed", ctx);
           }
         }, hostContext);
       } else {

@@ -225,6 +225,48 @@ export function createDualInspectorServer(
       return;
     }
 
+    // Environment sync endpoint (for injected scripts in widgets)
+    if (url === "/sync-globals") {
+      // Handle CORS for cross-origin widget requests
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+      if (req.method === "OPTIONS") {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+
+      if (req.method === "POST") {
+        // Read body for POST
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) {
+          chunks.push(chunk as Buffer);
+        }
+        const bodyData = Buffer.concat(chunks);
+
+        try {
+          const data = JSON.parse(bodyData.toString("utf-8")) as {
+            globals?: Record<string, unknown>;
+          };
+          if (data.globals) {
+            await connectionManager.updateEnvironmentFromGlobals(data.globals);
+          }
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true }));
+        } catch {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Invalid payload" }));
+        }
+        return;
+      }
+
+      res.writeHead(405, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Method not allowed" }));
+      return;
+    }
+
     // Convert to Web Request
     const protocol = "http";
     const host = req.headers.host ?? "localhost";
@@ -290,6 +332,9 @@ export function createDualInspectorServer(
             });
           });
           httpServer.listen(port, () => {
+            // Set inspector URL for sync script injection
+            connectionManager.setInspectorUrl(`http://localhost:${port}`);
+
             // eslint-disable-next-line no-console
             console.log(`[dual-inspector] Started on port ${port}`);
             // eslint-disable-next-line no-console
