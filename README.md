@@ -198,7 +198,7 @@ Files are automatically converted to camelCase identifiers:
 | Package                                                                 | Description                                  |
 | ----------------------------------------------------------------------- | -------------------------------------------- |
 | [`@mcp-apps-kit/core`](packages/core/README.md)                         | Server framework with tool/workflow builders |
-| [`@mcp-apps-kit/codegen`](packages/codegen/)                            | File-based discovery and manifest generation |
+| [`@mcp-apps-kit/codegen`](packages/codegen/README.md)                   | File-based discovery and manifest generation |
 | [`@mcp-apps-kit/ui`](packages/ui/README.md)                             | Client SDK (vanilla JS)                      |
 | [`@mcp-apps-kit/ui-react`](packages/ui-react/README.md)                 | React bindings and hooks                     |
 | [`@mcp-apps-kit/ui-react-builder`](packages/ui-react-builder/README.md) | Vite plugin for widget bundling              |
