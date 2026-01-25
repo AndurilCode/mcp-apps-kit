@@ -74,6 +74,9 @@ export type {
   // Session source tracking
   SessionSource,
   ProxyMetadata,
+  // Event sync types (for 1:1 widget state mirroring in dual mode)
+  SyncEventType,
+  SyncEventPayload,
 } from "./types";
 
 // =============================================================================

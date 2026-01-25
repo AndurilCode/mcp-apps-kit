@@ -18,29 +18,53 @@ import type {
 // =============================================================================
 
 /**
- * Generate the sync script that listens for environment updates and forwards to inspector
+ * Generate the unified sync script that listens for ALL events and forwards to inspector
  *
  * Handles both protocols:
- * - OpenAI/ChatGPT: postMessage with type 'openai:set_globals' or CustomEvent 'openai:set_globals'
- * - MCP Apps: JSON-RPC postMessage with method 'ui/hostContextChanged'
+ * - OpenAI/ChatGPT: postMessage and CustomEvent patterns for all event types
+ * - MCP Apps: JSON-RPC postMessage for all notification types
+ *
+ * Event types captured:
+ * - globals/host-context-changed: Environment state updates
+ * - tool-input, tool-input-partial: Tool input data
+ * - tool-output, tool-result: Tool result data
+ * - tool-response-metadata: Tool metadata
+ * - tool-cancelled: Tool cancellation
+ * - call-tool, call-tool-response: Bidirectional tool calls
+ *
+ * @param inspectorUrl - The inspector server URL (e.g., "http://localhost:6274")
+ * @param sessionId - Optional session ID for targeted sync
+ * @param protocol - Protocol to use ("openai" or "mcp")
  */
-function generateSyncScript(inspectorUrl: string): string {
+function generateSyncScript(
+  inspectorUrl: string,
+  sessionId?: string,
+  protocol: "openai" | "mcp" = "openai"
+): string {
   return `<script data-inspector-sync>
 (function() {
   var INSPECTOR_URL = ${JSON.stringify(inspectorUrl)};
-  var DEBUG = true; // Enable debug logging
+  var SESSION_ID = ${sessionId ? JSON.stringify(sessionId) : "null"};
+  var PROTOCOL = ${JSON.stringify(protocol)};
+  var DEBUG = true;
 
   function log() {
     if (DEBUG) console.log.apply(console, ['[inspector-sync]'].concat(Array.prototype.slice.call(arguments)));
   }
 
-  function syncToInspector(globals, source) {
-    log('Syncing to inspector from', source, globals);
+  function syncEvent(type, data) {
+    log('Syncing event:', type, data);
     try {
-      fetch(INSPECTOR_URL + '/sync-globals', {
+      fetch(INSPECTOR_URL + '/sync-events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ globals: globals })
+        body: JSON.stringify({
+          type: type,
+          data: data,
+          sessionId: SESSION_ID,
+          protocol: PROTOCOL,
+          timestamp: new Date().toISOString()
+        })
       }).then(function(r) {
         log('Sync response:', r.status);
       }).catch(function(e) {
@@ -51,8 +75,61 @@ function generateSyncScript(inspectorUrl: string): string {
     }
   }
 
-  log('Inspector sync script loaded, listening for messages...');
+  log('Inspector sync script loaded, listening for ALL events...');
 
+  // =====================================================
+  // Capture initial window.openai state (OpenAI protocol)
+  // ChatGPT sets toolInput/toolOutput directly on window.openai
+  // before any events are fired, so we need to capture them
+  // =====================================================
+  function syncInitialOpenAIState() {
+    var openai = window.openai;
+    if (!openai) return;
+
+    log('Capturing initial window.openai state');
+
+    // Sync toolInput if present
+    if (openai.toolInput !== undefined) {
+      log('Found initial toolInput:', openai.toolInput);
+      syncEvent('tool-input', openai.toolInput);
+    }
+
+    // Sync toolOutput if present
+    if (openai.toolOutput !== undefined) {
+      log('Found initial toolOutput:', openai.toolOutput);
+      syncEvent('tool-output', openai.toolOutput);
+    }
+
+    // Sync toolResponseMetadata if present
+    if (openai.toolResponseMetadata !== undefined) {
+      log('Found initial toolResponseMetadata:', openai.toolResponseMetadata);
+      syncEvent('tool-response-metadata', openai.toolResponseMetadata);
+    }
+
+    // Sync initial globals (theme, displayMode, etc.)
+    var globals = {
+      theme: openai.theme,
+      displayMode: openai.displayMode,
+      locale: openai.locale,
+      maxHeight: openai.maxHeight,
+      safeArea: openai.safeArea,
+      userAgent: openai.userAgent,
+      userLocation: openai.userLocation,
+      toolInput: openai.toolInput,
+      toolOutput: openai.toolOutput,
+      toolResponseMetadata: openai.toolResponseMetadata
+    };
+    syncEvent('globals', globals);
+  }
+
+  // Try immediately (in case SDK already initialized)
+  syncInitialOpenAIState();
+
+  // Also try after a short delay (in case SDK initializes async)
+  setTimeout(syncInitialOpenAIState, 0);
+  setTimeout(syncInitialOpenAIState, 100);
+
+  // Listen for ALL postMessage events
   window.addEventListener('message', function(e) {
     var data = e.data;
     if (!data) return;
@@ -62,37 +139,120 @@ function generateSyncScript(inspectorUrl: string): string {
       log('Received postMessage:', JSON.stringify(data).substring(0, 500));
     }
 
-    // OpenAI/ChatGPT pattern: { type: 'openai:set_globals', globals: {...} }
+    // =====================================================
+    // OpenAI Protocol Events
+    // =====================================================
+
+    // OpenAI: { type: 'openai:set_globals', globals: {...} }
     if (data.type === 'openai:set_globals' && data.globals) {
-      syncToInspector(data.globals, 'openai:set_globals');
+      syncEvent('globals', data.globals);
+      // Also extract specific tool data from globals
+      if (data.globals.toolOutput !== undefined) {
+        syncEvent('tool-output', data.globals.toolOutput);
+      }
+      if (data.globals.toolInput !== undefined) {
+        syncEvent('tool-input', data.globals.toolInput);
+      }
+      if (data.globals.toolResponseMetadata !== undefined) {
+        syncEvent('tool-response-metadata', data.globals.toolResponseMetadata);
+      }
       return;
     }
 
-    // MCP Apps pattern: JSON-RPC with method 'ui/notifications/host-context-changed'
-    // Format: { jsonrpc: '2.0', method: 'ui/notifications/host-context-changed', params: { theme: '...', ... } }
-    if (data.jsonrpc === '2.0' && data.method === 'ui/notifications/host-context-changed' && data.params) {
-      syncToInspector(data.params, 'ui/notifications/host-context-changed');
+    // OpenAI: Tool call response from host
+    if (data.type === 'openai:callTool:response') {
+      syncEvent('call-tool-response', data);
       return;
     }
 
-    // MCP Apps: Capture initial hostContext from ui/initialize response
-    // Format: { result: { hostContext: {...}, ... } }
-    if (data.result && data.result.hostContext) {
-      syncToInspector(data.result.hostContext, 'ui/initialize response');
+    // OpenAI: Widget making tool call
+    if (data.type === 'openai:callTool') {
+      syncEvent('call-tool', { name: data.toolName, args: data.args });
       return;
     }
 
-    // Also check for notifications (no id field in JSON-RPC)
-    if (data.jsonrpc === '2.0' && data.method && !data.id) {
-      log('Received JSON-RPC notification:', data.method);
+    // =====================================================
+    // MCP Protocol Events (JSON-RPC)
+    // =====================================================
+
+    if (data.jsonrpc === '2.0') {
+      // MCP: Host context changed notification
+      if (data.method === 'ui/notifications/host-context-changed' && data.params) {
+        syncEvent('host-context-changed', data.params);
+        return;
+      }
+
+      // MCP: Tool result notification
+      if (data.method === 'ui/notifications/tool-result' && data.params) {
+        syncEvent('tool-result', data.params);
+        return;
+      }
+
+      // MCP: Tool input notification
+      if (data.method === 'ui/notifications/tool-input' && data.params) {
+        syncEvent('tool-input', data.params);
+        return;
+      }
+
+      // MCP: Tool input partial notification (streaming)
+      if (data.method === 'ui/notifications/tool-input-partial' && data.params) {
+        syncEvent('tool-input-partial', data.params);
+        return;
+      }
+
+      // MCP: Tool cancelled notification
+      if (data.method === 'ui/notifications/tool-cancelled') {
+        syncEvent('tool-cancelled', data.params || {});
+        return;
+      }
+
+      // MCP: Widget making tool call
+      if (data.method === 'tools/call' && data.params) {
+        syncEvent('call-tool', data.params);
+        return;
+      }
+
+      // MCP: Initialize response contains hostContext
+      // Note: data.id can be 0, so we check for undefined instead of truthiness
+      if (data.id !== undefined && data.result && data.result.hostContext) {
+        log('Captured ui/initialize response with hostContext');
+        syncEvent('globals', data.result.hostContext);
+        return;
+      }
+
+      // Log other JSON-RPC notifications for debugging
+      if (data.method && data.id === undefined) {
+        log('Received JSON-RPC notification:', data.method);
+      }
     }
   });
 
-  // CustomEvent pattern (OpenAI SDK fires these)
+  // =====================================================
+  // CustomEvent Listeners (OpenAI SDK fires these)
+  // =====================================================
+
   window.addEventListener('openai:set_globals', function(e) {
     log('Received openai:set_globals CustomEvent:', e.detail);
     var globals = (e.detail && e.detail.globals) ? e.detail.globals : e.detail;
-    if (globals) syncToInspector(globals, 'CustomEvent');
+    if (globals) {
+      syncEvent('globals', globals);
+      // Also extract specific tool data from globals
+      if (globals.toolOutput !== undefined) {
+        syncEvent('tool-output', globals.toolOutput);
+      }
+      if (globals.toolInput !== undefined) {
+        syncEvent('tool-input', globals.toolInput);
+      }
+      if (globals.toolResponseMetadata !== undefined) {
+        syncEvent('tool-response-metadata', globals.toolResponseMetadata);
+      }
+    }
+  });
+
+  // Listen for tool cancellation event
+  window.addEventListener('openai:tool_cancelled', function() {
+    log('Received openai:tool_cancelled CustomEvent');
+    syncEvent('tool-cancelled', {});
   });
 })();
 </script>`;
@@ -100,9 +260,17 @@ function generateSyncScript(inspectorUrl: string): string {
 
 /**
  * Inject the sync script into HTML content
+ *
+ * @param html - The HTML content to inject the script into
+ * @param inspectorUrl - The inspector server URL
+ * @param protocol - Protocol to use for sync ("openai" or "mcp")
  */
-function injectSyncScript(html: string, inspectorUrl: string): string {
-  const script = generateSyncScript(inspectorUrl);
+function injectSyncScript(
+  html: string,
+  inspectorUrl: string,
+  protocol: "openai" | "mcp" = "openai"
+): string {
+  const script = generateSyncScript(inspectorUrl, undefined, protocol);
   if (html.includes("</head>")) return html.replace("</head>", script + "</head>");
   if (html.includes("<body>")) return html.replace("<body>", "<body>" + script);
   return script + html;
@@ -202,7 +370,10 @@ export function registerProxyResources(
         // Check if this is a UI resource that needs sync script injection
         const inspectorUrl = connectionManager.getInspectorUrl();
         if (isUIResource(resource) && content && inspectorUrl) {
-          const modifiedHTML = injectSyncScript(content, inspectorUrl);
+          // Determine protocol from mimeType
+          const protocol: "openai" | "mcp" =
+            resource.mimeType === "text/html;profile=mcp-app" ? "mcp" : "openai";
+          const modifiedHTML = injectSyncScript(content, inspectorUrl, protocol);
           const modifiedMeta = addInspectorToCSP(resource._meta, inspectorUrl);
 
           return {

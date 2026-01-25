@@ -80,6 +80,9 @@ export class ConnectionManager extends EventEmitter {
   /** Inspector URL for injected sync scripts (set when server starts) */
   private inspectorUrl: string | null = null;
 
+  /** Raw MCP hostContext from external widget (for session creation) */
+  private externalMcpHostContext: Record<string, unknown> | null = null;
+
   constructor(options: InspectorServerOptions = {}) {
     super();
     this.maxHistorySize = options.maxHistorySize ?? 1000;
@@ -394,6 +397,14 @@ export class ConnectionManager extends EventEmitter {
   }
 
   /**
+   * Get the raw external MCP hostContext (from ui/initialize response)
+   * This contains all fields including styles, containerDimensions, etc.
+   */
+  getExternalMcpHostContext(): Record<string, unknown> | null {
+    return this.externalMcpHostContext ? { ...this.externalMcpHostContext } : null;
+  }
+
+  /**
    * Update environment state (partial update, merges with current state)
    */
   setEnvironmentState(partial: Partial<EnvironmentState>): EnvironmentState {
@@ -502,14 +513,24 @@ export class ConnectionManager extends EventEmitter {
   }
 
   /**
-   * Update environment from external globals (e.g., from /sync-globals endpoint)
+   * Update environment from external globals (e.g., from /sync-events endpoint)
    *
-   * Maps both OpenAI globals format and MCP hostContext format to EnvironmentState,
-   * then propagates to all Playwright sessions.
+   * Maps both OpenAI globals format and MCP hostContext format to EnvironmentState.
+   * Also stores the raw hostContext for MCP protocol to use when creating new sessions.
+   * Note: Event delivery to Playwright widgets is handled separately by
+   * WidgetSessionManager.syncEvent() in dual-server.ts.
    *
    * @param globals - Globals/hostContext object from external source
    */
-  async updateEnvironmentFromGlobals(globals: Record<string, unknown>): Promise<void> {
+  updateEnvironmentFromGlobals(globals: Record<string, unknown>): void {
+    // Store the raw hostContext for MCP sessions created later
+    // This preserves all fields (styles, containerDimensions, etc.)
+    this.externalMcpHostContext = { ...(this.externalMcpHostContext || {}), ...globals };
+
+    if (this.debug) {
+      console.log(`[inspector] Stored external MCP hostContext:`, this.externalMcpHostContext);
+    }
+
     // Map OpenAI globals format OR MCP hostContext format to EnvironmentState
     const update: Partial<EnvironmentState> = {};
 
@@ -598,14 +619,11 @@ export class ConnectionManager extends EventEmitter {
     }
 
     // Update state using existing method (handles deep merging)
-    const currentState = this.setEnvironmentState(update);
+    this.setEnvironmentState(update);
 
     if (this.debug) {
       console.log(`[inspector] Environment updated from external globals:`, update);
     }
-
-    // Propagate to all Playwright sessions
-    await this.widgetSessionManager.updateAllSessionGlobals(currentState);
   }
 
   /**

@@ -907,3 +907,44 @@ export interface ResetGlobalsOutput {
   reset: boolean;
   currentState: EnvironmentState;
 }
+
+// =============================================================================
+// EVENT SYNC TYPES (for 1:1 widget state mirroring)
+// =============================================================================
+
+/**
+ * All event types that can be synced between external and Playwright widgets
+ */
+export type SyncEventType =
+  // Globals/Environment
+  | "globals"
+  | "host-context-changed"
+  // Tool Events
+  | "tool-input"
+  | "tool-input-partial"
+  | "tool-output"
+  | "tool-result"
+  | "tool-response-metadata"
+  | "tool-cancelled"
+  // Bidirectional Tool Calls
+  | "call-tool"
+  | "call-tool-response"
+  // Lifecycle
+  | "initialize"
+  | "teardown";
+
+/**
+ * Unified sync event payload for /sync-events endpoint
+ */
+export interface SyncEventPayload {
+  /** Event type */
+  type: SyncEventType;
+  /** Event data (type-dependent) */
+  data: unknown;
+  /** Session ID to target (optional - broadcasts to all if omitted) */
+  sessionId?: string;
+  /** Protocol for delivery */
+  protocol: "openai" | "mcp";
+  /** Timestamp when event was captured */
+  timestamp?: string;
+}
