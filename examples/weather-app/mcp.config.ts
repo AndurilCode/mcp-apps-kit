@@ -26,12 +26,11 @@ export default defineConfig({
 
   // Server configuration
   config: {
-    protocol: "openai",
+    protocol: "mcp",
     cors: {
       origin: true,
     },
     debug: {
-      logTool: true,
       level: "debug",
     },
   },

@@ -77,6 +77,9 @@ export class ConnectionManager extends EventEmitter {
   /** Auth token for proxied requests (from OAuth flow) */
   private authToken: string | null = null;
 
+  /** Inspector URL for injected sync scripts (set when server starts) */
+  private inspectorUrl: string | null = null;
+
   constructor(options: InspectorServerOptions = {}) {
     super();
     this.maxHistorySize = options.maxHistorySize ?? 1000;
@@ -475,6 +478,134 @@ export class ConnectionManager extends EventEmitter {
    */
   getAuthToken(): string | null {
     return this.authToken;
+  }
+
+  /**
+   * Set the inspector URL (for injected sync scripts)
+   *
+   * @param url - The inspector URL (e.g., "http://localhost:6274")
+   */
+  setInspectorUrl(url: string): void {
+    this.inspectorUrl = url;
+    if (this.debug) {
+      console.log(`[inspector] Inspector URL set to: ${url}`);
+    }
+  }
+
+  /**
+   * Get the inspector URL
+   *
+   * @returns The current inspector URL or null if not set
+   */
+  getInspectorUrl(): string | null {
+    return this.inspectorUrl;
+  }
+
+  /**
+   * Update environment from external globals (e.g., from /sync-globals endpoint)
+   *
+   * Maps both OpenAI globals format and MCP hostContext format to EnvironmentState,
+   * then propagates to all Playwright sessions.
+   *
+   * @param globals - Globals/hostContext object from external source
+   */
+  async updateEnvironmentFromGlobals(globals: Record<string, unknown>): Promise<void> {
+    // Map OpenAI globals format OR MCP hostContext format to EnvironmentState
+    const update: Partial<EnvironmentState> = {};
+
+    // Theme (both protocols use 'theme')
+    if (globals.theme !== undefined) update.theme = globals.theme as "light" | "dark";
+
+    // Locale (both protocols use 'locale')
+    if (globals.locale !== undefined) update.locale = globals.locale as string;
+
+    // TimeZone (MCP uses 'timeZone')
+    if (globals.timeZone !== undefined) update.timeZone = globals.timeZone as string;
+
+    // Display mode (both protocols use 'displayMode')
+    if (globals.displayMode !== undefined)
+      update.displayMode = globals.displayMode as "inline" | "fullscreen" | "pip";
+
+    // Max height (OpenAI uses 'maxHeight')
+    if (globals.maxHeight !== undefined) update.maxHeight = globals.maxHeight as number;
+
+    // Safe area insets
+    // OpenAI format: { safeArea: { insets: {...} } }
+    // MCP format: { safeAreaInsets: {...} }
+    if (globals.safeArea !== undefined) {
+      const safeArea = globals.safeArea as { insets?: Record<string, number> };
+      if (safeArea.insets) {
+        update.safeAreaInsets = safeArea.insets as {
+          top: number;
+          right: number;
+          bottom: number;
+          left: number;
+        };
+      }
+    } else if (globals.safeAreaInsets !== undefined) {
+      update.safeAreaInsets = globals.safeAreaInsets as {
+        top: number;
+        right: number;
+        bottom: number;
+        left: number;
+      };
+    }
+
+    // Viewport (MCP uses 'viewport' or 'containerDimensions')
+    if (globals.viewport !== undefined) {
+      update.viewport = globals.viewport as { width: number; height: number };
+    } else if (globals.containerDimensions !== undefined) {
+      const dims = globals.containerDimensions as { width?: number; height?: number };
+      if (dims.width !== undefined && dims.height !== undefined) {
+        update.viewport = { width: dims.width, height: dims.height };
+      }
+    }
+
+    // User agent (both protocols may use 'userAgent' but with different structures)
+    if (globals.userAgent !== undefined) {
+      // If it's an object with device/capabilities, use it directly
+      if (typeof globals.userAgent === "object") {
+        update.userAgent = globals.userAgent as {
+          device?: { type?: string };
+          capabilities?: { hover?: boolean; touch?: boolean };
+        };
+      }
+    }
+    // MCP may also have 'deviceCapabilities' separately
+    if (globals.deviceCapabilities !== undefined) {
+      update.userAgent = {
+        ...update.userAgent,
+        capabilities: globals.deviceCapabilities as { hover?: boolean; touch?: boolean },
+      };
+    }
+
+    // User location (OpenAI uses 'userLocation')
+    if (globals.userLocation !== undefined) {
+      update.userLocation = globals.userLocation as {
+        city?: string;
+        region?: string;
+        country?: string;
+        timezone?: string;
+      };
+    }
+
+    // Only update if we have changes
+    if (Object.keys(update).length === 0) {
+      if (this.debug) {
+        console.log(`[inspector] No relevant environment fields in globals, skipping update`);
+      }
+      return;
+    }
+
+    // Update state using existing method (handles deep merging)
+    const currentState = this.setEnvironmentState(update);
+
+    if (this.debug) {
+      console.log(`[inspector] Environment updated from external globals:`, update);
+    }
+
+    // Propagate to all Playwright sessions
+    await this.widgetSessionManager.updateAllSessionGlobals(currentState);
   }
 
   /**

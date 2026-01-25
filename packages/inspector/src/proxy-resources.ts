@@ -13,6 +13,139 @@ import type {
   ResourceContents,
 } from "./types";
 
+// =============================================================================
+// SYNC SCRIPT INJECTION HELPERS
+// =============================================================================
+
+/**
+ * Generate the sync script that listens for environment updates and forwards to inspector
+ *
+ * Handles both protocols:
+ * - OpenAI/ChatGPT: postMessage with type 'openai:set_globals' or CustomEvent 'openai:set_globals'
+ * - MCP Apps: JSON-RPC postMessage with method 'ui/hostContextChanged'
+ */
+function generateSyncScript(inspectorUrl: string): string {
+  return `<script data-inspector-sync>
+(function() {
+  var INSPECTOR_URL = ${JSON.stringify(inspectorUrl)};
+  var DEBUG = true; // Enable debug logging
+
+  function log() {
+    if (DEBUG) console.log.apply(console, ['[inspector-sync]'].concat(Array.prototype.slice.call(arguments)));
+  }
+
+  function syncToInspector(globals, source) {
+    log('Syncing to inspector from', source, globals);
+    try {
+      fetch(INSPECTOR_URL + '/sync-globals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ globals: globals })
+      }).then(function(r) {
+        log('Sync response:', r.status);
+      }).catch(function(e) {
+        log('Sync failed:', e);
+      });
+    } catch (e) {
+      log('Sync error:', e);
+    }
+  }
+
+  log('Inspector sync script loaded, listening for messages...');
+
+  window.addEventListener('message', function(e) {
+    var data = e.data;
+    if (!data) return;
+
+    // Log all messages for debugging (filter out noise)
+    if (typeof data === 'object' && (data.jsonrpc || data.type || data.method)) {
+      log('Received postMessage:', JSON.stringify(data).substring(0, 500));
+    }
+
+    // OpenAI/ChatGPT pattern: { type: 'openai:set_globals', globals: {...} }
+    if (data.type === 'openai:set_globals' && data.globals) {
+      syncToInspector(data.globals, 'openai:set_globals');
+      return;
+    }
+
+    // MCP Apps pattern: JSON-RPC with method 'ui/notifications/host-context-changed'
+    // Format: { jsonrpc: '2.0', method: 'ui/notifications/host-context-changed', params: { theme: '...', ... } }
+    if (data.jsonrpc === '2.0' && data.method === 'ui/notifications/host-context-changed' && data.params) {
+      syncToInspector(data.params, 'ui/notifications/host-context-changed');
+      return;
+    }
+
+    // MCP Apps: Capture initial hostContext from ui/initialize response
+    // Format: { result: { hostContext: {...}, ... } }
+    if (data.result && data.result.hostContext) {
+      syncToInspector(data.result.hostContext, 'ui/initialize response');
+      return;
+    }
+
+    // Also check for notifications (no id field in JSON-RPC)
+    if (data.jsonrpc === '2.0' && data.method && !data.id) {
+      log('Received JSON-RPC notification:', data.method);
+    }
+  });
+
+  // CustomEvent pattern (OpenAI SDK fires these)
+  window.addEventListener('openai:set_globals', function(e) {
+    log('Received openai:set_globals CustomEvent:', e.detail);
+    var globals = (e.detail && e.detail.globals) ? e.detail.globals : e.detail;
+    if (globals) syncToInspector(globals, 'CustomEvent');
+  });
+})();
+</script>`;
+}
+
+/**
+ * Inject the sync script into HTML content
+ */
+function injectSyncScript(html: string, inspectorUrl: string): string {
+  const script = generateSyncScript(inspectorUrl);
+  if (html.includes("</head>")) return html.replace("</head>", script + "</head>");
+  if (html.includes("<body>")) return html.replace("<body>", "<body>" + script);
+  return script + html;
+}
+
+/**
+ * Check if resource is a UI resource that should have script injection
+ */
+function isUIResource(resource: TargetResourceInfo): boolean {
+  return (
+    resource.uri.startsWith("ui://") ||
+    resource.mimeType === "text/html;profile=mcp-app" ||
+    resource.mimeType === "text/html+skybridge"
+  );
+}
+
+/**
+ * Add inspector URL to CSP connect domains in resource metadata
+ */
+function addInspectorToCSP(
+  meta: Record<string, unknown> | undefined,
+  inspectorUrl: string
+): Record<string, unknown> {
+  if (!meta) return { ui: { csp: { connectDomains: [inspectorUrl] } } };
+
+  const ui = (meta.ui as Record<string, unknown>) ?? {};
+  const csp = (ui.csp as Record<string, unknown>) ?? {};
+  const connectDomains = [...((csp.connectDomains as string[]) ?? [])];
+
+  if (!connectDomains.includes(inspectorUrl)) {
+    connectDomains.push(inspectorUrl);
+  }
+
+  return {
+    ...meta,
+    ui: { ...ui, csp: { ...csp, connectDomains } },
+  };
+}
+
+// =============================================================================
+// PROXY RESOURCE REGISTRATION
+// =============================================================================
+
 /**
  * Registered proxy resource info (for tracking)
  */
@@ -66,6 +199,25 @@ export function registerProxyResources(
         // Read from target server
         const content = await connectionManager.readTargetResource(resource.uri);
 
+        // Check if this is a UI resource that needs sync script injection
+        const inspectorUrl = connectionManager.getInspectorUrl();
+        if (isUIResource(resource) && content && inspectorUrl) {
+          const modifiedHTML = injectSyncScript(content, inspectorUrl);
+          const modifiedMeta = addInspectorToCSP(resource._meta, inspectorUrl);
+
+          return {
+            contents: [
+              {
+                uri: resource.uri,
+                mimeType: resource.mimeType,
+                text: modifiedHTML,
+                _meta: modifiedMeta,
+              },
+            ],
+          };
+        }
+
+        // Non-UI resources pass through unchanged
         return {
           contents: [
             {
