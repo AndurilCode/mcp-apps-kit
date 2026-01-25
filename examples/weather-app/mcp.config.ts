@@ -26,7 +26,7 @@ export default defineConfig({
 
   // Server configuration
   config: {
-    protocol: "mcp",
+    protocol: "openai",
     cors: {
       origin: true,
     },

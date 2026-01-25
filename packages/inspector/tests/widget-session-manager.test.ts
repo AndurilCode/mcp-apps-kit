@@ -513,14 +513,13 @@ describe("WidgetSessionManager", () => {
       expect(mockPage.evaluate).toHaveBeenCalled();
     });
 
-    it("should update OpenAI session globals via CustomEvent", async () => {
+    it("should update OpenAI session globals via postMessage to iframe", async () => {
+      // OpenAI now sends from host page (page.evaluate) to iframe
+      // This ensures event.source === window.parent in the widget
       const mockPage = createMockPage();
-      const mockWidgetFrame = {
-        evaluate: vi.fn().mockResolvedValue(undefined),
-      };
       const mainFrameObj = { id: "main" };
       mockPage.mainFrame.mockReturnValue(mainFrameObj);
-      mockPage.frames.mockReturnValue([mainFrameObj, mockWidgetFrame]);
+      mockPage.frames.mockReturnValue([mainFrameObj]);
 
       const session = await manager.createSession(
         "greet",
@@ -544,14 +543,16 @@ describe("WidgetSessionManager", () => {
       });
 
       expect(result).toBe(true);
-      expect(mockWidgetFrame.evaluate).toHaveBeenCalled();
+      // OpenAI now uses page.evaluate (host page) to send to iframe
+      expect(mockPage.evaluate).toHaveBeenCalled();
     });
 
-    it("should return false for OpenAI when widget frame not found", async () => {
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    it("should succeed for OpenAI even without finding widget frame (sends from host)", async () => {
+      // With new host-to-iframe approach, we don't need to find the widget frame
+      // The message is sent from the host page which finds the iframe by ID
       const debugManager = new WidgetSessionManager({ debug: true });
       const mockPage = createMockPage();
-      // Only main frame, no widget frame
+      // Only main frame - but this is fine now since we send from host
       const mainFrameObj = { id: "main" };
       mockPage.mainFrame.mockReturnValue(mainFrameObj);
       mockPage.frames.mockReturnValue([mainFrameObj]);
@@ -575,9 +576,10 @@ describe("WidgetSessionManager", () => {
         userAgent: {},
       });
 
-      expect(result).toBe(false);
+      // Should now succeed since we send from host page to iframe
+      expect(result).toBe(true);
+      expect(mockPage.evaluate).toHaveBeenCalled();
       await debugManager.dispose();
-      consoleSpy.mockRestore();
     });
 
     it("should handle evaluate error gracefully", async () => {

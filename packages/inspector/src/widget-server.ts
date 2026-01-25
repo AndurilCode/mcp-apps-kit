@@ -20,6 +20,8 @@ export interface WidgetSession {
   protocol: "mcp" | "openai";
   createdAt: number;
   environmentState?: EnvironmentState;
+  /** Raw external MCP hostContext (from ui/initialize response) for 1:1 sync */
+  externalHostContext?: Record<string, unknown>;
   // Metadata fields for production parity (legacy, kept for backward compat)
   subjectId?: string;
   sessionId?: string;
@@ -134,13 +136,16 @@ export class WidgetServer {
 
   /**
    * Create a new widget session
+   *
+   * @param externalHostContext - Raw MCP hostContext from external widget's ui/initialize response
    */
   createSession(
     html: string,
     toolResult: unknown,
     toolName: string,
     protocol: "mcp" | "openai",
-    environmentState?: EnvironmentState
+    environmentState?: EnvironmentState,
+    externalHostContext?: Record<string, unknown>
   ): CreateSessionResult {
     const sessionId = randomUUID();
     const session: WidgetSession = {
@@ -151,6 +156,7 @@ export class WidgetServer {
       protocol,
       createdAt: Date.now(),
       environmentState,
+      externalHostContext,
       // Generate mock metadata for production parity (legacy support)
       subjectId: `mock-subject-${randomUUID().slice(0, 8)}`,
       sessionId: `mock-session-${randomUUID().slice(0, 8)}`,
@@ -265,11 +271,20 @@ export class WidgetServer {
     const toolNameJson = JSON.stringify(session.toolName);
     const widgetUrl = `http://127.0.0.1:${this.port}/widget/${session.id}`;
     const env = session.environmentState;
-    const theme = env?.theme ?? "light";
-    const displayMode = env?.displayMode ?? "inline";
-    const locale = env?.locale ?? "en-US";
-    const timeZone = env?.timeZone ?? "UTC";
-    const platform = env?.userAgent?.device?.type === "mobile" ? "mobile" : "desktop";
+
+    // Use external hostContext if available (synced from external widget's ui/initialize)
+    // This ensures 1:1 state sync with the external widget
+    const ext = session.externalHostContext ?? {};
+    const theme = (ext.theme as string) ?? env?.theme ?? "light";
+    const displayMode = (ext.displayMode as string) ?? env?.displayMode ?? "inline";
+    const locale = (ext.locale as string) ?? env?.locale ?? "en-US";
+    const timeZone = (ext.timeZone as string) ?? env?.timeZone ?? "UTC";
+    const platform =
+      (ext.platform as string) ??
+      (env?.userAgent?.device?.type === "mobile" ? "mobile" : "desktop");
+
+    // Serialize the full external hostContext for use in ui/initialize response
+    const externalHostContextJson = JSON.stringify(ext);
 
     return `<!DOCTYPE html>
 <html>
@@ -292,6 +307,23 @@ export class WidgetServer {
       const iframe = document.getElementById('widget-frame');
       let initialized = false;
 
+      // External hostContext from ui/initialize sync (captured before session creation)
+      const externalHostContext = ${externalHostContextJson};
+
+      // Fallback hostContext values (from session.environmentState)
+      const fallbackHostContext = {
+        theme: '${theme}',
+        displayMode: '${displayMode}',
+        availableDisplayModes: ['inline', 'fullscreen'],
+        locale: '${locale}',
+        timeZone: '${timeZone}',
+        platform: '${platform}',
+        viewport: ${JSON.stringify(env?.viewport ?? { width: 800, height: 600 })},
+        toolInfo: {
+          tool: { name: toolName, inputSchema: { type: 'object' } },
+        },
+      };
+
       // Listen for messages from the widget
       window.addEventListener('message', function(event) {
         // Only accept messages from our iframe
@@ -305,6 +337,13 @@ export class WidgetServer {
         // Handle ui/initialize request
         if (message.method === 'ui/initialize') {
           initialized = true;
+
+          // Build hostContext: fallback -> external (pre-session) -> runtime updates
+          // This ensures external widget's hostContext is reflected in Playwright widget
+          const runtimeUpdates = window.__mcpHostContextUpdates || {};
+          const hostContext = { ...fallbackHostContext, ...externalHostContext, ...runtimeUpdates };
+          console.log('[MCP Host] Using hostContext:', JSON.stringify(hostContext));
+
           const response = {
             jsonrpc: '2.0',
             id: message.id,
@@ -318,18 +357,7 @@ export class WidgetServer {
                 logging: {},
                 serverTools: {},
               },
-              hostContext: {
-                theme: '${theme}',
-                displayMode: '${displayMode}',
-                availableDisplayModes: ['inline', 'fullscreen'],
-                locale: '${locale}',
-                timeZone: '${timeZone}',
-                platform: '${platform}',
-                viewport: ${JSON.stringify(env?.viewport ?? { width: 800, height: 600 })},
-                toolInfo: {
-                  tool: { name: toolName, inputSchema: { type: 'object' } },
-                },
-              },
+              hostContext: hostContext,
             },
           };
           iframe.contentWindow.postMessage(response, '*');
@@ -786,6 +814,9 @@ export class WidgetServer {
 
   // Listen for storage sync from host
   window.addEventListener('message', (event) => {
+    // Only accept messages from parent (security validation)
+    if (event.source !== window.parent) return;
+
     if (event.data?.type === 'openai:syncStorage') {
       const key = event.data.key;
       const value = event.data.value;
@@ -793,6 +824,77 @@ export class WidgetServer {
         localStorage.removeItem(key);
       } else {
         localStorage.setItem(key, value);
+      }
+    }
+
+    // Handle inspector sync events (globals, theme, tool data)
+    if (event.data?.type === 'openai:inspector_sync') {
+      const syncType = event.data.syncType;
+      const data = event.data.data;
+      console.log('[OpenAI Runtime] Received inspector sync:', syncType, data);
+
+      switch (syncType) {
+        case 'globals':
+        case 'host-context-changed': {
+          // Update window.openai properties
+          const g = data || {};
+          if (g.theme !== undefined) openaiAPI.theme = g.theme;
+          if (g.displayMode !== undefined) openaiAPI.displayMode = g.displayMode;
+          if (g.locale !== undefined) openaiAPI.locale = g.locale;
+          if (g.maxHeight !== undefined) openaiAPI.maxHeight = g.maxHeight;
+          if (g.safeArea !== undefined) openaiAPI.safeArea = g.safeArea;
+          if (g.userAgent !== undefined) openaiAPI.userAgent = g.userAgent;
+          if (g.userLocation !== undefined) openaiAPI.userLocation = g.userLocation;
+          if (g.toolOutput !== undefined) openaiAPI.toolOutput = g.toolOutput;
+          if (g.toolInput !== undefined) openaiAPI.toolInput = g.toolInput;
+          if (g.toolResponseMetadata !== undefined) openaiAPI.toolResponseMetadata = g.toolResponseMetadata;
+          // Dispatch CustomEvent for SDK listeners
+          window.dispatchEvent(new CustomEvent('openai:set_globals', {
+            detail: { globals: g }
+          }));
+          break;
+        }
+
+        case 'tool-output':
+        case 'tool-result':
+          openaiAPI.toolOutput = data;
+          window.dispatchEvent(new CustomEvent('openai:set_globals', {
+            detail: { globals: { toolOutput: data } }
+          }));
+          break;
+
+        case 'tool-input':
+          openaiAPI.toolInput = data;
+          window.dispatchEvent(new CustomEvent('openai:set_globals', {
+            detail: { globals: { toolInput: data } }
+          }));
+          break;
+
+        case 'tool-input-partial': {
+          // Merge partial input with existing
+          const existing = openaiAPI.toolInput || {};
+          openaiAPI.toolInput = { ...existing, ...data };
+          window.dispatchEvent(new CustomEvent('openai:set_globals', {
+            detail: { globals: { toolInput: data } }
+          }));
+          break;
+        }
+
+        case 'tool-response-metadata':
+          openaiAPI.toolResponseMetadata = data;
+          break;
+
+        case 'call-tool-response':
+          // Re-dispatch as the expected message type
+          window.postMessage({
+            type: 'openai:callTool:response',
+            ...data
+          }, '*');
+          break;
+
+        case 'tool-cancelled':
+          window.dispatchEvent(new CustomEvent('openai:tool_cancelled'));
+          break;
       }
     }
   });

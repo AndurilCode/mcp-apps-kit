@@ -9,7 +9,7 @@ import type { Page } from "playwright";
 import { randomUUID } from "node:crypto";
 import type { ConsoleLogEntry } from "./tools/get-console-logs";
 import type { DetectedProtocol } from "./ui-host";
-import type { EnvironmentState } from "./types";
+import type { EnvironmentState, SyncEventPayload, SyncEventType } from "./types";
 import { mapConsoleTypeToLogLevel, getLogSourceFromUrl } from "./tools/helpers";
 
 /**
@@ -238,21 +238,8 @@ export class WidgetSessionManager {
           }
         }, hostContext);
       } else {
-        // OpenAI protocol: dispatch openai:set_globals CustomEvent that the SDK listens for
-        const frames = page.frames();
-        // Find the frame that's not the main frame (should be the widget iframe)
-        const widgetFrame = frames.find((f) => f !== page.mainFrame());
-
-        if (!widgetFrame) {
-          if (this.debug) {
-            console.warn(
-              `[WidgetSessionManager] Could not find widget frame for session ${sessionId}`
-            );
-          }
-          return false;
-        }
-
-        // Build globals object from environment state
+        // OpenAI protocol: send via inspector_sync message from host to iframe
+        // This ensures event.source === window.parent (required by SDK security)
         const globals = {
           theme: environmentState.theme,
           displayMode: environmentState.displayMode,
@@ -263,31 +250,21 @@ export class WidgetSessionManager {
           userLocation: environmentState.userLocation,
         };
 
-        // Update window.openai properties and dispatch the CustomEvent
-        /* eslint-disable no-undef */
-        await widgetFrame.evaluate((globalsData) => {
-          // Update window.openai properties if available
-          const openai = (window as { openai?: Record<string, unknown> }).openai;
-          if (openai) {
-            if (globalsData.theme !== undefined) openai.theme = globalsData.theme;
-            if (globalsData.displayMode !== undefined) openai.displayMode = globalsData.displayMode;
-            if (globalsData.locale !== undefined) openai.locale = globalsData.locale;
-            if (globalsData.maxHeight !== undefined) openai.maxHeight = globalsData.maxHeight;
-            if (globalsData.safeArea !== undefined) openai.safeArea = globalsData.safeArea;
-            if (globalsData.userAgent !== undefined) openai.userAgent = globalsData.userAgent;
-            if (globalsData.userLocation !== undefined)
-              openai.userLocation = globalsData.userLocation;
-          }
+        const syncMessage = {
+          type: "openai:inspector_sync",
+          syncType: "globals",
+          data: globals,
+        };
 
-          // Dispatch the CustomEvent that the OpenAI adapter listens for
-          window.dispatchEvent(
-            new CustomEvent("openai:set_globals", {
-              detail: { globals: globalsData },
-            })
-          );
-          // eslint-disable-next-line no-console
-          console.log("[OpenAI Host] Dispatched openai:set_globals", globalsData);
-        }, globals);
+        /* eslint-disable no-undef */
+        await page.evaluate((message) => {
+          const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
+          if (iframe?.contentWindow) {
+            iframe.contentWindow.postMessage(message, "*");
+            // eslint-disable-next-line no-console
+            console.log("[OpenAI Host] Sent globals sync:", message.data);
+          }
+        }, syncMessage);
         /* eslint-enable no-undef */
       }
 
@@ -319,6 +296,192 @@ export class WidgetSessionManager {
       }
     }
     return updated;
+  }
+
+  /**
+   * Sync any event to Playwright widget sessions
+   *
+   * This is the unified entry point for all event synchronization in dual mode.
+   * Events from external widgets (ChatGPT/MCP Apps) are mirrored to Playwright widgets
+   * to achieve 1:1 state synchronization.
+   *
+   * @param payload - The sync event payload containing type, data, and routing info
+   */
+  async syncEvent(payload: SyncEventPayload): Promise<void> {
+    const { type, data, sessionId, protocol } = payload;
+
+    // If sessionId specified, sync to that session only
+    if (sessionId) {
+      const session = this.sessions.get(sessionId);
+      if (session && !session.page.isClosed()) {
+        await this.deliverEvent(session, type, data, protocol);
+      }
+      return;
+    }
+
+    // Broadcast to all sessions matching protocol
+    const promises: Promise<void>[] = [];
+    for (const [, session] of this.sessions) {
+      if (session.protocol === protocol && !session.page.isClosed()) {
+        promises.push(this.deliverEvent(session, type, data, protocol));
+      }
+    }
+    await Promise.all(promises);
+  }
+
+  /**
+   * Deliver an event to a specific session based on protocol
+   *
+   * IMPORTANT: Messages must be sent FROM the host page TO the widget iframe
+   * so that event.source === window.parent in the widget. The widget SDK
+   * validates that messages come from the parent frame for security.
+   */
+  private async deliverEvent(
+    session: ActiveWidgetSession,
+    type: SyncEventType,
+    data: unknown,
+    protocol: "openai" | "mcp"
+  ): Promise<void> {
+    try {
+      if (protocol === "mcp") {
+        await this.deliverMcpEvent(session, type, data);
+      } else {
+        await this.deliverOpenAIEvent(session, type, data);
+      }
+
+      if (this.debug) {
+        console.log(
+          `[WidgetSessionManager] Delivered ${type} event to session ${session.id} (${protocol})`
+        );
+      }
+    } catch (error) {
+      if (this.debug) {
+        console.warn(
+          `[WidgetSessionManager] Error delivering ${type} event to session ${session.id}:`,
+          error
+        );
+      }
+    }
+  }
+
+  /**
+   * Deliver an event using MCP protocol (JSON-RPC postMessage from host to iframe)
+   *
+   * Messages are sent FROM the host page TO the widget iframe so that
+   * event.source === window.parent in the widget (required by SDK security).
+   */
+  private async deliverMcpEvent(
+    session: ActiveWidgetSession,
+    type: SyncEventType,
+    data: unknown
+  ): Promise<void> {
+    // Map sync event types to MCP method names
+    const methodMap: Record<SyncEventType, string | null> = {
+      globals: "ui/notifications/host-context-changed",
+      "host-context-changed": "ui/notifications/host-context-changed",
+      "tool-result": "ui/notifications/tool-result",
+      "tool-output": "ui/notifications/tool-result",
+      "tool-input": "ui/notifications/tool-input",
+      "tool-input-partial": "ui/notifications/tool-input-partial",
+      "tool-cancelled": "ui/notifications/tool-cancelled",
+      "call-tool": "tools/call",
+      "call-tool-response": null, // Response, not notification
+      "tool-response-metadata": null, // Handled via tool-result
+      initialize: null,
+      teardown: null,
+    };
+
+    const method = methodMap[type];
+    if (!method) return;
+
+    // For host-context-changed, pass through the full hostContext data
+    // The external widget may send rich data (styles, containerDimensions, etc.)
+    // that we want to preserve for 1:1 state sync
+    let params: unknown = data;
+    if (type === "globals" || type === "host-context-changed") {
+      const d = (data ?? {}) as Record<string, unknown>;
+
+      // Start with all the original fields from the external hostContext
+      params = { ...d };
+
+      // Add platform mapping if not present (derived from userAgent)
+      if (!d.platform && d.userAgent) {
+        const userAgent = d.userAgent as Record<string, unknown>;
+        const deviceType = (userAgent.device as Record<string, unknown>)?.type;
+        (params as Record<string, unknown>).platform =
+          deviceType === "mobile" ? "mobile" : deviceType === "tablet" ? "web" : "desktop";
+      }
+    }
+
+    // For host-context-changed, also store on host page for ui/initialize response
+    // This handles the case where sync arrives before widget initialization
+    const isHostContextUpdate = method === "ui/notifications/host-context-changed";
+
+    // Execute on the HOST page, sending message TO the iframe
+    // This ensures event.source === window.parent in the widget
+    /* eslint-disable no-undef */
+    await session.page.evaluate(
+      ({ method: m, params: p, storeOnHost }) => {
+        // Store host context updates for ui/initialize response
+        if (storeOnHost) {
+          const w = window as Window & { __mcpHostContextUpdates?: Record<string, unknown> };
+          w.__mcpHostContextUpdates = { ...(w.__mcpHostContextUpdates || {}), ...(p as object) };
+          // eslint-disable-next-line no-console
+          console.log("[MCP Host] Stored hostContext update for ui/initialize:", p);
+        }
+
+        const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
+        if (iframe?.contentWindow) {
+          iframe.contentWindow.postMessage(
+            {
+              jsonrpc: "2.0",
+              method: m,
+              params: p,
+            },
+            "*"
+          );
+          // eslint-disable-next-line no-console
+          console.log("[MCP Host] Sent synced event:", m, p);
+        }
+      },
+      { method, params, storeOnHost: isHostContextUpdate }
+    );
+    /* eslint-enable no-undef */
+  }
+
+  /**
+   * Deliver an event using OpenAI protocol (postMessage from host to iframe)
+   *
+   * Messages are sent FROM the host page TO the widget iframe so that
+   * event.source === window.parent in the widget (required by SDK security).
+   *
+   * We use a custom message type `openai:inspector_sync` which the injected
+   * runtime in widget-server.ts listens for and processes.
+   */
+  private async deliverOpenAIEvent(
+    session: ActiveWidgetSession,
+    type: SyncEventType,
+    data: unknown
+  ): Promise<void> {
+    // Build the sync message payload
+    const syncMessage = {
+      type: "openai:inspector_sync",
+      syncType: type,
+      data: data,
+    };
+
+    // Execute on the HOST page, sending message TO the iframe
+    // This ensures event.source === window.parent in the widget
+    /* eslint-disable no-undef */
+    await session.page.evaluate((message) => {
+      const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
+      if (iframe?.contentWindow) {
+        iframe.contentWindow.postMessage(message, "*");
+        // eslint-disable-next-line no-console
+        console.log("[OpenAI Host] Sent synced event:", message.syncType, message.data);
+      }
+    }, syncMessage);
+    /* eslint-enable no-undef */
   }
 
   /**

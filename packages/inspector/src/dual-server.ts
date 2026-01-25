@@ -17,7 +17,12 @@ import { createApp, type App, type ToolDefs } from "@mcp-apps-kit/core";
 import type { Server } from "http";
 import http from "http";
 import { ConnectionManager } from "./connection";
-import type { InspectorServerOptions, TargetServerSchema, McpServerLike } from "./types";
+import type {
+  InspectorServerOptions,
+  TargetServerSchema,
+  McpServerLike,
+  SyncEventPayload,
+} from "./types";
 import { registerProxyToolsDirectly } from "./proxy-tools";
 import { registerProxyResources } from "./proxy-resources";
 import {
@@ -225,7 +230,54 @@ export function createDualInspectorServer(
       return;
     }
 
-    // Environment sync endpoint (for injected scripts in widgets)
+    // Unified event sync endpoint (for 1:1 widget state mirroring)
+    // Handles ALL event types: globals, tool-input, tool-output, tool-result, etc.
+    if (url === "/sync-events") {
+      // Handle CORS for cross-origin widget requests
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+      if (req.method === "OPTIONS") {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+
+      if (req.method === "POST") {
+        // Read body for POST
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) {
+          chunks.push(chunk as Buffer);
+        }
+        const bodyData = Buffer.concat(chunks);
+
+        try {
+          const payload = JSON.parse(bodyData.toString("utf-8")) as SyncEventPayload;
+
+          // For globals/host-context-changed events, also update the environment state
+          if (payload.type === "globals" || payload.type === "host-context-changed") {
+            connectionManager.updateEnvironmentFromGlobals(payload.data as Record<string, unknown>);
+          }
+
+          // Route to widget session manager for delivery to Playwright widgets
+          await connectionManager.getWidgetSessionManager().syncEvent(payload);
+
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true, type: payload.type }));
+        } catch {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Invalid payload" }));
+        }
+        return;
+      }
+
+      res.writeHead(405, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Method not allowed" }));
+      return;
+    }
+
+    // Legacy endpoint for backwards compatibility (redirects to /sync-events)
     if (url === "/sync-globals") {
       // Handle CORS for cross-origin widget requests
       res.setHeader("Access-Control-Allow-Origin", "*");
@@ -251,7 +303,15 @@ export function createDualInspectorServer(
             globals?: Record<string, unknown>;
           };
           if (data.globals) {
-            await connectionManager.updateEnvironmentFromGlobals(data.globals);
+            // Convert to new SyncEventPayload format
+            const payload: SyncEventPayload = {
+              type: "globals",
+              data: data.globals,
+              protocol: "openai", // Legacy endpoint assumed OpenAI protocol
+              timestamp: new Date().toISOString(),
+            };
+            connectionManager.updateEnvironmentFromGlobals(data.globals);
+            await connectionManager.getWidgetSessionManager().syncEvent(payload);
           }
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: true }));

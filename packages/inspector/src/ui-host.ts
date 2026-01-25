@@ -433,6 +433,8 @@ export class UIHostManager {
    *
    * Uses a WidgetServer to serve the widget in a real iframe,
    * enabling proper postMessage communication where event.source === window.parent.
+   *
+   * @param externalHostContext - Raw MCP hostContext from external widget for 1:1 sync
    */
   async renderInBrowser(
     html: string,
@@ -440,7 +442,8 @@ export class UIHostManager {
     toolResult: unknown,
     toolName: string,
     environmentState?: EnvironmentState,
-    viewport?: { width: number; height: number }
+    viewport?: { width: number; height: number },
+    externalHostContext?: Record<string, unknown>
   ): Promise<BrowserRenderResult> {
     const errors: string[] = [];
     const browser = await this.getBrowser();
@@ -465,13 +468,14 @@ export class UIHostManager {
     // Get the widget server (lazy initialization)
     const server = await this.getWidgetServer();
 
-    // Create a session for this widget, passing environment state
+    // Create a session for this widget, passing environment state and external hostContext
     const { hostUrl, sessionId } = server.createSession(
       html,
       toolResult,
       toolName,
       protocol,
-      environmentState
+      environmentState,
+      externalHostContext
     );
 
     // Navigate to the host page (which embeds the widget in an iframe)
