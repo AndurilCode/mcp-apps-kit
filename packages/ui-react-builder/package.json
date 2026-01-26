@@ -74,8 +74,10 @@
   "devDependencies": {
     "@mcp-apps-kit/core": "workspace:*",
     "@mcp-apps-kit/ui-react": "workspace:*",
+    "@tailwindcss/postcss": "^4.1.18",
     "@types/react": "^19.2.9",
     "@types/react-dom": "^19.2.3",
+    "postcss": "^8.5.6",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "vite": "^7.3.1"

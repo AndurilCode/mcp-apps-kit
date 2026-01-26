@@ -26,6 +26,8 @@ export default defineConfig({
     "vite",
     "@typescript-eslint/typescript-estree",
     "@typescript-eslint/types",
+    "postcss",
+    "@tailwindcss/postcss",
   ],
   esbuildOptions(options) {
     options.jsx = "automatic";
