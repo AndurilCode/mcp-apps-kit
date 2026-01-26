@@ -49,6 +49,7 @@ import {
   createWidgetWaitForSelectorTool,
   createWidgetLocatorTool,
   createWidgetDragTool,
+  createWidgetRefreshTool,
   createGetWidgetStateTool,
 } from "./tools";
 
@@ -118,6 +119,7 @@ function createInspectorTools(connectionManager: ConnectionManager): ToolDefs {
     widget_wait_for_selector: createWidgetWaitForSelectorTool(connectionManager),
     widget_locator: createWidgetLocatorTool(connectionManager),
     widget_drag: createWidgetDragTool(connectionManager),
+    widget_refresh: createWidgetRefreshTool(connectionManager),
     get_widget_state: createGetWidgetStateTool(connectionManager),
   };
 }
@@ -202,7 +204,7 @@ export function createStandaloneInspectorServer(
         const bodyData = Buffer.concat(chunks);
 
         try {
-          const { toolName, args } = JSON.parse(bodyData.toString("utf-8")) as {
+          const { sessionId, toolName, args } = JSON.parse(bodyData.toString("utf-8")) as {
             sessionId?: string;
             toolName: string;
             args: Record<string, unknown>;
@@ -226,6 +228,35 @@ export function createStandaloneInspectorServer(
           // Execute the tool on the connected server
           const client = connectionManager.getClient();
           const result = await client.callTool(toolName, args);
+
+          // Extract structured result for recording
+          let toolResult: unknown;
+          if (result.structuredContent) {
+            toolResult = result.structuredContent;
+          } else if (result.content.length > 0) {
+            const textContent = result.content.find(
+              (c: { type: string; text?: string }) => c.type === "text"
+            );
+            if (textContent?.text) {
+              try {
+                toolResult = JSON.parse(textContent.text);
+              } catch {
+                toolResult = textContent.text;
+              }
+            }
+          }
+
+          // Record the tool call with result in the session (if sessionId provided)
+          if (sessionId) {
+            const sessionManager = connectionManager.getWidgetSessionManager();
+            sessionManager.recordToolCall(
+              sessionId,
+              toolName,
+              args,
+              toolResult,
+              result.isError ?? false
+            );
+          }
 
           // Return the result in the format expected by the widget
           // MCP format: { content: [...], isError?: boolean }

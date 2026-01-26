@@ -1040,6 +1040,36 @@ export interface WidgetDragOutput {
 }
 
 /**
+ * Tracked dialog from widget interactions
+ */
+export interface TrackedDialog {
+  /** Dialog type (alert, confirm, prompt, beforeunload) */
+  type: "alert" | "confirm" | "prompt" | "beforeunload";
+  /** Dialog message text */
+  message: string;
+  /** Default value for prompt dialogs */
+  defaultValue?: string;
+  /** How it was handled (accepted, dismissed) */
+  handled: "accepted" | "dismissed";
+  /** Timestamp when dialog appeared */
+  timestamp: number;
+}
+
+/**
+ * Output from widget_refresh tool
+ */
+export interface WidgetRefreshOutput {
+  /** Whether the refresh was successful */
+  success: boolean;
+  /** Error message if refresh failed */
+  error?: string;
+  /** The new tool result after refresh */
+  newToolResult?: unknown;
+  /** Whether the widget was updated */
+  widgetUpdated?: boolean;
+}
+
+/**
  * Input for widget_wait_for_selector tool
  */
 export interface WidgetWaitForSelectorInput {
@@ -1132,6 +1162,10 @@ export interface WidgetToolCall {
   name: string;
   /** Tool arguments */
   args: unknown;
+  /** Tool result (if captured from /execute-tool) */
+  result?: unknown;
+  /** Whether the call resulted in an error */
+  isError?: boolean;
   /** Timestamp when the call was made */
   timestamp: number;
 }
@@ -1184,6 +1218,8 @@ export interface WidgetStateSnapshot {
   consoleLogs: ConsoleLogEntry[];
   /** Page errors captured from the widget */
   pageErrors: string[];
+  /** Native dialogs that were auto-handled (confirm, alert, prompt) */
+  dialogs: TrackedDialog[];
   /** When the session was created */
   createdAt: number;
   /** Which endpoint created this session */

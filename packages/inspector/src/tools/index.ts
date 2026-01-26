@@ -47,6 +47,7 @@ export {
   createWidgetWaitForSelectorTool,
   createWidgetLocatorTool,
   createWidgetDragTool,
+  createWidgetRefreshTool,
 } from "./widget-control";
 
 // Widget state tool (available in both modes for observation)

@@ -6,10 +6,15 @@
  */
 
 import type { Page } from "playwright";
-import { randomUUID } from "node:crypto";
 import type { ConsoleLogEntry } from "./tools/get-console-logs";
 import type { DetectedProtocol } from "./ui-host";
-import type { EnvironmentState, SyncEventPayload, SyncEventType } from "./types";
+import type {
+  EnvironmentState,
+  SyncEventPayload,
+  SyncEventType,
+  TrackedDialog,
+  WidgetToolCall,
+} from "./types";
 import { mapConsoleTypeToLogLevel, getLogSourceFromUrl } from "./tools/helpers";
 
 /**
@@ -31,7 +36,7 @@ export interface ProxyMetadata {
  * Active widget session with persistent Playwright page
  */
 export interface ActiveWidgetSession {
-  /** Unique session ID */
+  /** Unique session ID (same as WidgetServer session ID for unified lookup) */
   id: string;
   /** Tool name that was called */
   toolName: string;
@@ -41,12 +46,14 @@ export interface ActiveWidgetSession {
   toolResult: unknown;
   /** Playwright page instance */
   page: Page;
-  /** WidgetServer session ID */
-  widgetSessionId: string;
   /** Accumulated console logs */
   consoleLogs: ConsoleLogEntry[];
   /** Accumulated page errors */
   pageErrors: string[];
+  /** Tracked dialogs (alert, confirm, prompt) that were auto-handled */
+  dialogs: TrackedDialog[];
+  /** Tool calls made by the widget (with results from /execute-tool) */
+  toolCalls: WidgetToolCall[];
   /** When the session was created */
   createdAt: number;
   /** Protocol used (mcp or openai) */
@@ -67,6 +74,8 @@ export interface SessionInfo {
   createdAt: number;
   logCount: number;
   errorCount: number;
+  /** Count of auto-handled dialogs */
+  dialogCount: number;
   /** Which endpoint created this session */
   source: SessionSource;
 }
@@ -105,7 +114,7 @@ export class WidgetSessionManager {
    * @param toolArgs - Arguments passed to the tool
    * @param toolResult - Result returned by the tool
    * @param page - Playwright page instance
-   * @param widgetSessionId - WidgetServer session ID
+   * @param sessionId - Session ID (from WidgetServer, used for unified lookup)
    * @param protocol - Protocol used (mcp or openai)
    * @param source - Which endpoint created this session (default: 'agent')
    * @param proxyMetadata - Optional metadata for proxy sessions
@@ -115,21 +124,23 @@ export class WidgetSessionManager {
     toolArgs: Record<string, unknown>,
     toolResult: unknown,
     page: Page,
-    widgetSessionId: string,
+    sessionId: string,
     protocol: DetectedProtocol,
     source: SessionSource = "agent",
     proxyMetadata?: ProxyMetadata
   ): Promise<ActiveWidgetSession> {
-    const id = randomUUID();
+    // Use the WidgetServer's session ID directly for unified lookup
+    // This ensures the host page and session manager use the same ID
     const session: ActiveWidgetSession = {
-      id,
+      id: sessionId,
       toolName,
       toolArgs,
       toolResult,
       page,
-      widgetSessionId,
       consoleLogs: [],
       pageErrors: [],
+      dialogs: [],
+      toolCalls: [],
       createdAt: Date.now(),
       protocol,
       source,
@@ -154,10 +165,34 @@ export class WidgetSessionManager {
       session.pageErrors.push(err.message);
     });
 
-    this.sessions.set(id, session);
+    // Set up dialog handler to auto-accept dialogs (confirm, alert, prompt)
+    // This prevents blocking and allows widget interactions to proceed
+    page.on("dialog", async (dialog) => {
+      const dialogType = dialog.type() as "alert" | "confirm" | "prompt" | "beforeunload";
+      const trackedDialog: TrackedDialog = {
+        type: dialogType,
+        message: dialog.message(),
+        defaultValue: dialog.defaultValue() || undefined,
+        handled: "accepted",
+        timestamp: Date.now(),
+      };
+
+      session.dialogs.push(trackedDialog);
+
+      if (this.debug) {
+        console.log(
+          `[WidgetSessionManager] Auto-accepted ${dialogType} dialog: "${dialog.message()}"`
+        );
+      }
+
+      // Accept the dialog (for confirm: returns true, for prompt: returns default value)
+      await dialog.accept(dialog.defaultValue());
+    });
+
+    this.sessions.set(sessionId, session);
 
     if (this.debug) {
-      console.log(`[WidgetSessionManager] Created session ${id} for tool ${toolName}`);
+      console.log(`[WidgetSessionManager] Created session ${sessionId} for tool ${toolName}`);
     }
 
     return session;
@@ -181,8 +216,61 @@ export class WidgetSessionManager {
       createdAt: session.createdAt,
       logCount: session.consoleLogs.length,
       errorCount: session.pageErrors.length,
+      dialogCount: session.dialogs.length,
       source: session.source,
     }));
+  }
+
+  /**
+   * Record a tool call with its result (called from /execute-tool)
+   *
+   * @param sessionId - Session ID (unified with WidgetServer)
+   * @param toolName - Name of the tool that was called
+   * @param args - Arguments passed to the tool
+   * @param result - Result returned by the tool
+   * @param isError - Whether the tool call resulted in an error
+   */
+  recordToolCall(
+    sessionId: string,
+    toolName: string,
+    args: unknown,
+    result: unknown,
+    isError: boolean = false
+  ): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      if (this.debug) {
+        console.log(`[WidgetSessionManager] Session not found: ${sessionId}`);
+      }
+      return false;
+    }
+
+    session.toolCalls.push({
+      name: toolName,
+      args,
+      result,
+      isError,
+      timestamp: Date.now(),
+    });
+
+    if (this.debug) {
+      console.log(`[WidgetSessionManager] Recorded tool call ${toolName} for session ${sessionId}`);
+    }
+
+    return true;
+  }
+
+  /**
+   * Update the session's tool result (for refresh scenarios)
+   */
+  updateToolResult(sessionId: string, toolResult: unknown): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return false;
+    }
+
+    session.toolResult = toolResult;
+    return true;
   }
 
   /**
