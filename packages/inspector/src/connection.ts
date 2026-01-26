@@ -90,7 +90,7 @@ export class ConnectionManager extends EventEmitter {
     this.debug = options.debug ?? false;
     this.environmentState = getDefaultEnvironmentState();
     this.widgetSessionManager = new WidgetSessionManager({
-      ttl: 5 * 60 * 1000, // 5 minutes
+      ttl: options.sessionTtl ?? 5 * 60 * 1000, // Use option or default 5 min
       debug: this.debug,
     });
   }
