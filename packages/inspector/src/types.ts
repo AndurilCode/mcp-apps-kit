@@ -1019,6 +1019,24 @@ export interface WidgetFillOutput {
   success: boolean;
   /** Error message if fill failed */
   error?: string;
+  /** Element type that was filled (input, textarea, contenteditable, select) */
+  elementType?: string;
+  /** The method used to fill (fill, type, selectOption) */
+  fillMethod?: "fill" | "type" | "selectOption" | "contenteditable";
+}
+
+/**
+ * Output from widget_drag tool
+ */
+export interface WidgetDragOutput {
+  /** Whether the drag was successful */
+  success: boolean;
+  /** Error message if drag failed */
+  error?: string;
+  /** Starting position of the drag */
+  startPosition?: { x: number; y: number };
+  /** Ending position of the drag */
+  endPosition?: { x: number; y: number };
 }
 
 /**

@@ -15,6 +15,7 @@ import type {
   WidgetWaitForSelectorOutput,
   WidgetLocatorOutput,
   LocatorElementInfo,
+  WidgetDragOutput,
 } from "../types";
 
 // =============================================================================
@@ -164,11 +165,14 @@ export const widgetFillInputSchema = z.object({
 export const widgetFillOutputSchema = z.object({
   success: z.boolean(),
   error: z.string().optional(),
+  elementType: z.string().optional(),
+  fillMethod: z.enum(["fill", "type", "selectOption", "contenteditable"]).optional(),
 });
 
 export function createWidgetFillTool(connectionManager: ConnectionManager) {
   return defineTool({
-    description: "Fill an input element in a widget iframe with a value.",
+    description:
+      "Fill an input, textarea, select, or contenteditable element in a widget iframe with a value. Automatically detects element type and uses the appropriate fill method.",
     input: widgetFillInputSchema,
     output: widgetFillOutputSchema,
     handler: async (input): Promise<WidgetFillOutput> => {
@@ -200,9 +204,76 @@ export function createWidgetFillTool(connectionManager: ConnectionManager) {
         }
 
         const timeout = input.timeout ?? 5000;
-        await frame.fill(input.selector, input.value, { timeout });
+        const locator = frame.locator(input.selector).first();
 
-        return { success: true };
+        // Wait for element to be visible
+        await locator.waitFor({ state: "visible", timeout });
+
+        // Detect element type
+        const elementInfo = await locator.evaluate((el) => {
+          const tagName = el.tagName.toLowerCase();
+          const isContentEditable =
+            el.getAttribute("contenteditable") === "true" ||
+            el.getAttribute("contenteditable") === "";
+          const inputType = el.getAttribute("type") ?? "text";
+          return { tagName, isContentEditable, inputType };
+        });
+
+        const { tagName, isContentEditable, inputType } = elementInfo;
+        let fillMethod: "fill" | "type" | "selectOption" | "contenteditable" = "fill";
+        let elementType = tagName;
+
+        // Handle different element types
+        if (tagName === "select") {
+          // For select elements, use selectOption
+          fillMethod = "selectOption";
+          await locator.selectOption(input.value, { timeout });
+        } else if (isContentEditable) {
+          // For contenteditable elements, use click + type with clear
+          fillMethod = "contenteditable";
+          elementType = `${tagName}[contenteditable]`;
+          await locator.click({ timeout });
+          // Select all and delete existing content
+          await locator.press("Control+a");
+          await locator.press("Backspace");
+          // Type the new value
+          await locator.pressSequentially(input.value, { delay: 10 });
+        } else if (tagName === "textarea") {
+          // For textarea, try fill first, fall back to type if needed
+          elementType = "textarea";
+          try {
+            await locator.fill(input.value, { timeout });
+            fillMethod = "fill";
+          } catch {
+            // Fallback: click, clear, and type
+            fillMethod = "type";
+            await locator.click({ timeout });
+            await locator.press("Control+a");
+            await locator.pressSequentially(input.value, { delay: 10 });
+          }
+        } else if (tagName === "input") {
+          elementType = `input[type=${inputType}]`;
+          // For input elements, use standard fill
+          await locator.fill(input.value, { timeout });
+          fillMethod = "fill";
+        } else {
+          // Unknown element type - try fill, then type as fallback
+          try {
+            await locator.fill(input.value, { timeout });
+            fillMethod = "fill";
+          } catch {
+            // Fallback: click and type
+            fillMethod = "type";
+            await locator.click({ timeout });
+            await locator.pressSequentially(input.value, { delay: 10 });
+          }
+        }
+
+        return {
+          success: true,
+          elementType,
+          fillMethod,
+        };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return {
@@ -389,6 +460,184 @@ export function createWidgetLocatorTool(connectionManager: ConnectionManager) {
           success: true,
           count,
           elements,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          success: false,
+          error: message,
+        };
+      }
+    },
+  });
+}
+
+// =============================================================================
+// WIDGET DRAG TOOL
+// =============================================================================
+
+export const widgetDragInputSchema = z.object({
+  sessionId: z.string().describe("Session ID of the widget"),
+  source: z
+    .union([
+      z.string().describe("CSS selector of the element to drag"),
+      z.object({ x: z.number(), y: z.number() }).describe("Position to start drag from"),
+    ])
+    .describe("Source element (selector) or position to drag from"),
+  target: z
+    .union([
+      z.string().describe("CSS selector of the element to drop on"),
+      z.object({ x: z.number(), y: z.number() }).describe("Position to drop at"),
+    ])
+    .describe("Target element (selector) or position to drop at"),
+  timeout: z.number().optional().describe("Timeout in ms (default: 5000)"),
+  steps: z
+    .number()
+    .optional()
+    .describe("Number of intermediate steps for smoother drag animation (default: 10)"),
+});
+
+export const widgetDragOutputSchema = z.object({
+  success: z.boolean(),
+  error: z.string().optional(),
+  startPosition: z
+    .object({
+      x: z.number(),
+      y: z.number(),
+    })
+    .optional(),
+  endPosition: z
+    .object({
+      x: z.number(),
+      y: z.number(),
+    })
+    .optional(),
+});
+
+export function createWidgetDragTool(connectionManager: ConnectionManager) {
+  return defineTool({
+    description:
+      "Drag an element from source to target in a widget iframe. Supports both CSS selectors and pixel positions. Useful for drag-and-drop interactions like moving tasks between columns.",
+    input: widgetDragInputSchema,
+    output: widgetDragOutputSchema,
+    handler: async (input): Promise<WidgetDragOutput> => {
+      const sessionManager = connectionManager.getWidgetSessionManager();
+      const session = sessionManager.getSession(input.sessionId);
+
+      if (!session) {
+        return {
+          success: false,
+          error: `Session not found: ${input.sessionId}`,
+        };
+      }
+
+      if (session.page.isClosed()) {
+        return {
+          success: false,
+          error: "Page closed",
+        };
+      }
+
+      try {
+        // Target the widget iframe
+        const frame = session.page.frame({ url: /\/widget\// });
+        if (!frame) {
+          return {
+            success: false,
+            error: "Widget iframe not found",
+          };
+        }
+
+        const timeout = input.timeout ?? 5000;
+        const steps = input.steps ?? 10;
+
+        // Get start position
+        let startPosition: { x: number; y: number };
+        if (typeof input.source === "string") {
+          const sourceLocator = frame.locator(input.source).first();
+          await sourceLocator.waitFor({ state: "visible", timeout });
+          const sourceBbox = await sourceLocator.boundingBox();
+          if (!sourceBbox) {
+            return {
+              success: false,
+              error: `Source element not found or not visible: ${input.source}`,
+            };
+          }
+          // Center of the source element
+          startPosition = {
+            x: sourceBbox.x + sourceBbox.width / 2,
+            y: sourceBbox.y + sourceBbox.height / 2,
+          };
+        } else {
+          startPosition = input.source;
+        }
+
+        // Get end position
+        let endPosition: { x: number; y: number };
+        if (typeof input.target === "string") {
+          const targetLocator = frame.locator(input.target).first();
+          await targetLocator.waitFor({ state: "visible", timeout });
+          const targetBbox = await targetLocator.boundingBox();
+          if (!targetBbox) {
+            return {
+              success: false,
+              error: `Target element not found or not visible: ${input.target}`,
+            };
+          }
+          // Center of the target element
+          endPosition = {
+            x: targetBbox.x + targetBbox.width / 2,
+            y: targetBbox.y + targetBbox.height / 2,
+          };
+        } else {
+          endPosition = input.target;
+        }
+
+        // Get the iframe's position relative to the page to adjust coordinates
+        const frameElement = await frame.frameElement();
+        const frameBbox = await frameElement.boundingBox();
+        if (!frameBbox) {
+          return {
+            success: false,
+            error: "Could not determine iframe position",
+          };
+        }
+
+        // Adjust positions to page coordinates (add iframe offset)
+        const pageStartX = frameBbox.x + startPosition.x;
+        const pageStartY = frameBbox.y + startPosition.y;
+        const pageEndX = frameBbox.x + endPosition.x;
+        const pageEndY = frameBbox.y + endPosition.y;
+
+        // Perform the drag operation using page mouse
+        const mouse = session.page.mouse;
+
+        // Move to start position
+        await mouse.move(pageStartX, pageStartY);
+
+        // Press mouse button
+        await mouse.down();
+
+        // Move in steps to simulate smooth drag
+        for (let i = 1; i <= steps; i++) {
+          const progress = i / steps;
+          const currentX = pageStartX + (pageEndX - pageStartX) * progress;
+          const currentY = pageStartY + (pageEndY - pageStartY) * progress;
+          await mouse.move(currentX, currentY);
+          // Small delay for drag events to register
+          await session.page.waitForTimeout(10);
+        }
+
+        // Release mouse button
+        await mouse.up();
+
+        // Small delay for drop events to process
+        await session.page.waitForTimeout(50);
+
+        return {
+          success: true,
+          startPosition,
+          endPosition,
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
