@@ -35,3 +35,18 @@ export {
 
 // Environment Configuration tools
 export { createSetGlobalsTool, createGetGlobalsTool, createResetGlobalsTool } from "./set-globals";
+
+// Widget control tools (standalone mode - agent owns session flow)
+// In standalone mode, the agent creates and owns widget sessions, making these tools useful.
+// In dual mode, these tools are NOT exposed because the Playwright mirror is disconnected
+// from the external widget's DOM state (no bidirectional sync).
+export {
+  createWidgetEvaluateTool,
+  createWidgetClickTool,
+  createWidgetFillTool,
+  createWidgetWaitForSelectorTool,
+  createWidgetLocatorTool,
+} from "./widget-control";
+
+// Widget state tool (available in both modes for observation)
+export { createGetWidgetStateTool } from "./get-widget-state";

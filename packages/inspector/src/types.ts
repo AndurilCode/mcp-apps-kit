@@ -948,3 +948,243 @@ export interface SyncEventPayload {
   /** Timestamp when event was captured */
   timestamp?: string;
 }
+
+// =============================================================================
+// WIDGET CONTROL TYPES (for dual mode agent tools)
+// =============================================================================
+
+/**
+ * Input for widget_evaluate tool
+ */
+export interface WidgetEvaluateInput {
+  /** Session ID of the widget to evaluate in */
+  sessionId: string;
+  /** JavaScript code to evaluate in the widget iframe */
+  expression: string;
+}
+
+/**
+ * Output from widget_evaluate tool
+ */
+export interface WidgetEvaluateOutput {
+  /** Whether the evaluation was successful */
+  success: boolean;
+  /** Result of the evaluation (JSON-serializable) */
+  result?: unknown;
+  /** Error message if evaluation failed */
+  error?: string;
+}
+
+/**
+ * Input for widget_click tool
+ */
+export interface WidgetClickInput {
+  /** Session ID of the widget */
+  sessionId: string;
+  /** CSS selector of the element to click */
+  selector: string;
+  /** Optional timeout in ms (default: 5000) */
+  timeout?: number;
+}
+
+/**
+ * Output from widget_click tool
+ */
+export interface WidgetClickOutput {
+  /** Whether the click was successful */
+  success: boolean;
+  /** Error message if click failed */
+  error?: string;
+}
+
+/**
+ * Input for widget_fill tool
+ */
+export interface WidgetFillInput {
+  /** Session ID of the widget */
+  sessionId: string;
+  /** CSS selector of the input element */
+  selector: string;
+  /** Value to fill in the input */
+  value: string;
+  /** Optional timeout in ms (default: 5000) */
+  timeout?: number;
+}
+
+/**
+ * Output from widget_fill tool
+ */
+export interface WidgetFillOutput {
+  /** Whether the fill was successful */
+  success: boolean;
+  /** Error message if fill failed */
+  error?: string;
+}
+
+/**
+ * Input for widget_wait_for_selector tool
+ */
+export interface WidgetWaitForSelectorInput {
+  /** Session ID of the widget */
+  sessionId: string;
+  /** CSS selector to wait for */
+  selector: string;
+  /** State to wait for (default: "visible") */
+  state?: "attached" | "detached" | "visible" | "hidden";
+  /** Optional timeout in ms (default: 5000) */
+  timeout?: number;
+}
+
+/**
+ * Output from widget_wait_for_selector tool
+ */
+export interface WidgetWaitForSelectorOutput {
+  /** Whether the selector was found in the expected state */
+  success: boolean;
+  /** Error message if wait failed */
+  error?: string;
+}
+
+/**
+ * Input for widget_locator tool
+ */
+export interface WidgetLocatorInput {
+  /** Session ID of the widget */
+  sessionId: string;
+  /** CSS selector to query */
+  selector: string;
+  /** Optional timeout in ms (default: 5000) */
+  timeout?: number;
+}
+
+/**
+ * Element info returned by widget_locator
+ */
+export interface LocatorElementInfo {
+  /** Tag name of the element */
+  tagName: string;
+  /** Element text content */
+  textContent: string;
+  /** Element id attribute */
+  id?: string;
+  /** Element class attribute */
+  className?: string;
+  /** Whether the element is visible */
+  isVisible: boolean;
+  /** Whether the element is enabled */
+  isEnabled: boolean;
+  /** Bounding box of the element */
+  boundingBox?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+}
+
+/**
+ * Output from widget_locator tool
+ */
+export interface WidgetLocatorOutput {
+  /** Whether the query was successful */
+  success: boolean;
+  /** Number of matching elements */
+  count?: number;
+  /** Info about matching elements (first 10) */
+  elements?: LocatorElementInfo[];
+  /** Error message if query failed */
+  error?: string;
+}
+
+/**
+ * Input for get_widget_state tool
+ */
+export interface GetWidgetStateInput {
+  /** Session ID of the widget */
+  sessionId: string;
+  /** Whether to include DOM snapshot (default: false) */
+  includeDOM?: boolean;
+}
+
+/**
+ * A recorded tool call made by the widget
+ */
+export interface WidgetToolCall {
+  /** Tool name */
+  name: string;
+  /** Tool arguments */
+  args: unknown;
+  /** Timestamp when the call was made */
+  timestamp: number;
+}
+
+/**
+ * A recorded state change (OpenAI setState)
+ */
+export interface WidgetStateChange {
+  /** The state that was set */
+  state: unknown;
+  /** Timestamp when the state was set */
+  timestamp: number;
+}
+
+/**
+ * DOM snapshot for widget state
+ */
+export interface WidgetDOMSnapshot {
+  /** Serialized HTML */
+  html: string;
+  /** Text content of the body */
+  textContent: string;
+}
+
+/**
+ * Comprehensive widget state snapshot
+ */
+export interface WidgetStateSnapshot {
+  /** Session ID */
+  sessionId: string;
+  /** Tool name that created this session */
+  toolName: string;
+  /** Protocol used (mcp or openai) */
+  protocol: "mcp" | "openai";
+  /** Current environment/globals state */
+  globals: EnvironmentState;
+  /** Original tool input arguments */
+  toolInput: Record<string, unknown>;
+  /** Tool result that was rendered */
+  toolOutput: unknown;
+  /** Tool response metadata (if available) */
+  toolResponseMetadata?: Record<string, unknown>;
+  /** Tool calls made by the widget */
+  toolCalls: WidgetToolCall[];
+  /** State changes (OpenAI setState history) */
+  stateChanges: WidgetStateChange[];
+  /** Optional DOM snapshot */
+  dom?: WidgetDOMSnapshot;
+  /** Console logs captured from the widget */
+  consoleLogs: ConsoleLogEntry[];
+  /** Page errors captured from the widget */
+  pageErrors: string[];
+  /** When the session was created */
+  createdAt: number;
+  /** Which endpoint created this session */
+  source: "apps" | "agent";
+  /** Proxy metadata (for sessions created via /apps/mcp) */
+  proxyMetadata?: {
+    targetServerUrl: string;
+    targetToolName: string;
+  };
+}
+
+/**
+ * Output from get_widget_state tool
+ */
+export interface GetWidgetStateOutput {
+  /** Whether the state was retrieved successfully */
+  success: boolean;
+  /** The widget state snapshot */
+  state?: WidgetStateSnapshot;
+  /** Error message if retrieval failed */
+  error?: string;
+}
