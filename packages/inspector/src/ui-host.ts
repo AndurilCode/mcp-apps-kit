@@ -10,6 +10,12 @@ import type { TestClient } from "@mcp-apps-kit/testing";
 import { JSDOM } from "jsdom";
 import { MCP_WIDGET_MIME_TYPE, OPENAI_WIDGET_MIME_TYPE } from "@mcp-apps-kit/core";
 import {
+  detectProtocolFromMimeType as _detectProtocolFromMimeType,
+  findUIResourceForTool as findUIResourceForToolHelper,
+  type DetectedProtocol as _DetectedProtocol,
+  type UIResourceInfo as _UIResourceInfo,
+} from "./tools/helpers";
+import {
   MCPHostEmulator,
   type MCPHostEmulatorOptions,
   type MCPEnvironmentSettings,
@@ -27,19 +33,10 @@ type Browser = Awaited<ReturnType<(typeof import("playwright"))["chromium"]["lau
 type Page = Awaited<ReturnType<Browser["newPage"]>>;
 
 /**
- * Detected protocol for a UI widget
+ * Re-export protocol detection utilities from helpers for backwards compatibility
  */
-export type DetectedProtocol = "mcp" | "openai";
-
-/**
- * Detect protocol from MIME type (standalone function for use without UIHostManager instance)
- */
-export function detectProtocolFromMimeType(mimeType: string | undefined): DetectedProtocol | null {
-  if (!mimeType) return null;
-  if (mimeType === MCP_WIDGET_MIME_TYPE) return "mcp";
-  if (mimeType === OPENAI_WIDGET_MIME_TYPE) return "openai";
-  return null;
-}
+export type DetectedProtocol = _DetectedProtocol;
+export const detectProtocolFromMimeType = _detectProtocolFromMimeType;
 
 /**
  * Options for UI Host Manager
@@ -52,13 +49,9 @@ export interface UIHostManagerOptions {
 }
 
 /**
- * Information about a UI resource
+ * Re-export UIResourceInfo from helpers for backwards compatibility
  */
-export interface UIResourceInfo {
-  uri: string;
-  mimeType: string;
-  protocol: DetectedProtocol;
-}
+export type UIResourceInfo = _UIResourceInfo;
 
 /**
  * Result from headless rendering
@@ -113,33 +106,15 @@ export class UIHostManager {
 
   /**
    * Find UI resource for a tool by name
+   *
+   * Delegates to the shared helper which supports 4 URI patterns:
+   * - `__ui_{toolName}` (internal convention)
+   * - `/{toolName}?` (query string)
+   * - `/{toolName}` (path segment)
+   * - `toolName={toolName}` (query parameter)
    */
   async findUIResourceForTool(toolName: string): Promise<UIResourceInfo | null> {
-    const rawClient = this.client.raw;
-    const resourcesResult = await rawClient.listResources();
-
-    // Look for resources that match the tool name
-    // Convention: ui://{app-name}/{tool-name} or similar patterns
-    for (const resource of resourcesResult.resources) {
-      const uri = resource.uri;
-      const mimeType = resource.mimeType;
-
-      if (!mimeType) continue;
-
-      const protocol = this.detectProtocol(mimeType);
-      if (!protocol) continue;
-
-      // Check if URI matches tool name (various patterns)
-      if (
-        uri.includes(`/${toolName}`) ||
-        uri.endsWith(toolName) ||
-        uri.includes(`toolName=${toolName}`)
-      ) {
-        return { uri, mimeType, protocol };
-      }
-    }
-
-    return null;
+    return findUIResourceForToolHelper(this.client.raw, toolName);
   }
 
   /**

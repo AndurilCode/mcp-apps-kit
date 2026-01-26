@@ -5,12 +5,15 @@
  * Implements the MCP Apps JSON-RPC over postMessage protocol.
  */
 
-/**
- * JSDOM type - minimal interface for type safety
- */
-interface JSDOMInterface {
-  window: Window;
-}
+import {
+  BaseHostEmulator,
+  type JSDOMInterface,
+  type TrackedToolCall,
+  type BaseHostEmulatorOptions,
+} from "./base-host";
+
+// Re-export shared types for backwards compatibility
+export type { TrackedToolCall };
 
 /**
  * Environment settings for the emulator
@@ -28,26 +31,11 @@ export interface MCPEnvironmentSettings {
 /**
  * Options for configuring the MCP host emulator
  */
-export interface MCPHostEmulatorOptions {
-  /** Tool name for context */
-  toolName: string;
-  /** Initial tool result */
-  toolResult: unknown;
+export interface MCPHostEmulatorOptions extends BaseHostEmulatorOptions {
   /** Handle bidirectional tool calls from widget */
   onToolCall?: (name: string, args: unknown) => Promise<unknown>;
   /** Environment settings (theme, locale, viewport, etc.) */
   environment?: MCPEnvironmentSettings;
-  /** Enable debug logging */
-  debug?: boolean;
-}
-
-/**
- * Tracked tool call from the widget
- */
-export interface TrackedToolCall {
-  name: string;
-  args: unknown;
-  timestamp: number;
 }
 
 /**
@@ -56,14 +44,7 @@ export interface TrackedToolCall {
  * Emulates Claude Desktop's ext-apps host for testing MCP Apps widgets.
  * Supports injecting into jsdom or generating Playwright init scripts.
  */
-export class MCPHostEmulator {
-  private options: MCPHostEmulatorOptions;
-  private toolCallHistory: TrackedToolCall[] = [];
-
-  constructor(options: MCPHostEmulatorOptions) {
-    this.options = options;
-  }
-
+export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
   /**
    * Inject the host emulator into a jsdom window
    */
@@ -266,11 +247,7 @@ export class MCPHostEmulator {
           const name = msg.params.name as string;
           const args = msg.params.arguments ?? {};
 
-          this.toolCallHistory.push({
-            name,
-            args,
-            timestamp: Date.now(),
-          });
+          this.recordToolCall(name, args);
 
           if (this.options.onToolCall) {
             void this.options
@@ -415,20 +392,6 @@ export class MCPHostEmulator {
       source: parentWindow as Window,
     });
     window.dispatchEvent(event);
-  }
-
-  /**
-   * Get history of tool calls made by the widget
-   */
-  getToolCallHistory(): TrackedToolCall[] {
-    return [...this.toolCallHistory];
-  }
-
-  /**
-   * Clear tool call history
-   */
-  clearToolCallHistory(): void {
-    this.toolCallHistory = [];
   }
 
   /**

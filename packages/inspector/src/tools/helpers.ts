@@ -5,7 +5,22 @@
  * and processing widget content.
  */
 
-import { detectProtocolFromMimeType, type DetectedProtocol } from "../ui-host";
+import { MCP_WIDGET_MIME_TYPE, OPENAI_WIDGET_MIME_TYPE } from "@mcp-apps-kit/core";
+
+/**
+ * Detected protocol for a UI widget
+ */
+export type DetectedProtocol = "mcp" | "openai";
+
+/**
+ * Detect protocol from MIME type (standalone function for use without UIHostManager instance)
+ */
+export function detectProtocolFromMimeType(mimeType: string | undefined): DetectedProtocol | null {
+  if (!mimeType) return null;
+  if (mimeType === MCP_WIDGET_MIME_TYPE) return "mcp";
+  if (mimeType === OPENAI_WIDGET_MIME_TYPE) return "openai";
+  return null;
+}
 
 /**
  * Minimal MCP client interface for resource operations
