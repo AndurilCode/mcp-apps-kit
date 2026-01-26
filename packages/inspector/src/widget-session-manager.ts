@@ -425,7 +425,7 @@ export class WidgetSessionManager {
         // Store host context updates for ui/initialize response
         if (storeOnHost) {
           const w = window as Window & { __mcpHostContextUpdates?: Record<string, unknown> };
-          w.__mcpHostContextUpdates = { ...(w.__mcpHostContextUpdates || {}), ...(p as object) };
+          w.__mcpHostContextUpdates = { ...(w.__mcpHostContextUpdates ?? {}), ...(p as object) };
           // eslint-disable-next-line no-console
           console.log("[MCP Host] Stored hostContext update for ui/initialize:", p);
         }

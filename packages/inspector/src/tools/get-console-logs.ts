@@ -241,6 +241,7 @@ export function createGetConsoleLogsTool(connectionManager: ConnectionManager) {
       const viewport = input.viewport ?? { width: 800, height: 600 };
       const waitMs = input.waitMs ?? 500;
       const environmentState = connectionManager.getEnvironmentState();
+      const inspectorUrl = connectionManager.getInspectorUrl();
 
       try {
         const renderResult = await uiHostManager.renderInBrowser(
@@ -249,7 +250,9 @@ export function createGetConsoleLogsTool(connectionManager: ConnectionManager) {
           toolResult,
           input.tool,
           environmentState,
-          viewport
+          viewport,
+          undefined, // externalHostContext
+          inspectorUrl ?? undefined
         );
 
         const { page } = renderResult;

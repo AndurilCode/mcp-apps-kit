@@ -22,6 +22,8 @@ export interface WidgetSession {
   environmentState?: EnvironmentState;
   /** Raw external MCP hostContext (from ui/initialize response) for 1:1 sync */
   externalHostContext?: Record<string, unknown>;
+  /** Inspector URL for tool call execution endpoint */
+  inspectorUrl?: string;
   // Metadata fields for production parity (legacy, kept for backward compat)
   subjectId?: string;
   sessionId?: string;
@@ -138,6 +140,7 @@ export class WidgetServer {
    * Create a new widget session
    *
    * @param externalHostContext - Raw MCP hostContext from external widget's ui/initialize response
+   * @param inspectorUrl - Inspector server URL for tool call execution (e.g., "http://localhost:6274")
    */
   createSession(
     html: string,
@@ -145,7 +148,8 @@ export class WidgetServer {
     toolName: string,
     protocol: "mcp" | "openai",
     environmentState?: EnvironmentState,
-    externalHostContext?: Record<string, unknown>
+    externalHostContext?: Record<string, unknown>,
+    inspectorUrl?: string
   ): CreateSessionResult {
     const sessionId = randomUUID();
     const session: WidgetSession = {
@@ -157,6 +161,7 @@ export class WidgetServer {
       createdAt: Date.now(),
       environmentState,
       externalHostContext,
+      inspectorUrl,
       // Generate mock metadata for production parity (legacy support)
       subjectId: `mock-subject-${randomUUID().slice(0, 8)}`,
       sessionId: `mock-session-${randomUUID().slice(0, 8)}`,
@@ -299,7 +304,7 @@ export class WidgetServer {
   </style>
 </head>
 <body>
-  <iframe id="widget-frame" src="${widgetUrl}" sandbox="allow-scripts allow-same-origin"></iframe>
+  <iframe id="widget-frame" src="${widgetUrl}" sandbox="allow-scripts allow-same-origin allow-forms allow-modals"></iframe>
   <script>
     (function() {
       const toolResult = ${toolResultJson};
@@ -381,20 +386,61 @@ export class WidgetServer {
 
         // Handle tools/call requests (bidirectional)
         if (message.method === 'tools/call') {
+          // Store for get_widget_state observation
+          window.__inspectorToolCalls = window.__inspectorToolCalls || [];
+          window.__inspectorToolCalls.push({
+            name: message.params.name,
+            args: message.params.arguments,
+            timestamp: Date.now()
+          });
+
           console.log('[WIDGET_TOOL_CALL] ' + JSON.stringify({
             name: message.params.name,
             args: message.params.arguments,
           }));
 
-          // Return mock result
-          const callResponse = {
-            jsonrpc: '2.0',
-            id: message.id,
-            result: {
-              content: [{ type: 'text', text: '{"mock": true}' }],
-            },
-          };
-          iframe.contentWindow.postMessage(callResponse, '*');
+          // Execute on connected server via inspector endpoint
+          const inspectorUrl = ${JSON.stringify(session.inspectorUrl ?? null)};
+          if (inspectorUrl) {
+            fetch(inspectorUrl + '/execute-tool', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sessionId: '${session.id}',
+                toolName: message.params.name,
+                args: message.params.arguments,
+                messageId: message.id
+              })
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(result) {
+              iframe.contentWindow.postMessage({
+                jsonrpc: '2.0',
+                id: message.id,
+                result: result
+              }, '*');
+              console.log('[MCP Host] Tool call executed:', message.params.name);
+            })
+            .catch(function(err) {
+              console.error('[MCP Host] Tool call failed:', err);
+              iframe.contentWindow.postMessage({
+                jsonrpc: '2.0',
+                id: message.id,
+                error: { code: -32000, message: 'Tool execution failed: ' + err.message }
+              }, '*');
+            });
+          } else {
+            // No inspector URL - return mock result (for tests or offline)
+            console.log('[MCP Host] No inspector URL, returning mock result');
+            const callResponse = {
+              jsonrpc: '2.0',
+              id: message.id,
+              result: {
+                content: [{ type: 'text', text: '{"mock": true}' }],
+              },
+            };
+            iframe.contentWindow.postMessage(callResponse, '*');
+          }
         }
 
         // Handle logging/sendMessage
@@ -430,7 +476,7 @@ export class WidgetServer {
   </style>
 </head>
 <body>
-  <iframe id="widget-frame" src="${widgetUrl}" sandbox="allow-scripts allow-same-origin"></iframe>
+  <iframe id="widget-frame" src="${widgetUrl}" sandbox="allow-scripts allow-same-origin allow-forms allow-modals"></iframe>
   <script>
     // Simple host that listens for widget messages
     const iframe = document.getElementById('widget-frame');
@@ -444,13 +490,55 @@ export class WidgetServer {
 
       // Handle widget tool calls
       if (message && message.type === 'openai:callTool') {
+        // Store for get_widget_state observation
+        window.__inspectorToolCalls = window.__inspectorToolCalls || [];
+        window.__inspectorToolCalls.push({
+          name: message.toolName,
+          args: message.args,
+          timestamp: Date.now()
+        });
+
         console.log('[WIDGET_TOOL_CALL]', message.toolName, message.args);
-        // Return mock result
-        iframe.contentWindow.postMessage({
-          type: 'openai:callTool:response',
-          callId: message.callId,
-          result: { output: '{"mock": true}' }
-        }, '*');
+
+        // Execute on connected server via inspector endpoint
+        const inspectorUrl = ${JSON.stringify(session.inspectorUrl ?? null)};
+        if (inspectorUrl) {
+          fetch(inspectorUrl + '/execute-tool', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId: '${session.id}',
+              toolName: message.toolName,
+              args: message.args,
+              callId: message.callId
+            })
+          })
+          .then(function(res) { return res.json(); })
+          .then(function(result) {
+            iframe.contentWindow.postMessage({
+              type: 'openai:callTool:response',
+              callId: message.callId,
+              result: result
+            }, '*');
+            console.log('[OpenAI Host] Tool call executed:', message.toolName);
+          })
+          .catch(function(err) {
+            console.error('[OpenAI Host] Tool call failed:', err);
+            iframe.contentWindow.postMessage({
+              type: 'openai:callTool:response',
+              callId: message.callId,
+              error: 'Tool execution failed: ' + err.message
+            }, '*');
+          });
+        } else {
+          // No inspector URL - return mock result (for tests or offline)
+          console.log('[OpenAI Host] No inspector URL, returning mock result');
+          iframe.contentWindow.postMessage({
+            type: 'openai:callTool:response',
+            callId: message.callId,
+            result: { output: '{"mock": true}' }
+          }, '*');
+        }
       }
 
       // Handle state changes

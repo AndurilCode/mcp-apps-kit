@@ -298,6 +298,7 @@ export function createTestWidgetInteractionTool(connectionManager: ConnectionMan
       const uiHostManager = new UIHostManager(client);
       const viewport = input.viewport ?? { width: 800, height: 600 };
       const environmentState = connectionManager.getEnvironmentState();
+      const inspectorUrl = connectionManager.getInspectorUrl();
 
       try {
         const renderResult = await uiHostManager.renderInBrowser(
@@ -306,7 +307,9 @@ export function createTestWidgetInteractionTool(connectionManager: ConnectionMan
           toolResult,
           input.tool,
           environmentState,
-          viewport
+          viewport,
+          undefined, // externalHostContext
+          inspectorUrl ?? undefined
         );
 
         const { page } = renderResult;

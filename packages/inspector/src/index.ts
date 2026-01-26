@@ -84,6 +84,11 @@ export type {
 // =============================================================================
 
 export { createInspectorServer } from "./server";
+export {
+  createStandaloneInspectorServer,
+  type StandaloneInspectorServer,
+  type StandaloneInspectorServerOptions,
+} from "./standalone-server";
 export { ConnectionManager } from "./connection";
 export { WidgetServer, type WidgetSession, type CreateSessionResult } from "./widget-server";
 

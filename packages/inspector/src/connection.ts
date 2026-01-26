@@ -525,7 +525,7 @@ export class ConnectionManager extends EventEmitter {
   updateEnvironmentFromGlobals(globals: Record<string, unknown>): void {
     // Store the raw hostContext for MCP sessions created later
     // This preserves all fields (styles, containerDimensions, etc.)
-    this.externalMcpHostContext = { ...(this.externalMcpHostContext || {}), ...globals };
+    this.externalMcpHostContext = { ...(this.externalMcpHostContext ?? {}), ...globals };
 
     if (this.debug) {
       console.log(`[inspector] Stored external MCP hostContext:`, this.externalMcpHostContext);
