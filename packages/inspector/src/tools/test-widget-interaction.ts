@@ -19,7 +19,7 @@ import {
 
 const interactionActionSchema = z.object({
   action: z
-    .enum(["click", "type", "hover", "wait", "snapshot", "scroll"])
+    .enum(["click", "type", "hover", "wait", "snapshot", "scroll", "drag"])
     .describe("Action to perform"),
   selector: z.string().optional().describe("CSS selector for the target element"),
   text: z.string().optional().describe("Text to type (for type action)"),
@@ -31,6 +31,14 @@ const interactionActionSchema = z.object({
     })
     .optional()
     .describe("Position for scroll/click (optional)"),
+  target: z
+    .union([
+      z.string().describe("CSS selector for drag target"),
+      z.object({ x: z.number(), y: z.number() }).describe("Position for drag target"),
+    ])
+    .optional()
+    .describe("Target element or position for drag action"),
+  steps: z.number().optional().describe("Number of steps for drag animation (default: 10)"),
 });
 
 export const testWidgetInteractionInputSchema = z.object({
@@ -174,6 +182,71 @@ export function createTestWidgetInteractionTool(connectionManager: ConnectionMan
                       // eslint-disable-next-line no-undef
                       window.scrollTo(x, y);
                     }, position);
+                  }
+                  break;
+
+                case "drag":
+                  {
+                    const target = actionItem.target;
+                    const dragSteps = actionItem.steps ?? 10;
+                    if (!target) {
+                      errors.push(`Action ${i} (drag) failed: target is required`);
+                      break;
+                    }
+
+                    // Get source position
+                    let startX: number, startY: number;
+                    if (selector) {
+                      const sourceBbox = await frame.locator(selector).first().boundingBox();
+                      if (!sourceBbox) {
+                        errors.push(`Action ${i} (drag) failed: source not found`);
+                        break;
+                      }
+                      startX = sourceBbox.x + sourceBbox.width / 2;
+                      startY = sourceBbox.y + sourceBbox.height / 2;
+                    } else if (position) {
+                      startX = position.x;
+                      startY = position.y;
+                    } else {
+                      errors.push(`Action ${i} (drag) failed: selector or position required`);
+                      break;
+                    }
+
+                    // Get target position
+                    let endX: number, endY: number;
+                    if (typeof target === "string") {
+                      const targetBbox = await frame.locator(target).first().boundingBox();
+                      if (!targetBbox) {
+                        errors.push(`Action ${i} (drag) failed: target not found`);
+                        break;
+                      }
+                      endX = targetBbox.x + targetBbox.width / 2;
+                      endY = targetBbox.y + targetBbox.height / 2;
+                    } else {
+                      endX = target.x;
+                      endY = target.y;
+                    }
+
+                    // Get iframe offset
+                    const frameEl = await frame.frameElement();
+                    const frameBbox = await frameEl.boundingBox();
+                    const offsetX = frameBbox?.x ?? 0;
+                    const offsetY = frameBbox?.y ?? 0;
+
+                    // Perform drag
+                    const mouse = page.mouse;
+                    await mouse.move(offsetX + startX, offsetY + startY);
+                    await mouse.down();
+                    for (let step = 1; step <= dragSteps; step++) {
+                      const progress = step / dragSteps;
+                      await mouse.move(
+                        offsetX + startX + (endX - startX) * progress,
+                        offsetY + startY + (endY - startY) * progress
+                      );
+                      await page.waitForTimeout(10);
+                    }
+                    await mouse.up();
+                    await page.waitForTimeout(50);
                   }
                   break;
 
@@ -398,6 +471,71 @@ export function createTestWidgetInteractionTool(connectionManager: ConnectionMan
                     },
                     { x: scrollX, y: scrollY }
                   );
+                }
+                break;
+
+              case "drag":
+                {
+                  const target = actionItem.target;
+                  const dragSteps = actionItem.steps ?? 10;
+                  if (!target) {
+                    errors.push(`Action ${i} (drag) failed: target is required`);
+                    break;
+                  }
+
+                  // Get source position
+                  let startX: number, startY: number;
+                  if (selector) {
+                    const sourceBbox = await frame.locator(selector).first().boundingBox();
+                    if (!sourceBbox) {
+                      errors.push(`Action ${i} (drag) failed: source not found`);
+                      break;
+                    }
+                    startX = sourceBbox.x + sourceBbox.width / 2;
+                    startY = sourceBbox.y + sourceBbox.height / 2;
+                  } else if (position) {
+                    startX = position.x;
+                    startY = position.y;
+                  } else {
+                    errors.push(`Action ${i} (drag) failed: selector or position required`);
+                    break;
+                  }
+
+                  // Get target position
+                  let endX: number, endY: number;
+                  if (typeof target === "string") {
+                    const targetBbox = await frame.locator(target).first().boundingBox();
+                    if (!targetBbox) {
+                      errors.push(`Action ${i} (drag) failed: target not found`);
+                      break;
+                    }
+                    endX = targetBbox.x + targetBbox.width / 2;
+                    endY = targetBbox.y + targetBbox.height / 2;
+                  } else {
+                    endX = target.x;
+                    endY = target.y;
+                  }
+
+                  // Get iframe offset
+                  const frameEl = await frame.frameElement();
+                  const frameBbox = await frameEl.boundingBox();
+                  const offsetX = frameBbox?.x ?? 0;
+                  const offsetY = frameBbox?.y ?? 0;
+
+                  // Perform drag
+                  const mouse = page.mouse;
+                  await mouse.move(offsetX + startX, offsetY + startY);
+                  await mouse.down();
+                  for (let step = 1; step <= dragSteps; step++) {
+                    const progress = step / dragSteps;
+                    await mouse.move(
+                      offsetX + startX + (endX - startX) * progress,
+                      offsetY + startY + (endY - startY) * progress
+                    );
+                    await page.waitForTimeout(10);
+                  }
+                  await mouse.up();
+                  await page.waitForTimeout(50);
                 }
                 break;
 

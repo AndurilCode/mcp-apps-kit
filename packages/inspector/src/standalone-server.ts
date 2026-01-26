@@ -48,6 +48,7 @@ import {
   createWidgetFillTool,
   createWidgetWaitForSelectorTool,
   createWidgetLocatorTool,
+  createWidgetDragTool,
   createGetWidgetStateTool,
 } from "./tools";
 
@@ -116,6 +117,7 @@ function createInspectorTools(connectionManager: ConnectionManager): ToolDefs {
     widget_fill: createWidgetFillTool(connectionManager),
     widget_wait_for_selector: createWidgetWaitForSelectorTool(connectionManager),
     widget_locator: createWidgetLocatorTool(connectionManager),
+    widget_drag: createWidgetDragTool(connectionManager),
     get_widget_state: createGetWidgetStateTool(connectionManager),
   };
 }
