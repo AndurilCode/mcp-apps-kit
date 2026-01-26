@@ -76,6 +76,8 @@ export const getWidgetStateOutputSchema = z.object({
         z.object({
           name: z.string(),
           args: z.unknown(),
+          result: z.unknown().optional(),
+          isError: z.boolean().optional(),
           timestamp: z.number(),
         })
       ),
@@ -102,6 +104,15 @@ export const getWidgetStateOutputSchema = z.object({
         })
       ),
       pageErrors: z.array(z.string()),
+      dialogs: z.array(
+        z.object({
+          type: z.enum(["alert", "confirm", "prompt", "beforeunload"]),
+          message: z.string(),
+          defaultValue: z.string().optional(),
+          handled: z.enum(["accepted", "dismissed"]),
+          timestamp: z.number(),
+        })
+      ),
       createdAt: z.number(),
       source: z.enum(["apps", "agent"]),
       proxyMetadata: z
@@ -146,21 +157,9 @@ export function createGetWidgetStateTool(connectionManager: ConnectionManager) {
         // Target the widget iframe
         const frame = session.page.frame({ url: /\/widget\// });
 
-        // Extract tool calls from HOST PAGE (where they are stored by widget-server.ts)
-        // Tool calls are intercepted and stored on the host page's window.__inspectorToolCalls
-        let toolCalls: WidgetToolCall[] = [];
-        try {
-          /* eslint-disable no-undef */
-          toolCalls = await session.page.evaluate(() => {
-            const w = window as Window & {
-              __inspectorToolCalls?: Array<{ name: string; args: unknown; timestamp: number }>;
-            };
-            return w.__inspectorToolCalls ?? [];
-          });
-          /* eslint-enable no-undef */
-        } catch {
-          // Host page tool calls extraction failed, continue with empty array
-        }
+        // Get tool calls from session (recorded by /execute-tool with results)
+        // This includes the actual tool results, not just args
+        const toolCalls: WidgetToolCall[] = session.toolCalls;
 
         // Extract widget runtime state (state changes, metadata) from the WIDGET IFRAME
         let stateChanges: WidgetStateChange[] = [];
@@ -256,6 +255,7 @@ export function createGetWidgetStateTool(connectionManager: ConnectionManager) {
           dom,
           consoleLogs: session.consoleLogs,
           pageErrors: session.pageErrors,
+          dialogs: session.dialogs,
           createdAt: session.createdAt,
           source: session.source,
           proxyMetadata: session.proxyMetadata,

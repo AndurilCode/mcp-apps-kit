@@ -16,6 +16,7 @@ import type {
   WidgetLocatorOutput,
   LocatorElementInfo,
   WidgetDragOutput,
+  WidgetRefreshOutput,
 } from "../types";
 
 // =============================================================================
@@ -638,6 +639,167 @@ export function createWidgetDragTool(connectionManager: ConnectionManager) {
           success: true,
           startPosition,
           endPosition,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          success: false,
+          error: message,
+        };
+      }
+    },
+  });
+}
+
+// =============================================================================
+// WIDGET REFRESH TOOL
+// =============================================================================
+
+export const widgetRefreshInputSchema = z.object({
+  sessionId: z.string().describe("Session ID of the widget to refresh"),
+  tool: z
+    .string()
+    .optional()
+    .describe("Tool name to call for fresh data (defaults to original tool)"),
+  arguments: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe("Arguments for the tool call (defaults to original arguments)"),
+});
+
+export const widgetRefreshOutputSchema = z.object({
+  success: z.boolean(),
+  error: z.string().optional(),
+  newToolResult: z.unknown().optional(),
+  widgetUpdated: z.boolean().optional(),
+});
+
+export function createWidgetRefreshTool(connectionManager: ConnectionManager) {
+  return defineTool({
+    description:
+      "Refresh a widget session with fresh data by re-calling the tool and pushing the new result to the widget. This syncs the widget UI with the current server state after mutations.",
+    input: widgetRefreshInputSchema,
+    output: widgetRefreshOutputSchema,
+    handler: async (input): Promise<WidgetRefreshOutput> => {
+      const sessionManager = connectionManager.getWidgetSessionManager();
+      const session = sessionManager.getSession(input.sessionId);
+
+      if (!session) {
+        return {
+          success: false,
+          error: `Session not found: ${input.sessionId}`,
+        };
+      }
+
+      if (session.page.isClosed()) {
+        return {
+          success: false,
+          error: "Page closed",
+        };
+      }
+
+      // Check if connected to server
+      const state = connectionManager.getState();
+      if (!state.connected) {
+        return {
+          success: false,
+          error: "Not connected to server",
+        };
+      }
+
+      try {
+        // Determine which tool and arguments to use
+        const toolName = input.tool ?? session.toolName;
+        const toolArgs = input.arguments ?? session.toolArgs;
+
+        // Call the tool to get fresh data
+        const client = connectionManager.getClient();
+        const result = await client.callTool(toolName, toolArgs);
+
+        // Extract the new tool result
+        let newToolResult: unknown;
+        if (result.structuredContent) {
+          newToolResult = result.structuredContent;
+        } else if (result.content.length > 0) {
+          const textContent = result.content.find(
+            (c: { type: string; text?: string }) => c.type === "text"
+          );
+          if (textContent?.text) {
+            try {
+              newToolResult = JSON.parse(textContent.text);
+            } catch {
+              newToolResult = textContent.text;
+            }
+          }
+        }
+
+        // Update the session's toolResult
+        session.toolResult = newToolResult;
+
+        // Push the new data to the widget via postMessage
+        const frame = session.page.frame({ url: /\/widget\// });
+        let widgetUpdated = false;
+
+        if (frame) {
+          try {
+            if (session.protocol === "mcp") {
+              // MCP protocol: Send ui/context with updated toolOutput
+              /* eslint-disable no-undef */
+              await session.page.evaluate(
+                ({ toolOutput }) => {
+                  const iframe = document.getElementById(
+                    "widget-frame"
+                  ) as HTMLIFrameElement | null;
+                  if (iframe?.contentWindow) {
+                    // Send updated context to widget
+                    iframe.contentWindow.postMessage(
+                      {
+                        jsonrpc: "2.0",
+                        method: "ui/context",
+                        params: {
+                          toolOutput,
+                        },
+                      },
+                      "*"
+                    );
+                  }
+                },
+                { toolOutput: newToolResult }
+              );
+              /* eslint-enable no-undef */
+              widgetUpdated = true;
+            } else {
+              // OpenAI protocol: Use updateOutput message
+              /* eslint-disable no-undef */
+              await session.page.evaluate(
+                ({ output }) => {
+                  const iframe = document.getElementById(
+                    "widget-frame"
+                  ) as HTMLIFrameElement | null;
+                  if (iframe?.contentWindow) {
+                    iframe.contentWindow.postMessage(
+                      {
+                        type: "updateOutput",
+                        output,
+                      },
+                      "*"
+                    );
+                  }
+                },
+                { output: newToolResult }
+              );
+              /* eslint-enable no-undef */
+              widgetUpdated = true;
+            }
+          } catch {
+            // Widget update failed, but tool call succeeded
+          }
+        }
+
+        return {
+          success: true,
+          newToolResult,
+          widgetUpdated,
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
