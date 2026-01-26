@@ -121,3 +121,19 @@ export type {
 
 // Re-export SyncEventType as a value (it's a union type alias, needs special handling)
 export { type SyncEventType } from "./environment-types";
+
+// DOM sync types (DOM interaction synchronization)
+export type {
+  DomClickPayload,
+  DomInputPayload,
+  DomScrollPayload,
+  DomFocusPayload,
+  DomKeyModifiers,
+  DomKeyPayload,
+  DomSelectPayload,
+  DomDragPayload,
+  DomSyncEventType,
+  DomEventPayload,
+} from "./dom-sync-types";
+
+export { isDomSyncEventType } from "./dom-sync-types";

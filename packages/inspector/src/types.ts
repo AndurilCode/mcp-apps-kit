@@ -113,4 +113,17 @@ export type {
   ResetGlobalsOutput,
   SyncEventPayload,
   SyncEventType,
+  // DOM sync types
+  DomClickPayload,
+  DomInputPayload,
+  DomScrollPayload,
+  DomFocusPayload,
+  DomKeyModifiers,
+  DomKeyPayload,
+  DomSelectPayload,
+  DomDragPayload,
+  DomSyncEventType,
+  DomEventPayload,
 } from "./types/index";
+
+export { isDomSyncEventType } from "./types/index";

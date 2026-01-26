@@ -24,16 +24,24 @@
  * underlying HTTP content can be efficiently cleaned up.
  */
 
-import type { Page } from "playwright";
+import type { Frame, Page } from "playwright";
 import type { ConsoleLogEntry } from "./tools/get-console-logs";
 import type { DetectedProtocol } from "./ui-host";
 import type {
+  DomClickPayload,
+  DomDragPayload,
+  DomFocusPayload,
+  DomInputPayload,
+  DomKeyPayload,
+  DomScrollPayload,
+  DomSelectPayload,
   EnvironmentState,
   SyncEventPayload,
   SyncEventType,
   TrackedDialog,
   WidgetToolCall,
 } from "./types";
+import { isDomSyncEventType } from "./types";
 import { mapConsoleTypeToLogLevel, getLogSourceFromUrl } from "./tools/helpers";
 
 /**
@@ -446,6 +454,13 @@ export class WidgetSessionManager {
   async syncEvent(payload: SyncEventPayload): Promise<void> {
     const { type, data, sessionId, protocol } = payload;
 
+    // Route DOM interaction events directly to Playwright (not protocol-based delivery)
+    // These are replayed to achieve 1:1 state sync with external widget
+    if (isDomSyncEventType(type)) {
+      await this.applyDomEvent(type, data, sessionId);
+      return;
+    }
+
     // If sessionId specified, sync to that session only
     if (sessionId) {
       const session = this.sessions.get(sessionId);
@@ -532,7 +547,26 @@ export class WidgetSessionManager {
       "tool-response-metadata": null, // Handled via tool-result
       initialize: null,
       teardown: null,
+      // DOM events are handled separately via applyDomEvent, not via postMessage
+      "dom-click": null,
+      "dom-dblclick": null,
+      "dom-input": null,
+      "dom-change": null,
+      "dom-focus": null,
+      "dom-blur": null,
+      "dom-scroll": null,
+      "dom-keydown": null,
+      "dom-keyup": null,
+      "dom-select": null,
+      "dom-hover": null,
+      "dom-drag": null,
     };
+
+    // Handle call-tool-response specially - deliver to host page to resolve pending calls
+    if (type === "call-tool-response") {
+      await this.deliverToolCallResponse(session, data);
+      return;
+    }
 
     const method = methodMap[type];
     if (!method) return;
@@ -625,6 +659,229 @@ export class WidgetSessionManager {
       }
     }, syncMessage);
     /* eslint-enable no-undef */
+  }
+
+  /**
+   * Deliver tool call response to host page (for dual mode)
+   *
+   * In dual mode, the Playwright mirror widget queues tool calls and waits
+   * for synced responses from the external widget. This method delivers
+   * those responses to resolve the pending calls.
+   */
+  private async deliverToolCallResponse(
+    session: ActiveWidgetSession,
+    data: unknown
+  ): Promise<void> {
+    /* eslint-disable no-undef */
+    await session.page.evaluate((responseData) => {
+      const d = responseData as { name?: string; result?: unknown; toolName?: string };
+      const toolName = d.name || d.toolName;
+
+      if (!toolName) {
+        // eslint-disable-next-line no-console
+        console.log("[MCP Host] Tool response missing name, cannot match:", responseData);
+        return;
+      }
+
+      type PendingCall = { messageId: number | string; args: unknown; timestamp: number };
+      const w = window as Window & { __pendingToolCalls?: Record<string, PendingCall[]> };
+      const pending = w.__pendingToolCalls?.[toolName];
+
+      if (!pending || pending.length === 0) {
+        // eslint-disable-next-line no-console
+        console.log("[MCP Host] No pending calls for tool:", toolName);
+        return;
+      }
+
+      // Get the oldest pending call (FIFO)
+      const call = pending.shift();
+      if (!call) return;
+
+      // Send response to widget iframe
+      const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
+      if (iframe?.contentWindow) {
+        iframe.contentWindow.postMessage(
+          {
+            jsonrpc: "2.0",
+            id: call.messageId,
+            result: d.result ?? { content: [{ type: "text", text: JSON.stringify(d) }] },
+          },
+          "*"
+        );
+        // eslint-disable-next-line no-console
+        console.log("[MCP Host] Delivered synced tool response:", toolName, call.messageId);
+      }
+    }, data);
+    /* eslint-enable no-undef */
+  }
+
+  // ===========================================================================
+  // DOM INTERACTION SYNC
+  // ===========================================================================
+
+  /**
+   * Apply DOM events directly to Playwright widget frames
+   *
+   * These events are replayed to achieve 1:1 state sync with external widget.
+   * Unlike protocol-based events, these interact directly with the widget DOM.
+   */
+  private async applyDomEvent(
+    type: SyncEventType,
+    data: unknown,
+    sessionId?: string
+  ): Promise<void> {
+    const sessions = sessionId
+      ? [this.sessions.get(sessionId)].filter((s): s is ActiveWidgetSession => !!s)
+      : Array.from(this.sessions.values());
+
+    for (const session of sessions) {
+      if (session.page.isClosed()) continue;
+
+      // Find widget iframe
+      const frame = session.page.frame({ name: "widget-frame" });
+      if (!frame) {
+        if (this.debug) {
+          console.log(`[WidgetSessionManager] No widget-frame found for session ${session.id}`);
+        }
+        continue;
+      }
+
+      try {
+        await this.applyDomEventToFrame(frame, type, data);
+        session.lastAccessedAt = Date.now();
+        if (this.debug) {
+          console.log(`[WidgetSessionManager] Applied ${type} to session ${session.id}`);
+        }
+      } catch (error) {
+        if (this.debug) {
+          console.warn(`[WidgetSessionManager] Failed to apply ${type}:`, error);
+        }
+      }
+    }
+  }
+
+  /**
+   * Apply a single DOM event to a Playwright frame
+   */
+  private async applyDomEventToFrame(
+    frame: Frame,
+    type: SyncEventType,
+    data: unknown
+  ): Promise<void> {
+    const timeout = 5000;
+
+    switch (type) {
+      case "dom-click": {
+        const { selector, x, y } = data as DomClickPayload;
+        await frame.click(selector, {
+          position: x !== undefined && y !== undefined ? { x, y } : undefined,
+          timeout,
+        });
+        break;
+      }
+
+      case "dom-dblclick": {
+        const { selector, x, y } = data as DomClickPayload;
+        await frame.dblclick(selector, {
+          position: x !== undefined && y !== undefined ? { x, y } : undefined,
+          timeout,
+        });
+        break;
+      }
+
+      case "dom-input": {
+        const { selector, value } = data as DomInputPayload;
+        await frame.fill(selector, value, { timeout });
+        break;
+      }
+
+      case "dom-change": {
+        const { selector, value, checked, inputType } = data as DomInputPayload;
+        // Only use setChecked for checkbox/radio inputs
+        if (checked !== undefined && (inputType === "checkbox" || inputType === "radio")) {
+          await frame.setChecked(selector, checked, { timeout });
+        } else {
+          await frame.fill(selector, value, { timeout });
+        }
+        break;
+      }
+
+      case "dom-select": {
+        const { selector, value, values } = data as DomSelectPayload;
+        await frame.selectOption(selector, values ?? value, { timeout });
+        break;
+      }
+
+      case "dom-scroll": {
+        const { selector, scrollTop, scrollLeft } = data as DomScrollPayload;
+        /* eslint-disable no-undef */
+        await frame.evaluate(
+          ({ sel, top, left }) => {
+            if (sel) {
+              const el = document.querySelector(sel);
+              if (el) {
+                el.scrollTop = top;
+                el.scrollLeft = left;
+              }
+            } else {
+              window.scrollTo(left, top);
+            }
+          },
+          { sel: selector ?? null, top: scrollTop, left: scrollLeft }
+        );
+        /* eslint-enable no-undef */
+        break;
+      }
+
+      case "dom-focus": {
+        const { selector } = data as DomFocusPayload;
+        await frame.focus(selector, { timeout });
+        break;
+      }
+
+      case "dom-blur": {
+        /* eslint-disable no-undef */
+        await frame.evaluate(() => {
+          (document.activeElement as HTMLElement)?.blur();
+        });
+        /* eslint-enable no-undef */
+        break;
+      }
+
+      case "dom-keydown": {
+        const { selector, key, modifiers } = data as DomKeyPayload;
+        const mods: string[] = [];
+        if (modifiers?.ctrl) mods.push("Control");
+        if (modifiers?.alt) mods.push("Alt");
+        if (modifiers?.shift) mods.push("Shift");
+        if (modifiers?.meta) mods.push("Meta");
+        const keyCombo = [...mods, key].join("+");
+        await frame.press(selector, keyCombo, { timeout });
+        break;
+      }
+
+      case "dom-drag": {
+        const { sourceSelector, targetSelector } = data as DomDragPayload;
+        // Strip transient drag-related classes from selectors (e.g., .drag-over, .dragging)
+        // These classes only exist during active drag operations in the source widget
+        const cleanSelector = (sel: string): string =>
+          sel
+            .replace(/\.drag-over/g, "")
+            .replace(/\.dragging/g, "")
+            .replace(/\.drag-source/g, "")
+            .replace(/\.drag-target/g, "")
+            .replace(/\.is-dragging/g, "")
+            .replace(/\.is-drag-over/g, "");
+        const cleanTarget = cleanSelector(targetSelector);
+        const cleanSource = cleanSelector(sourceSelector);
+        await frame.dragAndDrop(cleanSource, cleanTarget, { timeout });
+        break;
+      }
+
+      // dom-keyup, dom-hover: no direct Playwright equivalent, skip
+      default:
+        break;
+    }
   }
 
   /**

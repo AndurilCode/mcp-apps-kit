@@ -420,7 +420,8 @@ export class UIHostManager {
     environmentState?: EnvironmentState,
     viewport?: { width: number; height: number },
     externalHostContext?: Record<string, unknown>,
-    inspectorUrl?: string
+    inspectorUrl?: string,
+    isDualMode?: boolean
   ): Promise<BrowserRenderResult> {
     const errors: string[] = [];
     const browser = await this.getBrowser();
@@ -453,7 +454,8 @@ export class UIHostManager {
       protocol,
       environmentState,
       externalHostContext,
-      inspectorUrl
+      inspectorUrl,
+      isDualMode
     );
 
     // Navigate to the host page (which embeds the widget in an iframe)

@@ -254,6 +254,166 @@ function generateSyncScript(
     log('Received openai:tool_cancelled CustomEvent');
     syncEvent('tool-cancelled', {});
   });
+
+  // =====================================================
+  // DOM Interaction Capture (for 1:1 state sync)
+  // Captures user interactions and sends to inspector
+  // =====================================================
+
+  function debounce(fn, ms) {
+    var timeout;
+    return function() {
+      var args = arguments;
+      var context = this;
+      clearTimeout(timeout);
+      timeout = setTimeout(function() { fn.apply(context, args); }, ms);
+    };
+  }
+
+  function getSelector(el) {
+    if (!el || el === document.body) return 'body';
+    if (el.id) return '#' + CSS.escape(el.id);
+
+    var path = [];
+    while (el && el !== document.body && el.parentNode) {
+      var tag = el.tagName.toLowerCase();
+      var selector = tag;
+      if (el.className && typeof el.className === 'string') {
+        var classes = el.className.trim().split(/\\s+/).filter(Boolean);
+        if (classes.length) selector += '.' + classes.map(function(c) { return CSS.escape(c); }).join('.');
+      }
+      var siblings = el.parentNode.querySelectorAll(':scope > ' + tag);
+      if (siblings.length > 1) {
+        var idx = Array.prototype.indexOf.call(siblings, el);
+        selector += ':nth-of-type(' + (idx + 1) + ')';
+      }
+      path.unshift(selector);
+      el = el.parentNode;
+    }
+    return 'body > ' + path.join(' > ');
+  }
+
+  // Click handler
+  document.addEventListener('click', function(e) {
+    var target = e.target;
+    if (!target || !target.tagName) return;
+    syncEvent('dom-click', {
+      selector: getSelector(target),
+      x: e.offsetX,
+      y: e.offsetY,
+      button: e.button === 0 ? 'left' : e.button === 2 ? 'right' : 'middle'
+    });
+  }, true);
+
+  // Input handler (debounced)
+  var syncInput = debounce(function(e) {
+    var el = e.target;
+    if (!el || !el.tagName) return;
+    syncEvent('dom-input', {
+      selector: getSelector(el),
+      value: el.value || '',
+      inputType: el.type || 'text',
+      checked: el.checked
+    });
+  }, 100);
+  document.addEventListener('input', syncInput, true);
+
+  // Change handler (for selects, checkboxes on commit)
+  document.addEventListener('change', function(e) {
+    var el = e.target;
+    if (!el || !el.tagName) return;
+    if (el.tagName === 'SELECT') {
+      var values = [];
+      for (var i = 0; i < el.selectedOptions.length; i++) {
+        values.push(el.selectedOptions[i].value);
+      }
+      syncEvent('dom-select', {
+        selector: getSelector(el),
+        value: el.value,
+        values: values
+      });
+    } else {
+      var isCheckable = el.type === 'checkbox' || el.type === 'radio';
+      syncEvent('dom-change', {
+        selector: getSelector(el),
+        value: el.value || '',
+        inputType: el.type || 'text',
+        checked: isCheckable ? el.checked : undefined
+      });
+    }
+  }, true);
+
+  // Scroll handler (debounced)
+  var syncScroll = debounce(function(e) {
+    var el = e.target === document ? null : e.target;
+    syncEvent('dom-scroll', {
+      selector: el ? getSelector(el) : null,
+      scrollTop: el ? el.scrollTop : window.scrollY,
+      scrollLeft: el ? el.scrollLeft : window.scrollX
+    });
+  }, 50);
+  document.addEventListener('scroll', syncScroll, true);
+
+  // Focus handler
+  document.addEventListener('focus', function(e) {
+    var el = e.target;
+    if (!el || !el.tagName) return;
+    syncEvent('dom-focus', { selector: getSelector(el) });
+  }, true);
+
+  // Blur handler
+  document.addEventListener('blur', function(e) {
+    var el = e.target;
+    if (!el || !el.tagName) return;
+    syncEvent('dom-blur', { selector: getSelector(el) });
+  }, true);
+
+  // Keyboard handler (special keys and input fields)
+  document.addEventListener('keydown', function(e) {
+    var el = e.target;
+    if (!el || !el.tagName) return;
+    if (e.key.length > 1 || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+      syncEvent('dom-keydown', {
+        selector: getSelector(el),
+        key: e.key,
+        code: e.code,
+        modifiers: { ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey }
+      });
+    }
+  }, true);
+
+  // Drag and drop handler
+  var dragSource = null;
+  var dragSourceSelector = null;
+
+  document.addEventListener('dragstart', function(e) {
+    var el = e.target;
+    if (!el || !el.tagName) return;
+    dragSource = el;
+    dragSourceSelector = getSelector(el);
+    log('Drag started:', dragSourceSelector);
+  }, true);
+
+  document.addEventListener('drop', function(e) {
+    var target = e.target;
+    if (!target || !target.tagName || !dragSourceSelector) return;
+    var targetSelector = getSelector(target);
+    log('Drop:', dragSourceSelector, '->', targetSelector);
+    syncEvent('dom-drag', {
+      sourceSelector: dragSourceSelector,
+      targetSelector: targetSelector
+    });
+    dragSource = null;
+    dragSourceSelector = null;
+  }, true);
+
+  document.addEventListener('dragend', function() {
+    // Clean up if drag was cancelled
+    dragSource = null;
+    dragSourceSelector = null;
+  }, true);
+
+  log('DOM interaction sync initialized');
 })();
 </script>`;
 }

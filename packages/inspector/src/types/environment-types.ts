@@ -154,7 +154,20 @@ export type SyncEventType =
   | "call-tool-response"
   // Lifecycle
   | "initialize"
-  | "teardown";
+  | "teardown"
+  // DOM Interaction Events (external -> mirror)
+  | "dom-click"
+  | "dom-dblclick"
+  | "dom-input"
+  | "dom-change"
+  | "dom-focus"
+  | "dom-blur"
+  | "dom-scroll"
+  | "dom-keydown"
+  | "dom-keyup"
+  | "dom-select"
+  | "dom-hover"
+  | "dom-drag";
 
 /**
  * Unified sync event payload for /sync-events endpoint

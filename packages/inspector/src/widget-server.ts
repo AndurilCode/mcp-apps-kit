@@ -39,6 +39,8 @@ export interface WidgetSession {
   externalHostContext?: Record<string, unknown>;
   /** Inspector URL for tool call execution endpoint */
   inspectorUrl?: string;
+  /** If true, wait for synced tool call responses instead of executing directly */
+  isDualMode?: boolean;
   // Metadata fields for production parity (legacy, kept for backward compat)
   subjectId?: string;
   sessionId?: string;
@@ -164,7 +166,8 @@ export class WidgetServer {
     protocol: "mcp" | "openai",
     environmentState?: EnvironmentState,
     externalHostContext?: Record<string, unknown>,
-    inspectorUrl?: string
+    inspectorUrl?: string,
+    isDualMode?: boolean
   ): CreateSessionResult {
     const sessionId = randomUUID();
     const session: WidgetSession = {
@@ -177,6 +180,7 @@ export class WidgetServer {
       environmentState,
       externalHostContext,
       inspectorUrl,
+      isDualMode,
       // Generate mock metadata for production parity (legacy support)
       subjectId: `mock-subject-${randomUUID().slice(0, 8)}`,
       sessionId: `mock-session-${randomUUID().slice(0, 8)}`,
@@ -414,9 +418,39 @@ export class WidgetServer {
             args: message.params.arguments,
           }));
 
-          // Execute on connected server via inspector endpoint
           const inspectorUrl = ${JSON.stringify(session.inspectorUrl ?? null)};
-          if (inspectorUrl) {
+          const isDualMode = ${JSON.stringify(session.isDualMode ?? false)};
+
+          if (isDualMode) {
+            // In dual mode, wait for synced tool response from external widget
+            // instead of executing the call ourselves (which would duplicate)
+            window.__pendingToolCalls = window.__pendingToolCalls || {};
+            window.__pendingToolCalls[message.params.name] = window.__pendingToolCalls[message.params.name] || [];
+            window.__pendingToolCalls[message.params.name].push({
+              messageId: message.id,
+              args: message.params.arguments,
+              timestamp: Date.now()
+            });
+            console.log('[MCP Host] Dual mode: queued tool call, waiting for synced response:', message.params.name);
+
+            // Set a timeout to return mock result if no sync arrives
+            setTimeout(function() {
+              var pending = window.__pendingToolCalls && window.__pendingToolCalls[message.params.name];
+              if (pending) {
+                var idx = pending.findIndex(function(p) { return p.messageId === message.id; });
+                if (idx !== -1) {
+                  pending.splice(idx, 1);
+                  console.log('[MCP Host] Tool call timed out, returning mock:', message.params.name);
+                  iframe.contentWindow.postMessage({
+                    jsonrpc: '2.0',
+                    id: message.id,
+                    result: { content: [{ type: 'text', text: '{"synced": false, "timeout": true}' }] }
+                  }, '*');
+                }
+              }
+            }, 10000); // 10 second timeout
+          } else if (inspectorUrl) {
+            // Standalone mode: execute on connected server via inspector endpoint
             fetch(inspectorUrl + '/execute-tool', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -515,9 +549,39 @@ export class WidgetServer {
 
         console.log('[WIDGET_TOOL_CALL]', message.toolName, message.args);
 
-        // Execute on connected server via inspector endpoint
         const inspectorUrl = ${JSON.stringify(session.inspectorUrl ?? null)};
-        if (inspectorUrl) {
+        const isDualMode = ${JSON.stringify(session.isDualMode ?? false)};
+
+        if (isDualMode) {
+          // In dual mode, wait for synced tool response from external widget
+          // instead of executing the call ourselves (which would duplicate)
+          window.__pendingToolCalls = window.__pendingToolCalls || {};
+          window.__pendingToolCalls[message.toolName] = window.__pendingToolCalls[message.toolName] || [];
+          window.__pendingToolCalls[message.toolName].push({
+            callId: message.callId,
+            args: message.args,
+            timestamp: Date.now()
+          });
+          console.log('[OpenAI Host] Dual mode: queued tool call, waiting for synced response:', message.toolName);
+
+          // Set a timeout to return mock result if no sync arrives
+          setTimeout(function() {
+            var pending = window.__pendingToolCalls && window.__pendingToolCalls[message.toolName];
+            if (pending) {
+              var idx = pending.findIndex(function(p) { return p.callId === message.callId; });
+              if (idx !== -1) {
+                pending.splice(idx, 1);
+                console.log('[OpenAI Host] Tool call timed out, returning mock:', message.toolName);
+                iframe.contentWindow.postMessage({
+                  type: 'openai:callTool:response',
+                  callId: message.callId,
+                  result: { output: '{"synced": false, "timeout": true}' }
+                }, '*');
+              }
+            }
+          }, 10000); // 10 second timeout
+        } else if (inspectorUrl) {
+          // Standalone mode: execute on connected server via inspector endpoint
           fetch(inspectorUrl + '/execute-tool', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

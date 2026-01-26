@@ -109,7 +109,8 @@ function generateProxyTool(
                 environmentState,
                 viewport,
                 externalHostContext ?? undefined,
-                inspectorUrl ?? undefined
+                inspectorUrl ?? undefined,
+                true // isDualMode - wait for synced responses from external widget
               );
 
               const { page } = renderResult;
@@ -374,7 +375,8 @@ export function registerProxyToolsDirectly(
                   environmentState,
                   viewport,
                   externalHostContext ?? undefined,
-                  inspectorUrl ?? undefined
+                  inspectorUrl ?? undefined,
+                  true // isDualMode - wait for synced responses from external widget
                 );
 
                 const { page } = renderResult;
