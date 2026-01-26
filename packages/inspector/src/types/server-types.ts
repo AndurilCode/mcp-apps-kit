@@ -178,4 +178,11 @@ export interface InspectorServerOptions {
 
   /** Session TTL in milliseconds. Default: 300000 (5 minutes) */
   sessionTtl?: number;
+
+  /**
+   * Target MCP server URL for auto-connect mode.
+   * When provided, the inspector auto-connects to this server on startup
+   * and disables the connect_to_server/disconnect tools.
+   */
+  targetUrl?: string;
 }

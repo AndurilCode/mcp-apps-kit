@@ -15,6 +15,33 @@ import type { Server } from "http";
 import http from "http";
 import { ConnectionManager } from "./connection";
 import type { InspectorServerOptions } from "./types";
+
+// =============================================================================
+// TOOL FILTERING (for auto-connect mode)
+// =============================================================================
+
+/**
+ * Connection tools to filter out when auto-connect mode is enabled
+ */
+const CONNECTION_TOOLS = ["connect_to_server", "disconnect"] as const;
+
+/**
+ * Filter connection tools from the tool definitions
+ * @param tools - All inspector tools
+ * @param exclude - Whether to exclude connection tools
+ * @returns Filtered tool definitions
+ */
+function filterConnectionTools(tools: ToolDefs, exclude: boolean): ToolDefs {
+  if (!exclude) return tools;
+
+  const filtered: ToolDefs = {};
+  for (const [name, tool] of Object.entries(tools)) {
+    if (!CONNECTION_TOOLS.includes(name as (typeof CONNECTION_TOOLS)[number])) {
+      filtered[name] = tool;
+    }
+  }
+  return filtered;
+}
 import {
   createConnectTool,
   createDisconnectTool,
@@ -143,9 +170,12 @@ export function createStandaloneInspectorServer(
 ): StandaloneInspectorServer {
   const connectionManager = new ConnectionManager(options);
   const defaultPort = options.port ?? 6274;
+  const targetUrl = options.targetUrl;
 
-  // Create MCP app with all inspector tools
-  const tools = createInspectorTools(connectionManager);
+  // Create MCP app with inspector tools
+  // Filter out connection tools when auto-connect mode is enabled (targetUrl provided)
+  const allTools = createInspectorTools(connectionManager);
+  const tools = filterConnectionTools(allTools, !!targetUrl);
   const app = createApp({
     name: "mcp-inspector",
     version: "1.0.0",
@@ -340,7 +370,28 @@ export function createStandaloneInspectorServer(
             // Set inspector URL for widget tool call execution
             connectionManager.setInspectorUrl(`http://localhost:${port}`);
 
-            resolve();
+            // Auto-connect if targetUrl is provided
+            if (targetUrl) {
+              void connectionManager
+                .connect(targetUrl, { trackHistory: true })
+                .then(() => {
+                  if (options.debug) {
+                    // eslint-disable-next-line no-console
+                    console.log(`[inspector] Auto-connected to: ${targetUrl}`);
+                  }
+                  resolve();
+                })
+                .catch((error: unknown) => {
+                  const message = error instanceof Error ? error.message : String(error);
+                  // eslint-disable-next-line no-console
+                  console.error(`[inspector] Auto-connect failed: ${message}`);
+                  // Close the HTTP server since we can't proceed
+                  httpServer?.close();
+                  reject(new Error(`Auto-connect to ${targetUrl} failed: ${message}`));
+                });
+            } else {
+              resolve();
+            }
           });
           httpServer.on("error", (err: Error) => {
             reject(err);

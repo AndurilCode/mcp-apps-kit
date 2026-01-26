@@ -104,6 +104,21 @@ export const OpenAIConfigSchema = z
   .describe("OpenAI-specific configuration");
 
 /**
+ * Auto-inspector configuration schema
+ */
+export const AutoInspectorConfigObjectSchema = z.object({
+  port: z.number().int().min(1).max(65535).optional(),
+  debug: z.boolean().optional(),
+  devOnly: z.boolean().optional(),
+});
+
+export const AutoInspectorConfigSchema = z
+  .union([z.boolean(), AutoInspectorConfigObjectSchema])
+  .nullable()
+  .optional()
+  .describe("Auto-inspector configuration");
+
+/**
  * Complete global configuration schema
  * Can be used to validate the entire global config at once
  */
@@ -114,6 +129,7 @@ export const GlobalConfigSchema = z.object({
   serverRoute: ServerRouteSchema,
   oauth: OAuthConfigSchema.nullable().optional(),
   openai: OpenAIConfigSchema,
+  autoInspector: AutoInspectorConfigSchema,
 });
 
 /**
