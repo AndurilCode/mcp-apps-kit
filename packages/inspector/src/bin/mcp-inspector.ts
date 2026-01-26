@@ -16,6 +16,7 @@ interface CLIOptions {
   maxHistory: number;
   sessionTtl: number;
   dual: boolean;
+  url: string | null;
 }
 
 function parseArgs(): CLIOptions {
@@ -25,6 +26,7 @@ function parseArgs(): CLIOptions {
     maxHistory: 1000,
     sessionTtl: 5 * 60 * 1000, // 5 minutes default
     dual: false,
+    url: null,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -70,6 +72,20 @@ function parseArgs(): CLIOptions {
         process.exit(1);
       }
       options.sessionTtl = ttl;
+    } else if (arg === "--url" || arg === "-u") {
+      const value = args[++i];
+      if (value === undefined) {
+        console.error("Error: --url requires a value");
+        process.exit(1);
+      }
+      // Validate URL format
+      try {
+        new URL(value);
+      } catch {
+        console.error(`Error: --url must be a valid URL (got: ${value})`);
+        process.exit(1);
+      }
+      options.url = value;
     } else if (arg === "--help" || arg === "-h") {
       printHelp();
       process.exit(0);
@@ -81,6 +97,12 @@ function parseArgs(): CLIOptions {
       printHelp();
       process.exit(1);
     }
+  }
+
+  // Validate incompatible flag combinations
+  if (options.url && options.dual) {
+    console.error("Error: --url cannot be used with --dual mode");
+    process.exit(1);
   }
 
   return options;
@@ -95,6 +117,7 @@ Usage: mcp-inspector [options]
 Options:
   -p, --port <number>      Port to listen on (default: 6274)
   -d, --debug              Enable debug logging
+  -u, --url <url>          Auto-connect to MCP server URL (standalone mode only)
   --dual                   Enable dual-endpoint mode for real ChatGPT testing
   --max-history <number>   Maximum call history entries (default: 1000)
   --ttl <ms>               Session TTL in milliseconds (default: 300000 = 5 min)
@@ -106,16 +129,28 @@ Modes:
     - One endpoint at /mcp with all inspector tools
     - Use for development and debugging
 
+  Auto-connect (--url):
+    - Automatically connects to the specified MCP server on startup
+    - Disables connect_to_server/disconnect tools (locked to that server)
+    - Cannot be used with --dual mode
+
   Dual (--dual):
     - /agent/mcp: Observation-only tools for coding agents
     - /apps/mcp: Proxy tools for ChatGPT (available after connect_to_server)
     - Use for real testing with ChatGPT
 
 Examples:
-  mcp-inspector                    Start in single mode on port 6274
-  mcp-inspector --dual             Start in dual mode for ChatGPT testing
-  mcp-inspector --dual --port 8080 Start in dual mode on custom port
-  mcp-inspector --debug            Enable debug logging
+  mcp-inspector                                Start in single mode on port 6274
+  mcp-inspector --url http://localhost:3000/mcp  Auto-connect to local server
+  mcp-inspector --url http://localhost:3000/mcp --debug  With debug logging
+  mcp-inspector --dual                         Start in dual mode for ChatGPT testing
+  mcp-inspector --dual --port 8080             Start in dual mode on custom port
+
+Auto-connect Mode Usage:
+  1. Start your MCP server (e.g., on http://localhost:3000/mcp)
+  2. Run: mcp-inspector --url http://localhost:3000/mcp
+  3. Inspector auto-connects and is locked to that server
+  4. Use list_tools, call_tool, etc. without needing connect_to_server
 
 Dual Mode Usage:
   1. Start: mcp-inspector --dual
@@ -160,6 +195,7 @@ async function main(): Promise<void> {
       debug: options.debug,
       maxHistorySize: options.maxHistory,
       sessionTtl: options.sessionTtl,
+      targetUrl: options.url ?? undefined,
     });
 
     if (options.debug) {
@@ -168,12 +204,18 @@ async function main(): Promise<void> {
       console.log(`[inspector] Debug: ${options.debug}`);
       console.log(`[inspector] Max History: ${options.maxHistory}`);
       console.log(`[inspector] Session TTL: ${options.sessionTtl}ms`);
+      if (options.url) {
+        console.log(`[inspector] Target URL: ${options.url}`);
+      }
     }
 
     try {
       await server.start(options.port);
       console.log(`MCP Inspector Server running at http://localhost:${options.port}`);
       console.log(`MCP endpoint: http://localhost:${options.port}/mcp`);
+      if (options.url) {
+        console.log(`Connected to: ${options.url}`);
+      }
       console.log(`\nPress Ctrl+C to stop`);
     } catch (error) {
       console.error("Failed to start MCP Inspector Server:", error);

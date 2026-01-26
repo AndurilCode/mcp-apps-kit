@@ -156,6 +156,40 @@ export type DebugLogLevel = "debug" | "info" | "warn" | "error";
  */
 export type DebugTransport = "builtin" | "tool" | "api";
 
+// =============================================================================
+// AUTO INSPECTOR CONFIGURATION
+// =============================================================================
+
+/**
+ * Configuration for auto-inspector feature
+ *
+ * When enabled, automatically spawns the MCP Inspector and connects it
+ * to this server on startup.
+ *
+ * @example
+ * ```typescript
+ * // Simple boolean - uses defaults
+ * autoInspector: true
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // With options
+ * autoInspector: {
+ *   port: 8080,
+ *   debug: true,
+ * }
+ * ```
+ */
+export interface AutoInspectorConfig {
+  /** Inspector server port. Default: 6274 */
+  port?: number;
+  /** Enable inspector debug logging. Default: false */
+  debug?: boolean;
+  /** Only enable in development (NODE_ENV !== 'production'). Default: true */
+  devOnly?: boolean;
+}
+
 /**
  * Debug logging configuration
  *
@@ -310,6 +344,27 @@ export interface GlobalConfig {
 
   /** OpenAI Apps SDK specific configuration */
   openai?: OpenAIConfig;
+
+  /**
+   * Automatically spawn the MCP Inspector and connect it to this server.
+   * Only works with HTTP transport. Disabled in production by default.
+   *
+   * @example
+   * ```typescript
+   * // Simple boolean - uses defaults
+   * autoInspector: true
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // With options
+   * autoInspector: {
+   *   port: 8080,
+   *   debug: true,
+   * }
+   * ```
+   */
+  autoInspector?: boolean | AutoInspectorConfig;
 
   /**
    * Target protocol for metadata generation.
