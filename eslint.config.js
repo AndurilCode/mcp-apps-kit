@@ -112,4 +112,21 @@ export default [
       "no-console": "off",
     },
   },
+  // CLI entrypoints and reporters - console output is intentional
+  {
+    files: [
+      "packages/codegen/src/cli.ts",
+      "packages/codegen/src/serve.ts",
+      "packages/codegen/src/app.ts",
+      "packages/codegen/src/watcher.ts",
+      "packages/codegen/src/generator.ts",
+      "packages/create-app/src/index.ts",
+      "packages/testing/src/eval/**/evaluator.ts",
+      "packages/testing/src/eval/**/reporter.ts",
+      "packages/testing/src/**/reporter/*.ts",
+    ],
+    rules: {
+      "no-console": "off",
+    },
+  },
 ];

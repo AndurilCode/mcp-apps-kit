@@ -1251,7 +1251,6 @@ export async function scaffoldProject(options: CreateAppOptions): Promise<void> 
       // Always use npm for standalone projects (avoids workspace conflicts)
       execSync("npm install", { cwd: projectDir, stdio: "inherit" });
     } catch {
-      // eslint-disable-next-line no-console
       console.warn("Warning: Could not install dependencies automatically.");
     }
   }
