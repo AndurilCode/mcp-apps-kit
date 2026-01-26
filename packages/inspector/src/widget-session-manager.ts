@@ -56,6 +56,8 @@ export interface ActiveWidgetSession {
   toolCalls: WidgetToolCall[];
   /** When the session was created */
   createdAt: number;
+  /** When the session was last accessed (for TTL reset) */
+  lastAccessedAt: number;
   /** Protocol used (mcp or openai) */
   protocol: DetectedProtocol;
   /** Which endpoint created this session (apps = ChatGPT proxy, agent = inspector tools) */
@@ -72,6 +74,8 @@ export interface SessionInfo {
   toolName: string;
   protocol: DetectedProtocol;
   createdAt: number;
+  /** When the session was last accessed (for TTL tracking) */
+  lastAccessedAt: number;
   logCount: number;
   errorCount: number;
   /** Count of auto-handled dialogs */
@@ -131,6 +135,7 @@ export class WidgetSessionManager {
   ): Promise<ActiveWidgetSession> {
     // Use the WidgetServer's session ID directly for unified lookup
     // This ensures the host page and session manager use the same ID
+    const now = Date.now();
     const session: ActiveWidgetSession = {
       id: sessionId,
       toolName,
@@ -141,7 +146,8 @@ export class WidgetSessionManager {
       pageErrors: [],
       dialogs: [],
       toolCalls: [],
-      createdAt: Date.now(),
+      createdAt: now,
+      lastAccessedAt: now,
       protocol,
       source,
       proxyMetadata,
@@ -199,10 +205,24 @@ export class WidgetSessionManager {
   }
 
   /**
+   * Touch a session to reset its TTL (called on any interaction)
+   */
+  touchSession(sessionId: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) return false;
+    session.lastAccessedAt = Date.now();
+    return true;
+  }
+
+  /**
    * Get a session by ID
    */
   getSession(sessionId: string): ActiveWidgetSession | null {
-    return this.sessions.get(sessionId) ?? null;
+    const session = this.sessions.get(sessionId) ?? null;
+    if (session) {
+      session.lastAccessedAt = Date.now();
+    }
+    return session;
   }
 
   /**
@@ -214,6 +234,7 @@ export class WidgetSessionManager {
       toolName: session.toolName,
       protocol: session.protocol,
       createdAt: session.createdAt,
+      lastAccessedAt: session.lastAccessedAt,
       logCount: session.consoleLogs.length,
       errorCount: session.pageErrors.length,
       dialogCount: session.dialogs.length,
@@ -253,6 +274,9 @@ export class WidgetSessionManager {
       timestamp: Date.now(),
     });
 
+    // Touch session to reset TTL
+    session.lastAccessedAt = Date.now();
+
     if (this.debug) {
       console.log(`[WidgetSessionManager] Recorded tool call ${toolName} for session ${sessionId}`);
     }
@@ -270,6 +294,8 @@ export class WidgetSessionManager {
     }
 
     session.toolResult = toolResult;
+    // Touch session to reset TTL
+    session.lastAccessedAt = Date.now();
     return true;
   }
 
@@ -356,6 +382,9 @@ export class WidgetSessionManager {
         /* eslint-enable no-undef */
       }
 
+      // Touch session to reset TTL
+      session.lastAccessedAt = Date.now();
+
       if (this.debug) {
         console.log(`[WidgetSessionManager] Updated globals for session ${sessionId}`);
       }
@@ -403,6 +432,8 @@ export class WidgetSessionManager {
       const session = this.sessions.get(sessionId);
       if (session && !session.page.isClosed()) {
         await this.deliverEvent(session, type, data, protocol);
+        // Touch session to reset TTL
+        session.lastAccessedAt = Date.now();
       }
       return;
     }
@@ -411,7 +442,12 @@ export class WidgetSessionManager {
     const promises: Promise<void>[] = [];
     for (const [, session] of this.sessions) {
       if (session.protocol === protocol && !session.page.isClosed()) {
-        promises.push(this.deliverEvent(session, type, data, protocol));
+        promises.push(
+          this.deliverEvent(session, type, data, protocol).then(() => {
+            // Touch session to reset TTL
+            session.lastAccessedAt = Date.now();
+          })
+        );
       }
     }
     await Promise.all(promises);
@@ -620,14 +656,14 @@ export class WidgetSessionManager {
   }
 
   /**
-   * Clean up stale sessions (TTL expired)
+   * Clean up stale sessions (TTL expired based on last access time)
    */
   private async cleanupStaleSessions(): Promise<void> {
     const now = Date.now();
     const staleSessionIds: string[] = [];
 
     for (const [id, session] of this.sessions.entries()) {
-      if (now - session.createdAt > this.ttl) {
+      if (now - session.lastAccessedAt > this.ttl) {
         staleSessionIds.push(id);
       }
     }

@@ -14,6 +14,7 @@ interface CLIOptions {
   port: number;
   debug: boolean;
   maxHistory: number;
+  sessionTtl: number;
   dual: boolean;
 }
 
@@ -22,6 +23,7 @@ function parseArgs(): CLIOptions {
     port: 6274,
     debug: false,
     maxHistory: 1000,
+    sessionTtl: 5 * 60 * 1000, // 5 minutes default
     dual: false,
   };
 
@@ -56,6 +58,18 @@ function parseArgs(): CLIOptions {
         process.exit(1);
       }
       options.maxHistory = maxHistory;
+    } else if (arg === "--ttl") {
+      const value = args[++i];
+      if (value === undefined) {
+        console.error("Error: --ttl requires a value");
+        process.exit(1);
+      }
+      const ttl = parseInt(value, 10);
+      if (isNaN(ttl) || ttl < 0) {
+        console.error("Error: --ttl must be a non-negative number (milliseconds)");
+        process.exit(1);
+      }
+      options.sessionTtl = ttl;
     } else if (arg === "--help" || arg === "-h") {
       printHelp();
       process.exit(0);
@@ -83,6 +97,7 @@ Options:
   -d, --debug              Enable debug logging
   --dual                   Enable dual-endpoint mode for real ChatGPT testing
   --max-history <number>   Maximum call history entries (default: 1000)
+  --ttl <ms>               Session TTL in milliseconds (default: 300000 = 5 min)
   -h, --help               Show this help message
   -v, --version            Show version number
 
@@ -120,6 +135,7 @@ async function main(): Promise<void> {
       port: options.port,
       debug: options.debug,
       maxHistorySize: options.maxHistory,
+      sessionTtl: options.sessionTtl,
     });
 
     if (options.debug) {
@@ -127,6 +143,7 @@ async function main(): Promise<void> {
       console.log(`[inspector] Port: ${options.port}`);
       console.log(`[inspector] Debug: ${options.debug}`);
       console.log(`[inspector] Max History: ${options.maxHistory}`);
+      console.log(`[inspector] Session TTL: ${options.sessionTtl}ms`);
     }
 
     try {
@@ -142,6 +159,7 @@ async function main(): Promise<void> {
       port: options.port,
       debug: options.debug,
       maxHistorySize: options.maxHistory,
+      sessionTtl: options.sessionTtl,
     });
 
     if (options.debug) {
@@ -149,6 +167,7 @@ async function main(): Promise<void> {
       console.log(`[inspector] Port: ${options.port}`);
       console.log(`[inspector] Debug: ${options.debug}`);
       console.log(`[inspector] Max History: ${options.maxHistory}`);
+      console.log(`[inspector] Session TTL: ${options.sessionTtl}ms`);
     }
 
     try {
