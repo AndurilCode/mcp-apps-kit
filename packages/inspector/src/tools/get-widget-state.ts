@@ -146,8 +146,23 @@ export function createGetWidgetStateTool(connectionManager: ConnectionManager) {
         // Target the widget iframe
         const frame = session.page.frame({ url: /\/widget\// });
 
-        // Extract widget runtime state via evaluate
+        // Extract tool calls from HOST PAGE (where they are stored by widget-server.ts)
+        // Tool calls are intercepted and stored on the host page's window.__inspectorToolCalls
         let toolCalls: WidgetToolCall[] = [];
+        try {
+          /* eslint-disable no-undef */
+          toolCalls = await session.page.evaluate(() => {
+            const w = window as Window & {
+              __inspectorToolCalls?: Array<{ name: string; args: unknown; timestamp: number }>;
+            };
+            return w.__inspectorToolCalls ?? [];
+          });
+          /* eslint-enable no-undef */
+        } catch {
+          // Host page tool calls extraction failed, continue with empty array
+        }
+
+        // Extract widget runtime state (state changes, metadata) from the WIDGET IFRAME
         let stateChanges: WidgetStateChange[] = [];
         let toolResponseMetadata: Record<string, unknown> | undefined;
 
@@ -159,14 +174,12 @@ export function createGetWidgetStateTool(connectionManager: ConnectionManager) {
             const runtimeState = await frame.evaluate(() => {
               // Type for OpenAI SDK-based widgets
               interface OpenAIRuntime {
-                _toolCalls?: Array<{ name: string; args: unknown; timestamp: number }>;
                 _stateChanges?: Array<{ state: unknown; timestamp: number }>;
                 _metadata?: Record<string, unknown>;
               }
 
               // Type for MCP-based widgets
               interface MCPRuntime {
-                toolCalls?: Array<{ name: string; args: unknown; timestamp: number }>;
                 stateHistory?: Array<{ state: unknown; timestamp: number }>;
                 responseMetadata?: Record<string, unknown>;
               }
@@ -174,7 +187,6 @@ export function createGetWidgetStateTool(connectionManager: ConnectionManager) {
               const w = window as Window & {
                 openai?: OpenAIRuntime;
                 __mcpWidgetRuntime?: MCPRuntime;
-                __inspectorToolCalls?: Array<{ name: string; args: unknown; timestamp: number }>;
                 __inspectorStateChanges?: Array<{ state: unknown; timestamp: number }>;
               };
 
@@ -182,7 +194,6 @@ export function createGetWidgetStateTool(connectionManager: ConnectionManager) {
               if (w.openai) {
                 return {
                   type: "openai" as const,
-                  toolCalls: w.openai._toolCalls ?? w.__inspectorToolCalls ?? [],
                   stateChanges: w.openai._stateChanges ?? w.__inspectorStateChanges ?? [],
                   metadata: w.openai._metadata,
                 };
@@ -192,7 +203,6 @@ export function createGetWidgetStateTool(connectionManager: ConnectionManager) {
               if (w.__mcpWidgetRuntime) {
                 return {
                   type: "mcp" as const,
-                  toolCalls: w.__mcpWidgetRuntime.toolCalls ?? w.__inspectorToolCalls ?? [],
                   stateChanges:
                     w.__mcpWidgetRuntime.stateHistory ?? w.__inspectorStateChanges ?? [],
                   metadata: w.__mcpWidgetRuntime.responseMetadata,
@@ -202,14 +212,12 @@ export function createGetWidgetStateTool(connectionManager: ConnectionManager) {
               // Fallback to inspector-injected state
               return {
                 type: "unknown" as const,
-                toolCalls: w.__inspectorToolCalls ?? [],
                 stateChanges: w.__inspectorStateChanges ?? [],
                 metadata: undefined,
               };
             });
             /* eslint-enable no-undef */
 
-            toolCalls = runtimeState.toolCalls;
             stateChanges = runtimeState.stateChanges;
             toolResponseMetadata = runtimeState.metadata;
           } catch {

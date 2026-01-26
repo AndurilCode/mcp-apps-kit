@@ -435,6 +435,7 @@ export class UIHostManager {
    * enabling proper postMessage communication where event.source === window.parent.
    *
    * @param externalHostContext - Raw MCP hostContext from external widget for 1:1 sync
+   * @param inspectorUrl - Inspector server URL for tool call execution (e.g., "http://localhost:6274")
    */
   async renderInBrowser(
     html: string,
@@ -443,7 +444,8 @@ export class UIHostManager {
     toolName: string,
     environmentState?: EnvironmentState,
     viewport?: { width: number; height: number },
-    externalHostContext?: Record<string, unknown>
+    externalHostContext?: Record<string, unknown>,
+    inspectorUrl?: string
   ): Promise<BrowserRenderResult> {
     const errors: string[] = [];
     const browser = await this.getBrowser();
@@ -468,14 +470,15 @@ export class UIHostManager {
     // Get the widget server (lazy initialization)
     const server = await this.getWidgetServer();
 
-    // Create a session for this widget, passing environment state and external hostContext
+    // Create a session for this widget, passing environment state, external hostContext, and inspector URL
     const { hostUrl, sessionId } = server.createSession(
       html,
       toolResult,
       toolName,
       protocol,
       environmentState,
-      externalHostContext
+      externalHostContext,
+      inspectorUrl
     );
 
     // Navigate to the host page (which embeds the widget in an iframe)

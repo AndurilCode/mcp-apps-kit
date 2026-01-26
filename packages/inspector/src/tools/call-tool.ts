@@ -123,6 +123,7 @@ export function createCallToolTool(connectionManager: ConnectionManager) {
               const uiHostManager = new UIHostManager(client);
               const environmentState = connectionManager.getEnvironmentState();
               const viewport = environmentState.viewport;
+              const inspectorUrl = connectionManager.getInspectorUrl();
 
               const renderResult = await uiHostManager.renderInBrowser(
                 html,
@@ -130,7 +131,9 @@ export function createCallToolTool(connectionManager: ConnectionManager) {
                 toolResult,
                 input.name,
                 environmentState,
-                viewport
+                viewport,
+                undefined, // externalHostContext
+                inspectorUrl ?? undefined
               );
 
               const { page } = renderResult;

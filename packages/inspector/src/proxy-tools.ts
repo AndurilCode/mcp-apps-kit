@@ -99,6 +99,7 @@ function generateProxyTool(
               const viewport = environmentState.viewport;
               // Get external hostContext for MCP 1:1 sync
               const externalHostContext = connectionManager.getExternalMcpHostContext();
+              const inspectorUrl = connectionManager.getInspectorUrl();
 
               const renderResult = await uiHostManager.renderInBrowser(
                 html,
@@ -107,7 +108,8 @@ function generateProxyTool(
                 toolInfo.name,
                 environmentState,
                 viewport,
-                externalHostContext ?? undefined
+                externalHostContext ?? undefined,
+                inspectorUrl ?? undefined
               );
 
               const { page } = renderResult;
@@ -362,6 +364,7 @@ export function registerProxyToolsDirectly(
                 const viewport = environmentState.viewport;
                 // Get external hostContext for MCP 1:1 sync
                 const externalHostContext = connectionManager.getExternalMcpHostContext();
+                const inspectorUrl = connectionManager.getInspectorUrl();
 
                 const renderResult = await uiHostManager.renderInBrowser(
                   html,
@@ -370,7 +373,8 @@ export function registerProxyToolsDirectly(
                   toolInfo.name,
                   environmentState,
                   viewport,
-                  externalHostContext ?? undefined
+                  externalHostContext ?? undefined,
+                  inspectorUrl ?? undefined
                 );
 
                 const { page } = renderResult;

@@ -4,7 +4,7 @@
  * Start the MCP Inspector Server for testing and debugging MCP servers.
  */
 
-import { createInspectorServer } from "../server";
+import { createStandaloneInspectorServer } from "../standalone-server";
 import { createDualInspectorServer } from "../dual-server";
 
 // Parse command line arguments
@@ -137,8 +137,9 @@ async function main(): Promise<void> {
       process.exit(1);
     }
   } else {
-    // Single mode: all tools on one endpoint
-    const app = createInspectorServer({
+    // Single mode: all tools on one endpoint with custom /execute-tool endpoint
+    const server = createStandaloneInspectorServer({
+      port: options.port,
       debug: options.debug,
       maxHistorySize: options.maxHistory,
     });
@@ -151,7 +152,7 @@ async function main(): Promise<void> {
     }
 
     try {
-      await app.start({ port: options.port });
+      await server.start(options.port);
       console.log(`MCP Inspector Server running at http://localhost:${options.port}`);
       console.log(`MCP endpoint: http://localhost:${options.port}/mcp`);
       console.log(`\nPress Ctrl+C to stop`);
