@@ -10,6 +10,6 @@
 import { runCodegen } from "./generator.js";
 
 runCodegen().catch((error: unknown) => {
-  console.error("Failed to generate manifest:", error); // eslint-disable-line no-console
+  console.error("Failed to generate manifest:", error);
   process.exit(1);
 });

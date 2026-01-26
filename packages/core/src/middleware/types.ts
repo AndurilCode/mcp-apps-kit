@@ -183,7 +183,6 @@ export function composeMiddleware(middleware: Middleware[]): Middleware {
       return await next();
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
     return await dispatch(0);
   }) as Middleware;
 }

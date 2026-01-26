@@ -67,7 +67,7 @@ export async function createAnthropicProvider(config: ProviderConfig): Promise<L
         } else if (msg.role === "assistant") {
           if (msg.toolCalls && msg.toolCalls.length > 0) {
             // Assistant message with tool calls
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
             const content: any[] = [];
 
             if (msg.content) {
@@ -121,7 +121,6 @@ export async function createAnthropicProvider(config: ProviderConfig): Promise<L
         input_schema: tool.parameters,
       }));
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const response: any = await anthropic.messages.create({
         model,
         max_tokens: maxTokens,

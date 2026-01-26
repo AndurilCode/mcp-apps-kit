@@ -109,7 +109,7 @@ function parseArgs(): ServeOptions {
     if (arg === "--port" || arg === "-p") {
       const nextArg = args[i + 1];
       if (!nextArg || nextArg.startsWith("-")) {
-        console.error(`[mcp-serve] Error: ${arg} requires a port number`); // eslint-disable-line no-console
+        console.error(`[mcp-serve] Error: ${arg} requires a port number`);
         process.exit(1);
       }
       i++;
@@ -123,7 +123,7 @@ function parseArgs(): ServeOptions {
       ) {
         console.error(
           `[mcp-serve] Error: Invalid port number: ${nextArg}. Must be an integer between 1 and 65535.`
-        ); // eslint-disable-line no-console
+        );
         process.exit(1);
       }
       options.port = parsedPort;
@@ -132,7 +132,7 @@ function parseArgs(): ServeOptions {
     } else if (arg === "--config" || arg === "-c") {
       const nextArg = args[i + 1];
       if (!nextArg || nextArg.startsWith("-")) {
-        console.error(`[mcp-serve] Error: ${arg} requires a config file path`); // eslint-disable-line no-console
+        console.error(`[mcp-serve] Error: ${arg} requires a config file path`);
         process.exit(1);
       }
       i++;
@@ -151,7 +151,6 @@ async function serve(options: ServeOptions = {}): Promise<void> {
   const configPath = options.configPath ?? "./mcp.config.ts";
   const outDir = "__generated__";
 
-  // eslint-disable-next-line no-console
   console.log("[mcp-serve] Starting...\n");
 
   // Step 1: Generate manifest
@@ -241,7 +240,7 @@ async function serve(options: ServeOptions = {}): Promise<void> {
       ) {
         console.error(
           `[mcp-serve] Error: Invalid PORT environment variable: ${envPort}. Must be an integer between 1 and 65535.`
-        ); // eslint-disable-line no-console
+        );
         process.exit(1);
       }
       port = parsedEnvPort;
@@ -255,7 +254,6 @@ async function serve(options: ServeOptions = {}): Promise<void> {
   const workflowNames = Object.keys(manifest.workflows);
   const toolOnlyNames = Object.keys(manifest.tools).filter((name) => !workflowNames.includes(name));
 
-  // eslint-disable-next-line no-console
   console.log(`
 [mcp-serve] Server running on http://localhost:${port}
 
@@ -272,7 +270,6 @@ Endpoints:
 
   // Step 5: Set up watch mode if requested
   if (options.watch) {
-    // eslint-disable-next-line no-console
     console.log("[mcp-serve] Watch mode enabled - hot reload active\n");
 
     const watcher = await createStandaloneWatcher({
@@ -327,18 +324,15 @@ Endpoints:
             (name) => !newWorkflowNames.includes(name)
           );
 
-          // eslint-disable-next-line no-console
           console.log(
             `[mcp-serve] Hot reloaded: ${newToolOnlyNames.length} tools, ${newWorkflowNames.length} workflows`
           );
         } catch (error) {
-          // eslint-disable-next-line no-console
           console.error(
             "[mcp-serve] Hot reload failed:",
             error instanceof Error ? error.message : String(error)
           );
           if (error instanceof Error && error.stack) {
-            // eslint-disable-next-line no-console
             console.error(error.stack);
           }
         }
@@ -347,7 +341,6 @@ Endpoints:
 
     // Handle graceful shutdown
     const cleanup = () => {
-      // eslint-disable-next-line no-console
       console.log("\n[mcp-serve] Shutting down...");
       watcher.close();
       process.exit(0);
@@ -360,6 +353,6 @@ Endpoints:
 
 // Run the server
 serve(parseArgs()).catch((error: unknown) => {
-  console.error("[mcp-serve] Failed to start:", error); // eslint-disable-line no-console
+  console.error("[mcp-serve] Failed to start:", error);
   process.exit(1);
 });

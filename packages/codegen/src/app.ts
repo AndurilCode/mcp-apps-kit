@@ -124,7 +124,6 @@ export async function defineApp(options: CreateAppOptions): Promise<FileBasedApp
 
       const toolOnlyNames = toolNames.filter((n) => !workflowNames.includes(n));
 
-      // eslint-disable-next-line no-console
       console.log(`
 ${config.name} running on http://localhost:${port}
 

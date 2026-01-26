@@ -22,13 +22,13 @@ import { getVersionDirectories } from "./generator";
  */
 const defaultLogger: PluginLogger = {
   info: (message: string) => {
-    console.log(`[mcp-apps-plugin] ${message}`); // eslint-disable-line no-console
+    console.log(`[mcp-apps-plugin] ${message}`);
   },
   warn: (message: string) => {
-    console.warn(`[mcp-apps-plugin] ${message}`); // eslint-disable-line no-console
+    console.warn(`[mcp-apps-plugin] ${message}`);
   },
   error: (message: string) => {
-    console.error(`[mcp-apps-plugin] ${message}`); // eslint-disable-line no-console
+    console.error(`[mcp-apps-plugin] ${message}`);
   },
 };
 
