@@ -34,6 +34,13 @@ import {
   createListSessionsTool,
   createCloseSessionTool,
   createCloseAllSessionsTool,
+  // Widget control tools (standalone mode - agent owns session flow)
+  createWidgetEvaluateTool,
+  createWidgetClickTool,
+  createWidgetFillTool,
+  createWidgetWaitForSelectorTool,
+  createWidgetLocatorTool,
+  createGetWidgetStateTool,
 } from "./tools";
 
 /**
@@ -85,6 +92,13 @@ export function createInspectorServer(options: InspectorServerOptions = {}): App
     list_sessions: createListSessionsTool(connectionManager),
     close_session: createCloseSessionTool(connectionManager),
     close_all_sessions: createCloseAllSessionsTool(connectionManager),
+    // Widget control tools (standalone mode - agent owns session flow)
+    widget_evaluate: createWidgetEvaluateTool(connectionManager),
+    widget_click: createWidgetClickTool(connectionManager),
+    widget_fill: createWidgetFillTool(connectionManager),
+    widget_wait_for_selector: createWidgetWaitForSelectorTool(connectionManager),
+    widget_locator: createWidgetLocatorTool(connectionManager),
+    get_widget_state: createGetWidgetStateTool(connectionManager),
   };
 
   const app = createApp({

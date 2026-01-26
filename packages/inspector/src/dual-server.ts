@@ -37,6 +37,8 @@ import {
   createGetConsoleLogsTool,
   createScreenshotWidgetTool,
   createGetGlobalsTool,
+  // Widget state observation (read-only, kept in dual mode)
+  createGetWidgetStateTool,
 } from "./tools";
 
 /**
@@ -69,7 +71,9 @@ export interface DualInspectorServer {
  * Create observation-only tools for the agent endpoint
  *
  * In dual mode, the agent can only observe sessions created by /apps/mcp.
- * It cannot mutate widget state (that would interfere with real testing).
+ * Widget control tools (widget_click, widget_fill, etc.) are NOT available here
+ * because the Playwright mirror is disconnected from the external widget's DOM state.
+ * Without bidirectional sync, clicking/filling in the mirror doesn't affect the external widget.
  *
  * Observation tools available:
  * - connect_to_server: Connect to a target server
@@ -83,8 +87,10 @@ export interface DualInspectorServer {
  * - get_console_logs: Get console logs from a session
  * - screenshot_widget: Take screenshot of a session
  * - get_globals: Get current environment state
+ * - get_widget_state: Get current widget DOM/form state (read-only)
  *
- * NOT available (would interfere with real test):
+ * NOT available (no bidirectional sync with external widget):
+ * - widget_click, widget_fill, widget_evaluate, widget_locator, widget_wait_for_selector
  * - set_globals, reset_globals
  * - call_tool (use /apps/mcp instead)
  * - test_widget_interaction
@@ -112,6 +118,9 @@ function createAgentTools(connectionManager: ConnectionManager): ToolDefs {
 
     // Environment reading (no mutation)
     get_globals: createGetGlobalsTool(connectionManager),
+
+    // Widget state observation (read-only) - can observe but not interact
+    get_widget_state: createGetWidgetStateTool(connectionManager),
   };
 }
 
