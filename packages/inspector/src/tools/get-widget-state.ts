@@ -31,7 +31,7 @@ const environmentStateSchema = z.object({
     width: z.number(),
     height: z.number(),
   }),
-  maxHeight: z.number().optional(),
+  maxHeight: z.number().nullable().optional(),
   safeAreaInsets: z.object({
     top: z.number(),
     right: z.number(),
