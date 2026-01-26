@@ -3,6 +3,21 @@
  *
  * Lightweight HTTP server that serves widget sessions with proper iframe embedding.
  * This enables correct postMessage communication where event.source === window.parent.
+ *
+ * ## Architecture Note
+ *
+ * This class manages **HTTP session storage** for serving widget HTML content.
+ * Sessions are identified by UUID and cleaned up based on `createdAt` timestamp.
+ *
+ * **Distinct from WidgetSessionManager** which manages **Playwright page instances**
+ * for interactive widget testing. The two classes have different TTL behaviors:
+ *
+ * - **WidgetServer**: TTL based on `createdAt` (static expiration)
+ * - **WidgetSessionManager**: TTL based on `lastAccessedAt` (sliding expiration)
+ *
+ * This separation allows the HTTP server to efficiently garbage-collect served
+ * content while keeping interactive Playwright sessions alive as long as they're
+ * being actively used.
  */
 
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";

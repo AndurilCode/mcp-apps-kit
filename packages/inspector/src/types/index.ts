@@ -1,21 +1,12 @@
 /**
- * Types for MCP Inspector Server
+ * Types Index
  *
- * This module re-exports all types from domain-specific modules for backwards compatibility.
- * New code should import from specific modules (e.g., ./types/server-types) when possible.
+ * Barrel export for all inspector types.
+ * This allows importing all types from a single location.
  */
 
-// Export session types from widget-session-manager
+// Server types (MCP server interface, target schema, options)
 export type {
-  ActiveWidgetSession,
-  SessionInfo,
-  SessionSource,
-  ProxyMetadata,
-} from "./widget-session-manager";
-
-// Re-export all types from the types directory
-export type {
-  // Server types
   ResourceMetadata,
   ResourceContents,
   ToolCallResult,
@@ -26,14 +17,20 @@ export type {
   TargetServerSchema,
   ServerInfo,
   InspectorServerOptions,
-  // Connection types
+} from "./server-types";
+
+// Connection types (state, options, tool inputs/outputs)
+export type {
   ConnectOptions,
   ConnectionState,
   ConnectInput,
   ConnectOutput,
   DisconnectOutput,
   ConnectionStatusOutput,
-  // Tool types
+} from "./connection-types";
+
+// Tool types (tool, resource, prompt operations)
+export type {
   ToolInfo,
   CallToolInput,
   ContentBlock,
@@ -45,17 +42,22 @@ export type {
   GetPromptInput,
   PromptMessage,
   GetPromptOutput,
-  // History types
-  HistoryEntry,
-  HistoryOutput,
-  ClearHistoryOutput,
-  // Test types
+} from "./tool-types";
+
+// History types (call history tracking)
+export type { HistoryEntry, HistoryOutput, ClearHistoryOutput } from "./history-types";
+
+// Test types (test suite definition and execution)
+export type {
   TestCaseInput,
   TestSuiteInput,
   RunTestSuiteInput,
   TestCaseResultOutput,
   RunTestSuiteOutput,
-  // UI types
+} from "./test-types";
+
+// UI types (widget inspection, preview, rendering, control)
+export type {
   UIProtocol,
   UIWidgetInfo,
   ListUIWidgetsOutput,
@@ -99,7 +101,10 @@ export type {
   WidgetDOMSnapshot,
   WidgetStateSnapshot,
   GetWidgetStateOutput,
-  // Environment types
+} from "./ui-types";
+
+// Environment types (state, globals, sync events)
+export type {
   DeviceType,
   DeviceCapabilitiesInfo,
   UserAgentInfo,
@@ -112,5 +117,7 @@ export type {
   GetGlobalsOutput,
   ResetGlobalsOutput,
   SyncEventPayload,
-  SyncEventType,
-} from "./types/index";
+} from "./environment-types";
+
+// Re-export SyncEventType as a value (it's a union type alias, needs special handling)
+export { type SyncEventType } from "./environment-types";

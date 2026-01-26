@@ -7,7 +7,12 @@ import { defineTool } from "@mcp-apps-kit/core";
 import type { ConnectionManager } from "../connection";
 import type { CallToolOutput } from "../types";
 import { UIHostManager } from "../ui-host";
-import { findUIResourceForTool, fetchWidgetHTML } from "./helpers";
+import {
+  findUIResourceForTool,
+  fetchWidgetHTML,
+  extractToolResult,
+  type MCPCallToolResponse,
+} from "./helpers";
 
 export const callToolInputSchema = z.object({
   name: z.string().describe("Name of the tool to call"),
@@ -95,20 +100,8 @@ export function createCallToolTool(connectionManager: ConnectionManager) {
         // Render widget and create session
         let sessionId: string | undefined;
         try {
-          // Extract tool result for widget
-          let toolResult: unknown;
-          if (result.structuredContent) {
-            toolResult = result.structuredContent;
-          } else if (content.length > 0) {
-            const textContent = content.find((c) => c.type === "text");
-            if (textContent?.text) {
-              try {
-                toolResult = JSON.parse(textContent.text);
-              } catch {
-                toolResult = textContent.text;
-              }
-            }
-          }
+          // Extract tool result for widget (cast to MCPCallToolResponse for type compatibility)
+          const toolResult = extractToolResult(result as MCPCallToolResponse);
 
           // Find UI resource for this tool
           const rawClient = client.raw;

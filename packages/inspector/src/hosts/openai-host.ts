@@ -5,13 +5,15 @@
  * Implements the OpenAI Apps SDK protocol (window.openai + DOM events).
  */
 
-/**
- * JSDOM type - minimal interface for type safety
- * Using a permissive type to accommodate jsdom's DOMWindow
- */
-interface JSDOMInterface {
-  window: Window;
-}
+import {
+  BaseHostEmulator,
+  type JSDOMInterface,
+  type TrackedToolCall,
+  type BaseHostEmulatorOptions,
+} from "./base-host";
+
+// Re-export shared types for backwards compatibility
+export type { TrackedToolCall };
 
 /**
  * Environment settings for the emulator
@@ -30,17 +32,11 @@ export interface OpenAIEnvironmentSettings {
 /**
  * Options for configuring the OpenAI host emulator
  */
-export interface OpenAIHostEmulatorOptions {
-  /** Tool name */
-  toolName: string;
-  /** Tool result (will be JSON stringified for toolOutput) */
-  toolResult: unknown;
+export interface OpenAIHostEmulatorOptions extends BaseHostEmulatorOptions {
   /** Initial widget state */
   initialState?: unknown;
   /** Environment settings (theme, locale, device, location, etc.) */
   environment?: OpenAIEnvironmentSettings;
-  /** Enable debug logging */
-  debug?: boolean;
 }
 
 /**
@@ -52,28 +48,17 @@ export interface TrackedStateChange {
 }
 
 /**
- * Tracked tool call
- */
-export interface TrackedToolCall {
-  name: string;
-  args: unknown;
-  timestamp: number;
-}
-
-/**
  * OpenAI Host Emulator
  *
  * Emulates ChatGPT's sandboxed environment for testing OpenAI Apps widgets.
  * Supports injecting into jsdom or generating Playwright init scripts.
  */
-export class OpenAIHostEmulator {
-  private options: OpenAIHostEmulatorOptions;
+export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptions> {
   private state: unknown;
   private stateChanges: TrackedStateChange[] = [];
-  private toolCalls: TrackedToolCall[] = [];
 
   constructor(options: OpenAIHostEmulatorOptions) {
-    this.options = options;
+    super(options);
     this.state = options.initialState ?? null;
   }
 
@@ -291,11 +276,7 @@ export class OpenAIHostEmulator {
 
       // Tool calls
       callTool: async (name: string, args: unknown) => {
-        this.toolCalls.push({
-          name,
-          args,
-          timestamp: Date.now(),
-        });
+        this.recordToolCall(name, args);
         if (debug) {
           // eslint-disable-next-line no-console
           console.log("[OpenAI Host] callTool:", name, args);
@@ -417,9 +398,10 @@ export class OpenAIHostEmulator {
 
   /**
    * Get history of tool calls made by the widget
+   * @deprecated Use getToolCallHistory() instead (inherited from base class)
    */
   getToolCalls(): TrackedToolCall[] {
-    return [...this.toolCalls];
+    return this.getToolCallHistory();
   }
 
   /**
@@ -430,10 +412,10 @@ export class OpenAIHostEmulator {
   }
 
   /**
-   * Clear tracking history
+   * Clear tracking history (state changes and tool calls)
    */
   clearHistory(): void {
     this.stateChanges = [];
-    this.toolCalls = [];
+    this.clearToolCallHistory();
   }
 }

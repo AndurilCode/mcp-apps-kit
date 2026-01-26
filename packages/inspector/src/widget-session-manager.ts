@@ -3,6 +3,25 @@
  *
  * Manages active widget rendering sessions with Playwright pages.
  * Sessions persist across multiple inspector operations (screenshot, console logs, interactions).
+ *
+ * ## Architecture Note
+ *
+ * This class manages **Playwright page instances** for interactive widget testing.
+ * Sessions track console logs, page errors, dialogs, and tool calls made by widgets.
+ *
+ * **Distinct from WidgetServer** which manages **HTTP session storage** for serving
+ * widget HTML content. The two classes have different TTL behaviors:
+ *
+ * - **WidgetSessionManager**: TTL based on `lastAccessedAt` (sliding expiration)
+ *   - Each operation (screenshot, get logs, interactions) resets the TTL
+ *   - Keeps sessions alive as long as they're being actively used
+ *
+ * - **WidgetServer**: TTL based on `createdAt` (static expiration)
+ *   - Sessions expire at a fixed time after creation
+ *   - Optimized for garbage-collecting served HTML content
+ *
+ * This separation allows interactive sessions to remain available while the
+ * underlying HTTP content can be efficiently cleaned up.
  */
 
 import type { Page } from "playwright";
