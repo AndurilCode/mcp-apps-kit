@@ -245,7 +245,7 @@ export function createWidgetClickTool(connectionManager: ConnectionManager) {
           stabilityWaitMs,
           wasStable,
           hints: {
-            next: "Use widget_snapshot to verify UI state changed, or get_widget_state for app state",
+            next: "Use widget_snapshot_diff to see what changed (auto-compares with last snapshot), or widget_snapshot for full state",
           },
         };
       } catch (error) {
@@ -253,7 +253,21 @@ export function createWidgetClickTool(connectionManager: ConnectionManager) {
 
         // Provide context-specific hints based on error type
         let hints: ToolHints;
-        if (message.includes("not found") || message.includes("timeout")) {
+        if (message.includes("intercepts pointer events")) {
+          // Extract blocking element from error message
+          // Example: "element with class 'modal-overlay' intercepts pointer events"
+          const blockingMatch = message.match(/(?:element|<[\w-]+>)[^']*'([^']+)'[^']*intercepts/i);
+          const blockingElement = blockingMatch?.[1] ?? "overlay";
+
+          hints = {
+            next: `Element is blocked by "${blockingElement}". Try using a CSS selector like ".${blockingElement} button" to target elements inside the overlay`,
+            alternatives: [
+              "Use widget_query to find elements inside the modal/overlay",
+              "Try clicking the blocking overlay first to dismiss it",
+              "Use a more specific selector that targets the visible element",
+            ],
+          };
+        } else if (message.includes("not found") || message.includes("timeout")) {
           hints = {
             next: "Use widget_snapshot to see current elements, or widget_query to search by text/role",
             alternatives: [
@@ -470,7 +484,7 @@ export function createWidgetFillTool(connectionManager: ConnectionManager) {
           stabilityWaitMs,
           wasStable,
           hints: {
-            next: "Use widget_snapshot to verify UI state changed, or get_widget_state for app state",
+            next: "Use widget_snapshot_diff to see what changed (auto-compares with last snapshot), or widget_snapshot for full state",
           },
         };
       } catch (error) {
@@ -730,6 +744,7 @@ export const widgetDragOutputSchema = z.object({
       y: z.number(),
     })
     .optional(),
+  hints: toolHintsSchema.optional(),
 });
 
 export function createWidgetDragTool(connectionManager: ConnectionManager) {
@@ -856,6 +871,9 @@ export function createWidgetDragTool(connectionManager: ConnectionManager) {
           success: true,
           startPosition,
           endPosition,
+          hints: {
+            next: "Use widget_snapshot_diff to see what changed (auto-compares with last snapshot), or widget_snapshot for full state",
+          },
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

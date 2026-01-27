@@ -27,6 +27,12 @@ export const widgetQueryInputSchema = z.object({
   testId: z.string().optional().describe("data-testid attribute value"),
   exact: z.boolean().optional().describe("Match text exactly (default: false for substring)"),
   // Options
+  nth: z
+    .number()
+    .optional()
+    .describe(
+      "Return only the Nth match (0-based index). Without this, returns all matches up to maxResults."
+    ),
   maxResults: z.number().optional().describe("Maximum elements to return (default: 10)"),
   timeout: z.number().optional().describe("Timeout in ms (default: 5000)"),
 });
@@ -181,6 +187,85 @@ export function createWidgetQueryTool(connectionManager: ConnectionManager) {
 
         const locatorStrategy = describeLocatorStrategy(locatorOptions);
         const count = await baseLocator.count();
+        const nth = input.nth;
+
+        // If nth is specified, validate and return only that element
+        if (nth !== undefined) {
+          if (nth < 0 || nth >= count) {
+            return {
+              success: false,
+              error: `Index ${nth} out of range (found ${count} matches, 0-based)`,
+              hints: {
+                next: "Use widget_query without 'nth' to see all matches",
+              },
+            };
+          }
+
+          const el = baseLocator.nth(nth);
+          try {
+            const [
+              tagName,
+              textContent,
+              value,
+              isVisible,
+              isEnabled,
+              boundingBox,
+              ariaRole,
+              ariaName,
+              id,
+              className,
+            ] = await Promise.all([
+              el.evaluate((e) => e.tagName.toLowerCase()),
+              el.textContent().then((t) => t?.trim().slice(0, 200) ?? ""),
+              el.inputValue().catch(() => undefined),
+              el.isVisible(),
+              el.isEnabled(),
+              el.boundingBox(),
+              el.getAttribute("role"),
+              el.getAttribute("aria-label"),
+              el.getAttribute("id"),
+              el.getAttribute("class"),
+            ]);
+
+            const attributes: Record<string, string> = {};
+            if (id) attributes["id"] = id;
+            if (className) attributes["class"] = className;
+
+            return {
+              success: true,
+              count: 1,
+              elements: [
+                {
+                  index: nth,
+                  tagName,
+                  role: ariaRole ?? undefined,
+                  name: ariaName ?? undefined,
+                  textContent,
+                  value,
+                  isVisible,
+                  isEnabled,
+                  attributes: Object.keys(attributes).length > 0 ? attributes : undefined,
+                  boundingBox: boundingBox ?? undefined,
+                },
+              ],
+              locatorStrategy,
+              hints: {
+                next: "Use widget_click/widget_fill with the same locator options to interact with this element",
+              },
+            };
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return {
+              success: false,
+              error: `Failed to extract element at index ${nth}: ${message}`,
+              hints: {
+                next: "Element may have been removed. Try widget_snapshot to see current state.",
+              },
+            };
+          }
+        }
+
+        // Standard behavior: return all matches up to maxResults
         const maxResults = input.maxResults ?? 10;
         const elements: QueryElementInfo[] = [];
 

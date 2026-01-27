@@ -23,6 +23,12 @@ import type {
 export const widgetSnapshotInputSchema = z.object({
   sessionId: z.string().describe("Session ID of the widget"),
   includeDOM: z.boolean().optional().describe("Include full DOM HTML as well (default: false)"),
+  compactDOM: z
+    .boolean()
+    .optional()
+    .describe(
+      "Strip inline styles from DOM output for readability (default: false). Only applies when includeDOM=true."
+    ),
   filterRoles: z
     .array(z.string())
     .optional()
@@ -132,13 +138,21 @@ function parseAriaSnapshot(yaml: string): Record<string, unknown> | null {
   };
 
   const parseLine = (line: string): { indent: number; node: ParsedNode } | null => {
-    const match = line.match(/^(\s*)-\s*(\w+)(?:\s+"([^"]*)")?(.*)$/);
+    // Match multiple ARIA snapshot formats:
+    // Format 1: - role "name"           (buttons, links with quoted names)
+    // Format 2: - role: "content"       (text nodes with colon + quoted content)
+    // Format 3: - role: content         (text nodes with colon + unquoted content)
+    // Format 4: - role [attrs]          (roles without names, just attributes)
+    const match = line.match(/^(\s*)-\s*(\w+)(?:(?:\s+"([^"]*)")|(?::\s*"?([^"[\]]*?)"?))?(.*)$/);
     if (!match) return null;
 
-    const [, spaces, role, name = "", rest = ""] = match;
+    const [, spaces, role, quotedName, colonContent, rest = ""] = match;
     if (!role) return null;
     const indent = spaces?.length ?? 0;
     const attrs = parseAttributes(rest);
+
+    // Prefer quoted name, then colon content (trimmed), then empty string
+    const name = quotedName ?? colonContent?.trim() ?? "";
 
     return {
       indent,
@@ -212,7 +226,8 @@ export function createWidgetSnapshotTool(connectionManager: ConnectionManager) {
     description:
       "Capture a compact accessibility tree snapshot of a widget. Returns structured " +
       "roles, names, and states - much smaller than full DOM. Includes locator hints " +
-      "for easy element targeting. Ideal for LLM context efficiency.",
+      "for easy element targeting. Save the accessibilityTree result to pass to " +
+      "widget_snapshot_diff after interactions.",
     input: widgetSnapshotInputSchema,
     output: widgetSnapshotOutputSchema,
     handler: async (input): Promise<WidgetSnapshotOutput> => {
@@ -391,29 +406,80 @@ export function createWidgetSnapshotTool(connectionManager: ConnectionManager) {
 
         const accessibilityTree = transformNode(rawTree, 0);
 
+        // Cache the snapshot for widget_snapshot_diff auto-comparison
+        session.lastSnapshot = accessibilityTree;
+        session.lastSnapshotTimestamp = Date.now();
+
         // Optionally include DOM
         let dom: WidgetDOMSnapshot | undefined;
         if (input.includeDOM) {
           try {
-            const [html, textContent] = await Promise.all([
+            let [html, textContent] = await Promise.all([
               frame.content(),
               frame
                 .locator("body")
                 .textContent()
                 .then((t) => t?.trim() ?? ""),
             ]);
+
+            // Apply compact mode: strip inline styles for readability
+            if (input.compactDOM) {
+              // Strip inline style attributes only
+              html = html.replace(/\s+style="[^"]*"/gi, "");
+              // Collapse excessive whitespace between tags (but preserve structure)
+              html = html.replace(/>\s{2,}</g, ">\n<");
+            }
+
             dom = { html, textContent };
           } catch {
             // DOM extraction failed, continue without it
           }
         }
 
+        // Check for accessibility issues
+        const emptyNameCount = interactiveElements.filter(
+          (el) => !el.name || el.name.trim() === ""
+        ).length;
+
+        // Find duplicate role+name pairs
+        const roleNameCounts = new Map<string, number>();
+        for (const el of interactiveElements) {
+          const key = `${el.role}:${el.name}`;
+          roleNameCounts.set(key, (roleNameCounts.get(key) ?? 0) + 1);
+        }
+        const duplicateRoleNames = Array.from(roleNameCounts.entries())
+          .filter(([, count]) => count > 1)
+          .map(([key, count]) => {
+            const [role, name] = key.split(":");
+            return { role: role ?? "", name: name ?? "", count };
+          });
+
         // Build contextual hints based on what was found
         let hints: ToolHints;
         if (interactiveElements.length > 0) {
           hints = {
-            next: "Use widget_click/widget_fill with the locatorHint from interactiveElements (e.g., role='button', name='Submit')",
+            next: "Save accessibilityTree to pass to widget_snapshot_diff after interactions. Use widget_click/widget_fill with the locatorHint.",
           };
+
+          // Add accessibility warnings if issues detected
+          const warnings: string[] = [];
+          if (emptyNameCount > 0) {
+            warnings.push(`${emptyNameCount} interactive element(s) have empty accessible names`);
+          }
+          if (duplicateRoleNames.length > 0) {
+            const example = duplicateRoleNames[0];
+            warnings.push(
+              `${duplicateRoleNames.length} role+name pair(s) are duplicated (e.g., ${example?.role}:"${example?.name}" appears ${example?.count} times)`
+            );
+          }
+
+          if (warnings.length > 0) {
+            hints.warning = `Accessibility issues detected: ${warnings.join("; ")}`;
+            hints.alternatives = [
+              "Use widget_query with CSS selectors for more precise targeting",
+              "Consider adding data-testid attributes to the widget for reliable automation",
+            ];
+          }
         } else {
           hints = {
             next: "No interactive elements found. Widget may be display-only or still loading.",

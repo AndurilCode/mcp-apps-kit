@@ -76,9 +76,10 @@ import {
   createWidgetDragTool,
   createWidgetRefreshTool,
   createGetWidgetStateTool,
-  // Widget snapshot and query tools (widget_query supersedes widget_locator)
+  // Widget snapshot, query, and diff tools (widget_query supersedes widget_locator)
   createWidgetSnapshotTool,
   createWidgetQueryTool,
+  createWidgetSnapshotDiffTool,
 } from "./tools";
 
 /**
@@ -147,9 +148,10 @@ function createInspectorTools(connectionManager: ConnectionManager): ToolDefs {
     widget_drag: createWidgetDragTool(connectionManager),
     widget_refresh: createWidgetRefreshTool(connectionManager),
     get_widget_state: createGetWidgetStateTool(connectionManager),
-    // Widget snapshot and query tools (widget_query supersedes widget_locator)
+    // Widget snapshot, query, and diff tools (widget_query supersedes widget_locator)
     widget_snapshot: createWidgetSnapshotTool(connectionManager),
     widget_query: createWidgetQueryTool(connectionManager),
+    widget_snapshot_diff: createWidgetSnapshotDiffTool(connectionManager),
   };
 }
 
