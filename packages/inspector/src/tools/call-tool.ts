@@ -5,7 +5,7 @@
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
 import type { ConnectionManager } from "../connection";
-import type { CallToolOutput } from "../types";
+import type { CallToolOutput, ToolHints } from "../types";
 import { UIHostManager } from "../ui-host";
 import {
   findUIResourceForTool,
@@ -21,6 +21,12 @@ export const callToolInputSchema = z.object({
     .boolean()
     .optional()
     .describe("If true, render the UI widget and return a sessionId for subsequent operations"),
+});
+
+const toolHintsSchema = z.object({
+  next: z.string().optional(),
+  alternatives: z.array(z.string()).optional(),
+  warning: z.string().optional(),
 });
 
 export const callToolOutputSchema = z.object({
@@ -42,6 +48,7 @@ export const callToolOutputSchema = z.object({
     .optional(),
   duration: z.number(),
   sessionId: z.string().optional().describe("Widget session ID (when renderWidget=true)"),
+  hints: toolHintsSchema.optional(),
 });
 
 export function createCallToolTool(connectionManager: ConnectionManager) {
@@ -157,9 +164,18 @@ export function createCallToolTool(connectionManager: ConnectionManager) {
           console.warn(`[call_tool] Failed to render widget:`, error);
         }
 
+        // Add hints when widget session is created
+        let hints: ToolHints | undefined;
+        if (sessionId) {
+          hints = {
+            next: "Widget session created. Use widget_snapshot to discover elements, then widget_click/widget_fill to interact",
+          };
+        }
+
         return {
           ...baseResponse,
           sessionId,
+          hints,
         };
       } catch (error) {
         const duration = Date.now() - startTime;

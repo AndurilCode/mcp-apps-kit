@@ -21,6 +21,7 @@ import type {
   LocatorElementInfo,
   WidgetDragOutput,
   WidgetRefreshOutput,
+  ToolHints,
 } from "../types";
 import {
   resolveLocator,
@@ -136,12 +137,19 @@ export const widgetClickInputSchema = z.object({
   stabilityOptions: stabilityOptionsSchema.describe("Options for DOM stability wait"),
 });
 
+const toolHintsSchema = z.object({
+  next: z.string().optional(),
+  alternatives: z.array(z.string()).optional(),
+  warning: z.string().optional(),
+});
+
 export const widgetClickOutputSchema = z.object({
   success: z.boolean(),
   error: z.string().optional(),
   locatorStrategy: z.string().optional().describe("How the element was located"),
   stabilityWaitMs: z.number().optional().describe("Time spent waiting for DOM stability"),
   wasStable: z.boolean().optional().describe("Whether DOM was stable before timeout"),
+  hints: toolHintsSchema.optional(),
 });
 
 export function createWidgetClickTool(connectionManager: ConnectionManager) {
@@ -160,6 +168,9 @@ export function createWidgetClickTool(connectionManager: ConnectionManager) {
         return {
           success: false,
           error: `Session not found: ${input.sessionId}`,
+          hints: {
+            next: "Create a new session with preview_ui or call_tool(renderWidget=true)",
+          },
         };
       }
 
@@ -167,6 +178,9 @@ export function createWidgetClickTool(connectionManager: ConnectionManager) {
         return {
           success: false,
           error: "Page closed",
+          hints: {
+            next: "Create a new session with preview_ui or call_tool(renderWidget=true)",
+          },
         };
       }
 
@@ -176,6 +190,9 @@ export function createWidgetClickTool(connectionManager: ConnectionManager) {
           success: false,
           error:
             "No locator specified. Provide one of: selector, text, role, label, placeholder, or testId",
+          hints: {
+            next: "Use widget_snapshot to see available elements and their locator hints",
+          },
         };
       }
 
@@ -186,6 +203,10 @@ export function createWidgetClickTool(connectionManager: ConnectionManager) {
           return {
             success: false,
             error: "Widget iframe not found",
+            hints: {
+              next: "Wait for widget to load, or verify session is valid",
+              warning: "Widget may still be loading",
+            },
           };
         }
 
@@ -223,12 +244,34 @@ export function createWidgetClickTool(connectionManager: ConnectionManager) {
           locatorStrategy,
           stabilityWaitMs,
           wasStable,
+          hints: {
+            next: "Use widget_snapshot to verify UI state changed, or get_widget_state for app state",
+          },
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+
+        // Provide context-specific hints based on error type
+        let hints: ToolHints;
+        if (message.includes("not found") || message.includes("timeout")) {
+          hints = {
+            next: "Use widget_snapshot to see current elements, or widget_query to search by text/role",
+            alternatives: [
+              "Try partial text match with exact=false",
+              "Try role-based locator: role='button'",
+              "Check if element is inside shadow DOM",
+            ],
+          };
+        } else {
+          hints = {
+            next: "Use widget_snapshot to verify element exists and is interactable",
+          };
+        }
+
         return {
           success: false,
           error: message,
+          hints,
         };
       }
     },
@@ -269,6 +312,7 @@ export const widgetFillOutputSchema = z.object({
   locatorStrategy: z.string().optional().describe("How the element was located"),
   stabilityWaitMs: z.number().optional().describe("Time spent waiting for DOM stability"),
   wasStable: z.boolean().optional().describe("Whether DOM was stable before timeout"),
+  hints: toolHintsSchema.optional(),
 });
 
 export function createWidgetFillTool(connectionManager: ConnectionManager) {
@@ -287,6 +331,9 @@ export function createWidgetFillTool(connectionManager: ConnectionManager) {
         return {
           success: false,
           error: `Session not found: ${input.sessionId}`,
+          hints: {
+            next: "Create a new session with preview_ui or call_tool(renderWidget=true)",
+          },
         };
       }
 
@@ -294,6 +341,9 @@ export function createWidgetFillTool(connectionManager: ConnectionManager) {
         return {
           success: false,
           error: "Page closed",
+          hints: {
+            next: "Create a new session with preview_ui or call_tool(renderWidget=true)",
+          },
         };
       }
 
@@ -303,6 +353,9 @@ export function createWidgetFillTool(connectionManager: ConnectionManager) {
           success: false,
           error:
             "No locator specified. Provide one of: selector, label, placeholder, role, testId, or text",
+          hints: {
+            next: "Use widget_snapshot to see available elements and their locator hints",
+          },
         };
       }
 
@@ -313,6 +366,10 @@ export function createWidgetFillTool(connectionManager: ConnectionManager) {
           return {
             success: false,
             error: "Widget iframe not found",
+            hints: {
+              next: "Wait for widget to load, or verify session is valid",
+              warning: "Widget may still be loading",
+            },
           };
         }
 
@@ -412,12 +469,34 @@ export function createWidgetFillTool(connectionManager: ConnectionManager) {
           locatorStrategy,
           stabilityWaitMs,
           wasStable,
+          hints: {
+            next: "Use widget_snapshot to verify UI state changed, or get_widget_state for app state",
+          },
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+
+        // Provide context-specific hints based on error type
+        let hints: ToolHints;
+        if (message.includes("not found") || message.includes("timeout")) {
+          hints = {
+            next: "Use widget_snapshot to see current elements, or widget_query to search by text/role",
+            alternatives: [
+              "Try label-based locator for form inputs",
+              "Try placeholder-based locator",
+              "Check if element is enabled and visible",
+            ],
+          };
+        } else {
+          hints = {
+            next: "Use widget_snapshot to verify element exists and is fillable",
+          };
+        }
+
         return {
           success: false,
           error: message,
+          hints,
         };
       }
     },

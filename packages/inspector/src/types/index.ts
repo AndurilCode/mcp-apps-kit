@@ -31,6 +31,7 @@ export type {
 
 // Tool types (tool, resource, prompt operations)
 export type {
+  ToolHints,
   ToolInfo,
   CallToolInput,
   ContentBlock,

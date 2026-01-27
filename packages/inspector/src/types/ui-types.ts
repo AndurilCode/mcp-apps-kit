@@ -5,6 +5,7 @@
  */
 
 import type { EnvironmentState } from "./environment-types";
+import type { ToolHints } from "./tool-types";
 
 // =============================================================================
 // UI INSPECTION TYPES
@@ -99,6 +100,8 @@ export interface InspectToolUIOutput {
   uiBinding: UIBinding | null;
   mcpMeta: Record<string, unknown> | null;
   openaiMeta: Record<string, unknown> | null;
+  /** Guidance hints for agent */
+  hints?: ToolHints;
 }
 
 /**
@@ -177,6 +180,8 @@ export interface PreviewUIOutput {
   errors: string[];
   /** Render duration (ms) */
   renderDuration?: number;
+  /** Guidance hints for agent */
+  hints?: ToolHints;
 }
 
 /**
@@ -379,6 +384,8 @@ export interface WidgetClickOutput {
   stabilityWaitMs?: number;
   /** Whether DOM was stable before timeout */
   wasStable?: boolean;
+  /** Guidance hints for agent */
+  hints?: ToolHints;
 }
 
 /**
@@ -413,6 +420,8 @@ export interface WidgetFillOutput {
   stabilityWaitMs?: number;
   /** Whether DOM was stable before timeout */
   wasStable?: boolean;
+  /** Guidance hints for agent */
+  hints?: ToolHints;
 }
 
 /**
@@ -715,6 +724,8 @@ export interface WidgetSnapshotOutput {
   dom?: WidgetDOMSnapshot;
   /** Error message if snapshot failed */
   error?: string;
+  /** Guidance hints for agent */
+  hints?: ToolHints;
 }
 
 // =============================================================================
@@ -826,4 +837,6 @@ export interface WidgetQueryOutput {
   locatorStrategy?: string;
   /** Error message if query failed */
   error?: string;
+  /** Guidance hints for agent */
+  hints?: ToolHints;
 }

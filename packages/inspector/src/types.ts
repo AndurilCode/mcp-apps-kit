@@ -33,7 +33,8 @@ export type {
   ConnectOutput,
   DisconnectOutput,
   ConnectionStatusOutput,
-  // Tool types
+  // Tool types (with hints)
+  ToolHints,
   ToolInfo,
   CallToolInput,
   ContentBlock,

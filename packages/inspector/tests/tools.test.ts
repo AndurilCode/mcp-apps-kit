@@ -103,7 +103,16 @@ describe("Inspector Tools", () => {
       const result = await tool.handler({}, {} as never);
 
       expect(result.tools).toHaveLength(1);
-      expect(result.tools[0]).toEqual({ name: "greet", description: "Greet someone" });
+      expect(result.tools[0]).toEqual({
+        name: "greet",
+        description: "Greet someone",
+        inputSchema: undefined,
+        hasUI: false,
+        visibility: undefined,
+      });
+      // Should include hints indicating no UI widgets available
+      expect(result.hints).toBeDefined();
+      expect(result.hints?.next).toContain("No tools have UI widgets");
     });
 
     it("should throw error when not connected", async () => {

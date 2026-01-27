@@ -5,7 +5,7 @@
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
 import type { ConnectionManager } from "../connection";
-import type { InspectToolUIOutput, UIBinding } from "../types";
+import type { InspectToolUIOutput, UIBinding, ToolHints } from "../types";
 
 /**
  * Extract UI binding from tool metadata
@@ -125,6 +125,12 @@ export const inspectToolUIInputSchema = z.object({
   toolName: z.string().describe("Name of the tool to inspect for UI binding"),
 });
 
+const toolHintsSchema = z.object({
+  next: z.string().optional(),
+  alternatives: z.array(z.string()).optional(),
+  warning: z.string().optional(),
+});
+
 export const inspectToolUIOutputSchema = z.object({
   toolName: z.string(),
   hasUI: z.boolean(),
@@ -136,6 +142,7 @@ export const inspectToolUIOutputSchema = z.object({
     .nullable(),
   mcpMeta: z.record(z.string(), z.unknown()).nullable(),
   openaiMeta: z.record(z.string(), z.unknown()).nullable(),
+  hints: toolHintsSchema.optional(),
 });
 
 export function createInspectToolUITool(connectionManager: ConnectionManager) {
@@ -159,12 +166,41 @@ export function createInspectToolUITool(connectionManager: ConnectionManager) {
       const meta = tool._meta;
       const uiBinding = extractUIBinding(meta);
 
+      // Build contextual hints based on visibility
+      let hints: ToolHints;
+      if (!uiBinding) {
+        hints = {
+          next: "This tool has no UI. Use call_tool to execute it directly.",
+          alternatives: ["Use list_tools to see which tools have hasUI=true"],
+        };
+      } else {
+        const visibility = uiBinding.visibility;
+        const isAppOnly = visibility.length === 1 && visibility.includes("app");
+        const isModelAndApp = visibility.includes("model") && visibility.includes("app");
+
+        if (isAppOnly) {
+          hints = {
+            next: "This tool is widget-internal (visibility: app). The widget calls it directly - you don't need to call it.",
+            warning: "Calling this tool directly may bypass widget state management",
+          };
+        } else if (isModelAndApp) {
+          hints = {
+            next: "Use preview_ui or call_tool(renderWidget=true) to render the widget. The widget may also call this tool via its UI.",
+          };
+        } else {
+          hints = {
+            next: "Use preview_ui or call_tool(renderWidget=true) to render this tool's widget",
+          };
+        }
+      }
+
       return {
         toolName: input.toolName,
         hasUI: uiBinding !== null,
         uiBinding,
         mcpMeta: buildMcpMeta(meta),
         openaiMeta: buildOpenaiMeta(meta),
+        hints,
       };
     },
   });
