@@ -16,6 +16,7 @@ import type {
   TargetServerSchema,
 } from "./types";
 import { WidgetSessionManager } from "./widget-session-manager";
+import { WidgetServer } from "./widget-server";
 
 /**
  * Events emitted by ConnectionManager
@@ -70,6 +71,7 @@ export class ConnectionManager extends EventEmitter {
   private readonly defaultTimeout: number;
   private readonly debug: boolean;
   private widgetSessionManager: WidgetSessionManager;
+  private widgetServer: WidgetServer | null = null;
 
   /** Cached target server schema for proxy tool generation */
   private targetSchema: TargetServerSchema | null = null;
@@ -282,6 +284,9 @@ export class ConnectionManager extends EventEmitter {
     // Close all widget sessions
     await this.widgetSessionManager.closeAllSessions();
 
+    // Stop the widget server
+    await this.stopWidgetServer();
+
     if (this.state.client) {
       try {
         await this.state.client.disconnect();
@@ -459,6 +464,48 @@ export class ConnectionManager extends EventEmitter {
    */
   getWidgetSessionManager(): WidgetSessionManager {
     return this.widgetSessionManager;
+  }
+
+  /**
+   * Get the shared widget server (creates if needed)
+   *
+   * The WidgetServer is shared across all tool calls to ensure consistent
+   * hostUrls and session management. This lazy initialization ensures the
+   * server is only started when actually needed.
+   */
+  async getWidgetServer(): Promise<WidgetServer> {
+    if (!this.widgetServer) {
+      this.widgetServer = new WidgetServer({ debug: this.debug });
+      await this.widgetServer.start();
+      if (this.debug) {
+        // eslint-disable-next-line no-console
+        console.log(
+          `[inspector] Shared WidgetServer started on port ${this.widgetServer.getPort()}`
+        );
+      }
+    }
+    return this.widgetServer;
+  }
+
+  /**
+   * Check if widget server is running
+   */
+  hasWidgetServer(): boolean {
+    return this.widgetServer !== null;
+  }
+
+  /**
+   * Stop the widget server (called during cleanup)
+   */
+  async stopWidgetServer(): Promise<void> {
+    if (this.widgetServer) {
+      await this.widgetServer.stop();
+      this.widgetServer = null;
+      if (this.debug) {
+        // eslint-disable-next-line no-console
+        console.log(`[inspector] Shared WidgetServer stopped`);
+      }
+    }
   }
 
   /**

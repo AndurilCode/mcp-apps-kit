@@ -204,6 +204,23 @@ export class WidgetServer {
   }
 
   /**
+   * Touch a session to extend its TTL
+   *
+   * Resets the session's createdAt timestamp to extend its lifetime.
+   * This is used when the linked WidgetSessionManager session is accessed,
+   * keeping both sessions in sync for active usage scenarios.
+   */
+  touchSession(sessionId: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return false;
+    }
+    session.createdAt = Date.now();
+    this.log(`Touched session ${sessionId}`);
+    return true;
+  }
+
+  /**
    * Delete a session
    */
   deleteSession(sessionId: string): void {

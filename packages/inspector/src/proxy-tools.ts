@@ -94,7 +94,9 @@ function generateProxyTool(
             const html = await fetchWidgetHTML(rawClient, uiResource.uri);
 
             if (html) {
-              const uiHostManager = new UIHostManager(client);
+              // Use shared WidgetServer from ConnectionManager
+              const sharedWidgetServer = await connectionManager.getWidgetServer();
+              const uiHostManager = new UIHostManager(client, { sharedWidgetServer });
               const environmentState = connectionManager.getEnvironmentState();
               const viewport = environmentState.viewport;
               // Get external hostContext for MCP 1:1 sync
@@ -120,6 +122,9 @@ function generateProxyTool(
               const urlMatch = pageUrl.match(/\/host\/([a-f0-9-]+)/);
               const widgetSessionId = urlMatch?.[1] ?? "";
 
+              // Create touch callback to keep WidgetServer session alive
+              const widgetServerTouch = uiHostManager.createSessionTouchCallback(widgetSessionId);
+
               // Create widget session with 'apps' source
               const sessionManager = connectionManager.getWidgetSessionManager();
               const targetServerUrl = connectionManager.getState().serverUrl ?? "";
@@ -134,7 +139,8 @@ function generateProxyTool(
                 {
                   targetServerUrl,
                   targetToolName: toolInfo.name,
-                }
+                },
+                widgetServerTouch
               );
 
               sessionId = session.id;
@@ -360,7 +366,9 @@ export function registerProxyToolsDirectly(
               const html = await fetchWidgetHTML(rawClient, uiResource.uri);
 
               if (html) {
-                const uiHostManager = new UIHostManager(client);
+                // Use shared WidgetServer from ConnectionManager
+                const sharedWidgetServer = await connectionManager.getWidgetServer();
+                const uiHostManager = new UIHostManager(client, { sharedWidgetServer });
                 const environmentState = connectionManager.getEnvironmentState();
                 const viewport = environmentState.viewport;
                 // Get external hostContext for MCP 1:1 sync
@@ -386,6 +394,9 @@ export function registerProxyToolsDirectly(
                 const urlMatch = pageUrl.match(/\/host\/([a-f0-9-]+)/);
                 const widgetSessionId = urlMatch?.[1] ?? "";
 
+                // Create touch callback to keep WidgetServer session alive
+                const widgetServerTouch = uiHostManager.createSessionTouchCallback(widgetSessionId);
+
                 // Create widget session with 'apps' source
                 const sessionManager = connectionManager.getWidgetSessionManager();
                 const targetServerUrl = connectionManager.getState().serverUrl ?? "";
@@ -400,7 +411,8 @@ export function registerProxyToolsDirectly(
                   {
                     targetServerUrl,
                     targetToolName: toolInfo.name,
-                  }
+                  },
+                  widgetServerTouch
                 );
 
                 sessionId = session.id;

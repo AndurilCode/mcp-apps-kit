@@ -46,6 +46,8 @@ export interface UIHostManagerOptions {
   timeout?: number;
   /** Enable debug logging */
   debug?: boolean;
+  /** Shared widget server (from ConnectionManager) */
+  sharedWidgetServer?: WidgetServer;
 }
 
 /**
@@ -85,10 +87,12 @@ export class UIHostManager {
   private client: TestClient;
   private browserPool: Browser | null = null;
   private widgetServer?: WidgetServer;
-  private options: Required<UIHostManagerOptions>;
+  private sharedWidgetServer?: WidgetServer;
+  private options: Required<Omit<UIHostManagerOptions, "sharedWidgetServer">>;
 
   constructor(client: TestClient, options: UIHostManagerOptions = {}) {
     this.client = client;
+    this.sharedWidgetServer = options.sharedWidgetServer;
     this.options = {
       timeout: options.timeout ?? 30000,
       debug: options.debug ?? false,
@@ -394,13 +398,37 @@ export class UIHostManager {
 
   /**
    * Get or create widget server (lazy initialization)
+   *
+   * Uses shared WidgetServer from ConnectionManager if provided,
+   * otherwise creates a local one (for backwards compatibility in tests).
    */
   private async getWidgetServer(): Promise<WidgetServer> {
+    // Prefer shared widget server if available
+    if (this.sharedWidgetServer) {
+      return this.sharedWidgetServer;
+    }
+
+    // Fallback: create local widget server (for tests/standalone usage)
     if (!this.widgetServer) {
       this.widgetServer = new WidgetServer({ debug: this.options.debug });
       await this.widgetServer.start();
     }
     return this.widgetServer;
+  }
+
+  /**
+   * Create a touch callback for a session.
+   * This callback can be passed to WidgetSessionManager to keep the WidgetServer session alive.
+   */
+  createSessionTouchCallback(sessionId: string): () => void {
+    // Use shared server if available, otherwise local server
+    const server = this.sharedWidgetServer ?? this.widgetServer;
+    if (!server) {
+      return () => {}; // No-op if server not initialized
+    }
+    return () => {
+      server.touchSession(sessionId);
+    };
   }
 
   /**
@@ -447,7 +475,7 @@ export class UIHostManager {
     const server = await this.getWidgetServer();
 
     // Create a session for this widget, passing environment state, external hostContext, and inspector URL
-    const { hostUrl, sessionId } = server.createSession(
+    const { hostUrl } = server.createSession(
       html,
       toolResult,
       toolName,
@@ -465,10 +493,11 @@ export class UIHostManager {
     // The widget needs time to: load iframe -> execute JS -> init client -> send init -> receive response + tool/result -> re-render
     await page.waitForTimeout(500);
 
-    // Schedule session cleanup (defer to allow interactions)
-    setTimeout(() => {
-      server.deleteSession(sessionId);
-    }, 60000);
+    // NOTE: We no longer delete sessions here. Session cleanup is handled by:
+    // 1. WidgetServer's TTL-based cleanup (resets on touch)
+    // 2. WidgetSessionManager's touchSession calls (from dashboard API, interactions, etc.)
+    // 3. Explicit closeSession calls when sessions are no longer needed
+    // This allows dashboard iframes to display widgets for as long as the session is active.
 
     return {
       page,

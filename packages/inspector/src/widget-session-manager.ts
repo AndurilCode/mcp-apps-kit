@@ -95,6 +95,8 @@ export interface ActiveWidgetSession {
   lastSnapshot?: unknown;
   /** Timestamp when lastSnapshot was captured */
   lastSnapshotTimestamp?: number;
+  /** Optional callback to keep external session (WidgetServer) alive when this session is touched */
+  onTouch?: () => void;
 }
 
 /**
@@ -153,6 +155,7 @@ export class WidgetSessionManager {
    * @param protocol - Protocol used (mcp or openai)
    * @param source - Which endpoint created this session (default: 'agent')
    * @param proxyMetadata - Optional metadata for proxy sessions
+   * @param onTouch - Optional callback to keep external session alive when this session is touched
    */
   async createSession(
     toolName: string,
@@ -162,7 +165,8 @@ export class WidgetSessionManager {
     sessionId: string,
     protocol: DetectedProtocol,
     source: SessionSource = "agent",
-    proxyMetadata?: ProxyMetadata
+    proxyMetadata?: ProxyMetadata,
+    onTouch?: () => void
   ): Promise<ActiveWidgetSession> {
     // Use the WidgetServer's session ID directly for unified lookup
     // This ensures the host page and session manager use the same ID
@@ -182,6 +186,7 @@ export class WidgetSessionManager {
       protocol,
       source,
       proxyMetadata,
+      onTouch,
     };
 
     // Set up console log listener
@@ -242,6 +247,8 @@ export class WidgetSessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) return false;
     session.lastAccessedAt = Date.now();
+    // Also touch any linked external session (e.g., WidgetServer)
+    session.onTouch?.();
     return true;
   }
 
@@ -252,6 +259,8 @@ export class WidgetSessionManager {
     const session = this.sessions.get(sessionId) ?? null;
     if (session) {
       session.lastAccessedAt = Date.now();
+      // Also touch any linked external session (e.g., WidgetServer)
+      session.onTouch?.();
     }
     return session;
   }
@@ -679,7 +688,7 @@ export class WidgetSessionManager {
     /* eslint-disable no-undef */
     await session.page.evaluate((responseData) => {
       const d = responseData as { name?: string; result?: unknown; toolName?: string };
-      const toolName = d.name || d.toolName;
+      const toolName = d.name ?? d.toolName;
 
       if (!toolName) {
         // eslint-disable-next-line no-console
