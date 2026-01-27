@@ -456,7 +456,8 @@ export class UIHostManager {
     const page = await browser.newPage();
 
     // Use viewport from environment state if provided, otherwise use parameter or default
-    const effectiveViewport = viewport ?? environmentState?.viewport ?? { width: 800, height: 600 };
+    const effectiveViewport = viewport ??
+      environmentState?.viewport ?? { width: 1920, height: 1080 };
 
     // Set viewport
     await page.setViewportSize(effectiveViewport);

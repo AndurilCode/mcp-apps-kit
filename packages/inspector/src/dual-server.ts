@@ -25,6 +25,7 @@ import type {
 } from "./types";
 import { registerProxyToolsDirectly } from "./proxy-tools";
 import { registerProxyResources } from "./proxy-resources";
+import { handleDashboardRequest } from "./dashboard/dashboard-server";
 import {
   createConnectTool,
   createDisconnectTool,
@@ -334,6 +335,12 @@ export function createDualInspectorServer(
       res.writeHead(405, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Method not allowed" }));
       return;
+    }
+
+    // Dashboard routes
+    if (url.startsWith("/dashboard")) {
+      const handled = await handleDashboardRequest(req, res, connectionManager);
+      if (handled) return;
     }
 
     // Convert to Web Request

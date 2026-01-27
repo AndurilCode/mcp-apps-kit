@@ -898,6 +898,22 @@ export class WidgetSessionManager {
   }
 
   /**
+   * Get a page for streaming (for dashboard screencast)
+   *
+   * Returns the page only if it exists and is not closed.
+   * Does NOT touch the session TTL - the streaming layer handles that separately.
+   *
+   * @param sessionId - Session ID
+   * @returns The Playwright page or null if not available
+   */
+  getPageForStreaming(sessionId: string): Page | null {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+    if (session.page.isClosed()) return null;
+    return session.page;
+  }
+
+  /**
    * Close a specific session
    */
   async closeSession(sessionId: string): Promise<boolean> {

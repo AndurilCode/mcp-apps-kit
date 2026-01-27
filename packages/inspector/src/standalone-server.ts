@@ -15,6 +15,7 @@ import type { Server } from "http";
 import http from "http";
 import { ConnectionManager } from "./connection";
 import type { InspectorServerOptions } from "./types";
+import { handleDashboardRequest } from "./dashboard/dashboard-server";
 
 // =============================================================================
 // TOOL FILTERING (for auto-connect mode)
@@ -349,6 +350,12 @@ export function createStandaloneInspectorServer(
       const responseBody = await webResponse.arrayBuffer();
       res.end(Buffer.from(responseBody));
       return;
+    }
+
+    // Dashboard routes
+    if (url.startsWith("/dashboard")) {
+      const handled = await handleDashboardRequest(req, res, connectionManager);
+      if (handled) return;
     }
 
     // 404 for other paths
