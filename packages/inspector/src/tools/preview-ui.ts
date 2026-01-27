@@ -34,6 +34,12 @@ export const previewUIInputSchema = z.object({
   waitMs: z.number().optional().describe("Time to wait for render in milliseconds (default: 100)"),
 });
 
+const toolHintsSchema = z.object({
+  next: z.string().optional(),
+  alternatives: z.array(z.string()).optional(),
+  warning: z.string().optional(),
+});
+
 export const previewUIOutputSchema = z.object({
   hasUI: z.boolean(),
   noUIReason: z.string().optional(),
@@ -56,6 +62,7 @@ export const previewUIOutputSchema = z.object({
   toolResultDisplayed: z.boolean().optional(),
   errors: z.array(z.string()),
   renderDuration: z.number().optional(),
+  hints: toolHintsSchema.optional(),
 });
 
 export function createPreviewUITool(connectionManager: ConnectionManager) {
@@ -77,6 +84,10 @@ export function createPreviewUITool(connectionManager: ConnectionManager) {
             hasUI: false,
             noUIReason: `Session not found: ${input.sessionId}`,
             errors: [`Session ${input.sessionId} does not exist or has expired`],
+            hints: {
+              next: "Create a new session with preview_ui or call_tool(renderWidget=true)",
+              alternatives: ["Use list_sessions to see active sessions"],
+            },
           };
         }
 
@@ -90,6 +101,10 @@ export function createPreviewUITool(connectionManager: ConnectionManager) {
               hasUI: true,
               protocol,
               errors: ["Widget iframe not found"],
+              hints: {
+                next: "Wait for widget to load, or verify session is valid",
+                warning: "Widget may still be loading",
+              },
             };
           }
 
@@ -119,6 +134,9 @@ export function createPreviewUITool(connectionManager: ConnectionManager) {
             toolResultDisplayed,
             errors: [],
             renderDuration,
+            hints: {
+              next: "Session active. Use widget_snapshot to get a compact accessibility tree, then widget_click/widget_fill to interact",
+            },
           };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -126,6 +144,9 @@ export function createPreviewUITool(connectionManager: ConnectionManager) {
             hasUI: true,
             protocol: session.protocol,
             errors: [`Preview failed: ${message}`],
+            hints: {
+              next: "Create a new session with preview_ui or call_tool(renderWidget=true)",
+            },
           };
         }
       }
@@ -136,6 +157,9 @@ export function createPreviewUITool(connectionManager: ConnectionManager) {
           hasUI: false,
           noUIReason: "Either sessionId or both tool and arguments must be provided",
           errors: ["Missing required parameters"],
+          hints: {
+            next: "Provide tool name and arguments, or use an existing sessionId",
+          },
         };
       }
 
@@ -157,6 +181,10 @@ export function createPreviewUITool(connectionManager: ConnectionManager) {
           hasUI: false,
           noUIReason: `Tool call failed: ${message}`,
           errors: [message],
+          hints: {
+            next: "Check tool name and arguments with list_tools",
+            alternatives: ["Verify server connection with connection_status"],
+          },
         };
       }
 
@@ -167,6 +195,10 @@ export function createPreviewUITool(connectionManager: ConnectionManager) {
           hasUI: false,
           noUIReason: `No UI resource found for tool: ${input.tool}`,
           errors: [],
+          hints: {
+            next: "This tool has no UI widget. Use call_tool to execute it directly.",
+            alternatives: ["Use list_tools to see which tools have hasUI=true"],
+          },
         };
       }
 
@@ -182,6 +214,9 @@ export function createPreviewUITool(connectionManager: ConnectionManager) {
             hasUI: false,
             noUIReason: `No HTML content in resource: ${uiResource.uri}`,
             errors: [],
+            hints: {
+              next: "UI resource exists but has no HTML content. Check resource URI.",
+            },
           };
         }
       } catch (error) {
@@ -190,6 +225,9 @@ export function createPreviewUITool(connectionManager: ConnectionManager) {
           hasUI: false,
           noUIReason: `Failed to fetch widget HTML: ${message}`,
           errors: [message],
+          hints: {
+            next: "Failed to fetch widget HTML. Verify server connection.",
+          },
         };
       }
 
@@ -230,6 +268,9 @@ export function createPreviewUITool(connectionManager: ConnectionManager) {
           toolResultDisplayed,
           errors: renderResult.errors,
           renderDuration,
+          hints: {
+            next: "For interactive widget testing, use call_tool with renderWidget=true to create a session, then widget_snapshot/widget_click/widget_fill",
+          },
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -238,6 +279,9 @@ export function createPreviewUITool(connectionManager: ConnectionManager) {
           protocol,
           resourceUri: uiResource.uri,
           errors: [`Render failed: ${message}`],
+          hints: {
+            next: "Render failed. Try again or check widget HTML for errors.",
+          },
         };
       }
     },

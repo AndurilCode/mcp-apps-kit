@@ -8,7 +8,7 @@
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
 import type { ConnectionManager } from "../connection";
-import type { WidgetQueryOutput, QueryElementInfo } from "../types";
+import type { WidgetQueryOutput, QueryElementInfo, ToolHints } from "../types";
 import { hasLocatorOptions, describeLocatorStrategy } from "./helpers";
 
 // =============================================================================
@@ -29,6 +29,12 @@ export const widgetQueryInputSchema = z.object({
   // Options
   maxResults: z.number().optional().describe("Maximum elements to return (default: 10)"),
   timeout: z.number().optional().describe("Timeout in ms (default: 5000)"),
+});
+
+const toolHintsSchema = z.object({
+  next: z.string().optional(),
+  alternatives: z.array(z.string()).optional(),
+  warning: z.string().optional(),
 });
 
 export const widgetQueryOutputSchema = z.object({
@@ -59,6 +65,7 @@ export const widgetQueryOutputSchema = z.object({
     .optional(),
   locatorStrategy: z.string().optional(),
   error: z.string().optional(),
+  hints: toolHintsSchema.optional(),
 });
 
 // =============================================================================
@@ -81,6 +88,9 @@ export function createWidgetQueryTool(connectionManager: ConnectionManager) {
         return {
           success: false,
           error: `Session not found: ${input.sessionId}`,
+          hints: {
+            next: "Create a new session with preview_ui or call_tool(renderWidget=true)",
+          },
         };
       }
 
@@ -88,6 +98,9 @@ export function createWidgetQueryTool(connectionManager: ConnectionManager) {
         return {
           success: false,
           error: "Page closed",
+          hints: {
+            next: "Create a new session with preview_ui or call_tool(renderWidget=true)",
+          },
         };
       }
 
@@ -97,6 +110,9 @@ export function createWidgetQueryTool(connectionManager: ConnectionManager) {
           success: false,
           error:
             "No locator specified. Provide one of: selector, text, role, label, placeholder, or testId",
+          hints: {
+            next: "Use widget_snapshot for a comprehensive view of all elements",
+          },
         };
       }
 
@@ -107,6 +123,10 @@ export function createWidgetQueryTool(connectionManager: ConnectionManager) {
           return {
             success: false,
             error: "Widget iframe not found",
+            hints: {
+              next: "Wait for widget to load, or verify session is valid",
+              warning: "Widget may still be loading",
+            },
           };
         }
 
@@ -153,6 +173,9 @@ export function createWidgetQueryTool(connectionManager: ConnectionManager) {
           return {
             success: false,
             error: "No valid locator options provided",
+            hints: {
+              next: "Provide text, role, label, placeholder, testId, or selector",
+            },
           };
         }
 
@@ -212,17 +235,47 @@ export function createWidgetQueryTool(connectionManager: ConnectionManager) {
           }
         }
 
+        // Build contextual hints based on results
+        let hints: ToolHints;
+        if (count > 0) {
+          if (count > 1) {
+            hints = {
+              next: `Found ${count} matches. Use widget_click/widget_fill with the same locator to interact with element[0]`,
+              warning:
+                count > 5
+                  ? "Multiple matches found. Add name/label to be more specific."
+                  : undefined,
+            };
+          } else {
+            hints = {
+              next: "Use widget_click/widget_fill with the same locator options to interact with this element",
+            };
+          }
+        } else {
+          hints = {
+            next: "No elements match. Try widget_snapshot to see all elements, or broaden search (exact=false)",
+            alternatives: [
+              "Search by text instead of role",
+              "Check element visibility with isVisible",
+            ],
+          };
+        }
+
         return {
           success: true,
           count,
           elements,
           locatorStrategy,
+          hints,
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return {
           success: false,
           error: message,
+          hints: {
+            next: "Use widget_snapshot to see all elements, or try a different locator strategy",
+          },
         };
       }
     },

@@ -24,6 +24,8 @@ export type {
   ConnectInput,
   ConnectOutput,
   DisconnectOutput,
+  // Tool types (with hints)
+  ToolHints,
   ToolInfo,
   CallToolInput,
   CallToolOutput,

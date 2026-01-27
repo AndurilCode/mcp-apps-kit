@@ -5,6 +5,24 @@
  */
 
 // =============================================================================
+// TOOL HINTS (for agent guidance)
+// =============================================================================
+
+/**
+ * Hints embedded in tool responses to guide agents on next steps.
+ * Progressive disclosure: keeps tool descriptions minimal while providing
+ * contextual guidance in responses.
+ */
+export interface ToolHints {
+  /** Suggested next action after this tool */
+  next?: string;
+  /** Alternative approaches to consider */
+  alternatives?: string[];
+  /** Warning about potential issues */
+  warning?: string;
+}
+
+// =============================================================================
 // TOOL TYPES
 // =============================================================================
 
@@ -45,6 +63,8 @@ export interface CallToolOutput {
   error?: { code: string; message: string };
   duration: number;
   sessionId?: string;
+  /** Guidance hints for agent */
+  hints?: ToolHints;
 }
 
 // =============================================================================

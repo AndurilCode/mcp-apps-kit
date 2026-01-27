@@ -13,6 +13,7 @@ import type {
   AccessibilityNode,
   InteractiveElementSummary,
   WidgetDOMSnapshot,
+  ToolHints,
 } from "../types";
 
 // =============================================================================
@@ -27,6 +28,12 @@ export const widgetSnapshotInputSchema = z.object({
     .optional()
     .describe("Filter to specific ARIA roles (e.g., ['button', 'textbox'])"),
   maxDepth: z.number().optional().describe("Maximum tree depth (default: unlimited)"),
+});
+
+const toolHintsSchema = z.object({
+  next: z.string().optional(),
+  alternatives: z.array(z.string()).optional(),
+  warning: z.string().optional(),
 });
 
 export const widgetSnapshotOutputSchema = z.object({
@@ -50,6 +57,7 @@ export const widgetSnapshotOutputSchema = z.object({
     })
     .optional(),
   error: z.string().optional(),
+  hints: toolHintsSchema.optional(),
 });
 
 // =============================================================================
@@ -215,6 +223,9 @@ export function createWidgetSnapshotTool(connectionManager: ConnectionManager) {
         return {
           success: false,
           error: `Session not found: ${input.sessionId}`,
+          hints: {
+            next: "Create a new session with preview_ui or call_tool(renderWidget=true)",
+          },
         };
       }
 
@@ -222,6 +233,9 @@ export function createWidgetSnapshotTool(connectionManager: ConnectionManager) {
         return {
           success: false,
           error: "Page closed",
+          hints: {
+            next: "Create a new session with preview_ui or call_tool(renderWidget=true)",
+          },
         };
       }
 
@@ -232,6 +246,10 @@ export function createWidgetSnapshotTool(connectionManager: ConnectionManager) {
           return {
             success: false,
             error: "Widget iframe not found",
+            hints: {
+              next: "Wait for widget to load, or verify session is valid",
+              warning: "Widget may still be loading",
+            },
           };
         }
 
@@ -243,6 +261,9 @@ export function createWidgetSnapshotTool(connectionManager: ConnectionManager) {
           return {
             success: false,
             error: "Failed to capture accessibility tree - page may be empty or inaccessible",
+            hints: {
+              next: "Widget may be loading. Wait and retry, or use widget_query with text search.",
+            },
           };
         }
 
@@ -253,6 +274,9 @@ export function createWidgetSnapshotTool(connectionManager: ConnectionManager) {
           return {
             success: false,
             error: "Failed to parse accessibility tree from YAML snapshot",
+            hints: {
+              next: "Widget may have non-standard structure. Try widget_query with text search.",
+            },
           };
         }
 
@@ -384,18 +408,39 @@ export function createWidgetSnapshotTool(connectionManager: ConnectionManager) {
           }
         }
 
+        // Build contextual hints based on what was found
+        let hints: ToolHints;
+        if (interactiveElements.length > 0) {
+          hints = {
+            next: "Use widget_click/widget_fill with the locatorHint from interactiveElements (e.g., role='button', name='Submit')",
+          };
+        } else {
+          hints = {
+            next: "No interactive elements found. Widget may be display-only or still loading.",
+            alternatives: [
+              "Try widget_query with text search",
+              "Wait and retry if content is loading",
+            ],
+            warning: "If expecting buttons/inputs, widget may still be loading",
+          };
+        }
+
         return {
           success: true,
           accessibilityTree: accessibilityTree ?? undefined,
           interactiveElementCount: interactiveElements.length,
           interactiveElements,
           dom,
+          hints,
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return {
           success: false,
           error: message,
+          hints: {
+            next: "Try widget_query with text search, or create a new session",
+          },
         };
       }
     },
