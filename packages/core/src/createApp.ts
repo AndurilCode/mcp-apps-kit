@@ -175,10 +175,6 @@ function validateVersionConfig<T extends ToolDefs>(
 }
 
 /**
- * Validate a single version config
- */
-
-/**
  * Validate app configuration (supports both single and multi-version)
  */
 function validateConfig<T extends ToolDefs>(config: unknown): asserts config is AppConfigInput<T> {
