@@ -37,7 +37,7 @@ function getDefaultEnvironmentState(): EnvironmentState {
     locale: "en-US",
     timeZone: "UTC",
     displayMode: "inline",
-    viewport: { width: 800, height: 600 },
+    viewport: { width: 1920, height: 1080 },
     maxHeight: undefined,
     safeAreaInsets: { top: 0, right: 0, bottom: 0, left: 0 },
     userAgent: {
