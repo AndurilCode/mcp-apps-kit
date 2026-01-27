@@ -5,7 +5,7 @@
  * Connects to the inspector backend via SSE for screencast and log streaming.
  */
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSessions } from "./hooks/useSessions";
 import { useScreencast } from "./hooks/useScreencast";
 import { useLogStream, type LogEntry } from "./hooks/useLogStream";
@@ -139,6 +139,37 @@ export function InspectorDashboard({
 
   const isStreaming = status === "streaming";
 
+  // Inject keyframe animation for streaming border
+  const keyframeStyles = useMemo(
+    () => `
+    @keyframes snakeBorder {
+      0% {
+        background-position: 0% 50%;
+      }
+      100% {
+        background-position: 200% 50%;
+      }
+    }
+  `,
+    []
+  );
+
+  useEffect(() => {
+    const styleId = "mcp-inspector-keyframes";
+    if (!document.getElementById(styleId)) {
+      const styleEl = document.createElement("style");
+      styleEl.id = styleId;
+      styleEl.textContent = keyframeStyles;
+      document.head.appendChild(styleEl);
+    }
+    return () => {
+      const existingStyle = document.getElementById(styleId);
+      if (existingStyle) {
+        existingStyle.remove();
+      }
+    };
+  }, [keyframeStyles]);
+
   return (
     <div style={styles.root}>
       {/* Header */}
@@ -165,24 +196,31 @@ export function InspectorDashboard({
                 </option>
               ))}
             </select>
-            <div style={styles.status}>
-              <span
-                style={{
-                  ...styles.statusDot,
-                  ...(status === "streaming"
-                    ? styles.statusDotStreaming
+            <div
+              style={{
+                ...styles.statusWrapper,
+                ...(isStreaming ? styles.statusWrapperStreaming : {}),
+              }}
+            >
+              <div style={styles.statusInner}>
+                <span
+                  style={{
+                    ...styles.statusDot,
+                    ...(status === "streaming"
+                      ? styles.statusDotStreaming
+                      : status === "connecting"
+                        ? styles.statusDotConnected
+                        : styles.statusDotDisconnected),
+                  }}
+                />
+                <span>
+                  {status === "streaming"
+                    ? "Streaming"
                     : status === "connecting"
-                      ? styles.statusDotConnected
-                      : styles.statusDotDisconnected),
-                }}
-              />
-              <span>
-                {status === "streaming"
-                  ? "Streaming"
-                  : status === "connecting"
-                    ? "Connecting..."
-                    : "Disconnected"}
-              </span>
+                      ? "Ready"
+                      : "Disconnected"}
+                </span>
+              </div>
             </div>
           </div>
           <Toolbar
