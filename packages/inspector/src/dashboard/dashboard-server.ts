@@ -7,6 +7,7 @@
  * - GET /dashboard/stream?sessionId={id} - SSE screencast stream
  * - GET /dashboard/logs?sessionId={id} - SSE log stream
  * - GET /dashboard/sessions - List active sessions (JSON)
+ * - GET /dashboard/globals - Get current environment state (JSON)
  */
 
 import type { IncomingMessage, ServerResponse } from "http";
@@ -73,6 +74,12 @@ export async function handleDashboardRequest(
       return true;
     }
     await startLogStream(req, res, connectionManager, sessionId);
+    return true;
+  }
+
+  // GET /dashboard/globals - Get current environment state
+  if (pathname === "/dashboard/globals" && req.method === "GET") {
+    serveGlobals(res, connectionManager);
     return true;
   }
 
@@ -512,19 +519,190 @@ function serveDashboardHtml(res: ServerResponse): void {
       color: #4b5563;
       font-size: 0.75rem;
     }
+
+    /* Header layout */
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    /* Toolbar */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      margin-left: 0.5rem;
+    }
+
+    .toolbar-btn {
+      background: transparent;
+      border: none;
+      border-radius: 4px;
+      padding: 0.375rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #6b7280;
+      transition: all 0.15s ease;
+    }
+
+    .toolbar-btn:hover {
+      color: #9ca3af;
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .toolbar-btn.active {
+      color: #20b2aa;
+      background-color: rgba(32, 178, 170, 0.1);
+    }
+
+    /* Content row for main + globals panel */
+    .content-row {
+      flex: 1;
+      display: flex;
+      flex-direction: row;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* Globals Panel */
+    .globals-panel {
+      background-color: #0d0e0e;
+      border-left: 1px solid #2d2f2f;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow: hidden;
+      transition: width 0.25s ease, opacity 0.2s ease;
+      width: 280px;
+    }
+
+    .globals-panel.collapsed {
+      width: 0;
+      border-left: none;
+      opacity: 0;
+    }
+
+    .globals-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1rem;
+      background-color: #0a0a0a;
+      border-bottom: 1px solid #1a1a1a;
+      flex-shrink: 0;
+    }
+
+    .globals-panel-title {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .globals-panel-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.75rem;
+      font-size: 0.75rem;
+      min-height: 0;
+    }
+
+    .globals-panel-content::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .globals-panel-content::-webkit-scrollbar-track {
+      background: #0a0a0a;
+    }
+
+    .globals-panel-content::-webkit-scrollbar-thumb {
+      background: #3d4040;
+      border-radius: 4px;
+    }
+
+    .globals-section {
+      margin-bottom: 1rem;
+    }
+
+    .globals-section-title {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      color: #20b2aa;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+      padding-bottom: 0.25rem;
+      border-bottom: 1px solid #2d2f2f;
+    }
+
+    .globals-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 0.25rem 0;
+      gap: 0.5rem;
+    }
+
+    .globals-item-label {
+      color: #6b7280;
+      font-size: 0.6875rem;
+      flex-shrink: 0;
+    }
+
+    .globals-item-value {
+      color: #e8e8e8;
+      font-size: 0.6875rem;
+      text-align: right;
+      word-break: break-word;
+    }
+
+    .globals-loading {
+      color: #6b7280;
+      text-align: center;
+      padding: 1rem;
+    }
   </style>
 </head>
 <body>
   <header>
-    <h1>MCP Inspector Dashboard</h1>
-    <div class="controls">
-      <label for="session-select">Session</label>
-      <select id="session-select">
-        <option value="">Select a session...</option>
-      </select>
-      <div class="status">
-        <span class="status-dot" id="status-dot"></span>
-        <span id="status-text">Disconnected</span>
+    <div class="header-left">
+      <h1>MCP Inspector Dashboard</h1>
+    </div>
+    <div class="header-right">
+      <div class="controls">
+        <label for="session-select">Session</label>
+        <select id="session-select">
+          <option value="">Select a session...</option>
+        </select>
+        <div class="status">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="status-text">Disconnected</span>
+        </div>
+      </div>
+      <div class="toolbar">
+        <button class="toolbar-btn active" id="toggle-logs-panel-btn" title="Toggle Logs Panel">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <line x1="2" y1="4" x2="14" y2="4" />
+            <line x1="2" y1="8" x2="14" y2="8" />
+            <line x1="2" y1="12" x2="10" y2="12" />
+          </svg>
+        </button>
+        <button class="toolbar-btn active" id="toggle-globals-panel-btn" title="Toggle Globals Panel">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="12" height="12" rx="2" />
+            <line x1="10" y1="2" x2="10" y2="14" />
+          </svg>
+        </button>
       </div>
     </div>
   </header>
@@ -532,18 +710,29 @@ function serveDashboardHtml(res: ServerResponse): void {
   <div class="error-banner" id="error-banner"></div>
 
   <div class="content-wrapper">
-    <main>
-      <div class="display-container">
-        <img id="stream-image" class="hidden" alt="Live browser view">
-        <div class="placeholder" id="placeholder">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-          </svg>
-          <h2>No Active Widget Session</h2>
-          <p>Connect to an MCP server and call a tool that creates a UI session to see live browser content.</p>
+    <div class="content-row">
+      <main>
+        <div class="display-container">
+          <img id="stream-image" class="hidden" alt="Live browser view">
+          <div class="placeholder" id="placeholder">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            <h2>No Active Widget Session</h2>
+            <p>Connect to an MCP server and call a tool that creates a UI session to see live browser content.</p>
+          </div>
+        </div>
+      </main>
+
+      <div class="globals-panel" id="globals-panel">
+        <div class="globals-panel-header">
+          <span class="globals-panel-title">Environment</span>
+        </div>
+        <div class="globals-panel-content" id="globals-panel-content">
+          <div class="globals-loading">Loading...</div>
         </div>
       </div>
-    </main>
+    </div>
 
     <div class="resize-handle" id="resize-handle"></div>
 
@@ -581,6 +770,12 @@ function serveDashboardHtml(res: ServerResponse): void {
     const toggleLogsBtn = document.getElementById('toggle-logs-btn');
     const resizeHandle = document.getElementById('resize-handle');
 
+    // Globals panel DOM elements
+    const globalsPanel = document.getElementById('globals-panel');
+    const globalsPanelContent = document.getElementById('globals-panel-content');
+    const toggleLogsPanelBtn = document.getElementById('toggle-logs-panel-btn');
+    const toggleGlobalsPanelBtn = document.getElementById('toggle-globals-panel-btn');
+
     // State
     let eventSource = null;
     let logEventSource = null;
@@ -588,15 +783,20 @@ function serveDashboardHtml(res: ServerResponse): void {
     let sessionPollInterval = null;
     let reconnectTimeout = null;
     let displayedLogCount = 0;
+    let globalsPollInterval = null;
 
     // Logs panel state (persisted in localStorage)
     const STORAGE_KEY_PANEL_HEIGHT = 'mcp-dashboard-logs-panel-height';
     const STORAGE_KEY_PANEL_COLLAPSED = 'mcp-dashboard-logs-panel-collapsed';
+    const STORAGE_KEY_LOGS_VISIBLE = 'mcp-dashboard-logs-panel-visible';
+    const STORAGE_KEY_GLOBALS_VISIBLE = 'mcp-dashboard-globals-panel-visible';
     const DEFAULT_PANEL_HEIGHT = 200;
     const MIN_PANEL_HEIGHT = 100;
 
     let isPanelCollapsed = localStorage.getItem(STORAGE_KEY_PANEL_COLLAPSED) === 'true';
     let panelHeight = parseInt(localStorage.getItem(STORAGE_KEY_PANEL_HEIGHT) || DEFAULT_PANEL_HEIGHT, 10);
+    let isLogsPanelVisible = localStorage.getItem(STORAGE_KEY_LOGS_VISIBLE) !== 'false';
+    let isGlobalsPanelVisible = localStorage.getItem(STORAGE_KEY_GLOBALS_VISIBLE) !== 'false';
 
     // Fetch sessions from server
     async function fetchSessions() {
@@ -908,6 +1108,148 @@ function serveDashboardHtml(res: ServerResponse): void {
     });
 
     // ============================================
+    // GLOBALS PANEL FUNCTIONS
+    // ============================================
+
+    // Fetch globals from server
+    async function fetchGlobals() {
+      try {
+        const res = await fetch('/dashboard/globals');
+        const data = await res.json();
+        return data.globals || null;
+      } catch (e) {
+        console.error('Failed to fetch globals:', e);
+        return null;
+      }
+    }
+
+    // Render globals panel content
+    function renderGlobals(globals) {
+      if (!globals) {
+        globalsPanelContent.innerHTML = '<div class="globals-loading">Loading...</div>';
+        return;
+      }
+
+      const { theme, displayMode, locale, timeZone, viewport, maxHeight, safeAreaInsets, userAgent, userLocation } = globals;
+
+      let html = '';
+
+      // Display section
+      html += '<div class="globals-section">';
+      html += '<div class="globals-section-title">Display</div>';
+      html += '<div class="globals-item"><span class="globals-item-label">Theme</span><span class="globals-item-value">' + theme + '</span></div>';
+      html += '<div class="globals-item"><span class="globals-item-label">Display Mode</span><span class="globals-item-value">' + displayMode + '</span></div>';
+      html += '</div>';
+
+      // Locale section
+      html += '<div class="globals-section">';
+      html += '<div class="globals-section-title">Locale</div>';
+      html += '<div class="globals-item"><span class="globals-item-label">Locale</span><span class="globals-item-value">' + locale + '</span></div>';
+      html += '<div class="globals-item"><span class="globals-item-label">Timezone</span><span class="globals-item-value">' + timeZone + '</span></div>';
+      html += '</div>';
+
+      // Viewport section
+      html += '<div class="globals-section">';
+      html += '<div class="globals-section-title">Viewport</div>';
+      html += '<div class="globals-item"><span class="globals-item-label">Dimensions</span><span class="globals-item-value">' + viewport.width + ' \\u00D7 ' + viewport.height + '</span></div>';
+      if (maxHeight !== undefined) {
+        html += '<div class="globals-item"><span class="globals-item-label">Max Height</span><span class="globals-item-value">' + maxHeight + 'px</span></div>';
+      }
+      html += '</div>';
+
+      // Safe Area section
+      html += '<div class="globals-section">';
+      html += '<div class="globals-section-title">Safe Area</div>';
+      html += '<div class="globals-item"><span class="globals-item-label">Insets</span><span class="globals-item-value">T:' + safeAreaInsets.top + ' R:' + safeAreaInsets.right + ' B:' + safeAreaInsets.bottom + ' L:' + safeAreaInsets.left + '</span></div>';
+      html += '</div>';
+
+      // Device section
+      html += '<div class="globals-section">';
+      html += '<div class="globals-section-title">Device</div>';
+      const deviceType = userAgent && userAgent.device ? userAgent.device.type || 'unknown' : 'unknown';
+      const hasHover = userAgent && userAgent.capabilities ? (userAgent.capabilities.hover ? 'Yes' : 'No') : 'Yes';
+      const hasTouch = userAgent && userAgent.capabilities ? (userAgent.capabilities.touch ? 'Yes' : 'No') : 'No';
+      html += '<div class="globals-item"><span class="globals-item-label">Type</span><span class="globals-item-value">' + deviceType + '</span></div>';
+      html += '<div class="globals-item"><span class="globals-item-label">Hover</span><span class="globals-item-value">' + hasHover + '</span></div>';
+      html += '<div class="globals-item"><span class="globals-item-label">Touch</span><span class="globals-item-value">' + hasTouch + '</span></div>';
+      html += '</div>';
+
+      // Location section (if present)
+      if (userLocation) {
+        html += '<div class="globals-section">';
+        html += '<div class="globals-section-title">Location</div>';
+        if (userLocation.city) html += '<div class="globals-item"><span class="globals-item-label">City</span><span class="globals-item-value">' + userLocation.city + '</span></div>';
+        if (userLocation.region) html += '<div class="globals-item"><span class="globals-item-label">Region</span><span class="globals-item-value">' + userLocation.region + '</span></div>';
+        if (userLocation.country) html += '<div class="globals-item"><span class="globals-item-label">Country</span><span class="globals-item-value">' + userLocation.country + '</span></div>';
+        if (userLocation.timezone) html += '<div class="globals-item"><span class="globals-item-label">Timezone</span><span class="globals-item-value">' + userLocation.timezone + '</span></div>';
+        html += '</div>';
+      }
+
+      globalsPanelContent.innerHTML = html;
+    }
+
+    // Update globals panel
+    async function updateGlobals() {
+      const globals = await fetchGlobals();
+      renderGlobals(globals);
+    }
+
+    // Start globals polling
+    function startGlobalsPolling() {
+      if (globalsPollInterval) clearInterval(globalsPollInterval);
+      updateGlobals();
+      globalsPollInterval = setInterval(updateGlobals, 2000);
+    }
+
+    // Stop globals polling
+    function stopGlobalsPolling() {
+      if (globalsPollInterval) {
+        clearInterval(globalsPollInterval);
+        globalsPollInterval = null;
+      }
+    }
+
+    // Initialize globals panel
+    function initGlobalsPanel() {
+      // Apply visibility state
+      if (!isGlobalsPanelVisible) {
+        globalsPanel.classList.add('collapsed');
+        toggleGlobalsPanelBtn.classList.remove('active');
+      }
+      startGlobalsPolling();
+    }
+
+    // Toggle globals panel visibility
+    function toggleGlobalsPanelVisibility() {
+      isGlobalsPanelVisible = !isGlobalsPanelVisible;
+      globalsPanel.classList.toggle('collapsed', !isGlobalsPanelVisible);
+      toggleGlobalsPanelBtn.classList.toggle('active', isGlobalsPanelVisible);
+      localStorage.setItem(STORAGE_KEY_GLOBALS_VISIBLE, isGlobalsPanelVisible);
+    }
+
+    // Toggle logs panel visibility (from toolbar)
+    function toggleLogsPanelVisibility() {
+      isLogsPanelVisible = !isLogsPanelVisible;
+      logsPanel.style.display = isLogsPanelVisible ? 'flex' : 'none';
+      resizeHandle.style.display = isLogsPanelVisible ? 'block' : 'none';
+      toggleLogsPanelBtn.classList.toggle('active', isLogsPanelVisible);
+      localStorage.setItem(STORAGE_KEY_LOGS_VISIBLE, isLogsPanelVisible);
+    }
+
+    // Initialize logs panel visibility
+    function initLogsPanelVisibility() {
+      if (!isLogsPanelVisible) {
+        logsPanel.style.display = 'none';
+        resizeHandle.style.display = 'none';
+        toggleLogsPanelBtn.classList.remove('active');
+      }
+    }
+
+    // Event listeners for toolbar buttons
+    toggleGlobalsPanelBtn.addEventListener('click', toggleGlobalsPanelVisibility);
+    toggleLogsPanelBtn.addEventListener('click', toggleLogsPanelVisibility);
+
+    // ============================================
     // MAIN STREAM FUNCTIONS
     // ============================================
 
@@ -1009,6 +1351,8 @@ function serveDashboardHtml(res: ServerResponse): void {
     // Initialize
     (async function init() {
       initLogsPanel();
+      initLogsPanelVisibility();
+      initGlobalsPanel();
       await updateSessionDropdown();
       startSessionPolling();
     })();
@@ -1021,6 +1365,20 @@ function serveDashboardHtml(res: ServerResponse): void {
     "Cache-Control": "no-cache",
   });
   res.end(html);
+}
+
+/**
+ * Serve the current environment/globals state
+ */
+function serveGlobals(res: ServerResponse, connectionManager: ConnectionManager): void {
+  const environmentState = connectionManager.getEnvironmentState();
+
+  res.writeHead(200, {
+    "Content-Type": "application/json",
+    "Cache-Control": "no-cache",
+    "Access-Control-Allow-Origin": "*",
+  });
+  res.end(JSON.stringify({ globals: environmentState }));
 }
 
 /**

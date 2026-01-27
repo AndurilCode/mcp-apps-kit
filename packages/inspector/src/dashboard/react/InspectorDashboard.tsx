@@ -10,6 +10,9 @@ import { useSessions } from "./hooks/useSessions";
 import { useScreencast } from "./hooks/useScreencast";
 import { useLogStream, type LogEntry } from "./hooks/useLogStream";
 import { useResizablePanel } from "./hooks/useResizablePanel";
+import { useGlobals } from "./hooks/useGlobals";
+import { Toolbar } from "./components/Toolbar";
+import { GlobalsPanel } from "./components/GlobalsPanel";
 import { styles } from "./styles";
 
 export interface InspectorDashboardProps {
@@ -35,6 +38,27 @@ export function InspectorDashboard({
 
   // Log stream state
   const { logs, clearLogs } = useLogStream(baseUrl, selectedSessionId);
+
+  // Globals state
+  const { globals } = useGlobals(baseUrl);
+
+  // Globals panel state (persisted)
+  const [isGlobalsPanelVisible, setIsGlobalsPanelVisible] = useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("mcp-dashboard-globals-panel-visible");
+      return stored !== "false"; // Default to visible
+    }
+    return true;
+  });
+
+  // Logs panel state (persisted)
+  const [isLogsPanelVisible, setIsLogsPanelVisible] = useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("mcp-dashboard-logs-panel-visible");
+      return stored !== "false"; // Default to visible
+    }
+    return true;
+  });
 
   // Panel state
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(() => {
@@ -78,6 +102,20 @@ export function InspectorDashboard({
     }
   }, [isPanelCollapsed]);
 
+  // Save globals panel visibility
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("mcp-dashboard-globals-panel-visible", String(isGlobalsPanelVisible));
+    }
+  }, [isGlobalsPanelVisible]);
+
+  // Save logs panel visibility
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("mcp-dashboard-logs-panel-visible", String(isLogsPanelVisible));
+    }
+  }, [isLogsPanelVisible]);
+
   const handleSessionChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       const value = e.target.value;
@@ -91,50 +129,68 @@ export function InspectorDashboard({
     setIsPanelCollapsed((prev) => !prev);
   }, []);
 
+  const toggleGlobalsPanel = useCallback(() => {
+    setIsGlobalsPanelVisible((prev) => !prev);
+  }, []);
+
+  const toggleLogsPanel = useCallback(() => {
+    setIsLogsPanelVisible((prev) => !prev);
+  }, []);
+
   const isStreaming = status === "streaming";
 
   return (
     <div style={styles.root}>
       {/* Header */}
       <header style={styles.header}>
-        <h1 style={styles.title}>MCP Inspector Dashboard</h1>
-        <div style={styles.controls}>
-          <label style={styles.label} htmlFor="session-select">
-            Session
-          </label>
-          <select
-            id="session-select"
-            style={styles.select}
-            value={selectedSessionId || ""}
-            onChange={handleSessionChange}
-            disabled={sessionsLoading}
-          >
-            <option value="">Select a session...</option>
-            {sessions.map((session) => (
-              <option key={session.id} value={session.id}>
-                {session.toolName} ({session.id.slice(0, 8)}...)
-              </option>
-            ))}
-          </select>
-          <div style={styles.status}>
-            <span
-              style={{
-                ...styles.statusDot,
-                ...(status === "streaming"
-                  ? styles.statusDotStreaming
+        <div style={styles.headerLeft}>
+          <h1 style={styles.title}>MCP Inspector Dashboard</h1>
+        </div>
+        <div style={styles.headerRight}>
+          <div style={styles.controls}>
+            <label style={styles.label} htmlFor="session-select">
+              Session
+            </label>
+            <select
+              id="session-select"
+              style={styles.select}
+              value={selectedSessionId || ""}
+              onChange={handleSessionChange}
+              disabled={sessionsLoading}
+            >
+              <option value="">Select a session...</option>
+              {sessions.map((session) => (
+                <option key={session.id} value={session.id}>
+                  {session.toolName} ({session.id.slice(0, 8)}...)
+                </option>
+              ))}
+            </select>
+            <div style={styles.status}>
+              <span
+                style={{
+                  ...styles.statusDot,
+                  ...(status === "streaming"
+                    ? styles.statusDotStreaming
+                    : status === "connecting"
+                      ? styles.statusDotConnected
+                      : styles.statusDotDisconnected),
+                }}
+              />
+              <span>
+                {status === "streaming"
+                  ? "Streaming"
                   : status === "connecting"
-                    ? styles.statusDotConnected
-                    : styles.statusDotDisconnected),
-              }}
-            />
-            <span>
-              {status === "streaming"
-                ? "Streaming"
-                : status === "connecting"
-                  ? "Connecting..."
-                  : "Disconnected"}
-            </span>
+                    ? "Connecting..."
+                    : "Disconnected"}
+              </span>
+            </div>
           </div>
+          <Toolbar
+            isLogsPanelVisible={isLogsPanelVisible}
+            onToggleLogsPanel={toggleLogsPanel}
+            isGlobalsPanelVisible={isGlobalsPanelVisible}
+            onToggleGlobalsPanel={toggleGlobalsPanel}
+          />
         </div>
       </header>
 
@@ -143,88 +199,98 @@ export function InspectorDashboard({
 
       {/* Content Wrapper */}
       <div style={styles.contentWrapper}>
-        {/* Main Display */}
-        <main style={styles.main}>
+        {/* Content Row (Main + Globals Panel) */}
+        <div style={styles.contentRow}>
+          {/* Main Display */}
+          <main style={styles.main}>
+            <div
+              style={{
+                ...styles.displayContainer,
+                ...(isStreaming ? styles.displayContainerStreaming : {}),
+              }}
+            >
+              {imageData ? (
+                <img src={imageData} alt="Live browser view" style={styles.streamImage} />
+              ) : (
+                <div style={styles.placeholder}>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    style={styles.placeholderIcon}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                    />
+                  </svg>
+                  <h2 style={styles.placeholderTitle}>No Active Widget Session</h2>
+                  <p style={styles.placeholderText}>
+                    Connect to an MCP server and call a tool that creates a UI session to see live
+                    browser content.
+                  </p>
+                </div>
+              )}
+            </div>
+          </main>
+
+          {/* Globals Panel */}
+          <GlobalsPanel globals={globals} isVisible={isGlobalsPanelVisible} />
+        </div>
+
+        {/* Resize Handle - only show when logs panel is visible */}
+        {isLogsPanelVisible && (
+          <div
+            {...resizeHandleProps}
+            style={{
+              ...styles.resizeHandle,
+              ...(isResizing ? styles.resizeHandleActive : {}),
+            }}
+          />
+        )}
+
+        {/* Logs Panel */}
+        {isLogsPanelVisible && (
           <div
             style={{
-              ...styles.displayContainer,
-              ...(isStreaming ? styles.displayContainerStreaming : {}),
+              ...styles.logsPanel,
+              height: isPanelCollapsed ? 36 : panelHeight,
             }}
           >
-            {imageData ? (
-              <img src={imageData} alt="Live browser view" style={styles.streamImage} />
-            ) : (
-              <div style={styles.placeholder}>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  style={styles.placeholderIcon}
+            <div style={styles.logsHeader}>
+              <span style={styles.logsTitle}>Session Logs</span>
+              <div style={styles.logsControls}>
+                <span style={styles.logCount}>
+                  {logs.length} log{logs.length !== 1 ? "s" : ""}
+                </span>
+                <button style={styles.clearLogsBtn} onClick={clearLogs}>
+                  Clear
+                </button>
+                <button
+                  style={{
+                    ...styles.toggleLogsBtn,
+                    transform: isPanelCollapsed ? "rotate(180deg)" : "none",
+                  }}
+                  onClick={togglePanel}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                  />
-                </svg>
-                <h2 style={styles.placeholderTitle}>No Active Widget Session</h2>
-                <p style={styles.placeholderText}>
-                  Connect to an MCP server and call a tool that creates a UI session to see live
-                  browser content.
-                </p>
+                  &#9660;
+                </button>
+              </div>
+            </div>
+            {!isPanelCollapsed && (
+              <div ref={logsContainerRef} style={styles.logsContainer}>
+                {logs.length === 0 ? (
+                  <div style={styles.logsEmpty}>No logs yet</div>
+                ) : (
+                  logs.map((log, index) => <LogEntryRow key={index} log={log} />)
+                )}
               </div>
             )}
           </div>
-        </main>
-
-        {/* Resize Handle */}
-        <div
-          {...resizeHandleProps}
-          style={{
-            ...styles.resizeHandle,
-            ...(isResizing ? styles.resizeHandleActive : {}),
-          }}
-        />
-
-        {/* Logs Panel */}
-        <div
-          style={{
-            ...styles.logsPanel,
-            height: isPanelCollapsed ? 36 : panelHeight,
-          }}
-        >
-          <div style={styles.logsHeader}>
-            <span style={styles.logsTitle}>Session Logs</span>
-            <div style={styles.logsControls}>
-              <span style={styles.logCount}>
-                {logs.length} log{logs.length !== 1 ? "s" : ""}
-              </span>
-              <button style={styles.clearLogsBtn} onClick={clearLogs}>
-                Clear
-              </button>
-              <button
-                style={{
-                  ...styles.toggleLogsBtn,
-                  transform: isPanelCollapsed ? "rotate(180deg)" : "none",
-                }}
-                onClick={togglePanel}
-              >
-                &#9660;
-              </button>
-            </div>
-          </div>
-          {!isPanelCollapsed && (
-            <div ref={logsContainerRef} style={styles.logsContainer}>
-              {logs.length === 0 ? (
-                <div style={styles.logsEmpty}>No logs yet</div>
-              ) : (
-                logs.map((log, index) => <LogEntryRow key={index} log={log} />)
-              )}
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
