@@ -37,18 +37,18 @@ interface StreamingSession {
  * Screencast quality/resolution options
  */
 export interface ScreencastOptions {
-  /** Maximum width of the screencast (default: 1920) */
+  /** Maximum width of the screencast (default: 800) */
   maxWidth?: number;
-  /** Maximum height of the screencast (default: 1080) */
+  /** Maximum height of the screencast (default: 600) */
   maxHeight?: number;
-  /** JPEG quality 0-100 (default: 90) */
+  /** JPEG quality 0-100 (default: 100) */
   quality?: number;
 }
 
-/** Default screencast options for retina-quality streaming */
+/** Default screencast options for high-quality streaming */
 const DEFAULT_SCREENCAST_OPTIONS: Required<ScreencastOptions> = {
-  maxWidth: 2560,
-  maxHeight: 1440,
+  maxWidth: 800,
+  maxHeight: 600,
   quality: 100,
 };
 
