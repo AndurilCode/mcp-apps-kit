@@ -99,6 +99,18 @@ export type {
   WidgetDOMSnapshot,
   WidgetStateSnapshot,
   GetWidgetStateOutput,
+  // Accessibility tree types (widget_snapshot)
+  AccessibilityNode,
+  InteractiveElementSummary,
+  WidgetSnapshotInput,
+  WidgetSnapshotOutput,
+  // Semantic locator types
+  SemanticLocatorOptions,
+  WaitForStabilityOptions,
+  // Widget query types
+  WidgetQueryInput,
+  QueryElementInfo,
+  WidgetQueryOutput,
   // Environment types
   DeviceType,
   DeviceCapabilitiesInfo,

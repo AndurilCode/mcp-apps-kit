@@ -41,6 +41,9 @@ import {
   createWidgetWaitForSelectorTool,
   createWidgetLocatorTool,
   createGetWidgetStateTool,
+  // Widget snapshot and query tools
+  createWidgetSnapshotTool,
+  createWidgetQueryTool,
 } from "./tools";
 
 /**
@@ -99,6 +102,9 @@ export function createInspectorServer(options: InspectorServerOptions = {}): App
     widget_wait_for_selector: createWidgetWaitForSelectorTool(connectionManager),
     widget_locator: createWidgetLocatorTool(connectionManager),
     get_widget_state: createGetWidgetStateTool(connectionManager),
+    // Widget snapshot and query tools
+    widget_snapshot: createWidgetSnapshotTool(connectionManager),
+    widget_query: createWidgetQueryTool(connectionManager),
   };
 
   const app = createApp({

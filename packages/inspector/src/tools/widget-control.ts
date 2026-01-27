@@ -3,6 +3,10 @@
  *
  * These tools allow coding agents to interact with widget sessions
  * created via /apps/mcp (ChatGPT). All tools use Playwright for browser automation.
+ *
+ * Features:
+ * - Semantic locators: target elements by text, role, label, placeholder, or testId
+ * - Auto-stability wait: automatically wait for DOM to settle after actions
  */
 
 import { z } from "zod";
@@ -18,6 +22,12 @@ import type {
   WidgetDragOutput,
   WidgetRefreshOutput,
 } from "../types";
+import {
+  resolveLocator,
+  hasLocatorOptions,
+  describeLocatorStrategy,
+  waitForDOMStability,
+} from "./helpers";
 
 // =============================================================================
 // WIDGET EVALUATE TOOL
@@ -93,20 +103,51 @@ export function createWidgetEvaluateTool(connectionManager: ConnectionManager) {
 // WIDGET CLICK TOOL
 // =============================================================================
 
+/**
+ * Stability options schema for DOM settling after actions
+ */
+const stabilityOptionsSchema = z
+  .object({
+    waitForNetwork: z.boolean().optional().describe("Wait for network idle"),
+    stabilityMs: z.number().optional().describe("Time with no DOM changes to consider stable (ms)"),
+    minWait: z.number().optional().describe("Minimum wait time (ms)"),
+  })
+  .optional();
+
 export const widgetClickInputSchema = z.object({
   sessionId: z.string().describe("Session ID of the widget"),
-  selector: z.string().describe("CSS selector of the element to click"),
+  // Semantic locator options (use one)
+  selector: z.string().optional().describe("CSS selector of the element to click"),
+  text: z.string().optional().describe("Visible text to click"),
+  role: z.string().optional().describe("ARIA role (e.g., 'button', 'link')"),
+  name: z.string().optional().describe("Accessible name (use with role)"),
+  label: z.string().optional().describe("Label text for form elements"),
+  placeholder: z.string().optional().describe("Placeholder text for inputs"),
+  testId: z.string().optional().describe("data-testid attribute value"),
+  exact: z.boolean().optional().describe("Match text exactly (default: false for substring)"),
+  // Options
   timeout: z.number().optional().describe("Timeout in ms (default: 5000)"),
+  waitForStability: z
+    .boolean()
+    .optional()
+    .describe("Wait for DOM to settle after click (default: true)"),
+  stabilityOptions: stabilityOptionsSchema.describe("Options for DOM stability wait"),
 });
 
 export const widgetClickOutputSchema = z.object({
   success: z.boolean(),
   error: z.string().optional(),
+  locatorStrategy: z.string().optional().describe("How the element was located"),
+  stabilityWaitMs: z.number().optional().describe("Time spent waiting for DOM stability"),
+  wasStable: z.boolean().optional().describe("Whether DOM was stable before timeout"),
 });
 
 export function createWidgetClickTool(connectionManager: ConnectionManager) {
   return defineTool({
-    description: "Click an element in a widget iframe by CSS selector.",
+    description:
+      "Click an element in a widget iframe. Supports semantic locators: CSS selector, " +
+      "visible text, ARIA role+name, label, placeholder, or data-testid. " +
+      "Automatically waits for DOM to settle after click.",
     input: widgetClickInputSchema,
     output: widgetClickOutputSchema,
     handler: async (input): Promise<WidgetClickOutput> => {
@@ -127,6 +168,15 @@ export function createWidgetClickTool(connectionManager: ConnectionManager) {
         };
       }
 
+      // Validate that at least one locator option is provided
+      if (!hasLocatorOptions(input)) {
+        return {
+          success: false,
+          error:
+            "No locator specified. Provide one of: selector, text, role, label, placeholder, or testId",
+        };
+      }
+
       try {
         // Target the widget iframe
         const frame = session.page.frame({ url: /\/widget\// });
@@ -138,9 +188,40 @@ export function createWidgetClickTool(connectionManager: ConnectionManager) {
         }
 
         const timeout = input.timeout ?? 5000;
-        await frame.click(input.selector, { timeout });
 
-        return { success: true };
+        // Resolve the locator using semantic options
+        const locator = resolveLocator(frame, {
+          selector: input.selector,
+          text: input.text,
+          role: input.role,
+          name: input.name,
+          label: input.label,
+          placeholder: input.placeholder,
+          testId: input.testId,
+          exact: input.exact,
+        });
+
+        const locatorStrategy = describeLocatorStrategy(input);
+
+        // Perform the click
+        await locator.click({ timeout });
+
+        // Wait for DOM stability (default: true)
+        let stabilityWaitMs: number | undefined;
+        let wasStable: boolean | undefined;
+
+        if (input.waitForStability !== false) {
+          const result = await waitForDOMStability(frame, input.stabilityOptions);
+          stabilityWaitMs = result.waitedMs;
+          wasStable = result.wasStable;
+        }
+
+        return {
+          success: true,
+          locatorStrategy,
+          stabilityWaitMs,
+          wasStable,
+        };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return {
@@ -158,9 +239,24 @@ export function createWidgetClickTool(connectionManager: ConnectionManager) {
 
 export const widgetFillInputSchema = z.object({
   sessionId: z.string().describe("Session ID of the widget"),
-  selector: z.string().describe("CSS selector of the input element"),
+  // Semantic locator options (use one)
+  selector: z.string().optional().describe("CSS selector of the input element"),
+  label: z.string().optional().describe("Label text for the input"),
+  placeholder: z.string().optional().describe("Placeholder text for the input"),
+  role: z.string().optional().describe("ARIA role (e.g., 'textbox', 'combobox')"),
+  name: z.string().optional().describe("Accessible name (use with role)"),
+  testId: z.string().optional().describe("data-testid attribute value"),
+  text: z.string().optional().describe("Visible text to target"),
+  exact: z.boolean().optional().describe("Match text exactly (default: false)"),
+  // Value to fill
   value: z.string().describe("Value to fill in the input"),
+  // Options
   timeout: z.number().optional().describe("Timeout in ms (default: 5000)"),
+  waitForStability: z
+    .boolean()
+    .optional()
+    .describe("Wait for DOM to settle after fill (default: true)"),
+  stabilityOptions: stabilityOptionsSchema.describe("Options for DOM stability wait"),
 });
 
 export const widgetFillOutputSchema = z.object({
@@ -168,12 +264,17 @@ export const widgetFillOutputSchema = z.object({
   error: z.string().optional(),
   elementType: z.string().optional(),
   fillMethod: z.enum(["fill", "type", "selectOption", "contenteditable"]).optional(),
+  locatorStrategy: z.string().optional().describe("How the element was located"),
+  stabilityWaitMs: z.number().optional().describe("Time spent waiting for DOM stability"),
+  wasStable: z.boolean().optional().describe("Whether DOM was stable before timeout"),
 });
 
 export function createWidgetFillTool(connectionManager: ConnectionManager) {
   return defineTool({
     description:
-      "Fill an input, textarea, select, or contenteditable element in a widget iframe with a value. Automatically detects element type and uses the appropriate fill method.",
+      "Fill an input, textarea, select, or contenteditable element in a widget iframe. " +
+      "Supports semantic locators: CSS selector, label, placeholder, ARIA role+name, or data-testid. " +
+      "Automatically detects element type and uses the appropriate fill method.",
     input: widgetFillInputSchema,
     output: widgetFillOutputSchema,
     handler: async (input): Promise<WidgetFillOutput> => {
@@ -194,6 +295,15 @@ export function createWidgetFillTool(connectionManager: ConnectionManager) {
         };
       }
 
+      // Validate that at least one locator option is provided
+      if (!hasLocatorOptions(input)) {
+        return {
+          success: false,
+          error:
+            "No locator specified. Provide one of: selector, label, placeholder, role, testId, or text",
+        };
+      }
+
       try {
         // Target the widget iframe
         const frame = session.page.frame({ url: /\/widget\// });
@@ -205,7 +315,20 @@ export function createWidgetFillTool(connectionManager: ConnectionManager) {
         }
 
         const timeout = input.timeout ?? 5000;
-        const locator = frame.locator(input.selector).first();
+
+        // Resolve the locator using semantic options
+        const locator = resolveLocator(frame, {
+          selector: input.selector,
+          text: input.text,
+          role: input.role,
+          name: input.name,
+          label: input.label,
+          placeholder: input.placeholder,
+          testId: input.testId,
+          exact: input.exact,
+        });
+
+        const locatorStrategy = describeLocatorStrategy(input);
 
         // Wait for element to be visible
         await locator.waitFor({ state: "visible", timeout });
@@ -270,10 +393,23 @@ export function createWidgetFillTool(connectionManager: ConnectionManager) {
           }
         }
 
+        // Wait for DOM stability (default: true)
+        let stabilityWaitMs: number | undefined;
+        let wasStable: boolean | undefined;
+
+        if (input.waitForStability !== false) {
+          const result = await waitForDOMStability(frame, input.stabilityOptions);
+          stabilityWaitMs = result.waitedMs;
+          wasStable = result.wasStable;
+        }
+
         return {
           success: true,
           elementType,
           fillMethod,
+          locatorStrategy,
+          stabilityWaitMs,
+          wasStable,
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

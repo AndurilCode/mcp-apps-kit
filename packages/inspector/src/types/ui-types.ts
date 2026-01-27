@@ -373,6 +373,12 @@ export interface WidgetClickOutput {
   success: boolean;
   /** Error message if click failed */
   error?: string;
+  /** Description of how the element was located */
+  locatorStrategy?: string;
+  /** Time spent waiting for DOM stability (ms) */
+  stabilityWaitMs?: number;
+  /** Whether DOM was stable before timeout */
+  wasStable?: boolean;
 }
 
 /**
@@ -401,6 +407,12 @@ export interface WidgetFillOutput {
   elementType?: string;
   /** The method used to fill (fill, type, selectOption) */
   fillMethod?: "fill" | "type" | "selectOption" | "contenteditable";
+  /** Description of how the element was located */
+  locatorStrategy?: string;
+  /** Time spent waiting for DOM stability (ms) */
+  stabilityWaitMs?: number;
+  /** Whether DOM was stable before timeout */
+  wasStable?: boolean;
 }
 
 /**
@@ -618,5 +630,200 @@ export interface GetWidgetStateOutput {
   /** The widget state snapshot */
   state?: WidgetStateSnapshot;
   /** Error message if retrieval failed */
+  error?: string;
+}
+
+// =============================================================================
+// ACCESSIBILITY TREE TYPES (for widget_snapshot)
+// =============================================================================
+
+/**
+ * Accessibility tree node from Playwright snapshot
+ */
+export interface AccessibilityNode {
+  /** ARIA role (e.g., "button", "textbox", "link") */
+  role: string;
+  /** Accessible name (visible text or aria-label) */
+  name: string;
+  /** Current value (for inputs, sliders, etc.) */
+  value?: string;
+  /** Description (aria-describedby content) */
+  description?: string;
+  /** Whether the element has focus */
+  focused?: boolean;
+  /** Checked state for checkboxes/radios */
+  checked?: boolean | "mixed";
+  /** Disabled state */
+  disabled?: boolean;
+  /** Expanded state for collapsible elements */
+  expanded?: boolean;
+  /** Selected state for options/tabs */
+  selected?: boolean;
+  /** Required state for form fields */
+  required?: boolean;
+  /** Level for headings (1-6) */
+  level?: number;
+  /** Unique index for targeting this element */
+  nodeIndex: number;
+  /** Playwright locator hint for this element (e.g., "getByRole('button', { name: 'Submit' })") */
+  locatorHint?: string;
+  /** Child nodes */
+  children?: AccessibilityNode[];
+}
+
+/**
+ * Interactive element summary for LLM consumption
+ */
+export interface InteractiveElementSummary {
+  /** Unique index for targeting */
+  nodeIndex: number;
+  /** ARIA role */
+  role: string;
+  /** Accessible name */
+  name: string;
+  /** Playwright locator hint */
+  locatorHint?: string;
+}
+
+/**
+ * Input for widget_snapshot tool
+ */
+export interface WidgetSnapshotInput {
+  /** Session ID of the widget */
+  sessionId: string;
+  /** Include full DOM HTML as well (default: false) */
+  includeDOM?: boolean;
+  /** Filter to specific ARIA roles (e.g., ["button", "textbox"]) */
+  filterRoles?: string[];
+  /** Maximum tree depth to traverse (default: unlimited) */
+  maxDepth?: number;
+}
+
+/**
+ * Output from widget_snapshot tool
+ */
+export interface WidgetSnapshotOutput {
+  /** Whether the snapshot was successful */
+  success: boolean;
+  /** Accessibility tree root */
+  accessibilityTree?: AccessibilityNode;
+  /** Total count of interactive elements */
+  interactiveElementCount?: number;
+  /** Flat list of interactive elements for easier LLM consumption */
+  interactiveElements?: InteractiveElementSummary[];
+  /** Optional DOM snapshot */
+  dom?: WidgetDOMSnapshot;
+  /** Error message if snapshot failed */
+  error?: string;
+}
+
+// =============================================================================
+// SEMANTIC LOCATOR TYPES (for text/role-based element selection)
+// =============================================================================
+
+/**
+ * Semantic locator options for element targeting
+ *
+ * Priority order when resolving:
+ * 1. selector (CSS selector - explicit override)
+ * 2. testId (data-testid - most stable)
+ * 3. role + name (semantic and accessible)
+ * 4. label (for form elements)
+ * 5. placeholder (for inputs)
+ * 6. text (visible text content)
+ */
+export interface SemanticLocatorOptions {
+  /** CSS selector (highest priority) */
+  selector?: string;
+  /** Visible text content */
+  text?: string;
+  /** ARIA role */
+  role?: string;
+  /** Accessible name (for role-based selection) */
+  name?: string;
+  /** Label text (for form elements) */
+  label?: string;
+  /** Placeholder text (for inputs) */
+  placeholder?: string;
+  /** data-testid attribute */
+  testId?: string;
+  /** Match exact text (default: false for substring match) */
+  exact?: boolean;
+}
+
+/**
+ * Options for waiting for DOM stability after actions
+ */
+export interface WaitForStabilityOptions {
+  /** Wait for network to be idle (default: false) */
+  waitForNetwork?: boolean;
+  /** Time with no DOM mutations to consider stable (ms, default: 100) */
+  stabilityMs?: number;
+  /** Maximum time to wait (ms, default: 5000) */
+  timeout?: number;
+  /** Minimum wait time even if stable (ms, default: 50) */
+  minWait?: number;
+}
+
+// =============================================================================
+// WIDGET QUERY TYPES (for element discovery)
+// =============================================================================
+
+/**
+ * Input for widget_query tool
+ */
+export interface WidgetQueryInput extends SemanticLocatorOptions {
+  /** Session ID of the widget */
+  sessionId: string;
+  /** Maximum elements to return (default: 10) */
+  maxResults?: number;
+  /** Timeout in ms (default: 5000) */
+  timeout?: number;
+}
+
+/**
+ * Element info returned by widget_query
+ */
+export interface QueryElementInfo {
+  /** Index within the query results */
+  index: number;
+  /** Tag name of the element */
+  tagName: string;
+  /** ARIA role (if present) */
+  role?: string;
+  /** Accessible name (aria-label or computed) */
+  name?: string;
+  /** Element text content (truncated to 200 chars) */
+  textContent: string;
+  /** Input value (for form elements) */
+  value?: string;
+  /** Whether the element is visible */
+  isVisible: boolean;
+  /** Whether the element is enabled */
+  isEnabled: boolean;
+  /** Key attributes for identification */
+  attributes?: Record<string, string>;
+  /** Bounding box of the element */
+  boundingBox?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+}
+
+/**
+ * Output from widget_query tool
+ */
+export interface WidgetQueryOutput {
+  /** Whether the query was successful */
+  success: boolean;
+  /** Total number of matching elements */
+  count?: number;
+  /** Info about matching elements */
+  elements?: QueryElementInfo[];
+  /** Description of how the element was located */
+  locatorStrategy?: string;
+  /** Error message if query failed */
   error?: string;
 }
