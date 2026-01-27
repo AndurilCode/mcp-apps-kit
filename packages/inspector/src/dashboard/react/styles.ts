@@ -32,6 +32,44 @@ export const styles: Record<string, CSSProperties> = {
     flexShrink: 0,
   },
 
+  headerLeft: {
+    display: "flex",
+    alignItems: "center",
+    gap: "1.25rem",
+  },
+
+  headerRight: {
+    display: "flex",
+    alignItems: "center",
+    gap: "1rem",
+  },
+
+  // Toolbar
+  toolbar: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.25rem",
+    marginLeft: "0.5rem",
+  },
+
+  toolbarBtn: {
+    background: "transparent",
+    border: "none",
+    borderRadius: "4px",
+    padding: "0.375rem",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#6b7280",
+    transition: "all 0.15s ease",
+  },
+
+  toolbarBtnActive: {
+    color: "#20b2aa",
+    backgroundColor: "rgba(32, 178, 170, 0.1)",
+  },
+
   title: {
     fontSize: "1rem",
     fontWeight: 500,
@@ -110,6 +148,15 @@ export const styles: Record<string, CSSProperties> = {
     flex: 1,
     display: "flex",
     flexDirection: "column",
+    minHeight: 0,
+    overflow: "hidden",
+  },
+
+  // Content Row (Main + Globals Panel)
+  contentRow: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "row",
     minHeight: 0,
     overflow: "hidden",
   },
@@ -354,5 +401,98 @@ export const styles: Record<string, CSSProperties> = {
 
   logLevelLog: {
     color: "#e8e8e8",
+  },
+
+  // Globals Panel
+  globalsPanel: {
+    backgroundColor: "#0d0e0e",
+    borderLeft: "1px solid #2d2f2f",
+    display: "flex",
+    flexDirection: "column",
+    flexShrink: 0,
+    overflow: "hidden",
+    transition: "width 0.25s ease, opacity 0.2s ease",
+  },
+
+  globalsPanelCollapsed: {
+    width: 0,
+    borderLeft: "none",
+    opacity: 0,
+  },
+
+  globalsPanelHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "0.75rem 1rem",
+    backgroundColor: "#0a0a0a",
+    borderBottom: "1px solid #1a1a1a",
+    flexShrink: 0,
+  },
+
+  globalsPanelTitle: {
+    fontSize: "0.75rem",
+    fontWeight: 500,
+    color: "#9ca3af",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+  },
+
+  globalsPanelToggle: {
+    background: "transparent",
+    border: "1px solid #3d4040",
+    borderRadius: "4px",
+    padding: "0.25rem 0.375rem",
+    cursor: "pointer",
+    color: "#9ca3af",
+    fontSize: "0.625rem",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "all 0.15s ease",
+  },
+
+  globalsPanelContent: {
+    flex: 1,
+    overflowY: "auto",
+    padding: "0.75rem",
+    fontSize: "0.75rem",
+    minHeight: 0,
+  },
+
+  globalsSection: {
+    marginBottom: "1rem",
+  },
+
+  globalsSectionTitle: {
+    fontSize: "0.6875rem",
+    fontWeight: 600,
+    color: "#20b2aa",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    marginBottom: "0.5rem",
+    paddingBottom: "0.25rem",
+    borderBottom: "1px solid #2d2f2f",
+  },
+
+  globalsItem: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    padding: "0.25rem 0",
+    gap: "0.5rem",
+  },
+
+  globalsItemLabel: {
+    color: "#6b7280",
+    fontSize: "0.6875rem",
+    flexShrink: 0,
+  },
+
+  globalsItemValue: {
+    color: "#e8e8e8",
+    fontSize: "0.6875rem",
+    textAlign: "right",
+    wordBreak: "break-word",
   },
 };

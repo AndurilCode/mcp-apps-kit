@@ -6,3 +6,12 @@ export {
   type UseResizablePanelOptions,
   type UseResizablePanelResult,
 } from "./useResizablePanel";
+export {
+  useGlobals,
+  type GlobalsState,
+  type UseGlobalsResult,
+  type ViewportInfo,
+  type SafeAreaInsetsInfo,
+  type UserAgentInfo,
+  type UserLocationInfo,
+} from "./useGlobals";
