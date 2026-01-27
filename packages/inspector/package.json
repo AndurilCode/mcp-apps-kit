@@ -18,6 +18,15 @@
       "require": {
         "default": "./dist/index.cjs"
       }
+    },
+    "./dashboard/react": {
+      "types": "./dist/dashboard/react/index.d.ts",
+      "import": {
+        "default": "./dist/dashboard/react/index.js"
+      },
+      "require": {
+        "default": "./dist/dashboard/react/index.cjs"
+      }
     }
   },
   "files": [
@@ -52,7 +61,16 @@
     "zod": "^4.3.5"
   },
   "devDependencies": {
-    "@types/jsdom": "^21.1.7"
+    "@types/jsdom": "^21.1.7",
+    "@types/react": "^18.2.0"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
   },
   "optionalDependencies": {
     "playwright": "^1.50.0"
