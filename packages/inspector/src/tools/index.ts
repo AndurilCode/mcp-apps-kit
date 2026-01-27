@@ -59,6 +59,9 @@ export { createWidgetSnapshotTool } from "./widget-snapshot";
 // Widget query tool (semantic element discovery)
 export { createWidgetQueryTool } from "./widget-query";
 
+// Widget snapshot diff tool (compare accessibility snapshots)
+export { createWidgetSnapshotDiffTool } from "./widget-snapshot-diff";
+
 // Helper exports (for advanced usage)
 export {
   resolveLocator,

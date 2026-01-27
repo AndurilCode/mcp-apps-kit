@@ -39,9 +39,10 @@ import {
   createWidgetFillTool,
   createWidgetWaitForSelectorTool,
   createGetWidgetStateTool,
-  // Widget snapshot and query tools (widget_query supersedes widget_locator)
+  // Widget snapshot, query, and diff tools (widget_query supersedes widget_locator)
   createWidgetSnapshotTool,
   createWidgetQueryTool,
+  createWidgetSnapshotDiffTool,
 } from "./tools";
 
 /**
@@ -98,9 +99,10 @@ export function createInspectorServer(options: InspectorServerOptions = {}): App
     widget_fill: createWidgetFillTool(connectionManager),
     widget_wait_for_selector: createWidgetWaitForSelectorTool(connectionManager),
     get_widget_state: createGetWidgetStateTool(connectionManager),
-    // Widget snapshot and query tools (widget_query supersedes widget_locator)
+    // Widget snapshot, query, and diff tools (widget_query supersedes widget_locator)
     widget_snapshot: createWidgetSnapshotTool(connectionManager),
     widget_query: createWidgetQueryTool(connectionManager),
+    widget_snapshot_diff: createWidgetSnapshotDiffTool(connectionManager),
   };
 
   const app = createApp({

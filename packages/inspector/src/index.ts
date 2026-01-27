@@ -91,6 +91,10 @@ export type {
   WidgetQueryInput,
   QueryElementInfo,
   WidgetQueryOutput,
+  // Widget snapshot diff types
+  ElementChange,
+  WidgetSnapshotDiffInput,
+  WidgetSnapshotDiffOutput,
 } from "./types";
 
 // =============================================================================
@@ -148,9 +152,10 @@ export {
   createPreviewUITool,
   createScreenshotWidgetTool,
   createTestWidgetInteractionTool,
-  // Widget snapshot and query tools
+  // Widget snapshot, query, and diff tools
   createWidgetSnapshotTool,
   createWidgetQueryTool,
+  createWidgetSnapshotDiffTool,
   // Semantic locator helpers
   resolveLocator,
   hasLocatorOptions,

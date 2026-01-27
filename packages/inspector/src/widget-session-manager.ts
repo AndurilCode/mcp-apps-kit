@@ -91,6 +91,10 @@ export interface ActiveWidgetSession {
   source: SessionSource;
   /** Metadata for proxy sessions (when source is 'apps') */
   proxyMetadata?: ProxyMetadata;
+  /** Last captured accessibility tree snapshot (for widget_snapshot_diff auto-comparison) */
+  lastSnapshot?: unknown;
+  /** Timestamp when lastSnapshot was captured */
+  lastSnapshotTimestamp?: number;
 }
 
 /**

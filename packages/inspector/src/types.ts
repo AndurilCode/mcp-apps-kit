@@ -112,6 +112,12 @@ export type {
   WidgetQueryInput,
   QueryElementInfo,
   WidgetQueryOutput,
+  // Widget snapshot diff types
+  ElementChange,
+  WidgetSnapshotDiffInput,
+  WidgetSnapshotDiffOutput,
+  CountChange,
+  SnapshotDiffSummary,
   // Environment types
   DeviceType,
   DeviceCapabilitiesInfo,

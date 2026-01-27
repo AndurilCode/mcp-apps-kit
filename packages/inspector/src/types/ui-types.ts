@@ -436,6 +436,8 @@ export interface WidgetDragOutput {
   startPosition?: { x: number; y: number };
   /** Ending position of the drag */
   endPosition?: { x: number; y: number };
+  /** Guidance hints for agent */
+  hints?: ToolHints;
 }
 
 /**
@@ -702,6 +704,8 @@ export interface WidgetSnapshotInput {
   sessionId: string;
   /** Include full DOM HTML as well (default: false) */
   includeDOM?: boolean;
+  /** Strip inline styles from DOM output for readability (default: false). Only applies when includeDOM=true. */
+  compactDOM?: boolean;
   /** Filter to specific ARIA roles (e.g., ["button", "textbox"]) */
   filterRoles?: string[];
   /** Maximum tree depth to traverse (default: unlimited) */
@@ -786,6 +790,8 @@ export interface WaitForStabilityOptions {
 export interface WidgetQueryInput extends SemanticLocatorOptions {
   /** Session ID of the widget */
   sessionId: string;
+  /** Return only the Nth match (0-based index). Without this, returns all matches up to maxResults. */
+  nth?: number;
   /** Maximum elements to return (default: 10) */
   maxResults?: number;
   /** Timeout in ms (default: 5000) */
@@ -836,6 +842,93 @@ export interface WidgetQueryOutput {
   /** Description of how the element was located */
   locatorStrategy?: string;
   /** Error message if query failed */
+  error?: string;
+  /** Guidance hints for agent */
+  hints?: ToolHints;
+}
+
+// =============================================================================
+// WIDGET SNAPSHOT DIFF TYPES
+// =============================================================================
+
+/**
+ * Element change record (added or removed)
+ */
+export interface ElementChange {
+  /** ARIA role of the element */
+  role: string;
+  /** Accessible name of the element */
+  name: string;
+  /** Node index in the current snapshot (only for added elements) */
+  nodeIndex?: number;
+}
+
+/**
+ * Input for widget_snapshot_diff tool
+ */
+export interface WidgetSnapshotDiffInput {
+  /** Session ID of the widget */
+  sessionId: string;
+  /** Previous accessibility tree from widget_snapshot to compare against */
+  previousSnapshot: unknown;
+}
+
+/**
+ * Count change record for elements with duplicate role+name
+ */
+export interface CountChange {
+  /** ARIA role of the element */
+  role: string;
+  /** Accessible name of the element */
+  name: string;
+  /** Count in the previous snapshot */
+  previousCount: number;
+  /** Count in the current snapshot */
+  currentCount: number;
+}
+
+/**
+ * Summary of snapshot comparison
+ */
+export interface SnapshotDiffSummary {
+  /** Total elements in previous snapshot */
+  previousTotal: number;
+  /** Total elements in current snapshot */
+  currentTotal: number;
+  /** Number of elements added (unique role+name) */
+  added: number;
+  /** Number of elements removed (unique role+name) */
+  removed: number;
+  /** Number of unchanged elements (unique role+name) */
+  unchanged: number;
+}
+
+/**
+ * Output from widget_snapshot_diff tool
+ */
+export interface WidgetSnapshotDiffOutput {
+  /** Whether the diff was successful */
+  success: boolean;
+  /** Changes detected between snapshots */
+  changes?: {
+    /** Elements present in current but not in previous */
+    added?: ElementChange[];
+    /** Elements present in previous but not in current */
+    removed?: ElementChange[];
+    /** Count changes for duplicate role+name elements */
+    countChanges?: CountChange[];
+  };
+  /** Summary of the comparison */
+  summary?: SnapshotDiffSummary;
+  /** Count of elements that are unchanged */
+  unchanged?: number;
+  /** Current accessibility tree for chaining */
+  currentSnapshot?: unknown;
+  /** Whether the cached snapshot was used instead of explicit previousSnapshot */
+  usedCachedSnapshot?: boolean;
+  /** Age of the cached snapshot in milliseconds (only when usedCachedSnapshot=true) */
+  cachedSnapshotAge?: number;
+  /** Error message if diff failed */
   error?: string;
   /** Guidance hints for agent */
   hints?: ToolHints;
