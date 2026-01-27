@@ -26,7 +26,6 @@ import {
   createGetUIMetadataTool,
   createPreviewUITool,
   createScreenshotWidgetTool,
-  createTestWidgetInteractionTool,
   createGetConsoleLogsTool,
   createSetGlobalsTool,
   createGetGlobalsTool,
@@ -39,9 +38,8 @@ import {
   createWidgetClickTool,
   createWidgetFillTool,
   createWidgetWaitForSelectorTool,
-  createWidgetLocatorTool,
   createGetWidgetStateTool,
-  // Widget snapshot and query tools
+  // Widget snapshot and query tools (widget_query supersedes widget_locator)
   createWidgetSnapshotTool,
   createWidgetQueryTool,
 } from "./tools";
@@ -85,7 +83,6 @@ export function createInspectorServer(options: InspectorServerOptions = {}): App
     // UI Rendering tools
     preview_ui: createPreviewUITool(connectionManager),
     screenshot_widget: createScreenshotWidgetTool(connectionManager),
-    test_widget_interaction: createTestWidgetInteractionTool(connectionManager),
     get_console_logs: createGetConsoleLogsTool(connectionManager),
     // Environment Configuration tools
     set_globals: createSetGlobalsTool(connectionManager),
@@ -100,9 +97,8 @@ export function createInspectorServer(options: InspectorServerOptions = {}): App
     widget_click: createWidgetClickTool(connectionManager),
     widget_fill: createWidgetFillTool(connectionManager),
     widget_wait_for_selector: createWidgetWaitForSelectorTool(connectionManager),
-    widget_locator: createWidgetLocatorTool(connectionManager),
     get_widget_state: createGetWidgetStateTool(connectionManager),
-    // Widget snapshot and query tools
+    // Widget snapshot and query tools (widget_query supersedes widget_locator)
     widget_snapshot: createWidgetSnapshotTool(connectionManager),
     widget_query: createWidgetQueryTool(connectionManager),
   };
