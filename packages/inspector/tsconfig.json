@@ -8,8 +8,9 @@
     "incremental": false,
     "declaration": true,
     "declarationMap": true,
-    "tsBuildInfoFile": null
+    "tsBuildInfoFile": null,
+    "jsx": "react-jsx"
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules", "dist", "tests", "**/*.test.ts", "**/*.spec.ts"]
 }
