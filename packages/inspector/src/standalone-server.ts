@@ -61,7 +61,6 @@ import {
   createGetUIMetadataTool,
   createPreviewUITool,
   createScreenshotWidgetTool,
-  createTestWidgetInteractionTool,
   createGetConsoleLogsTool,
   createSetGlobalsTool,
   createGetGlobalsTool,
@@ -74,11 +73,10 @@ import {
   createWidgetClickTool,
   createWidgetFillTool,
   createWidgetWaitForSelectorTool,
-  createWidgetLocatorTool,
   createWidgetDragTool,
   createWidgetRefreshTool,
   createGetWidgetStateTool,
-  // Widget snapshot and query tools
+  // Widget snapshot and query tools (widget_query supersedes widget_locator)
   createWidgetSnapshotTool,
   createWidgetQueryTool,
 } from "./tools";
@@ -132,7 +130,6 @@ function createInspectorTools(connectionManager: ConnectionManager): ToolDefs {
     // UI Rendering tools
     preview_ui: createPreviewUITool(connectionManager),
     screenshot_widget: createScreenshotWidgetTool(connectionManager),
-    test_widget_interaction: createTestWidgetInteractionTool(connectionManager),
     get_console_logs: createGetConsoleLogsTool(connectionManager),
     // Environment Configuration tools
     set_globals: createSetGlobalsTool(connectionManager),
@@ -147,11 +144,10 @@ function createInspectorTools(connectionManager: ConnectionManager): ToolDefs {
     widget_click: createWidgetClickTool(connectionManager),
     widget_fill: createWidgetFillTool(connectionManager),
     widget_wait_for_selector: createWidgetWaitForSelectorTool(connectionManager),
-    widget_locator: createWidgetLocatorTool(connectionManager),
     widget_drag: createWidgetDragTool(connectionManager),
     widget_refresh: createWidgetRefreshTool(connectionManager),
     get_widget_state: createGetWidgetStateTool(connectionManager),
-    // Widget snapshot and query tools
+    // Widget snapshot and query tools (widget_query supersedes widget_locator)
     widget_snapshot: createWidgetSnapshotTool(connectionManager),
     widget_query: createWidgetQueryTool(connectionManager),
   };

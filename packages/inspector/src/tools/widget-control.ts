@@ -79,9 +79,11 @@ export function createWidgetEvaluateTool(connectionManager: ConnectionManager) {
         }
 
         // Evaluate the expression in the widget iframe
-        // Intentionally using eval to execute arbitrary JS in widget context
+        // Using Function constructor to execute arbitrary JS in widget context
+        // This avoids bundler warnings about direct eval while achieving the same goal
         const result: unknown = await frame.evaluate((expr: string) => {
-          return eval(expr) as unknown;
+          // eslint-disable-next-line @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call
+          return new Function(`return (${expr})`)() as unknown;
         }, input.expression);
 
         return {
