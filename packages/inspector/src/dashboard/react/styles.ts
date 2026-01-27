@@ -92,9 +92,9 @@ export const styles: Record<string, CSSProperties> = {
 
   select: {
     fontFamily: "inherit",
-    backgroundColor: "#2d2f2f",
-    color: "#e8e8e8",
-    border: "1px solid #3d4040",
+    backgroundColor: "#111111",
+    color: "#ffffff",
+    border: "1px solid #2d2f2f",
     borderRadius: "8px",
     padding: "0.5rem 1rem",
     fontSize: "0.8125rem",
@@ -107,10 +107,40 @@ export const styles: Record<string, CSSProperties> = {
     alignItems: "center",
     gap: "0.5rem",
     fontSize: "0.75rem",
-    color: "#6b7280",
-    backgroundColor: "#2d2f2f",
+    color: "#ffffff",
+    backgroundColor: "#111111",
     padding: "0.375rem 0.75rem",
     borderRadius: "6px",
+    position: "relative",
+    overflow: "hidden",
+  },
+
+  // Status wrapper for streaming animation
+  statusWrapper: {
+    position: "relative",
+    borderRadius: "8px",
+    padding: "2px",
+    background: "transparent",
+  },
+
+  statusWrapperStreaming: {
+    background: "linear-gradient(90deg, #20b2aa, #00d4ff, #20b2aa)",
+    backgroundSize: "200% 100%",
+    animation: "snakeBorder 2s linear infinite",
+    boxShadow: "0 0 12px rgba(32, 178, 170, 0.4), 0 0 24px rgba(32, 178, 170, 0.2)",
+  },
+
+  statusInner: {
+    backgroundColor: "#111111",
+    borderRadius: "6px",
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    fontSize: "0.75rem",
+    color: "#ffffff",
+    padding: "0.375rem 0.75rem",
+    position: "relative",
+    zIndex: 1,
   },
 
   statusDot: {
