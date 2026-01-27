@@ -11,7 +11,7 @@ export const styles: Record<string, CSSProperties> = {
   root: {
     fontFamily:
       "'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace",
-    backgroundColor: "#191a1a",
+    backgroundColor: "#000000",
     color: "#e8e8e8",
     height: "100%",
     display: "flex",
@@ -23,7 +23,7 @@ export const styles: Record<string, CSSProperties> = {
 
   // Header
   header: {
-    backgroundColor: "#202222",
+    backgroundColor: "#000000",
     padding: "1rem 1.5rem",
     display: "flex",
     alignItems: "center",
@@ -168,14 +168,14 @@ export const styles: Record<string, CSSProperties> = {
     alignItems: "center",
     justifyContent: "center",
     padding: "1rem",
-    backgroundColor: "#191a1a",
+    backgroundColor: "#000000",
     minHeight: 0,
     overflow: "hidden",
   },
 
   // Display Container
   displayContainer: {
-    backgroundColor: "#202222",
+    backgroundColor: "#000000",
     borderRadius: "12px",
     border: "1px solid #2d2f2f",
     overflow: "hidden",
@@ -243,11 +243,16 @@ export const styles: Record<string, CSSProperties> = {
     backgroundColor: "#2d2f2f",
     cursor: "ns-resize",
     flexShrink: 0,
-    transition: "background-color 0.15s ease",
+    transition: "background-color 0.15s ease, height 0.25s ease, opacity 0.2s ease",
   },
 
   resizeHandleActive: {
     backgroundColor: "#20b2aa",
+  },
+
+  resizeHandleHidden: {
+    height: 0,
+    opacity: 0,
   },
 
   // Logs Panel
@@ -258,6 +263,13 @@ export const styles: Record<string, CSSProperties> = {
     flexDirection: "column",
     flexShrink: 0,
     overflow: "hidden",
+    transition: "height 0.25s ease, opacity 0.2s ease",
+  },
+
+  logsPanelHidden: {
+    height: 0,
+    borderTop: "none",
+    opacity: 0,
   },
 
   logsHeader: {

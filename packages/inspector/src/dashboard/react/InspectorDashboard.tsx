@@ -241,56 +241,54 @@ export function InspectorDashboard({
           <GlobalsPanel globals={globals} isVisible={isGlobalsPanelVisible} />
         </div>
 
-        {/* Resize Handle - only show when logs panel is visible */}
-        {isLogsPanelVisible && (
-          <div
-            {...resizeHandleProps}
-            style={{
-              ...styles.resizeHandle,
-              ...(isResizing ? styles.resizeHandleActive : {}),
-            }}
-          />
-        )}
+        {/* Resize Handle */}
+        <div
+          {...resizeHandleProps}
+          style={{
+            ...styles.resizeHandle,
+            ...(isResizing ? styles.resizeHandleActive : {}),
+            ...(!isLogsPanelVisible ? styles.resizeHandleHidden : {}),
+          }}
+        />
 
         {/* Logs Panel */}
-        {isLogsPanelVisible && (
-          <div
-            style={{
-              ...styles.logsPanel,
-              height: isPanelCollapsed ? 36 : panelHeight,
-            }}
-          >
-            <div style={styles.logsHeader}>
-              <span style={styles.logsTitle}>Session Logs</span>
-              <div style={styles.logsControls}>
-                <span style={styles.logCount}>
-                  {logs.length} log{logs.length !== 1 ? "s" : ""}
-                </span>
-                <button style={styles.clearLogsBtn} onClick={clearLogs}>
-                  Clear
-                </button>
-                <button
-                  style={{
-                    ...styles.toggleLogsBtn,
-                    transform: isPanelCollapsed ? "rotate(180deg)" : "none",
-                  }}
-                  onClick={togglePanel}
-                >
-                  &#9660;
-                </button>
-              </div>
+        <div
+          style={{
+            ...styles.logsPanel,
+            height: isLogsPanelVisible ? (isPanelCollapsed ? 36 : panelHeight) : 0,
+            ...(!isLogsPanelVisible ? styles.logsPanelHidden : {}),
+          }}
+        >
+          <div style={styles.logsHeader}>
+            <span style={styles.logsTitle}>Session Logs</span>
+            <div style={styles.logsControls}>
+              <span style={styles.logCount}>
+                {logs.length} log{logs.length !== 1 ? "s" : ""}
+              </span>
+              <button style={styles.clearLogsBtn} onClick={clearLogs}>
+                Clear
+              </button>
+              <button
+                style={{
+                  ...styles.toggleLogsBtn,
+                  transform: isPanelCollapsed ? "rotate(180deg)" : "none",
+                }}
+                onClick={togglePanel}
+              >
+                &#9660;
+              </button>
             </div>
-            {!isPanelCollapsed && (
-              <div ref={logsContainerRef} style={styles.logsContainer}>
-                {logs.length === 0 ? (
-                  <div style={styles.logsEmpty}>No logs yet</div>
-                ) : (
-                  logs.map((log, index) => <LogEntryRow key={index} log={log} />)
-                )}
-              </div>
-            )}
           </div>
-        )}
+          {!isPanelCollapsed && (
+            <div ref={logsContainerRef} style={styles.logsContainer}>
+              {logs.length === 0 ? (
+                <div style={styles.logsEmpty}>No logs yet</div>
+              ) : (
+                logs.map((log, index) => <LogEntryRow key={index} log={log} />)
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -18,7 +18,7 @@ export interface ToolbarProps {
   onToggleGlobalsPanel: () => void;
 }
 
-/** Logs panel icon - horizontal lines */
+/** Logs panel icon - bottom panel (like globals icon but rotated) */
 function LogsIcon(): React.ReactElement {
   return (
     <svg
@@ -29,10 +29,10 @@ function LogsIcon(): React.ReactElement {
       stroke="currentColor"
       strokeWidth="1.5"
       strokeLinecap="round"
+      strokeLinejoin="round"
     >
-      <line x1="2" y1="4" x2="14" y2="4" />
-      <line x1="2" y1="8" x2="14" y2="8" />
-      <line x1="2" y1="12" x2="10" y2="12" />
+      <rect x="2" y="2" width="12" height="12" rx="2" />
+      <line x1="2" y1="10" x2="14" y2="10" />
     </svg>
   );
 }
