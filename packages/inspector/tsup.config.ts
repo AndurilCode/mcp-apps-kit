@@ -11,7 +11,7 @@ export default defineConfig([
       },
     },
     sourcemap: true,
-    clean: true,
+    clean: false, // Don't clean - dashboard HTML is built first by Vite
     treeshake: true,
     minify: false,
     external: ["zod", "@mcp-apps-kit/core", "@mcp-apps-kit/testing", "playwright", "jsdom"],

@@ -6,7 +6,7 @@
 
 /* global window, document */
 import type React from "react";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export interface UseResizablePanelOptions {
   initialHeight: number;
@@ -44,8 +44,10 @@ export function useResizablePanel({
   });
 
   const [isResizing, setIsResizing] = useState(false);
-  const startYRef = useRef(0);
-  const startHeightRef = useRef(0);
+
+  // Use a ref to track the current height during resize to avoid stale closures
+  const heightRef = useRef(panelHeight);
+  heightRef.current = panelHeight;
 
   // Validate height on mount and window resize
   useEffect(() => {
@@ -64,51 +66,45 @@ export function useResizablePanel({
     };
   }, [minHeight]);
 
-  // Save to localStorage when height changes
+  // Save to localStorage when height changes (but not during active resize)
   useEffect(() => {
     if (typeof window !== "undefined" && storageKey && !isResizing) {
       window.localStorage.setItem(storageKey, String(panelHeight));
     }
   }, [panelHeight, storageKey, isResizing]);
 
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (disabled || typeof window === "undefined") return;
+  const handleMouseDown = (e: React.MouseEvent): void => {
+    if (disabled || typeof document === "undefined") return;
 
-      const deltaY = startYRef.current - e.clientY;
+    e.preventDefault();
+
+    const startY = e.clientY;
+    const startHeight = heightRef.current;
+
+    setIsResizing(true);
+    document.body.style.cursor = "ns-resize";
+    document.body.style.userSelect = "none";
+
+    const handleMouseMove = (moveEvent: MouseEvent): void => {
+      const deltaY = startY - moveEvent.clientY;
       const reservedHeight = 250;
       const maxHeight = window.innerHeight - reservedHeight;
-      const newHeight = Math.min(maxHeight, Math.max(minHeight, startHeightRef.current + deltaY));
+      const newHeight = Math.min(maxHeight, Math.max(minHeight, startHeight + deltaY));
 
       setPanelHeight(newHeight);
-    },
-    [disabled, minHeight]
-  );
+    };
 
-  const handleMouseUp = useCallback(() => {
-    if (typeof document === "undefined") return;
+    const handleMouseUp = (): void => {
+      setIsResizing(false);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
 
-    setIsResizing(false);
-    document.body.style.cursor = "";
-    document.body.style.userSelect = "";
-    document.removeEventListener("mousemove", handleMouseMove);
-    document.removeEventListener("mouseup", handleMouseUp);
-  }, [handleMouseMove]);
-
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      if (disabled || typeof document === "undefined") return;
-
-      setIsResizing(true);
-      startYRef.current = e.clientY;
-      startHeightRef.current = panelHeight;
-      document.body.style.cursor = "ns-resize";
-      document.body.style.userSelect = "none";
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-    },
-    [disabled, panelHeight, handleMouseMove, handleMouseUp]
-  );
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  };
 
   return {
     panelHeight,
