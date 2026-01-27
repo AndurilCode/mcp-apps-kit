@@ -22,9 +22,9 @@
     "@mcp-apps-kit/ui": "workspace:*",
     "@mcp-apps-kit/ui-react": "workspace:*",
     "@mcp-apps-kit/ui-react-builder": "workspace:*",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
-    "zod": "^4.3.5"
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@mcp-apps-kit/testing": "workspace:*",
