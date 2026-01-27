@@ -78,6 +78,9 @@ import {
   createWidgetDragTool,
   createWidgetRefreshTool,
   createGetWidgetStateTool,
+  // Widget snapshot and query tools
+  createWidgetSnapshotTool,
+  createWidgetQueryTool,
 } from "./tools";
 
 /**
@@ -148,6 +151,9 @@ function createInspectorTools(connectionManager: ConnectionManager): ToolDefs {
     widget_drag: createWidgetDragTool(connectionManager),
     widget_refresh: createWidgetRefreshTool(connectionManager),
     get_widget_state: createGetWidgetStateTool(connectionManager),
+    // Widget snapshot and query tools
+    widget_snapshot: createWidgetSnapshotTool(connectionManager),
+    widget_query: createWidgetQueryTool(connectionManager),
   };
 }
 

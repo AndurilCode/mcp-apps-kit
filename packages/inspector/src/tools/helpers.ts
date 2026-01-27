@@ -2,10 +2,12 @@
  * Shared helpers for UI rendering tools
  *
  * Common utilities for extracting tool results, finding UI resources,
- * and processing widget content.
+ * processing widget content, semantic locators, and DOM stability.
  */
 
 import { MCP_WIDGET_MIME_TYPE, OPENAI_WIDGET_MIME_TYPE } from "@mcp-apps-kit/core";
+import type { Frame, Locator } from "playwright";
+import type { SemanticLocatorOptions, WaitForStabilityOptions } from "../types";
 
 /**
  * Detected protocol for a UI widget
@@ -214,4 +216,194 @@ export function calculateLogSummary(
     error: logs.filter((l) => l.level === "error").length,
     debug: logs.filter((l) => l.level === "debug").length,
   };
+}
+
+// =============================================================================
+// SEMANTIC LOCATOR HELPERS
+// =============================================================================
+
+/**
+ * Escape special regex characters in a string
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Resolve a locator from semantic options
+ *
+ * Priority order:
+ * 1. selector (CSS selector) - if provided, used directly
+ * 2. testId (data-testid) - most stable for testing
+ * 3. role + name - semantic and accessible
+ * 4. label - for form elements
+ * 5. placeholder - for inputs
+ * 6. text - visible text content
+ *
+ * @throws Error if no valid locator options are provided
+ */
+export function resolveLocator(frame: Frame, options: SemanticLocatorOptions): Locator {
+  const { selector, text, role, name, label, placeholder, testId, exact } = options;
+
+  // Priority 1: CSS selector (explicit override)
+  if (selector) {
+    return frame.locator(selector).first();
+  }
+
+  // Priority 2: data-testid (most stable for testing)
+  if (testId) {
+    return frame.getByTestId(testId).first();
+  }
+
+  // Priority 3: Role + name (semantic and accessible)
+  if (role) {
+    const roleOptions: { name?: string | RegExp; exact?: boolean } = {};
+    if (name) {
+      roleOptions.name = exact ? name : new RegExp(escapeRegex(name), "i");
+      roleOptions.exact = exact;
+    }
+    // Cast role to any valid role type - Playwright accepts string
+    return frame.getByRole(role as Parameters<typeof frame.getByRole>[0], roleOptions).first();
+  }
+
+  // Priority 4: Label (for form elements)
+  if (label) {
+    return frame.getByLabel(label, { exact }).first();
+  }
+
+  // Priority 5: Placeholder (for inputs)
+  if (placeholder) {
+    return frame.getByPlaceholder(placeholder, { exact }).first();
+  }
+
+  // Priority 6: Text (visible text content)
+  if (text) {
+    return frame.getByText(text, { exact }).first();
+  }
+
+  // No valid locator options provided
+  throw new Error(
+    "No locator specified. Provide one of: selector, text, role, label, placeholder, or testId"
+  );
+}
+
+/**
+ * Check if any locator option is provided
+ */
+export function hasLocatorOptions(options: SemanticLocatorOptions): boolean {
+  // Using Boolean() to convert to boolean - empty strings are intentionally falsy
+  return Boolean(
+    options.selector ??
+    options.text ??
+    options.role ??
+    options.label ??
+    options.placeholder ??
+    options.testId
+  );
+}
+
+/**
+ * Get human-readable description of the locator strategy used
+ */
+export function describeLocatorStrategy(options: SemanticLocatorOptions): string {
+  if (options.selector) return `CSS selector: ${options.selector}`;
+  if (options.testId) return `data-testid: ${options.testId}`;
+  if (options.role) {
+    return options.name
+      ? `role "${options.role}" with name "${options.name}"`
+      : `role "${options.role}"`;
+  }
+  if (options.label) return `label: ${options.label}`;
+  if (options.placeholder) return `placeholder: ${options.placeholder}`;
+  if (options.text) return `text: ${options.text}`;
+  return "unknown";
+}
+
+// =============================================================================
+// DOM STABILITY HELPERS
+// =============================================================================
+
+/**
+ * Wait for DOM to stabilize after an action
+ *
+ * Uses multiple strategies:
+ * 1. Minimum wait time (always applied)
+ * 2. Network idle (if waitForNetwork is true)
+ * 3. DOM mutation stability (no changes for stabilityMs)
+ */
+export async function waitForDOMStability(
+  frame: Frame,
+  options: WaitForStabilityOptions = {}
+): Promise<{ waitedMs: number; wasStable: boolean }> {
+  const { waitForNetwork = false, stabilityMs = 100, timeout = 5000, minWait = 50 } = options;
+
+  const startTime = Date.now();
+
+  // Minimum wait
+  await new Promise((resolve) => setTimeout(resolve, minWait));
+
+  // Network idle wait
+  if (waitForNetwork) {
+    try {
+      const remainingForNetwork = Math.max(0, timeout - (Date.now() - startTime));
+      await frame.waitForLoadState("networkidle", { timeout: remainingForNetwork });
+    } catch {
+      // Timeout is acceptable - continue with DOM stability check
+    }
+  }
+
+  // DOM mutation stability check using MutationObserver
+  const remainingTimeout = Math.max(0, timeout - (Date.now() - startTime));
+  let wasStable = false;
+
+  if (remainingTimeout > stabilityMs) {
+    try {
+      wasStable = await frame.evaluate(
+        ({ stabilityMs: ms, timeout: to }) => {
+          return new Promise<boolean>((resolve) => {
+            let lastMutationTime = Date.now();
+            let checkInterval: ReturnType<typeof setInterval>;
+            let timeoutId: ReturnType<typeof setTimeout>;
+
+            const observer = new MutationObserver(() => {
+              lastMutationTime = Date.now();
+            });
+
+            // eslint-disable-next-line no-undef -- runs in browser context via frame.evaluate
+            observer.observe(document.body, {
+              childList: true,
+              subtree: true,
+              attributes: true,
+              characterData: true,
+            });
+
+            checkInterval = setInterval(() => {
+              if (Date.now() - lastMutationTime >= ms) {
+                cleanup();
+                resolve(true); // DOM was stable
+              }
+            }, ms / 2);
+
+            timeoutId = setTimeout(() => {
+              cleanup();
+              resolve(false); // Timed out without stability
+            }, to);
+
+            function cleanup() {
+              observer.disconnect();
+              clearInterval(checkInterval);
+              clearTimeout(timeoutId);
+            }
+          });
+        },
+        { stabilityMs, timeout: remainingTimeout }
+      );
+    } catch {
+      // Evaluation failed, assume stable
+      wasStable = true;
+    }
+  }
+
+  const waitedMs = Date.now() - startTime;
+  return { waitedMs, wasStable };
 }

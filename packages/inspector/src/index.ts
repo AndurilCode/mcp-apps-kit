@@ -77,6 +77,18 @@ export type {
   // Event sync types (for 1:1 widget state mirroring in dual mode)
   SyncEventType,
   SyncEventPayload,
+  // Accessibility tree types (widget_snapshot)
+  AccessibilityNode,
+  InteractiveElementSummary,
+  WidgetSnapshotInput,
+  WidgetSnapshotOutput,
+  // Semantic locator types
+  SemanticLocatorOptions,
+  WaitForStabilityOptions,
+  // Widget query types
+  WidgetQueryInput,
+  QueryElementInfo,
+  WidgetQueryOutput,
 } from "./types";
 
 // =============================================================================
@@ -134,4 +146,12 @@ export {
   createPreviewUITool,
   createScreenshotWidgetTool,
   createTestWidgetInteractionTool,
+  // Widget snapshot and query tools
+  createWidgetSnapshotTool,
+  createWidgetQueryTool,
+  // Semantic locator helpers
+  resolveLocator,
+  hasLocatorOptions,
+  describeLocatorStrategy,
+  waitForDOMStability,
 } from "./tools";

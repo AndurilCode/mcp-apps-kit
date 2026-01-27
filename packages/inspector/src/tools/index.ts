@@ -52,3 +52,18 @@ export {
 
 // Widget state tool (available in both modes for observation)
 export { createGetWidgetStateTool } from "./get-widget-state";
+
+// Widget snapshot tool (accessibility tree - compact alternative to DOM)
+export { createWidgetSnapshotTool } from "./widget-snapshot";
+
+// Widget query tool (semantic element discovery)
+export { createWidgetQueryTool } from "./widget-query";
+
+// Helper exports (for advanced usage)
+export {
+  resolveLocator,
+  hasLocatorOptions,
+  describeLocatorStrategy,
+  waitForDOMStability,
+} from "./helpers";
+export type { SemanticLocatorOptions, WaitForStabilityOptions } from "../types";
