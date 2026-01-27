@@ -120,7 +120,11 @@ export function createCallToolTool(connectionManager: ConnectionManager) {
 
             if (html) {
               // Render widget in browser
-              const uiHostManager = new UIHostManager(client);
+              // Use shared WidgetServer from ConnectionManager
+              const sharedWidgetServer = await connectionManager.getWidgetServer();
+              const uiHostManager = new UIHostManager(client, {
+                sharedWidgetServer,
+              });
               const environmentState = connectionManager.getEnvironmentState();
               const viewport = environmentState.viewport;
               const inspectorUrl = connectionManager.getInspectorUrl();
@@ -144,18 +148,30 @@ export function createCallToolTool(connectionManager: ConnectionManager) {
               const urlMatch = pageUrl.match(/\/host\/([a-f0-9-]+)/);
               const widgetSessionId = urlMatch?.[1] ?? "";
 
+              // Create touch callback to keep WidgetServer session alive
+              const widgetServerTouch = uiHostManager.createSessionTouchCallback(widgetSessionId);
+
               // Create widget session in session manager
               const sessionManager = connectionManager.getWidgetSessionManager();
+              // eslint-disable-next-line no-console
+              console.log(
+                `[call_tool] Creating session for ${input.name}, widgetSessionId: ${widgetSessionId}, hostUrl: ${pageUrl}`
+              );
               const session = await sessionManager.createSession(
                 input.name,
                 input.arguments,
                 toolResult,
                 page,
                 widgetSessionId,
-                uiResource.protocol
+                uiResource.protocol,
+                "agent", // source
+                undefined, // proxyMetadata
+                widgetServerTouch
               );
 
               sessionId = session.id;
+              // eslint-disable-next-line no-console
+              console.log(`[call_tool] Session created: ${sessionId}`);
             }
           }
         } catch (error) {

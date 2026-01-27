@@ -389,7 +389,7 @@ export function createWidgetSnapshotDiffTool(connectionManager: ConnectionManage
         const currentTree = indexTree(rawTree, { index: 0 });
 
         // Flatten both trees for comparison
-        const previousStats = flattenTree(previousSnapshot as AccessibilityNode);
+        const previousStats = flattenTree(previousSnapshot);
         const currentStats = flattenTree(currentTree);
 
         // Compute diff
