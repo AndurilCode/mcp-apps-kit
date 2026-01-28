@@ -9,6 +9,7 @@
  * - GET /dashboard/events?sessionId={id} - SSE event stream
  * - GET /dashboard/sessions - List active sessions (JSON)
  * - GET /dashboard/globals - Get current environment state (JSON)
+ * - GET /mcp/primitives - Get MCP server primitives (tools, resources, prompts)
  */
 
 import type { IncomingMessage, ServerResponse } from "http";
@@ -110,6 +111,12 @@ export async function handleDashboardRequest(
   // GET /dashboard/agent-events - SSE agent event stream (session-agnostic)
   if (pathname === "/dashboard/agent-events" && req.method === "GET") {
     startAgentEventStream(req, res, connectionManager);
+    return true;
+  }
+
+  // GET /mcp/primitives - Get MCP server primitives (tools, resources, prompts)
+  if (pathname === "/mcp/primitives" && req.method === "GET") {
+    await serveMcpPrimitives(res, connectionManager);
     return true;
   }
 
@@ -421,6 +428,53 @@ function startEventStream(
 
   req.on("close", cleanup);
   req.on("error", cleanup);
+}
+
+/**
+ * Serve MCP server primitives (tools, resources, prompts)
+ *
+ * Fetches the current primitives from the connected MCP server.
+ * Returns empty arrays if not connected or if the server doesn't support a capability.
+ */
+async function serveMcpPrimitives(
+  res: ServerResponse,
+  connectionManager: ConnectionManager
+): Promise<void> {
+  let tools: unknown[] = [];
+  let resources: unknown[] = [];
+  let prompts: unknown[] = [];
+
+  try {
+    const client = connectionManager.getClient();
+
+    // Fetch each primitive type, handling individual failures gracefully
+    try {
+      tools = await client.listTools();
+    } catch {
+      // Server doesn't support tools capability or error occurred
+    }
+
+    try {
+      resources = await client.listResources();
+    } catch {
+      // Server doesn't support resources capability or error occurred
+    }
+
+    try {
+      prompts = await client.listPrompts();
+    } catch {
+      // Server doesn't support prompts capability or error occurred
+    }
+  } catch {
+    // Not connected - return empty arrays (already initialized)
+  }
+
+  res.writeHead(200, {
+    "Content-Type": "application/json",
+    "Cache-Control": "no-cache",
+    "Access-Control-Allow-Origin": "*",
+  });
+  res.end(JSON.stringify({ tools, resources, prompts }));
 }
 
 /**

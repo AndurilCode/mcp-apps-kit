@@ -14,8 +14,10 @@ import { useAgentEventStream } from "./hooks/useAgentEventStream";
 import { useResizablePanel } from "./hooks/useResizablePanel";
 import { useGlobals } from "./hooks/useGlobals";
 import { useConnectionStatus } from "./hooks/useConnectionStatus";
+import { useMcpPrimitives } from "./hooks/useMcpPrimitives";
 import { Toolbar } from "./components/Toolbar";
 import { GlobalsPanel } from "./components/GlobalsPanel";
+import { McpPrimitivesPanel } from "./components/McpPrimitivesPanel";
 import { BottomPanel, type PanelVisibility } from "./components/BottomPanel";
 import { styles } from "./styles";
 import logoUrl from "../assets/logo.png";
@@ -63,6 +65,12 @@ export function InspectorDashboard({
 
   // Connection status state
   const { status: connectionStatus } = useConnectionStatus(baseUrl);
+
+  // MCP Primitives state
+  const { tools, resources, prompts, isLoading: primitivesLoading } = useMcpPrimitives(baseUrl);
+
+  // Left panel state (for MCP primitives when session is active)
+  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
 
   // Globals panel state (persisted)
   const [isGlobalsPanelVisible, setIsGlobalsPanelVisible] = useState(() => {
@@ -186,6 +194,9 @@ export function InspectorDashboard({
 
   const isStreaming = status === "streaming";
 
+  // Determine if UI session is active (has screencast)
+  const hasActiveSession = !!selectedSessionId && !!imageData;
+
   // Inject keyframe animation for streaming border
   const keyframeStyles = useMemo(
     () => `
@@ -286,42 +297,45 @@ export function InspectorDashboard({
 
       {/* Content Wrapper */}
       <div style={styles.contentWrapper}>
-        {/* Content Row (Main + Globals Panel) */}
+        {/* Content Row (Left Panel + Main + Globals Panel) */}
         <div style={styles.contentRow}>
+          {/* Left Panel - MCP Primitives when session active */}
+          {hasActiveSession && (
+            <McpPrimitivesPanel
+              tools={tools}
+              resources={resources}
+              prompts={prompts}
+              isLoading={primitivesLoading}
+              isVisible={true}
+              isCollapsed={isLeftPanelCollapsed}
+              onToggleCollapse={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)}
+              position="left"
+            />
+          )}
+
           {/* Main Display */}
           <main style={styles.main}>
-            <div
-              style={{
-                ...styles.displayContainer,
-                ...(isStreaming ? styles.displayContainerStreaming : {}),
-              }}
-            >
-              {imageData ? (
+            {hasActiveSession ? (
+              /* Screencast when session is active */
+              <div
+                style={{
+                  ...styles.displayContainer,
+                  ...(isStreaming ? styles.displayContainerStreaming : {}),
+                }}
+              >
                 <img src={imageData} alt="Live browser view" style={styles.streamImage} />
-              ) : (
-                <div style={styles.placeholder}>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    style={styles.placeholderIcon}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                    />
-                  </svg>
-                  <h2 style={styles.placeholderTitle}>No Active Widget Session</h2>
-                  <p style={styles.placeholderText}>
-                    Connect to an MCP server and call a tool that creates a UI session to see live
-                    browser content.
-                  </p>
-                </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              /* MCP Primitives in center when no session */
+              <McpPrimitivesPanel
+                tools={tools}
+                resources={resources}
+                prompts={prompts}
+                isLoading={primitivesLoading}
+                isVisible={true}
+                position="center"
+              />
+            )}
           </main>
 
           {/* Globals Panel */}

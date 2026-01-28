@@ -223,6 +223,12 @@ export const styles: Record<string, CSSProperties> = {
     overflow: "hidden",
   },
 
+  // Left Panel (MCP Primitives)
+  leftPanel: {
+    width: "320px",
+    flexShrink: 0,
+  },
+
   // Display Container
   displayContainer: {
     backgroundColor: "#000000",
