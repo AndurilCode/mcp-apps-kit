@@ -15,6 +15,7 @@ import type {
   WidgetDOMSnapshot,
   ToolHints,
 } from "../types";
+import { validateWidgetSession } from "./helpers";
 
 // =============================================================================
 // SCHEMAS
