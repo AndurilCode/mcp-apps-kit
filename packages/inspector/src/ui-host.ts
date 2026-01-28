@@ -8,7 +8,6 @@
 
 import type { TestClient } from "@mcp-apps-kit/testing";
 import { JSDOM } from "jsdom";
-import { MCP_WIDGET_MIME_TYPE, OPENAI_WIDGET_MIME_TYPE } from "@mcp-apps-kit/core";
 import {
   detectProtocolFromMimeType as _detectProtocolFromMimeType,
   findUIResourceForTool as findUIResourceForToolHelper,
@@ -97,15 +96,6 @@ export class UIHostManager {
       timeout: options.timeout ?? 30000,
       debug: options.debug ?? false,
     };
-  }
-
-  /**
-   * Detect protocol from MIME type
-   */
-  detectProtocol(mimeType: string): DetectedProtocol | null {
-    if (mimeType === MCP_WIDGET_MIME_TYPE) return "mcp";
-    if (mimeType === OPENAI_WIDGET_MIME_TYPE) return "openai";
-    return null;
   }
 
   /**

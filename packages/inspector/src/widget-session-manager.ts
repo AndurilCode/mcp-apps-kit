@@ -22,11 +22,15 @@
  *
  * This separation allows interactive sessions to remain available while the
  * underlying HTTP content can be efficiently cleaned up.
+ *
+ * ## Refactored Architecture
+ *
+ * Uses SessionStore for session lifecycle management, while this class
+ * handles higher-level concerns like event recording and protocol delivery.
  */
 
 import { EventEmitter } from "node:events";
 import type { Frame, Page } from "playwright";
-import type { ConsoleLogEntry } from "./tools/get-console-logs";
 import type { DetectedProtocol } from "./ui-host";
 import type {
   DomClickPayload,
@@ -41,8 +45,6 @@ import type {
   InspectorEventType,
   SyncEventPayload,
   SyncEventType,
-  TrackedDialog,
-  WidgetToolCall,
 } from "./types";
 import { isDomSyncEventType, getEventCategory } from "./types";
 import {
@@ -50,82 +52,13 @@ import {
   getPlatformFromDeviceType,
   type DisplayMode,
 } from "./types/environment-types";
-import { mapConsoleTypeToLogLevel, getLogSourceFromUrl } from "./tools/helpers";
 
-/**
- * Source endpoint that created the session
- */
-export type SessionSource = "apps" | "agent";
+// Import from session module
+import { SessionStore, setupPageListeners, deliverToolCallResponse } from "./session";
+import type { ActiveWidgetSession, SessionInfo, SessionSource, ProxyMetadata } from "./session";
 
-/**
- * Proxy metadata for sessions created via /apps/mcp proxy
- */
-export interface ProxyMetadata {
-  /** URL of the target server being proxied */
-  targetServerUrl: string;
-  /** Original tool name on target server */
-  targetToolName: string;
-}
-
-/**
- * Active widget session with persistent Playwright page
- */
-export interface ActiveWidgetSession {
-  /** Unique session ID (same as WidgetServer session ID for unified lookup) */
-  id: string;
-  /** Tool name that was called */
-  toolName: string;
-  /** Arguments passed to the tool */
-  toolArgs: Record<string, unknown>;
-  /** Result returned by the tool */
-  toolResult: unknown;
-  /** Playwright page instance */
-  page: Page;
-  /** Accumulated console logs */
-  consoleLogs: ConsoleLogEntry[];
-  /** Accumulated page errors */
-  pageErrors: string[];
-  /** Tracked dialogs (alert, confirm, prompt) that were auto-handled */
-  dialogs: TrackedDialog[];
-  /** Tool calls made by the widget (with results from /execute-tool) */
-  toolCalls: WidgetToolCall[];
-  /** When the session was created */
-  createdAt: number;
-  /** When the session was last accessed (for TTL reset) */
-  lastAccessedAt: number;
-  /** Protocol used (mcp or openai) */
-  protocol: DetectedProtocol;
-  /** Which endpoint created this session (apps = ChatGPT proxy, agent = inspector tools) */
-  source: SessionSource;
-  /** Metadata for proxy sessions (when source is 'apps') */
-  proxyMetadata?: ProxyMetadata;
-  /** Last captured accessibility tree snapshot (for widget_snapshot_diff auto-comparison) */
-  lastSnapshot?: unknown;
-  /** Timestamp when lastSnapshot was captured */
-  lastSnapshotTimestamp?: number;
-  /** Optional callback to keep external session (WidgetServer) alive when this session is touched */
-  onTouch?: () => void;
-  /** Accumulated inspector events (for dashboard events panel) */
-  events: InspectorEvent[];
-}
-
-/**
- * Session info for listing
- */
-export interface SessionInfo {
-  id: string;
-  toolName: string;
-  protocol: DetectedProtocol;
-  createdAt: number;
-  /** When the session was last accessed (for TTL tracking) */
-  lastAccessedAt: number;
-  logCount: number;
-  errorCount: number;
-  /** Count of auto-handled dialogs */
-  dialogCount: number;
-  /** Which endpoint created this session */
-  source: SessionSource;
-}
+// Re-export types for backwards compatibility
+export type { ActiveWidgetSession, SessionInfo, SessionSource, ProxyMetadata };
 
 /**
  * Options for session manager
@@ -145,19 +78,19 @@ export interface WidgetSessionManagerOptions {
  * - 'event' (InspectorEvent) - when a new event is recorded
  */
 export class WidgetSessionManager extends EventEmitter {
-  private sessions: Map<string, ActiveWidgetSession> = new Map();
-  private cleanupInterval: ReturnType<typeof setInterval> | null = null;
-  private readonly ttl: number;
+  private store: SessionStore;
   private readonly debug: boolean;
   private eventIdCounter: number = 0;
 
   constructor(options: WidgetSessionManagerOptions = {}) {
     super();
-    this.ttl = options.ttl ?? 5 * 60 * 1000; // 5 minutes default
     this.debug = options.debug ?? false;
 
-    // Start cleanup interval
-    this.startCleanupInterval();
+    // Initialize session store with same options
+    this.store = new SessionStore({
+      ttl: options.ttl,
+      debug: options.debug,
+    });
   }
 
   /**
@@ -183,8 +116,13 @@ export class WidgetSessionManager extends EventEmitter {
     source: "widget" | "host" | "server" = "server",
     protocol?: "mcp" | "openai"
   ): InspectorEvent | null {
-    const session = this.sessions.get(sessionId);
+    const session = this.store.peek(sessionId);
     if (!session) {
+      if (this.debug) {
+        console.log(
+          `[WidgetSessionManager] Dropping event ${type} - session ${sessionId} not found`
+        );
+      }
       return null;
     }
 
@@ -199,7 +137,7 @@ export class WidgetSessionManager extends EventEmitter {
       protocol: protocol ?? session.protocol,
     };
 
-    session.events.push(event);
+    this.store.recordEvent(sessionId, event);
     this.emit("event", event);
 
     if (this.debug) {
@@ -213,7 +151,7 @@ export class WidgetSessionManager extends EventEmitter {
    * Get all events for a session
    */
   getEvents(sessionId: string): InspectorEvent[] {
-    const session = this.sessions.get(sessionId);
+    const session = this.store.peek(sessionId);
     return session?.events ?? [];
   }
 
@@ -241,76 +179,41 @@ export class WidgetSessionManager extends EventEmitter {
     proxyMetadata?: ProxyMetadata,
     onTouch?: () => void
   ): Promise<ActiveWidgetSession> {
-    // Use the WidgetServer's session ID directly for unified lookup
-    // This ensures the host page and session manager use the same ID
-    const now = Date.now();
-    const session: ActiveWidgetSession = {
-      id: sessionId,
+    // Create session in store
+    const session = this.store.create({
+      sessionId,
       toolName,
       toolArgs,
       toolResult,
       page,
-      consoleLogs: [],
-      pageErrors: [],
-      dialogs: [],
-      toolCalls: [],
-      events: [],
-      createdAt: now,
-      lastAccessedAt: now,
       protocol,
       source,
       proxyMetadata,
       onTouch,
-    };
-
-    // Set up console log listener
-    page.on("console", (msg) => {
-      const location = msg.location();
-      session.consoleLogs.push({
-        level: mapConsoleTypeToLogLevel(msg.type()),
-        text: msg.text(),
-        source: getLogSourceFromUrl(location.url),
-        timestamp: Date.now(),
-        url: location.url || undefined,
-        lineNumber: location.lineNumber || undefined,
-      });
     });
 
-    // Set up page error listener
-    page.on("pageerror", (err) => {
-      session.pageErrors.push(err.message);
-      // Record as inspector event
-      this.recordEvent(sessionId, "page-error", { message: err.message }, "widget", protocol);
+    // Set up page listeners using the session-renderer module
+    setupPageListeners({
+      page,
+      sessionId,
+      protocol,
+      debug: this.debug,
+      callbacks: {
+        onConsoleLog: (log) => {
+          this.store.recordConsoleLog(sessionId, log);
+        },
+        onPageError: (error) => {
+          this.store.recordPageError(sessionId, error);
+          // Record as inspector event
+          this.recordEvent(sessionId, "page-error", { message: error }, "widget", protocol);
+        },
+        onDialog: (dialog) => {
+          this.store.recordDialog(sessionId, dialog);
+          // Record as inspector event
+          this.recordEvent(sessionId, "dialog", dialog, "widget", protocol);
+        },
+      },
     });
-
-    // Set up dialog handler to auto-accept dialogs (confirm, alert, prompt)
-    // This prevents blocking and allows widget interactions to proceed
-    page.on("dialog", async (dialog) => {
-      const dialogType = dialog.type() as "alert" | "confirm" | "prompt" | "beforeunload";
-      const trackedDialog: TrackedDialog = {
-        type: dialogType,
-        message: dialog.message(),
-        defaultValue: dialog.defaultValue() || undefined,
-        handled: "accepted",
-        timestamp: Date.now(),
-      };
-
-      session.dialogs.push(trackedDialog);
-
-      // Record as inspector event
-      this.recordEvent(sessionId, "dialog", trackedDialog, "widget", protocol);
-
-      if (this.debug) {
-        console.log(
-          `[WidgetSessionManager] Auto-accepted ${dialogType} dialog: "${dialog.message()}"`
-        );
-      }
-
-      // Accept the dialog (for confirm: returns true, for prompt: returns default value)
-      await dialog.accept(dialog.defaultValue());
-    });
-
-    this.sessions.set(sessionId, session);
 
     // Record session-created event
     this.recordEvent(
@@ -338,42 +241,21 @@ export class WidgetSessionManager extends EventEmitter {
    * Touch a session to reset its TTL (called on any interaction)
    */
   touchSession(sessionId: string): boolean {
-    const session = this.sessions.get(sessionId);
-    if (!session) return false;
-    session.lastAccessedAt = Date.now();
-    // Also touch any linked external session (e.g., WidgetServer)
-    session.onTouch?.();
-    return true;
+    return this.store.touch(sessionId);
   }
 
   /**
    * Get a session by ID
    */
   getSession(sessionId: string): ActiveWidgetSession | null {
-    const session = this.sessions.get(sessionId) ?? null;
-    if (session) {
-      session.lastAccessedAt = Date.now();
-      // Also touch any linked external session (e.g., WidgetServer)
-      session.onTouch?.();
-    }
-    return session;
+    return this.store.get(sessionId);
   }
 
   /**
    * List all active sessions
    */
   listSessions(): SessionInfo[] {
-    return Array.from(this.sessions.values()).map((session) => ({
-      id: session.id,
-      toolName: session.toolName,
-      protocol: session.protocol,
-      createdAt: session.createdAt,
-      lastAccessedAt: session.lastAccessedAt,
-      logCount: session.consoleLogs.length,
-      errorCount: session.pageErrors.length,
-      dialogCount: session.dialogs.length,
-      source: session.source,
-    }));
+    return this.store.list();
   }
 
   /**
@@ -392,7 +274,7 @@ export class WidgetSessionManager extends EventEmitter {
     result: unknown,
     isError: boolean = false
   ): boolean {
-    const session = this.sessions.get(sessionId);
+    const session = this.store.peek(sessionId);
     if (!session) {
       if (this.debug) {
         console.log(`[WidgetSessionManager] Session not found: ${sessionId}`);
@@ -402,7 +284,7 @@ export class WidgetSessionManager extends EventEmitter {
 
     const timestamp = Date.now();
 
-    session.toolCalls.push({
+    this.store.recordToolCall(sessionId, {
       name: toolName,
       args,
       result,
@@ -429,9 +311,6 @@ export class WidgetSessionManager extends EventEmitter {
       session.protocol
     );
 
-    // Touch session to reset TTL
-    session.lastAccessedAt = Date.now();
-
     if (this.debug) {
       console.log(`[WidgetSessionManager] Recorded tool call ${toolName} for session ${sessionId}`);
     }
@@ -443,15 +322,7 @@ export class WidgetSessionManager extends EventEmitter {
    * Update the session's tool result (for refresh scenarios)
    */
   updateToolResult(sessionId: string, toolResult: unknown): boolean {
-    const session = this.sessions.get(sessionId);
-    if (!session) {
-      return false;
-    }
-
-    session.toolResult = toolResult;
-    // Touch session to reset TTL
-    session.lastAccessedAt = Date.now();
-    return true;
+    return this.store.updateToolResult(sessionId, toolResult);
   }
 
   /**
@@ -462,7 +333,7 @@ export class WidgetSessionManager extends EventEmitter {
     sessionId: string,
     environmentState: EnvironmentState
   ): Promise<boolean> {
-    const session = this.sessions.get(sessionId);
+    const session = this.store.peek(sessionId);
     if (!session) {
       return false;
     }
@@ -515,7 +386,7 @@ export class WidgetSessionManager extends EventEmitter {
         };
 
         /* eslint-disable no-undef */
-        await page.evaluate((ctx) => {
+        await page.evaluate((ctx: typeof hostContext) => {
           const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
           if (iframe?.contentWindow) {
             // Use the correct MCP Apps protocol method name
@@ -553,7 +424,7 @@ export class WidgetSessionManager extends EventEmitter {
         };
 
         /* eslint-disable no-undef */
-        await page.evaluate((message) => {
+        await page.evaluate((message: typeof syncMessage) => {
           const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
           if (iframe?.contentWindow) {
             iframe.contentWindow.postMessage(message, "*");
@@ -568,7 +439,7 @@ export class WidgetSessionManager extends EventEmitter {
       this.recordEvent(sessionId, "globals", environmentState, "host", session.protocol);
 
       // Touch session to reset TTL
-      session.lastAccessedAt = Date.now();
+      this.store.touch(sessionId);
 
       if (this.debug) {
         console.log(`[WidgetSessionManager] Updated globals for session ${sessionId}`);
@@ -591,7 +462,7 @@ export class WidgetSessionManager extends EventEmitter {
    */
   async updateAllSessionGlobals(environmentState: EnvironmentState): Promise<number> {
     let updated = 0;
-    for (const sessionId of this.sessions.keys()) {
+    for (const sessionId of this.store.keys()) {
       const success = await this.updateSessionGlobals(sessionId, environmentState);
       if (success) {
         updated++;
@@ -621,9 +492,9 @@ export class WidgetSessionManager extends EventEmitter {
       this.recordEvent(sessionId, eventType, data, eventSource, protocol);
     } else {
       // Broadcast event to all matching sessions
-      for (const [id, session] of this.sessions) {
+      for (const session of this.store.values()) {
         if (session.protocol === protocol) {
-          this.recordEvent(id, eventType, data, eventSource, protocol);
+          this.recordEvent(session.id, eventType, data, eventSource, protocol);
         }
       }
     }
@@ -637,23 +508,23 @@ export class WidgetSessionManager extends EventEmitter {
 
     // If sessionId specified, sync to that session only
     if (sessionId) {
-      const session = this.sessions.get(sessionId);
+      const session = this.store.peek(sessionId);
       if (session && !session.page.isClosed()) {
         await this.deliverEvent(session, type, data, protocol);
         // Touch session to reset TTL
-        session.lastAccessedAt = Date.now();
+        this.store.touch(sessionId);
       }
       return;
     }
 
     // Broadcast to all sessions matching protocol
     const promises: Promise<void>[] = [];
-    for (const [, session] of this.sessions) {
+    for (const session of this.store.values()) {
       if (session.protocol === protocol && !session.page.isClosed()) {
         promises.push(
           this.deliverEvent(session, type, data, protocol).then(() => {
             // Touch session to reset TTL
-            session.lastAccessedAt = Date.now();
+            this.store.touch(session.id);
           })
         );
       }
@@ -738,7 +609,7 @@ export class WidgetSessionManager extends EventEmitter {
 
     // Handle call-tool-response specially - deliver to host page to resolve pending calls
     if (type === "call-tool-response") {
-      await this.deliverToolCallResponse(session, data);
+      await deliverToolCallResponse({ page: session.page, data, debug: this.debug });
       return;
     }
 
@@ -772,7 +643,15 @@ export class WidgetSessionManager extends EventEmitter {
     // This ensures event.source === window.parent in the widget
     /* eslint-disable no-undef */
     await session.page.evaluate(
-      ({ method: m, params: p, storeOnHost }) => {
+      ({
+        method: m,
+        params: p,
+        storeOnHost,
+      }: {
+        method: string;
+        params: unknown;
+        storeOnHost: boolean;
+      }) => {
         // Store host context updates for ui/initialize response
         if (storeOnHost) {
           const w = window as Window & { __mcpHostContextUpdates?: Record<string, unknown> };
@@ -824,7 +703,7 @@ export class WidgetSessionManager extends EventEmitter {
     // Execute on the HOST page, sending message TO the iframe
     // This ensures event.source === window.parent in the widget
     /* eslint-disable no-undef */
-    await session.page.evaluate((message) => {
+    await session.page.evaluate((message: typeof syncMessage) => {
       const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
       if (iframe?.contentWindow) {
         iframe.contentWindow.postMessage(message, "*");
@@ -832,60 +711,6 @@ export class WidgetSessionManager extends EventEmitter {
         console.log("[OpenAI Host] Sent synced event:", message.syncType, message.data);
       }
     }, syncMessage);
-    /* eslint-enable no-undef */
-  }
-
-  /**
-   * Deliver tool call response to host page (for dual mode)
-   *
-   * In dual mode, the Playwright mirror widget queues tool calls and waits
-   * for synced responses from the external widget. This method delivers
-   * those responses to resolve the pending calls.
-   */
-  private async deliverToolCallResponse(
-    session: ActiveWidgetSession,
-    data: unknown
-  ): Promise<void> {
-    /* eslint-disable no-undef */
-    await session.page.evaluate((responseData) => {
-      const d = responseData as { name?: string; result?: unknown; toolName?: string };
-      const toolName = d.name ?? d.toolName;
-
-      if (!toolName) {
-        // eslint-disable-next-line no-console
-        console.log("[MCP Host] Tool response missing name, cannot match:", responseData);
-        return;
-      }
-
-      type PendingCall = { messageId: number | string; args: unknown; timestamp: number };
-      const w = window as Window & { __pendingToolCalls?: Record<string, PendingCall[]> };
-      const pending = w.__pendingToolCalls?.[toolName];
-
-      if (!pending || pending.length === 0) {
-        // eslint-disable-next-line no-console
-        console.log("[MCP Host] No pending calls for tool:", toolName);
-        return;
-      }
-
-      // Get the oldest pending call (FIFO)
-      const call = pending.shift();
-      if (!call) return;
-
-      // Send response to widget iframe
-      const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
-      if (iframe?.contentWindow) {
-        iframe.contentWindow.postMessage(
-          {
-            jsonrpc: "2.0",
-            id: call.messageId,
-            result: d.result ?? { content: [{ type: "text", text: JSON.stringify(d) }] },
-          },
-          "*"
-        );
-        // eslint-disable-next-line no-console
-        console.log("[MCP Host] Delivered synced tool response:", toolName, call.messageId);
-      }
-    }, data);
     /* eslint-enable no-undef */
   }
 
@@ -905,8 +730,8 @@ export class WidgetSessionManager extends EventEmitter {
     sessionId?: string
   ): Promise<void> {
     const sessions = sessionId
-      ? [this.sessions.get(sessionId)].filter((s): s is ActiveWidgetSession => !!s)
-      : Array.from(this.sessions.values());
+      ? [this.store.peek(sessionId)].filter((s): s is ActiveWidgetSession => !!s)
+      : Array.from(this.store.values());
 
     for (const session of sessions) {
       if (session.page.isClosed()) continue;
@@ -922,7 +747,7 @@ export class WidgetSessionManager extends EventEmitter {
 
       try {
         await this.applyDomEventToFrame(frame, type, data);
-        session.lastAccessedAt = Date.now();
+        this.store.touch(session.id);
         if (this.debug) {
           console.log(`[WidgetSessionManager] Applied ${type} to session ${session.id}`);
         }
@@ -1068,7 +893,7 @@ export class WidgetSessionManager extends EventEmitter {
    * @returns The Playwright page or null if not available
    */
   getPageForStreaming(sessionId: string): Page | null {
-    const session = this.sessions.get(sessionId);
+    const session = this.store.peek(sessionId);
     if (!session) return null;
     if (session.page.isClosed()) return null;
     return session.page;
@@ -1078,7 +903,7 @@ export class WidgetSessionManager extends EventEmitter {
    * Close a specific session
    */
   async closeSession(sessionId: string): Promise<boolean> {
-    const session = this.sessions.get(sessionId);
+    const session = this.store.peek(sessionId);
     if (!session) {
       return false;
     }
@@ -1092,36 +917,31 @@ export class WidgetSessionManager extends EventEmitter {
       session.protocol
     );
 
-    try {
-      // Close the Playwright page
-      if (!session.page.isClosed()) {
-        await session.page.close();
-      }
-    } catch (error) {
-      if (this.debug) {
-        console.warn(`[WidgetSessionManager] Error closing page for session ${sessionId}:`, error);
-      }
-    }
+    const result = await this.store.close(sessionId);
 
-    this.sessions.delete(sessionId);
-
-    if (this.debug) {
+    if (this.debug && result) {
       console.log(`[WidgetSessionManager] Closed session ${sessionId}`);
     }
 
-    return true;
+    return result;
   }
 
   /**
    * Close all active sessions
    */
   async closeAllSessions(): Promise<number> {
-    const count = this.sessions.size;
-    const sessionIds = Array.from(this.sessions.keys());
-
-    for (const sessionId of sessionIds) {
-      await this.closeSession(sessionId);
+    // Record events before closing
+    for (const session of this.store.values()) {
+      this.recordEvent(
+        session.id,
+        "session-closed",
+        { toolName: session.toolName },
+        "server",
+        session.protocol
+      );
     }
+
+    const count = await this.store.closeAll();
 
     if (this.debug) {
       console.log(`[WidgetSessionManager] Closed ${count} session(s)`);
@@ -1131,49 +951,21 @@ export class WidgetSessionManager extends EventEmitter {
   }
 
   /**
-   * Clean up stale sessions (TTL expired based on last access time)
-   */
-  private async cleanupStaleSessions(): Promise<void> {
-    const now = Date.now();
-    const staleSessionIds: string[] = [];
-
-    for (const [id, session] of this.sessions.entries()) {
-      if (now - session.lastAccessedAt > this.ttl) {
-        staleSessionIds.push(id);
-      }
-    }
-
-    for (const id of staleSessionIds) {
-      if (this.debug) {
-        console.log(`[WidgetSessionManager] Cleaning up stale session ${id}`);
-      }
-      await this.closeSession(id);
-    }
-  }
-
-  /**
-   * Start the cleanup interval
-   */
-  private startCleanupInterval(): void {
-    // Run cleanup every minute
-    this.cleanupInterval = setInterval(() => {
-      void this.cleanupStaleSessions();
-    }, 60 * 1000);
-  }
-
-  /**
    * Stop the cleanup interval and close all sessions
    */
   async dispose(): Promise<void> {
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
-      this.cleanupInterval = null;
-    }
-
-    await this.closeAllSessions();
+    await this.store.dispose();
 
     if (this.debug) {
       console.log(`[WidgetSessionManager] Disposed`);
     }
+  }
+
+  /**
+   * Inject a session directly (for testing only)
+   * @internal
+   */
+  _injectSession(sessionId: string, session: ActiveWidgetSession): void {
+    this.store.set(sessionId, session);
   }
 }

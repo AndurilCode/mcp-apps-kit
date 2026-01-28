@@ -91,9 +91,21 @@ export const testWidgetInteractionOutputSchema = z.object({
   errors: z.array(z.string()),
 });
 
+/**
+ * @deprecated Use individual widget tools instead: widget_click, widget_fill, widget_drag, widget_snapshot.
+ * This tool will be removed in a future version.
+ *
+ * Migration guide:
+ * - For clicking: use widget_click with semantic locators
+ * - For typing: use widget_fill with label/placeholder locators
+ * - For dragging: use widget_drag with source/target selectors
+ * - For snapshots: use widget_snapshot (returns accessibility tree)
+ * - For assertions: use widget_snapshot_diff to compare states
+ */
 export function createTestWidgetInteractionTool(connectionManager: ConnectionManager) {
   return defineTool({
     description:
+      "[DEPRECATED - Use widget_click, widget_fill, widget_drag, widget_snapshot instead] " +
       "Test widget interactions by performing a sequence of actions (click, type, hover, wait) and capturing DOM snapshots. Can use an existing session. Returns snapshots after snapshot actions, plus any tool calls and state changes made by the widget.",
     input: testWidgetInteractionInputSchema,
     output: testWidgetInteractionOutputSchema,

@@ -9,7 +9,7 @@ import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
 import type { ConnectionManager } from "../connection";
 import type { WidgetQueryOutput, QueryElementInfo, ToolHints } from "../types";
-import { hasLocatorOptions, describeLocatorStrategy } from "./helpers";
+import { hasLocatorOptions, describeLocatorStrategy, validateWidgetSession } from "./helpers";
 
 // =============================================================================
 // SCHEMAS
@@ -88,27 +88,11 @@ export function createWidgetQueryTool(connectionManager: ConnectionManager) {
     output: widgetQueryOutputSchema,
     handler: async (input): Promise<WidgetQueryOutput> => {
       const sessionManager = connectionManager.getWidgetSessionManager();
-      const session = sessionManager.getSession(input.sessionId);
-
-      if (!session) {
-        return {
-          success: false,
-          error: `Session not found: ${input.sessionId}`,
-          hints: {
-            next: "Create a new session with preview_ui or call_tool(renderWidget=true)",
-          },
-        };
+      const validation = validateWidgetSession(sessionManager, input.sessionId);
+      if (!validation.success) {
+        return { success: false, error: validation.error, hints: validation.hints };
       }
-
-      if (session.page.isClosed()) {
-        return {
-          success: false,
-          error: "Page closed",
-          hints: {
-            next: "Create a new session with preview_ui or call_tool(renderWidget=true)",
-          },
-        };
-      }
+      const { frame } = validation;
 
       // Validate that at least one locator option is provided
       if (!hasLocatorOptions(input)) {
@@ -123,19 +107,6 @@ export function createWidgetQueryTool(connectionManager: ConnectionManager) {
       }
 
       try {
-        // Target the widget iframe
-        const frame = session.page.frame({ url: /\/widget\// });
-        if (!frame) {
-          return {
-            success: false,
-            error: "Widget iframe not found",
-            hints: {
-              next: "Wait for widget to load, or verify session is valid",
-              warning: "Widget may still be loading",
-            },
-          };
-        }
-
         // Resolve the locator using semantic options
         // Note: resolveLocator returns .first(), but we need to count all matches
         // So we rebuild the base locator without .first()
