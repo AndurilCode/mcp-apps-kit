@@ -335,8 +335,8 @@ describe("WidgetSessionManager", () => {
 
       const originalLastAccess = session.lastAccessedAt;
 
-      // Advance time
-      vi.advanceTimersByTime(1000);
+      // Advance system time (vi.advanceTimersByTime doesn't affect Date.now)
+      vi.setSystemTime(Date.now() + 1000);
 
       manager.recordToolCall(session.id, "some_tool", { arg: 1 }, { result: "ok" }, false);
 

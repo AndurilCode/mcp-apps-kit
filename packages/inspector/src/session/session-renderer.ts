@@ -1,159 +1,20 @@
 /**
  * Session Renderer
  *
- * Handles Playwright page setup, rendering, and listener configuration for widget sessions.
- * Extracts the page initialization and rendering logic from WidgetSessionManager and UIHost.
+ * Handles Playwright page setup and listener configuration for widget sessions.
+ * Extracts the page initialization logic from WidgetSessionManager.
  */
 
-import type { BrowserContext, Page, Frame } from "playwright";
+import type { Page } from "playwright";
 import type { DetectedProtocol } from "../ui-host";
 import type { TrackedDialog, EnvironmentState } from "../types";
 import type { ConsoleLogEntry } from "../tools/get-console-logs";
-import type { WidgetProtocol } from "./widget-session";
 import { mapConsoleTypeToLogLevel, getLogSourceFromUrl } from "../tools/helpers";
 import {
   getDisplayModeSizing,
   getPlatformFromDeviceType,
   type DisplayMode,
 } from "../types/environment-types";
-
-// ===========================================================================
-// SESSION RENDERER CLASS
-// ===========================================================================
-
-/**
- * Options for rendering a widget page
- */
-export interface RenderOptions {
-  /** Protocol used (mcp or openai) */
-  protocol: WidgetProtocol;
-  /** URL of the host page to navigate to */
-  hostUrl: string;
-  /** Viewport dimensions */
-  viewport?: { width: number; height: number };
-  /** Wait for widget to initialize (ms) */
-  initWaitMs?: number;
-  /** Enable debug logging */
-  debug?: boolean;
-}
-
-/**
- * Result of rendering a widget page
- */
-export interface RenderResult {
-  /** Playwright page instance */
-  page: Page;
-  /** Widget frame (iframe containing the widget) */
-  frame: Frame | null;
-  /** Errors captured during rendering */
-  errors: string[];
-}
-
-/**
- * Session Renderer
- *
- * Renders widget pages in a Playwright browser context.
- * Handles page creation, navigation, viewport setup, and frame detection.
- */
-export class SessionRenderer {
-  constructor(private context: BrowserContext) {}
-
-  /**
-   * Render a widget page
-   *
-   * Creates a new page, navigates to the host URL, sets up the viewport,
-   * waits for initialization, and locates the widget frame.
-   *
-   * @param options - Rendering options
-   * @returns RenderResult with page, frame, and any errors
-   */
-  async render(options: RenderOptions): Promise<RenderResult> {
-    const { protocol, hostUrl, viewport, initWaitMs = 500, debug } = options;
-    const errors: string[] = [];
-
-    // Create a new page in the context
-    const page = await this.context.newPage();
-
-    // Set viewport dimensions
-    const effectiveViewport = viewport ?? { width: 800, height: 600 };
-    await page.setViewportSize(effectiveViewport);
-
-    // Capture console errors
-    page.on("pageerror", (err) => {
-      errors.push(err.message);
-    });
-    page.on("console", (msg) => {
-      if (msg.type() === "error") {
-        errors.push(msg.text());
-      }
-    });
-
-    if (debug) {
-      console.log(`[SessionRenderer] Navigating to ${hostUrl}`);
-    }
-
-    // Navigate to the host page (which embeds the widget in an iframe)
-    await page.goto(hostUrl, { waitUntil: "networkidle" });
-
-    // Wait for widget to initialize and receive tool result via postMessage
-    // The widget needs time to: load iframe -> execute JS -> init client -> send init -> receive response + tool/result -> re-render
-    await page.waitForTimeout(initWaitMs);
-
-    // Find the widget frame
-    const frame = await this.findWidgetFrame(page, protocol);
-
-    if (debug) {
-      console.log(`[SessionRenderer] Rendered page, frame found: ${frame !== null}`);
-    }
-
-    return { page, frame, errors };
-  }
-
-  /**
-   * Find the widget frame within a page
-   *
-   * Tries multiple strategies to locate the widget iframe:
-   * 1. By name: "widget-frame"
-   * 2. By URL pattern: /\/widget\//
-   *
-   * @param page - Playwright page instance
-   * @param protocol - Protocol being used (mcp or openai)
-   * @returns The widget Frame or null if not found
-   */
-  async findWidgetFrame(page: Page, protocol: WidgetProtocol): Promise<Frame | null> {
-    // Strategy 1: Find by frame name (most reliable for our host pages)
-    let frame = page.frame({ name: "widget-frame" });
-    if (frame) {
-      return frame;
-    }
-
-    // Strategy 2: Find by URL pattern (fallback)
-    frame = page.frame({ url: /\/widget\// });
-    if (frame) {
-      return frame;
-    }
-
-    // Strategy 3: Wait briefly for iframe to appear (dynamic loading)
-    try {
-      await page.waitForSelector("iframe#widget-frame", { timeout: 2000 });
-      frame = page.frame({ name: "widget-frame" });
-      if (frame) {
-        return frame;
-      }
-    } catch {
-      // Timeout waiting for iframe, continue to return null
-    }
-
-    return null;
-  }
-
-  /**
-   * Get the BrowserContext used by this renderer
-   */
-  getContext(): BrowserContext {
-    return this.context;
-  }
-}
 
 /**
  * Callbacks for session events
@@ -287,7 +148,8 @@ export async function updateSessionGlobals(options: UpdateGlobalsOptions): Promi
     if (protocol === "mcp") {
       await updateMcpGlobals(page, environmentState, viewport);
     } else {
-      await updateOpenAIGlobals(page, environmentState, viewport, modeSizing.maxHeight);
+      const maxHeight: number = modeSizing.maxHeight ?? 600;
+      await updateOpenAIGlobals(page, environmentState, viewport, maxHeight);
     }
 
     return true;
@@ -324,7 +186,7 @@ async function updateMcpGlobals(
   };
 
   /* eslint-disable no-undef */
-  await page.evaluate((ctx) => {
+  await page.evaluate((ctx: typeof hostContext) => {
     const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
     if (iframe?.contentWindow) {
       const message = {
@@ -369,7 +231,7 @@ async function updateOpenAIGlobals(
   };
 
   /* eslint-disable no-undef */
-  await page.evaluate((message) => {
+  await page.evaluate((message: typeof syncMessage) => {
     const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
     if (iframe?.contentWindow) {
       iframe.contentWindow.postMessage(message, "*");
@@ -402,7 +264,7 @@ export async function deliverToolCallResponse(options: DeliverToolResponseOption
   const { page, data } = options;
 
   /* eslint-disable no-undef */
-  await page.evaluate((responseData) => {
+  await page.evaluate((responseData: unknown) => {
     const d = responseData as { name?: string; result?: unknown; toolName?: string };
     const toolName = d.name ?? d.toolName;
 

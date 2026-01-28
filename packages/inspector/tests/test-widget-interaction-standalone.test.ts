@@ -562,7 +562,7 @@ describe("test_widget_interaction Standalone Mode", () => {
       };
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (sessionManager as any).sessions.set("test-session-id", mockSession);
+      (sessionManager as any).store.sessions.set("test-session-id", mockSession);
 
       const tool = createTestWidgetInteractionTool(manager);
       const result = await tool.handler(
@@ -600,7 +600,7 @@ describe("test_widget_interaction Standalone Mode", () => {
       };
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (sessionManager as any).sessions.set("no-frame-session", mockSession);
+      (sessionManager as any).store.sessions.set("no-frame-session", mockSession);
 
       const tool = createTestWidgetInteractionTool(manager);
       const result = await tool.handler(
