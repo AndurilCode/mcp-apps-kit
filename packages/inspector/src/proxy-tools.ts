@@ -172,6 +172,7 @@ export function registerProxyToolsDirectly(
                   uiResource.protocol,
                   toolResult,
                   toolInfo.name,
+                  args,
                   environmentState,
                   viewport,
                   externalHostContext ?? undefined,

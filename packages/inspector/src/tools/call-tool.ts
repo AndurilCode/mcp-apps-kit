@@ -134,6 +134,7 @@ export function createCallToolTool(connectionManager: ConnectionManager) {
                 uiResource.protocol,
                 toolResult,
                 input.name,
+                input.arguments,
                 environmentState,
                 viewport,
                 undefined, // externalHostContext

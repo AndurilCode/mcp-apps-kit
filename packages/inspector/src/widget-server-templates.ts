@@ -33,6 +33,8 @@ export interface McpHostContext {
   toolResultJson: string;
   /** JSON-serialized tool name */
   toolNameJson: string;
+  /** JSON-serialized tool arguments (input) */
+  toolArgsJson: string;
   /** Theme from hostContext or environment */
   theme: string;
   /** Display mode */
@@ -262,7 +264,7 @@ export function generateDomEventListenersScript(
  * - Records DOM events for interaction capture
  */
 export function generateMcpHostPage(ctx: McpHostContext): string {
-  const { session, widgetUrl, toolResultJson, toolNameJson } = ctx;
+  const { session, widgetUrl, toolResultJson, toolNameJson, toolArgsJson } = ctx;
   const { theme, displayMode, locale, timeZone, platform, externalHostContextJson } = ctx;
   const env = session.environmentState;
 
@@ -280,6 +282,7 @@ export function generateMcpHostPage(ctx: McpHostContext): string {
     (function() {
       const toolResult = ${toolResultJson};
       const toolName = ${toolNameJson};
+      const toolArgs = ${toolArgsJson};
       const sessionId = '${session.id}';
       const inspectorUrl = ${JSON.stringify(session.inspectorUrl ?? null)};
       const isDualMode = ${JSON.stringify(session.isDualMode ?? false)};
@@ -358,6 +361,23 @@ ${generateDomEventListenersScript()}
           };
           iframe.contentWindow.postMessage(response, '*');
           console.log('[MCP Host] Sent ui/initialize response');
+
+          // Send tool input first (the arguments passed to the tool)
+          // Method: 'ui/notifications/tool-input', params: { arguments: {...} }
+          setTimeout(function() {
+            const inputMessage = {
+              jsonrpc: '2.0',
+              method: 'ui/notifications/tool-input',
+              params: {
+                arguments: toolArgs,
+              },
+            };
+            iframe.contentWindow.postMessage(inputMessage, '*');
+            console.log('[MCP Host] Sent ui/notifications/tool-input');
+
+            // Record tool-input event
+            recordEvent('tool-input', { toolName: toolName, args: toolArgs }, 'host');
+          }, 25);
 
           // Send tool result after a short delay
           // Method: 'ui/notifications/tool-result', params: CallToolResult (not wrapped in 'result')

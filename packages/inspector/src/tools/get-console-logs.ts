@@ -249,6 +249,7 @@ export function createGetConsoleLogsTool(connectionManager: ConnectionManager) {
           protocol,
           toolResult,
           input.tool,
+          input.arguments ?? {},
           environmentState,
           viewport,
           undefined, // externalHostContext
