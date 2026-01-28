@@ -15,7 +15,7 @@ import type {
   WidgetDOMSnapshot,
   ToolHints,
 } from "../types";
-import { validateWidgetSession } from "./helpers";
+// validateWidgetSession helper is available in ./helpers for session validation refactoring
 
 // =============================================================================
 // SCHEMAS
