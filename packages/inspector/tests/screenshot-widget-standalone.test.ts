@@ -359,7 +359,7 @@ describe("screenshot_widget Standalone Mode", () => {
 
       // Access private sessions map through reflection
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (sessionManager as any).sessions.set("test-session-id", mockSession);
+      (sessionManager as any).store.sessions.set("test-session-id", mockSession);
 
       const tool = createScreenshotWidgetTool(manager);
       const result = await tool.handler({ sessionId: "test-session-id" }, {} as never);
@@ -396,7 +396,7 @@ describe("screenshot_widget Standalone Mode", () => {
       };
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (sessionManager as any).sessions.set("failing-session", mockSession);
+      (sessionManager as any).store.sessions.set("failing-session", mockSession);
 
       const tool = createScreenshotWidgetTool(manager);
       const result = await tool.handler({ sessionId: "failing-session" }, {} as never);

@@ -304,9 +304,9 @@ describe("get_console_logs Standalone Mode", () => {
         lastAccessedAt: Date.now(),
       };
 
-      // Access private sessions map through reflection
+      // Access private sessions map through store reflection
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (sessionManager as any).sessions.set("test-session-id", mockSession);
+      (sessionManager as any).store.sessions.set("test-session-id", mockSession);
 
       const tool = createGetConsoleLogsTool(manager);
       const result = await tool.handler({ sessionId: "test-session-id" }, {} as never);
