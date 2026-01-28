@@ -99,6 +99,13 @@ export class UIHostManager {
   }
 
   /**
+   * Detect protocol from MIME type
+   */
+  detectProtocol(mimeType: string): DetectedProtocol | null {
+    return _detectProtocolFromMimeType(mimeType);
+  }
+
+  /**
    * Find UI resource for a tool by name
    *
    * Delegates to the shared helper which supports 4 URI patterns:
