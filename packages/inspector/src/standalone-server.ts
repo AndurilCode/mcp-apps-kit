@@ -321,6 +321,60 @@ export function createStandaloneInspectorServer(
       return;
     }
 
+    // Record event endpoint - for host pages to report lifecycle and DOM events
+    if (url === "/record-event") {
+      // Handle CORS for cross-origin widget requests
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+      if (req.method === "OPTIONS") {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+
+      if (req.method === "POST") {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) {
+          chunks.push(chunk as Buffer);
+        }
+        const bodyData = Buffer.concat(chunks);
+
+        try {
+          const { sessionId, type, payload, source, protocol } = JSON.parse(
+            bodyData.toString("utf-8")
+          ) as {
+            sessionId: string;
+            type: string;
+            payload: unknown;
+            source?: "widget" | "host" | "server";
+            protocol?: "mcp" | "openai";
+          };
+
+          const sessionManager = connectionManager.getWidgetSessionManager();
+          sessionManager.recordEvent(
+            sessionId,
+            type as import("./types").InspectorEventType,
+            payload,
+            source ?? "host",
+            protocol
+          );
+
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true }));
+        } catch {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Invalid payload" }));
+        }
+        return;
+      }
+
+      res.writeHead(405, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Method not allowed" }));
+      return;
+    }
+
     // Route MCP requests to the app
     if (url.startsWith("/mcp")) {
       // Convert to Web Request

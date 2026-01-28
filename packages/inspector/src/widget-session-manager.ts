@@ -24,6 +24,7 @@
  * underlying HTTP content can be efficiently cleaned up.
  */
 
+import { EventEmitter } from "node:events";
 import type { Frame, Page } from "playwright";
 import type { ConsoleLogEntry } from "./tools/get-console-logs";
 import type { DetectedProtocol } from "./ui-host";
@@ -36,12 +37,14 @@ import type {
   DomScrollPayload,
   DomSelectPayload,
   EnvironmentState,
+  InspectorEvent,
+  InspectorEventType,
   SyncEventPayload,
   SyncEventType,
   TrackedDialog,
   WidgetToolCall,
 } from "./types";
-import { isDomSyncEventType } from "./types";
+import { isDomSyncEventType, getEventCategory } from "./types";
 import { mapConsoleTypeToLogLevel, getLogSourceFromUrl } from "./tools/helpers";
 
 /**
@@ -97,6 +100,8 @@ export interface ActiveWidgetSession {
   lastSnapshotTimestamp?: number;
   /** Optional callback to keep external session (WidgetServer) alive when this session is touched */
   onTouch?: () => void;
+  /** Accumulated inspector events (for dashboard events panel) */
+  events: InspectorEvent[];
 }
 
 /**
@@ -129,19 +134,82 @@ export interface WidgetSessionManagerOptions {
 
 /**
  * Manages active widget rendering sessions
+ *
+ * Extends EventEmitter to allow real-time event streaming to the dashboard.
+ * Emits:
+ * - 'event' (InspectorEvent) - when a new event is recorded
  */
-export class WidgetSessionManager {
+export class WidgetSessionManager extends EventEmitter {
   private sessions: Map<string, ActiveWidgetSession> = new Map();
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
   private readonly ttl: number;
   private readonly debug: boolean;
+  private eventIdCounter: number = 0;
 
   constructor(options: WidgetSessionManagerOptions = {}) {
+    super();
     this.ttl = options.ttl ?? 5 * 60 * 1000; // 5 minutes default
     this.debug = options.debug ?? false;
 
     // Start cleanup interval
     this.startCleanupInterval();
+  }
+
+  /**
+   * Generate a unique event ID
+   */
+  private generateEventId(): string {
+    return `evt-${Date.now()}-${++this.eventIdCounter}`;
+  }
+
+  /**
+   * Record an event for a session
+   *
+   * @param sessionId - Session ID
+   * @param type - Event type
+   * @param payload - Event payload
+   * @param source - Event source
+   * @param protocol - Protocol used
+   */
+  recordEvent(
+    sessionId: string,
+    type: InspectorEventType,
+    payload: unknown,
+    source: "widget" | "host" | "server" = "server",
+    protocol?: "mcp" | "openai"
+  ): InspectorEvent | null {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return null;
+    }
+
+    const event: InspectorEvent = {
+      id: this.generateEventId(),
+      category: getEventCategory(type),
+      type,
+      timestamp: Date.now(),
+      sessionId,
+      payload,
+      source,
+      protocol: protocol ?? session.protocol,
+    };
+
+    session.events.push(event);
+    this.emit("event", event);
+
+    if (this.debug) {
+      console.log(`[WidgetSessionManager] Recorded event ${type} for session ${sessionId}`);
+    }
+
+    return event;
+  }
+
+  /**
+   * Get all events for a session
+   */
+  getEvents(sessionId: string): InspectorEvent[] {
+    const session = this.sessions.get(sessionId);
+    return session?.events ?? [];
   }
 
   /**
@@ -181,6 +249,7 @@ export class WidgetSessionManager {
       pageErrors: [],
       dialogs: [],
       toolCalls: [],
+      events: [],
       createdAt: now,
       lastAccessedAt: now,
       protocol,
@@ -205,6 +274,8 @@ export class WidgetSessionManager {
     // Set up page error listener
     page.on("pageerror", (err) => {
       session.pageErrors.push(err.message);
+      // Record as inspector event
+      this.recordEvent(sessionId, "page-error", { message: err.message }, "widget", protocol);
     });
 
     // Set up dialog handler to auto-accept dialogs (confirm, alert, prompt)
@@ -221,6 +292,9 @@ export class WidgetSessionManager {
 
       session.dialogs.push(trackedDialog);
 
+      // Record as inspector event
+      this.recordEvent(sessionId, "dialog", trackedDialog, "widget", protocol);
+
       if (this.debug) {
         console.log(
           `[WidgetSessionManager] Auto-accepted ${dialogType} dialog: "${dialog.message()}"`
@@ -232,6 +306,21 @@ export class WidgetSessionManager {
     });
 
     this.sessions.set(sessionId, session);
+
+    // Record session-created event
+    this.recordEvent(
+      sessionId,
+      "session-created",
+      { toolName, toolArgs, protocol, source },
+      "server",
+      protocol
+    );
+
+    // Record initialize event (widget lifecycle)
+    this.recordEvent(sessionId, "initialize", { toolName }, "widget", protocol);
+
+    // Record initial tool-result event (the result passed when creating the session)
+    this.recordEvent(sessionId, "tool-result", { toolName, result: toolResult }, "host", protocol);
 
     if (this.debug) {
       console.log(`[WidgetSessionManager] Created session ${sessionId} for tool ${toolName}`);
@@ -306,13 +395,34 @@ export class WidgetSessionManager {
       return false;
     }
 
+    const timestamp = Date.now();
+
     session.toolCalls.push({
       name: toolName,
       args,
       result,
       isError,
-      timestamp: Date.now(),
+      timestamp,
     });
+
+    // Record inspector events for the dashboard events panel
+    // Record call-tool event (input)
+    this.recordEvent(
+      sessionId,
+      "call-tool",
+      { name: toolName, arguments: args },
+      "widget",
+      session.protocol
+    );
+
+    // Record call-tool-response event (output)
+    this.recordEvent(
+      sessionId,
+      "call-tool-response",
+      { name: toolName, result, isError },
+      "server",
+      session.protocol
+    );
 
     // Touch session to reset TTL
     session.lastAccessedAt = Date.now();
@@ -422,6 +532,9 @@ export class WidgetSessionManager {
         /* eslint-enable no-undef */
       }
 
+      // Record globals event for the dashboard events panel
+      this.recordEvent(sessionId, "globals", environmentState, "host", session.protocol);
+
       // Touch session to reset TTL
       session.lastAccessedAt = Date.now();
 
@@ -466,6 +579,22 @@ export class WidgetSessionManager {
    */
   async syncEvent(payload: SyncEventPayload): Promise<void> {
     const { type, data, sessionId, protocol } = payload;
+
+    // Record the event for the dashboard events panel
+    // Cast SyncEventType to InspectorEventType (they overlap significantly)
+    const eventType = type as InspectorEventType;
+    const eventSource = isDomSyncEventType(type) ? "widget" : "host";
+
+    if (sessionId) {
+      this.recordEvent(sessionId, eventType, data, eventSource, protocol);
+    } else {
+      // Broadcast event to all matching sessions
+      for (const [id, session] of this.sessions) {
+        if (session.protocol === protocol) {
+          this.recordEvent(id, eventType, data, eventSource, protocol);
+        }
+      }
+    }
 
     // Route DOM interaction events directly to Playwright (not protocol-based delivery)
     // These are replayed to achieve 1:1 state sync with external widget
@@ -921,6 +1050,15 @@ export class WidgetSessionManager {
     if (!session) {
       return false;
     }
+
+    // Record session-closed event before deleting the session
+    this.recordEvent(
+      sessionId,
+      "session-closed",
+      { toolName: session.toolName },
+      "server",
+      session.protocol
+    );
 
     try {
       // Close the Playwright page

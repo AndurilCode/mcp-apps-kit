@@ -6,6 +6,7 @@
  * - GET /dashboard - Serve dashboard HTML
  * - GET /dashboard/stream?sessionId={id} - SSE screencast stream
  * - GET /dashboard/logs?sessionId={id} - SSE log stream
+ * - GET /dashboard/events?sessionId={id} - SSE event stream
  * - GET /dashboard/sessions - List active sessions (JSON)
  * - GET /dashboard/globals - Get current environment state (JSON)
  */
@@ -15,6 +16,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ConnectionManager } from "../connection";
+import type { InspectorEvent } from "../types";
 import { CDPStreamer } from "./cdp-streamer";
 
 // Dashboard HTML file path (built by Vite)
@@ -84,6 +86,18 @@ export async function handleDashboardRequest(
       return true;
     }
     await startLogStream(req, res, connectionManager, sessionId);
+    return true;
+  }
+
+  // GET /dashboard/events?sessionId={id} - SSE event stream
+  if (pathname === "/dashboard/events" && req.method === "GET") {
+    const sessionId = url.searchParams.get("sessionId");
+    if (!sessionId) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Missing sessionId parameter" }));
+      return true;
+    }
+    startEventStream(req, res, connectionManager, sessionId);
     return true;
   }
 
@@ -338,6 +352,65 @@ async function startLogStream(
   // Clean up on connection close
   const cleanup = (): void => {
     clearInterval(pollInterval);
+  };
+
+  req.on("close", cleanup);
+  req.on("error", cleanup);
+}
+
+/**
+ * Start SSE event stream for a session
+ *
+ * Events are streamed via EventEmitter from WidgetSessionManager.
+ * Initial batch of existing events is sent, then real-time events are pushed.
+ */
+function startEventStream(
+  req: IncomingMessage,
+  res: ServerResponse,
+  connectionManager: ConnectionManager,
+  sessionId: string
+): void {
+  const sessionManager = connectionManager.getWidgetSessionManager();
+  const session = sessionManager.getSession(sessionId);
+
+  // Set up SSE headers
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "Access-Control-Allow-Origin": "*",
+  });
+
+  // If no session, send noSession event
+  if (!session) {
+    res.write(
+      `event: noSession\ndata: ${JSON.stringify({ message: "Session not found or closed" })}\n\n`
+    );
+    return;
+  }
+
+  // Send initial batch of existing events
+  const existingEvents = sessionManager.getEvents(sessionId);
+  if (existingEvents.length > 0) {
+    res.write(`event: events\ndata: ${JSON.stringify({ events: existingEvents })}\n\n`);
+  }
+
+  // Subscribe to real-time events via EventEmitter
+  const eventHandler = (event: InspectorEvent): void => {
+    // Only send events for this session
+    if (event.sessionId !== sessionId) {
+      return;
+    }
+    if (!res.writableEnded) {
+      res.write(`event: event\ndata: ${JSON.stringify(event)}\n\n`);
+    }
+  };
+
+  sessionManager.on("event", eventHandler);
+
+  // Clean up on connection close
+  const cleanup = (): void => {
+    sessionManager.off("event", eventHandler);
   };
 
   req.on("close", cleanup);

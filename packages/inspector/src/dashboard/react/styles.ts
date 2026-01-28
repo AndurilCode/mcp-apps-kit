@@ -537,4 +537,311 @@ export const styles: Record<string, CSSProperties> = {
     textAlign: "right",
     wordBreak: "break-word",
   },
+
+  // ===========================================================================
+  // BOTTOM PANEL (Logs + Events)
+  // ===========================================================================
+
+  // View Mode Selector
+  viewModeSelector: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.25rem",
+  },
+
+  viewModeBtn: {
+    fontFamily: "inherit",
+    backgroundColor: "transparent",
+    border: "1px solid #3d4040",
+    color: "#9ca3af",
+    padding: "0.25rem 0.5rem",
+    borderRadius: "4px",
+    fontSize: "0.6875rem",
+    cursor: "pointer",
+    transition: "all 0.15s ease",
+  },
+
+  viewModeBtnActive: {
+    backgroundColor: "rgba(32, 178, 170, 0.15)",
+    borderColor: "#20b2aa",
+    color: "#20b2aa",
+  },
+
+  // Split View
+  splitView: {
+    display: "flex",
+    flexDirection: "row",
+    flex: 1,
+    minHeight: 0,
+    overflow: "hidden",
+  },
+
+  splitPane: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    minWidth: 0,
+    overflow: "hidden",
+  },
+
+  splitDivider: {
+    width: "1px",
+    backgroundColor: "#2d2f2f",
+    flexShrink: 0,
+  },
+
+  // ===========================================================================
+  // EVENTS PANEL
+  // ===========================================================================
+
+  eventsPanel: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    minHeight: 0,
+    overflow: "hidden",
+  },
+
+  eventsPanelHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "0.375rem 0.75rem",
+    backgroundColor: "#0a0a0a",
+    borderBottom: "1px solid #1a1a1a",
+    flexShrink: 0,
+    gap: "0.5rem",
+  },
+
+  eventsPanelTitle: {
+    fontSize: "0.6875rem",
+    fontWeight: 500,
+    color: "#9ca3af",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+  },
+
+  eventsPanelControls: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+  },
+
+  eventsContainer: {
+    flex: 1,
+    overflowY: "auto",
+    padding: "0.25rem",
+    fontSize: "0.75rem",
+    minHeight: 0,
+  },
+
+  eventsEmpty: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    height: "100%",
+    color: "#4b5563",
+    fontSize: "0.75rem",
+  },
+
+  // Filter Select
+  filterSelect: {
+    fontFamily: "inherit",
+    backgroundColor: "#111111",
+    color: "#e8e8e8",
+    border: "1px solid #3d4040",
+    borderRadius: "4px",
+    padding: "0.125rem 0.375rem",
+    fontSize: "0.625rem",
+    cursor: "pointer",
+    minWidth: "80px",
+  },
+
+  // ===========================================================================
+  // EVENT ROW
+  // ===========================================================================
+
+  eventRow: {
+    borderRadius: "4px",
+    marginBottom: "2px",
+    transition: "background-color 0.1s ease",
+  },
+
+  eventRowHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    padding: "0.25rem 0.5rem",
+    cursor: "pointer",
+    userSelect: "none",
+  },
+
+  eventRowHeaderHover: {
+    backgroundColor: "rgba(255, 255, 255, 0.03)",
+  },
+
+  eventRowExpanded: {
+    backgroundColor: "rgba(255, 255, 255, 0.02)",
+  },
+
+  eventExpandIcon: {
+    color: "#6b7280",
+    fontSize: "0.625rem",
+    width: "12px",
+    textAlign: "center",
+    flexShrink: 0,
+    transition: "transform 0.15s ease",
+  },
+
+  eventExpandIconOpen: {
+    transform: "rotate(90deg)",
+  },
+
+  eventTime: {
+    color: "#4b5563",
+    fontSize: "0.625rem",
+    flexShrink: 0,
+    fontVariantNumeric: "tabular-nums",
+  },
+
+  eventBadge: {
+    fontSize: "0.5rem",
+    padding: "0.0625rem 0.25rem",
+    borderRadius: "2px",
+    textTransform: "uppercase",
+    fontWeight: 600,
+    letterSpacing: "0.02em",
+    flexShrink: 0,
+  },
+
+  // Event category badge colors
+  eventBadgeTool: {
+    backgroundColor: "rgba(0, 212, 255, 0.15)",
+    color: "#00d4ff",
+  },
+
+  eventBadgeDom: {
+    backgroundColor: "rgba(179, 157, 219, 0.15)",
+    color: "#b39ddb",
+  },
+
+  eventBadgeGlobals: {
+    backgroundColor: "rgba(76, 175, 80, 0.15)",
+    color: "#4caf50",
+  },
+
+  eventBadgeLifecycle: {
+    backgroundColor: "rgba(255, 152, 0, 0.15)",
+    color: "#ff9800",
+  },
+
+  eventBadgeSession: {
+    backgroundColor: "rgba(33, 150, 243, 0.15)",
+    color: "#2196f3",
+  },
+
+  eventBadgeError: {
+    backgroundColor: "rgba(255, 107, 107, 0.15)",
+    color: "#ff6b6b",
+  },
+
+  eventBadgeDialog: {
+    backgroundColor: "rgba(255, 193, 7, 0.15)",
+    color: "#ffc107",
+  },
+
+  eventType: {
+    fontSize: "0.625rem",
+    color: "#6b7280",
+    flexShrink: 0,
+  },
+
+  eventSummary: {
+    flex: 1,
+    fontSize: "0.6875rem",
+    color: "#e8e8e8",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+
+  eventPayload: {
+    padding: "0.5rem 0.5rem 0.5rem 1.5rem",
+    borderTop: "1px solid rgba(255, 255, 255, 0.05)",
+  },
+
+  // ===========================================================================
+  // JSON VIEWER
+  // ===========================================================================
+
+  jsonContainer: {
+    fontFamily:
+      "'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace",
+    fontSize: "0.625rem",
+    lineHeight: 1.5,
+    color: "#e8e8e8",
+    backgroundColor: "#0a0a0a",
+    borderRadius: "4px",
+    padding: "0.5rem",
+    overflow: "auto",
+    maxHeight: "200px",
+  },
+
+  jsonLine: {
+    display: "flex",
+    alignItems: "flex-start",
+  },
+
+  jsonIndent: {
+    flexShrink: 0,
+    width: "1rem",
+    display: "inline-block",
+  },
+
+  jsonExpandBtn: {
+    background: "transparent",
+    border: "none",
+    padding: 0,
+    cursor: "pointer",
+    color: "#6b7280",
+    fontSize: "0.625rem",
+    width: "1rem",
+    textAlign: "center",
+    flexShrink: 0,
+  },
+
+  jsonKey: {
+    color: "#9cdcfe",
+  },
+
+  jsonColon: {
+    color: "#6b7280",
+    marginRight: "0.25rem",
+  },
+
+  jsonString: {
+    color: "#ce9178",
+  },
+
+  jsonNumber: {
+    color: "#b5cea8",
+  },
+
+  jsonBoolean: {
+    color: "#569cd6",
+  },
+
+  jsonNull: {
+    color: "#569cd6",
+    fontStyle: "italic",
+  },
+
+  jsonBracket: {
+    color: "#d4d4d4",
+  },
+
+  jsonEllipsis: {
+    color: "#6b7280",
+    fontStyle: "italic",
+  },
 };

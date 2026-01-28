@@ -2,17 +2,19 @@
  * Inspector Dashboard - React Component
  *
  * Real-time browser dashboard for viewing widget sessions.
- * Connects to the inspector backend via SSE for screencast and log streaming.
+ * Connects to the inspector backend via SSE for screencast, log, and event streaming.
  */
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useSessions } from "./hooks/useSessions";
 import { useScreencast } from "./hooks/useScreencast";
-import { useLogStream, type LogEntry } from "./hooks/useLogStream";
+import { useLogStream } from "./hooks/useLogStream";
+import { useEventStream } from "./hooks/useEventStream";
 import { useResizablePanel } from "./hooks/useResizablePanel";
 import { useGlobals } from "./hooks/useGlobals";
 import { Toolbar } from "./components/Toolbar";
 import { GlobalsPanel } from "./components/GlobalsPanel";
+import { BottomPanel } from "./components/BottomPanel";
 import { styles } from "./styles";
 
 export interface InspectorDashboardProps {
@@ -39,6 +41,9 @@ export function InspectorDashboard({
   // Log stream state
   const { logs, clearLogs } = useLogStream(baseUrl, selectedSessionId);
 
+  // Event stream state
+  const { events, clearEvents } = useEventStream(baseUrl, selectedSessionId);
+
   // Globals state
   const { globals } = useGlobals(baseUrl);
 
@@ -51,8 +56,8 @@ export function InspectorDashboard({
     return true;
   });
 
-  // Logs panel state (persisted)
-  const [isLogsPanelVisible, setIsLogsPanelVisible] = useState(() => {
+  // Bottom panel state (persisted)
+  const [isBottomPanelVisible, setIsBottomPanelVisible] = useState(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("mcp-dashboard-logs-panel-visible");
       return stored !== "false"; // Default to visible
@@ -60,7 +65,7 @@ export function InspectorDashboard({
     return true;
   });
 
-  // Panel state
+  // Panel collapse state
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("mcp-dashboard-logs-panel-collapsed") === "true";
@@ -75,9 +80,6 @@ export function InspectorDashboard({
     disabled: isPanelCollapsed,
   });
 
-  // Refs
-  const logsContainerRef = useRef<HTMLDivElement>(null);
-
   // Auto-select first session when available
   useEffect(() => {
     const firstSession = sessions[0];
@@ -87,13 +89,6 @@ export function InspectorDashboard({
       setSelectedSessionId(null);
     }
   }, [sessions, selectedSessionId]);
-
-  // Auto-scroll logs to bottom
-  useEffect(() => {
-    if (logsContainerRef.current) {
-      logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
-    }
-  }, [logs]);
 
   // Save collapsed state
   useEffect(() => {
@@ -109,20 +104,21 @@ export function InspectorDashboard({
     }
   }, [isGlobalsPanelVisible]);
 
-  // Save logs panel visibility
+  // Save bottom panel visibility
   useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("mcp-dashboard-logs-panel-visible", String(isLogsPanelVisible));
+      localStorage.setItem("mcp-dashboard-logs-panel-visible", String(isBottomPanelVisible));
     }
-  }, [isLogsPanelVisible]);
+  }, [isBottomPanelVisible]);
 
   const handleSessionChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       const value = e.target.value;
       setSelectedSessionId(value || null);
       clearLogs();
+      clearEvents();
     },
-    [clearLogs]
+    [clearLogs, clearEvents]
   );
 
   const togglePanel = useCallback(() => {
@@ -133,8 +129,8 @@ export function InspectorDashboard({
     setIsGlobalsPanelVisible((prev) => !prev);
   }, []);
 
-  const toggleLogsPanel = useCallback(() => {
-    setIsLogsPanelVisible((prev) => !prev);
+  const toggleBottomPanel = useCallback(() => {
+    setIsBottomPanelVisible((prev) => !prev);
   }, []);
 
   const isStreaming = status === "streaming";
@@ -224,8 +220,8 @@ export function InspectorDashboard({
             </div>
           </div>
           <Toolbar
-            isLogsPanelVisible={isLogsPanelVisible}
-            onToggleLogsPanel={toggleLogsPanel}
+            isLogsPanelVisible={isBottomPanelVisible}
+            onToggleLogsPanel={toggleBottomPanel}
             isGlobalsPanelVisible={isGlobalsPanelVisible}
             onToggleGlobalsPanel={toggleGlobalsPanel}
           />
@@ -285,87 +281,29 @@ export function InspectorDashboard({
           style={{
             ...styles.resizeHandle,
             ...(isResizing ? styles.resizeHandleActive : {}),
-            ...(!isLogsPanelVisible ? styles.resizeHandleHidden : {}),
+            ...(!isBottomPanelVisible ? styles.resizeHandleHidden : {}),
           }}
         />
 
-        {/* Logs Panel */}
+        {/* Bottom Panel (Logs + Events) */}
         <div
           style={{
             ...styles.logsPanel,
-            height: isLogsPanelVisible ? (isPanelCollapsed ? 36 : panelHeight) : 0,
-            ...(!isLogsPanelVisible ? styles.logsPanelHidden : {}),
+            height: isBottomPanelVisible ? (isPanelCollapsed ? 36 : panelHeight) : 0,
+            ...(!isBottomPanelVisible ? styles.logsPanelHidden : {}),
           }}
         >
-          <div style={styles.logsHeader}>
-            <span style={styles.logsTitle}>Session Logs</span>
-            <div style={styles.logsControls}>
-              <span style={styles.logCount}>
-                {logs.length} log{logs.length !== 1 ? "s" : ""}
-              </span>
-              <button style={styles.clearLogsBtn} onClick={clearLogs}>
-                Clear
-              </button>
-              <button
-                style={{
-                  ...styles.toggleLogsBtn,
-                  transform: isPanelCollapsed ? "rotate(180deg)" : "none",
-                }}
-                onClick={togglePanel}
-              >
-                &#9660;
-              </button>
-            </div>
-          </div>
-          {!isPanelCollapsed && (
-            <div ref={logsContainerRef} style={styles.logsContainer}>
-              {logs.length === 0 ? (
-                <div style={styles.logsEmpty}>No logs yet</div>
-              ) : (
-                logs.map((log, index) => <LogEntryRow key={index} log={log} />)
-              )}
-            </div>
-          )}
+          <BottomPanel
+            logs={logs}
+            events={events}
+            onClearLogs={clearLogs}
+            onClearEvents={clearEvents}
+            panelHeight={panelHeight}
+            isCollapsed={isPanelCollapsed}
+            onToggleCollapse={togglePanel}
+          />
         </div>
       </div>
-    </div>
-  );
-}
-
-function LogEntryRow({ log }: { log: LogEntry }): React.ReactElement {
-  const formatTime = (timestamp: number): string => {
-    const date = new Date(timestamp);
-    const h = date.getHours().toString().padStart(2, "0");
-    const m = date.getMinutes().toString().padStart(2, "0");
-    const s = date.getSeconds().toString().padStart(2, "0");
-    const ms = date.getMilliseconds().toString().padStart(3, "0");
-    return `${h}:${m}:${s}.${ms}`;
-  };
-
-  const levelStyle =
-    log.level === "error"
-      ? styles.logLevelError
-      : log.level === "warn"
-        ? styles.logLevelWarn
-        : log.level === "info"
-          ? styles.logLevelInfo
-          : log.level === "debug"
-            ? styles.logLevelDebug
-            : styles.logLevelLog;
-
-  const badgeStyle =
-    log.source === "host"
-      ? styles.logBadgeHost
-      : log.source === "widget"
-        ? styles.logBadgeWidget
-        : styles.logBadgeUnknown;
-
-  return (
-    <div style={styles.logEntry}>
-      <span style={styles.logTime}>{formatTime(log.timestamp)}</span>
-      <span style={{ ...styles.logBadge, ...badgeStyle }}>{log.source}</span>
-      <span style={{ ...styles.logLevel, ...levelStyle }}>[{log.level}]</span>
-      <span style={{ ...styles.logText, ...levelStyle }}>{log.text}</span>
     </div>
   );
 }
