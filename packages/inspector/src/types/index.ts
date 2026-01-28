@@ -154,6 +154,11 @@ export type {
 export { isDomSyncEventType } from "./dom-sync-types";
 
 // Inspector event types (for dashboard events panel)
-export type { EventCategory, InspectorEventType, InspectorEvent } from "./inspector-event-types";
+export type {
+  EventCategory,
+  InspectorEventType,
+  InspectorEvent,
+  AgnosticInspectorEvent,
+} from "./inspector-event-types";
 
 export { getEventCategory, getEventSummary } from "./inspector-event-types";

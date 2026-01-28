@@ -15,7 +15,8 @@ export type EventCategory =
   | "lifecycle"
   | "session"
   | "error"
-  | "dialog";
+  | "dialog"
+  | "agent";
 
 /**
  * All event types that can be recorded by the inspector
@@ -57,7 +58,10 @@ export type InspectorEventType =
   // Error events
   | "page-error"
   // Dialog events
-  | "dialog";
+  | "dialog"
+  // Agent events (session-agnostic tool calls from the inspector)
+  | "agent-tool-call"
+  | "agent-tool-result";
 
 /**
  * Inspector event record
@@ -79,6 +83,29 @@ export interface InspectorEvent {
   payload: unknown;
   /** Source of the event */
   source: "widget" | "host" | "server";
+  /** Protocol used (mcp or openai) */
+  protocol?: "mcp" | "openai";
+}
+
+/**
+ * Session-agnostic inspector event record
+ *
+ * Used for events that are not tied to a specific widget session,
+ * such as agent tool calls on the connected MCP server.
+ */
+export interface AgnosticInspectorEvent {
+  /** Unique event ID */
+  id: string;
+  /** Event category (for filtering) */
+  category: EventCategory;
+  /** Specific event type */
+  type: InspectorEventType;
+  /** Timestamp when the event occurred */
+  timestamp: number;
+  /** Event payload (type-dependent) */
+  payload: unknown;
+  /** Source of the event */
+  source: "widget" | "host" | "server" | "agent";
   /** Protocol used (mcp or openai) */
   protocol?: "mcp" | "openai";
 }
@@ -128,6 +155,10 @@ export function getEventCategory(type: InspectorEventType): EventCategory {
 
     case "dialog":
       return "dialog";
+
+    case "agent-tool-call":
+    case "agent-tool-result":
+      return "agent";
   }
 }
 
@@ -145,7 +176,7 @@ function getStr(payload: unknown, key: string): string | undefined {
 /**
  * Generate a summary string for an event
  */
-export function getEventSummary(event: InspectorEvent): string {
+export function getEventSummary(event: InspectorEvent | AgnosticInspectorEvent): string {
   const payload = event.payload;
 
   switch (event.type) {
@@ -228,6 +259,16 @@ export function getEventSummary(event: InspectorEvent): string {
       const dialogType = getStr(payload, "type") ?? "unknown";
       const dialogMsg = getStr(payload, "message") ?? "";
       return `Dialog: ${dialogType} - ${dialogMsg.slice(0, 30)}`;
+    }
+
+    case "agent-tool-call":
+      return `Agent Call: ${getStr(payload, "name") ?? getStr(payload, "toolName") ?? "unknown"}`;
+
+    case "agent-tool-result": {
+      const isError =
+        payload && typeof payload === "object" && "isError" in payload && payload.isError;
+      const toolName = getStr(payload, "name") ?? getStr(payload, "toolName") ?? "unknown";
+      return isError ? `Agent Error: ${toolName}` : `Agent Result: ${toolName}`;
     }
   }
 }

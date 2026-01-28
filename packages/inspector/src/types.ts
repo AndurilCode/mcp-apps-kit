@@ -147,6 +147,7 @@ export type {
   EventCategory,
   InspectorEventType,
   InspectorEvent,
+  AgnosticInspectorEvent,
 } from "./types/index";
 
 export { isDomSyncEventType, getEventCategory, getEventSummary } from "./types/index";

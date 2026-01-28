@@ -10,11 +10,13 @@ import { useSessions } from "./hooks/useSessions";
 import { useScreencast } from "./hooks/useScreencast";
 import { useLogStream } from "./hooks/useLogStream";
 import { useEventStream } from "./hooks/useEventStream";
+import { useAgentEventStream } from "./hooks/useAgentEventStream";
 import { useResizablePanel } from "./hooks/useResizablePanel";
 import { useGlobals } from "./hooks/useGlobals";
+import { useConnectionStatus } from "./hooks/useConnectionStatus";
 import { Toolbar } from "./components/Toolbar";
 import { GlobalsPanel } from "./components/GlobalsPanel";
-import { BottomPanel } from "./components/BottomPanel";
+import { BottomPanel, type PanelVisibility } from "./components/BottomPanel";
 import { styles } from "./styles";
 
 export interface InspectorDashboardProps {
@@ -25,6 +27,14 @@ export interface InspectorDashboardProps {
   /** Minimum panel height in pixels (default: 100) */
   minPanelHeight?: number;
 }
+
+const DEFAULT_PANEL_VISIBILITY: PanelVisibility = {
+  logs: true,
+  events: true,
+  agent: true,
+};
+
+const PANEL_VISIBILITY_STORAGE_KEY = "mcp-dashboard-panel-visibility";
 
 export function InspectorDashboard({
   baseUrl = "",
@@ -44,8 +54,14 @@ export function InspectorDashboard({
   // Event stream state
   const { events, clearEvents } = useEventStream(baseUrl, selectedSessionId);
 
+  // Agent event stream state (session-agnostic)
+  const { events: agentEvents, clearEvents: clearAgentEvents } = useAgentEventStream(baseUrl);
+
   // Globals state
   const { globals } = useGlobals(baseUrl);
+
+  // Connection status state
+  const { status: connectionStatus } = useConnectionStatus(baseUrl);
 
   // Globals panel state (persisted)
   const [isGlobalsPanelVisible, setIsGlobalsPanelVisible] = useState(() => {
@@ -71,6 +87,26 @@ export function InspectorDashboard({
       return localStorage.getItem("mcp-dashboard-logs-panel-collapsed") === "true";
     }
     return false;
+  });
+
+  // Panel visibility state (which panels are shown)
+  const [panelVisibility, setPanelVisibility] = useState<PanelVisibility>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem(PANEL_VISIBILITY_STORAGE_KEY);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored) as Partial<PanelVisibility>;
+          return {
+            logs: parsed.logs ?? DEFAULT_PANEL_VISIBILITY.logs,
+            events: parsed.events ?? DEFAULT_PANEL_VISIBILITY.events,
+            agent: parsed.agent ?? DEFAULT_PANEL_VISIBILITY.agent,
+          };
+        } catch {
+          // Invalid JSON, use defaults
+        }
+      }
+    }
+    return DEFAULT_PANEL_VISIBILITY;
   });
 
   const { panelHeight, resizeHandleProps, isResizing } = useResizablePanel({
@@ -111,6 +147,13 @@ export function InspectorDashboard({
     }
   }, [isBottomPanelVisible]);
 
+  // Save panel visibility state
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(PANEL_VISIBILITY_STORAGE_KEY, JSON.stringify(panelVisibility));
+    }
+  }, [panelVisibility]);
+
   const handleSessionChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       const value = e.target.value;
@@ -131,6 +174,13 @@ export function InspectorDashboard({
 
   const toggleBottomPanel = useCallback(() => {
     setIsBottomPanelVisible((prev) => !prev);
+  }, []);
+
+  const handleTogglePanel = useCallback((panel: keyof PanelVisibility) => {
+    setPanelVisibility((prev) => ({
+      ...prev,
+      [panel]: !prev[panel],
+    }));
   }, []);
 
   const isStreaming = status === "streaming";
@@ -204,7 +254,7 @@ export function InspectorDashboard({
                     ...styles.statusDot,
                     ...(status === "streaming"
                       ? styles.statusDotStreaming
-                      : status === "connecting"
+                      : connectionStatus.connected
                         ? styles.statusDotConnected
                         : styles.statusDotDisconnected),
                   }}
@@ -212,8 +262,8 @@ export function InspectorDashboard({
                 <span>
                   {status === "streaming"
                     ? "Streaming"
-                    : status === "connecting"
-                      ? "Ready"
+                    : connectionStatus.connected
+                      ? "Connected"
                       : "Disconnected"}
                 </span>
               </div>
@@ -285,7 +335,7 @@ export function InspectorDashboard({
           }}
         />
 
-        {/* Bottom Panel (Logs + Events) */}
+        {/* Bottom Panel (Logs + Events + Agent) */}
         <div
           style={{
             ...styles.logsPanel,
@@ -296,11 +346,15 @@ export function InspectorDashboard({
           <BottomPanel
             logs={logs}
             events={events}
+            agentEvents={agentEvents}
             onClearLogs={clearLogs}
             onClearEvents={clearEvents}
+            onClearAgentEvents={clearAgentEvents}
             panelHeight={panelHeight}
             isCollapsed={isPanelCollapsed}
             onToggleCollapse={togglePanel}
+            panelVisibility={panelVisibility}
+            onTogglePanel={handleTogglePanel}
           />
         </div>
       </div>

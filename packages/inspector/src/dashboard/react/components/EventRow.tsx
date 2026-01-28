@@ -12,14 +12,14 @@
  */
 
 import React, { useState, useCallback } from "react";
-import type { InspectorEvent, EventCategory } from "../../../types";
+import type { InspectorEvent, AgnosticInspectorEvent, EventCategory } from "../../../types";
 import { getEventSummary } from "../../../types";
 import { styles } from "../styles";
 import { JsonViewer } from "./JsonViewer";
 
 export interface EventRowProps {
   /** The event to display */
-  event: InspectorEvent;
+  event: InspectorEvent | AgnosticInspectorEvent;
 }
 
 /**
@@ -53,6 +53,8 @@ function getCategoryBadgeStyle(category: EventCategory): React.CSSProperties {
       return styles.eventBadgeError as React.CSSProperties;
     case "dialog":
       return styles.eventBadgeDialog as React.CSSProperties;
+    case "agent":
+      return styles.eventBadgeAgent as React.CSSProperties;
   }
 }
 

@@ -14,7 +14,10 @@ import type {
   HistoryEntry,
   EnvironmentState,
   TargetServerSchema,
+  AgnosticInspectorEvent,
+  InspectorEventType,
 } from "./types";
+import { getEventCategory } from "./types";
 import { WidgetSessionManager } from "./widget-session-manager";
 import { WidgetServer } from "./widget-server";
 
@@ -26,6 +29,8 @@ export interface ConnectionManagerEvents {
   schemaUpdated: [schema: TargetServerSchema];
   /** Emitted when disconnected from target server */
   disconnected: [previousUrl: string | null];
+  /** Emitted when a session-agnostic agent event is recorded */
+  agentEvent: [event: AgnosticInspectorEvent];
 }
 
 /**
@@ -84,6 +89,12 @@ export class ConnectionManager extends EventEmitter {
 
   /** Raw MCP hostContext from external widget (for session creation) */
   private externalMcpHostContext: Record<string, unknown> | null = null;
+
+  /** Storage for session-agnostic agent events */
+  private agentEvents: AgnosticInspectorEvent[] = [];
+
+  /** Counter for generating unique agent event IDs */
+  private agentEventIdCounter = 0;
 
   constructor(options: InspectorServerOptions = {}) {
     super();
@@ -701,5 +712,72 @@ export class ConnectionManager extends EventEmitter {
       }
       return null;
     }
+  }
+
+  /**
+   * Record a session-agnostic agent event
+   *
+   * Used for tracking agent tool calls on the connected MCP server
+   * that are not tied to a specific widget session.
+   *
+   * @param type - Event type (agent-tool-call or agent-tool-result)
+   * @param payload - Event payload (tool name, args, result, etc.)
+   * @param protocol - Protocol used (mcp or openai)
+   */
+  recordAgentEvent(
+    type: InspectorEventType,
+    payload: unknown,
+    protocol?: "mcp" | "openai"
+  ): AgnosticInspectorEvent {
+    const event: AgnosticInspectorEvent = {
+      id: `agent-${++this.agentEventIdCounter}`,
+      category: getEventCategory(type),
+      type,
+      timestamp: Date.now(),
+      payload,
+      source: "agent",
+      protocol,
+    };
+
+    this.agentEvents.push(event);
+
+    // Limit stored events to prevent memory issues
+    if (this.agentEvents.length > this.maxHistorySize) {
+      this.agentEvents = this.agentEvents.slice(-this.maxHistorySize);
+    }
+
+    // Emit event for real-time SSE streaming
+    this.emit("agentEvent", event);
+
+    if (this.debug) {
+      console.log(`[inspector] Agent event recorded: ${type}`, event.id);
+    }
+
+    return event;
+  }
+
+  /**
+   * Get all recorded agent events
+   *
+   * @returns Array of session-agnostic agent events
+   */
+  getAgentEvents(): AgnosticInspectorEvent[] {
+    return [...this.agentEvents];
+  }
+
+  /**
+   * Clear all recorded agent events
+   *
+   * @returns Number of events cleared
+   */
+  clearAgentEvents(): number {
+    const count = this.agentEvents.length;
+    this.agentEvents = [];
+
+    if (this.debug) {
+      console.log(`[inspector] Cleared ${count} agent events`);
+    }
+
+    return count;
   }
 }
