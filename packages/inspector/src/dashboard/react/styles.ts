@@ -6,11 +6,16 @@
 
 import type { CSSProperties } from "react";
 
+// Font stacks
+const FONT_SANS =
+  "'Inter', 'SF Pro Display', 'Segoe UI', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif";
+const FONT_MONO =
+  "'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace";
+
 export const styles: Record<string, CSSProperties> = {
   // Root
   root: {
-    fontFamily:
-      "'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace",
+    fontFamily: FONT_SANS,
     backgroundColor: "#000000",
     color: "#e8e8e8",
     height: "100%",
@@ -35,7 +40,13 @@ export const styles: Record<string, CSSProperties> = {
   headerLeft: {
     display: "flex",
     alignItems: "center",
-    gap: "1.25rem",
+    gap: "0.75rem",
+  },
+
+  logo: {
+    width: "28px",
+    height: "28px",
+    objectFit: "contain",
   },
 
   headerRight: {
@@ -72,9 +83,9 @@ export const styles: Record<string, CSSProperties> = {
 
   title: {
     fontSize: "1rem",
-    fontWeight: 500,
-    color: "#20b2aa",
-    letterSpacing: "-0.02em",
+    fontWeight: 600,
+    color: "#e8e8e8",
+    letterSpacing: "-0.01em",
     margin: 0,
   },
 
@@ -96,10 +107,19 @@ export const styles: Record<string, CSSProperties> = {
     color: "#ffffff",
     border: "1px solid #2d2f2f",
     borderRadius: "8px",
-    padding: "0.5rem 1rem",
+    padding: "0.5rem 2rem 0.5rem 1rem",
     fontSize: "0.8125rem",
     cursor: "pointer",
     minWidth: "220px",
+  },
+
+  selectSingleSession: {
+    cursor: "default",
+    appearance: "none",
+    WebkitAppearance: "none",
+    MozAppearance: "none",
+    backgroundImage: "none",
+    paddingRight: "1rem",
   },
 
   status: {
@@ -355,6 +375,7 @@ export const styles: Record<string, CSSProperties> = {
   },
 
   logsContainer: {
+    fontFamily: FONT_MONO,
     flex: 1,
     overflowY: "auto",
     padding: "0.5rem",
@@ -628,6 +649,7 @@ export const styles: Record<string, CSSProperties> = {
   },
 
   eventsContainer: {
+    fontFamily: FONT_MONO,
     flex: 1,
     overflowY: "auto",
     padding: "0.25rem",
@@ -780,8 +802,7 @@ export const styles: Record<string, CSSProperties> = {
   // ===========================================================================
 
   jsonContainer: {
-    fontFamily:
-      "'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace",
+    fontFamily: FONT_MONO,
     fontSize: "0.625rem",
     lineHeight: 1.5,
     color: "#e8e8e8",
