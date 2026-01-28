@@ -5,41 +5,10 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
+import type { McpTool, McpResource, McpPrompt, McpPrimitives } from "../types/mcp-primitives";
 
-export interface McpToolInputSchema {
-  type: string;
-  properties?: Record<string, unknown>;
-  required?: string[];
-}
-
-export interface McpTool {
-  name: string;
-  description?: string;
-  inputSchema?: McpToolInputSchema;
-}
-
-export interface McpResource {
-  uri: string;
-  name: string;
-  description?: string;
-  mimeType?: string;
-}
-
-export interface McpPrompt {
-  name: string;
-  description?: string;
-  arguments?: Array<{
-    name: string;
-    description?: string;
-    required?: boolean;
-  }>;
-}
-
-export interface McpPrimitives {
-  tools: McpTool[];
-  resources: McpResource[];
-  prompts: McpPrompt[];
-}
+// Re-export types for convenience
+export type { McpTool, McpResource, McpPrompt, McpPrimitives };
 
 interface PrimitivesResponse {
   tools?: McpTool[];
@@ -56,10 +25,15 @@ export interface UseMcpPrimitivesResult {
   refresh: () => Promise<void>;
 }
 
-export function useMcpPrimitives(baseUrl: string, pollInterval = 30000): UseMcpPrimitivesResult {
+export function useMcpPrimitives(
+  baseUrl: string,
+  isConnected: boolean,
+  pollInterval = 30000
+): UseMcpPrimitivesResult {
   const [primitives, setPrimitives] = useState<McpPrimitives | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [wasConnected, setWasConnected] = useState(false);
 
   const fetchPrimitives = useCallback(async () => {
     try {
@@ -80,6 +54,15 @@ export function useMcpPrimitives(baseUrl: string, pollInterval = 30000): UseMcpP
       setIsLoading(false);
     }
   }, [baseUrl]);
+
+  // Refresh immediately when connection is established
+  useEffect(() => {
+    if (isConnected && !wasConnected) {
+      setIsLoading(true);
+      void fetchPrimitives();
+    }
+    setWasConnected(isConnected);
+  }, [isConnected, wasConnected, fetchPrimitives]);
 
   useEffect(() => {
     void fetchPrimitives();

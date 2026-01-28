@@ -12,6 +12,7 @@ import { useLogStream } from "./hooks/useLogStream";
 import { useEventStream } from "./hooks/useEventStream";
 import { useAgentEventStream } from "./hooks/useAgentEventStream";
 import { useResizablePanel } from "./hooks/useResizablePanel";
+import { useResizablePanelWidth } from "./hooks/useResizablePanelWidth";
 import { useGlobals } from "./hooks/useGlobals";
 import { useConnectionStatus } from "./hooks/useConnectionStatus";
 import { useMcpPrimitives } from "./hooks/useMcpPrimitives";
@@ -66,8 +67,13 @@ export function InspectorDashboard({
   // Connection status state
   const { status: connectionStatus } = useConnectionStatus(baseUrl);
 
-  // MCP Primitives state
-  const { tools, resources, prompts, isLoading: primitivesLoading } = useMcpPrimitives(baseUrl);
+  // MCP Primitives state (refreshes on connection)
+  const {
+    tools,
+    resources,
+    prompts,
+    isLoading: primitivesLoading,
+  } = useMcpPrimitives(baseUrl, connectionStatus.connected);
 
   // Left panel state (for MCP primitives when session is active)
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
@@ -123,6 +129,19 @@ export function InspectorDashboard({
     minHeight: minPanelHeight,
     storageKey: "mcp-dashboard-logs-panel-height",
     disabled: isPanelCollapsed,
+  });
+
+  // Left panel (MCP primitives) width resize
+  const {
+    panelWidth: leftPanelWidth,
+    resizeHandleProps: leftResizeHandleProps,
+    isResizing: isLeftResizing,
+  } = useResizablePanelWidth({
+    initialWidth: 320,
+    minWidth: 200,
+    maxWidth: 600,
+    storageKey: "mcp-dashboard-primitives-panel-width",
+    disabled: isLeftPanelCollapsed,
   });
 
   // Auto-select first session when available
@@ -288,6 +307,9 @@ export function InspectorDashboard({
             onToggleLogsPanel={toggleBottomPanel}
             isGlobalsPanelVisible={isGlobalsPanelVisible}
             onToggleGlobalsPanel={toggleGlobalsPanel}
+            isPrimitivesPanelVisible={!isLeftPanelCollapsed}
+            onTogglePrimitivesPanel={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)}
+            hasActiveSession={hasActiveSession}
           />
         </div>
       </header>
@@ -295,24 +317,27 @@ export function InspectorDashboard({
       {/* Error Banner */}
       {error && <div style={styles.errorBanner}>{error}</div>}
 
-      {/* Content Wrapper */}
+      {/* Content Wrapper - horizontal layout */}
       <div style={styles.contentWrapper}>
-        {/* Content Row (Left Panel + Main + Globals Panel) */}
-        <div style={styles.contentRow}>
-          {/* Left Panel - MCP Primitives when session active */}
-          {hasActiveSession && (
-            <McpPrimitivesPanel
-              tools={tools}
-              resources={resources}
-              prompts={prompts}
-              isLoading={primitivesLoading}
-              isVisible={true}
-              isCollapsed={isLeftPanelCollapsed}
-              onToggleCollapse={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)}
-              position="left"
-            />
-          )}
+        {/* Left Panel - MCP Primitives when session active */}
+        {hasActiveSession && (
+          <McpPrimitivesPanel
+            tools={tools}
+            resources={resources}
+            prompts={prompts}
+            isLoading={primitivesLoading}
+            isVisible={true}
+            isCollapsed={isLeftPanelCollapsed}
+            onToggleCollapse={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)}
+            position="left"
+            panelWidth={leftPanelWidth}
+            resizeHandleProps={leftResizeHandleProps}
+            isResizing={isLeftResizing}
+          />
+        )}
 
+        {/* Center Column - main content + bottom panel */}
+        <div style={styles.centerColumn}>
           {/* Main Display */}
           <main style={styles.main}>
             {hasActiveSession ? (
@@ -338,42 +363,42 @@ export function InspectorDashboard({
             )}
           </main>
 
-          {/* Globals Panel */}
-          <GlobalsPanel globals={globals} isVisible={isGlobalsPanelVisible} />
-        </div>
-
-        {/* Resize Handle */}
-        <div
-          {...resizeHandleProps}
-          style={{
-            ...styles.resizeHandle,
-            ...(isResizing ? styles.resizeHandleActive : {}),
-            ...(!isBottomPanelVisible ? styles.resizeHandleHidden : {}),
-          }}
-        />
-
-        {/* Bottom Panel (Logs + Events + Agent) */}
-        <div
-          style={{
-            ...styles.logsPanel,
-            height: isBottomPanelVisible ? (isPanelCollapsed ? 36 : panelHeight) : 0,
-            ...(!isBottomPanelVisible ? styles.logsPanelHidden : {}),
-          }}
-        >
-          <BottomPanel
-            logs={logs}
-            events={events}
-            agentEvents={agentEvents}
-            onClearLogs={clearLogs}
-            onClearEvents={clearEvents}
-            onClearAgentEvents={clearAgentEvents}
-            panelHeight={panelHeight}
-            isCollapsed={isPanelCollapsed}
-            onToggleCollapse={togglePanel}
-            panelVisibility={panelVisibility}
-            onTogglePanel={handleTogglePanel}
+          {/* Resize Handle */}
+          <div
+            {...resizeHandleProps}
+            style={{
+              ...styles.resizeHandle,
+              ...(isResizing ? styles.resizeHandleActive : {}),
+              ...(!isBottomPanelVisible ? styles.resizeHandleHidden : {}),
+            }}
           />
+
+          {/* Bottom Panel (Logs + Events + Agent) */}
+          <div
+            style={{
+              ...styles.logsPanel,
+              height: isBottomPanelVisible ? (isPanelCollapsed ? 36 : panelHeight) : 0,
+              ...(!isBottomPanelVisible ? styles.logsPanelHidden : {}),
+            }}
+          >
+            <BottomPanel
+              logs={logs}
+              events={events}
+              agentEvents={agentEvents}
+              onClearLogs={clearLogs}
+              onClearEvents={clearEvents}
+              onClearAgentEvents={clearAgentEvents}
+              panelHeight={panelHeight}
+              isCollapsed={isPanelCollapsed}
+              onToggleCollapse={togglePanel}
+              panelVisibility={panelVisibility}
+              onTogglePanel={handleTogglePanel}
+            />
+          </div>
         </div>
+
+        {/* Globals Panel - full height on the right */}
+        <GlobalsPanel globals={globals} isVisible={isGlobalsPanelVisible} />
       </div>
     </div>
   );

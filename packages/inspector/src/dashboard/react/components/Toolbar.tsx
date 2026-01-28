@@ -1,7 +1,7 @@
 /**
  * Toolbar Component
  *
- * Icon buttons for toggling dashboard panels (logs, globals).
+ * Icon buttons for toggling dashboard panels (logs, globals, primitives).
  */
 
 import React from "react";
@@ -16,6 +16,12 @@ export interface ToolbarProps {
   isGlobalsPanelVisible: boolean;
   /** Callback to toggle globals panel */
   onToggleGlobalsPanel: () => void;
+  /** Whether the MCP primitives panel is visible (only shown when session is active) */
+  isPrimitivesPanelVisible?: boolean;
+  /** Callback to toggle primitives panel */
+  onTogglePrimitivesPanel?: () => void;
+  /** Whether a session is active (determines if primitives toggle shows) */
+  hasActiveSession?: boolean;
 }
 
 /** Logs panel icon - bottom panel (like globals icon but rotated) */
@@ -37,7 +43,7 @@ function LogsIcon(): React.ReactElement {
   );
 }
 
-/** Globals panel icon - sidebar panel */
+/** Globals panel icon - right sidebar panel */
 function GlobalsIcon(): React.ReactElement {
   return (
     <svg
@@ -56,14 +62,50 @@ function GlobalsIcon(): React.ReactElement {
   );
 }
 
+/** Primitives panel icon - left sidebar panel (tools/resources/prompts) */
+function PrimitivesIcon(): React.ReactElement {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="2" y="2" width="12" height="12" rx="2" />
+      <line x1="6" y1="2" x2="6" y2="14" />
+    </svg>
+  );
+}
+
 export function Toolbar({
   isLogsPanelVisible,
   onToggleLogsPanel,
   isGlobalsPanelVisible,
   onToggleGlobalsPanel,
+  isPrimitivesPanelVisible,
+  onTogglePrimitivesPanel,
+  hasActiveSession,
 }: ToolbarProps): React.ReactElement {
   return (
     <div style={styles.toolbar}>
+      {/* Primitives panel toggle - only shown when session is active */}
+      {hasActiveSession && onTogglePrimitivesPanel && (
+        <button
+          style={{
+            ...styles.toolbarBtn,
+            ...(isPrimitivesPanelVisible ? styles.toolbarBtnActive : {}),
+          }}
+          onClick={onTogglePrimitivesPanel}
+          title={isPrimitivesPanelVisible ? "Hide MCP Primitives" : "Show MCP Primitives"}
+          aria-label={isPrimitivesPanelVisible ? "Hide MCP Primitives" : "Show MCP Primitives"}
+        >
+          <PrimitivesIcon />
+        </button>
+      )}
       <button
         style={{
           ...styles.toolbarBtn,
