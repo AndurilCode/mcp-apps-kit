@@ -345,6 +345,9 @@ export class WidgetServer {
     (function() {
       const toolResult = ${toolResultJson};
       const toolName = ${toolNameJson};
+      const sessionId = '${session.id}';
+      const inspectorUrl = ${JSON.stringify(session.inspectorUrl ?? null)};
+      const isDualMode = ${JSON.stringify(session.isDualMode ?? false)};
       const iframe = document.getElementById('widget-frame');
       let initialized = false;
 
@@ -365,6 +368,125 @@ export class WidgetServer {
         },
       };
 
+      // Helper to record events to the inspector server (only in standalone mode)
+      // In dual mode, events are captured via /sync-events from the external widget
+      function recordEvent(type, payload, source) {
+        if (!inspectorUrl || isDualMode) return;
+        fetch(inspectorUrl + '/record-event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: sessionId,
+            type: type,
+            payload: payload,
+            source: source || 'host',
+            protocol: 'mcp'
+          })
+        }).catch(function(err) {
+          console.warn('[MCP Host] Failed to record event:', err);
+        });
+      }
+
+      // Helper to get a CSS selector for an element
+      function getSelector(el) {
+        if (!el || el === document.body || el === document.documentElement) return 'body';
+        if (el.id) return '#' + el.id;
+        if (el.dataset && el.dataset.testid) return '[data-testid="' + el.dataset.testid + '"]';
+        var selector = el.tagName.toLowerCase();
+        if (el.className && typeof el.className === 'string') {
+          selector += '.' + el.className.trim().split(/\\s+/).join('.');
+        }
+        return selector;
+      }
+
+      // Set up DOM event listeners on iframe once loaded
+      iframe.addEventListener('load', function() {
+        try {
+          var iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+
+          // Click events
+          iframeDoc.addEventListener('click', function(e) {
+            recordEvent('dom-click', {
+              selector: getSelector(e.target),
+              x: e.clientX,
+              y: e.clientY
+            }, 'widget');
+          }, true);
+
+          // Input events
+          iframeDoc.addEventListener('input', function(e) {
+            var target = e.target;
+            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+              recordEvent('dom-input', {
+                selector: getSelector(target),
+                value: target.value,
+                inputType: target.type
+              }, 'widget');
+            }
+          }, true);
+
+          // Change events (for select, checkbox, radio)
+          iframeDoc.addEventListener('change', function(e) {
+            var target = e.target;
+            var payload = { selector: getSelector(target) };
+            if (target.tagName === 'SELECT') {
+              payload.value = target.value;
+              payload.values = Array.from(target.selectedOptions).map(function(o) { return o.value; });
+            } else if (target.type === 'checkbox' || target.type === 'radio') {
+              payload.checked = target.checked;
+              payload.inputType = target.type;
+            } else {
+              payload.value = target.value;
+            }
+            recordEvent('dom-change', payload, 'widget');
+          }, true);
+
+          // Focus events
+          iframeDoc.addEventListener('focus', function(e) {
+            recordEvent('dom-focus', { selector: getSelector(e.target) }, 'widget');
+          }, true);
+
+          // Blur events
+          iframeDoc.addEventListener('blur', function(e) {
+            recordEvent('dom-blur', { selector: getSelector(e.target) }, 'widget');
+          }, true);
+
+          // Scroll events (debounced)
+          var scrollTimeout;
+          iframeDoc.addEventListener('scroll', function(e) {
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(function() {
+              var target = e.target;
+              recordEvent('dom-scroll', {
+                selector: target === iframeDoc ? null : getSelector(target),
+                scrollTop: target.scrollTop || iframeDoc.documentElement.scrollTop,
+                scrollLeft: target.scrollLeft || iframeDoc.documentElement.scrollLeft
+              }, 'widget');
+            }, 100);
+          }, true);
+
+          // Keydown events (for special keys)
+          iframeDoc.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === 'Escape' || e.key === 'Tab' || e.ctrlKey || e.metaKey) {
+              recordEvent('dom-keydown', {
+                selector: getSelector(e.target),
+                key: e.key,
+                modifiers: {
+                  ctrl: e.ctrlKey,
+                  alt: e.altKey,
+                  shift: e.shiftKey,
+                  meta: e.metaKey
+                }
+              }, 'widget');
+            }
+          }, true);
+
+          console.log('[MCP Host] DOM event listeners attached');
+        } catch (err) {
+          console.warn('[MCP Host] Cannot attach DOM listeners (cross-origin):', err);
+        }
+      });
+
       // Listen for messages from the widget
       window.addEventListener('message', function(event) {
         // Only accept messages from our iframe
@@ -384,6 +506,9 @@ export class WidgetServer {
           const runtimeUpdates = window.__mcpHostContextUpdates || {};
           const hostContext = { ...fallbackHostContext, ...externalHostContext, ...runtimeUpdates };
           console.log('[MCP Host] Using hostContext:', JSON.stringify(hostContext));
+
+          // Record initialize event
+          recordEvent('initialize', { toolName: toolName, hostContext: hostContext }, 'widget');
 
           const response = {
             jsonrpc: '2.0',
@@ -417,6 +542,9 @@ export class WidgetServer {
             };
             iframe.contentWindow.postMessage(resultMessage, '*');
             console.log('[MCP Host] Sent ui/notifications/tool-result');
+
+            // Record tool-result event
+            recordEvent('tool-result', { toolName: toolName, result: toolResult }, 'host');
           }, 50);
         }
 
@@ -544,30 +672,157 @@ export class WidgetServer {
 <body>
   <iframe id="widget-frame" src="${widgetUrl}" sandbox="allow-scripts allow-same-origin allow-forms allow-modals"></iframe>
   <script>
-    // Simple host that listens for widget messages
-    const iframe = document.getElementById('widget-frame');
+    (function() {
+      const sessionId = '${session.id}';
+      const toolName = '${session.toolName}';
+      const inspectorUrl = ${JSON.stringify(session.inspectorUrl ?? null)};
+      const isDualMode = ${JSON.stringify(session.isDualMode ?? false)};
+      const iframe = document.getElementById('widget-frame');
+      let initialized = false;
 
-    window.addEventListener('message', function(event) {
-      // Only accept messages from our iframe
-      if (event.source !== iframe.contentWindow) return;
-
-      const message = event.data;
-      console.log('[OpenAI Host] Received:', JSON.stringify(message));
-
-      // Handle widget tool calls
-      if (message && message.type === 'openai:callTool') {
-        // Store for get_widget_state observation
-        window.__inspectorToolCalls = window.__inspectorToolCalls || [];
-        window.__inspectorToolCalls.push({
-          name: message.toolName,
-          args: message.args,
-          timestamp: Date.now()
+      // Helper to record events to the inspector server (only in standalone mode)
+      // In dual mode, events are captured via /sync-events from the external widget
+      function recordEvent(type, payload, source) {
+        if (!inspectorUrl || isDualMode) return;
+        fetch(inspectorUrl + '/record-event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: sessionId,
+            type: type,
+            payload: payload,
+            source: source || 'host',
+            protocol: 'openai'
+          })
+        }).catch(function(err) {
+          console.warn('[OpenAI Host] Failed to record event:', err);
         });
+      }
 
-        console.log('[WIDGET_TOOL_CALL]', message.toolName, message.args);
+      // Helper to get a CSS selector for an element
+      function getSelector(el) {
+        if (!el || el === document.body || el === document.documentElement) return 'body';
+        if (el.id) return '#' + el.id;
+        if (el.dataset && el.dataset.testid) return '[data-testid="' + el.dataset.testid + '"]';
+        var selector = el.tagName.toLowerCase();
+        if (el.className && typeof el.className === 'string') {
+          selector += '.' + el.className.trim().split(/\\s+/).join('.');
+        }
+        return selector;
+      }
 
-        const inspectorUrl = ${JSON.stringify(session.inspectorUrl ?? null)};
-        const isDualMode = ${JSON.stringify(session.isDualMode ?? false)};
+      // Set up DOM event listeners on iframe once loaded
+      iframe.addEventListener('load', function() {
+        // Record initialize event when iframe loads
+        if (!initialized) {
+          initialized = true;
+          recordEvent('initialize', { toolName: toolName }, 'widget');
+        }
+
+        try {
+          var iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+
+          // Click events
+          iframeDoc.addEventListener('click', function(e) {
+            recordEvent('dom-click', {
+              selector: getSelector(e.target),
+              x: e.clientX,
+              y: e.clientY
+            }, 'widget');
+          }, true);
+
+          // Input events
+          iframeDoc.addEventListener('input', function(e) {
+            var target = e.target;
+            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+              recordEvent('dom-input', {
+                selector: getSelector(target),
+                value: target.value,
+                inputType: target.type
+              }, 'widget');
+            }
+          }, true);
+
+          // Change events (for select, checkbox, radio)
+          iframeDoc.addEventListener('change', function(e) {
+            var target = e.target;
+            var payload = { selector: getSelector(target) };
+            if (target.tagName === 'SELECT') {
+              payload.value = target.value;
+              payload.values = Array.from(target.selectedOptions).map(function(o) { return o.value; });
+            } else if (target.type === 'checkbox' || target.type === 'radio') {
+              payload.checked = target.checked;
+              payload.inputType = target.type;
+            } else {
+              payload.value = target.value;
+            }
+            recordEvent('dom-change', payload, 'widget');
+          }, true);
+
+          // Focus events
+          iframeDoc.addEventListener('focus', function(e) {
+            recordEvent('dom-focus', { selector: getSelector(e.target) }, 'widget');
+          }, true);
+
+          // Blur events
+          iframeDoc.addEventListener('blur', function(e) {
+            recordEvent('dom-blur', { selector: getSelector(e.target) }, 'widget');
+          }, true);
+
+          // Scroll events (debounced)
+          var scrollTimeout;
+          iframeDoc.addEventListener('scroll', function(e) {
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(function() {
+              var target = e.target;
+              recordEvent('dom-scroll', {
+                selector: target === iframeDoc ? null : getSelector(target),
+                scrollTop: target.scrollTop || iframeDoc.documentElement.scrollTop,
+                scrollLeft: target.scrollLeft || iframeDoc.documentElement.scrollLeft
+              }, 'widget');
+            }, 100);
+          }, true);
+
+          // Keydown events (for special keys)
+          iframeDoc.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === 'Escape' || e.key === 'Tab' || e.ctrlKey || e.metaKey) {
+              recordEvent('dom-keydown', {
+                selector: getSelector(e.target),
+                key: e.key,
+                modifiers: {
+                  ctrl: e.ctrlKey,
+                  alt: e.altKey,
+                  shift: e.shiftKey,
+                  meta: e.metaKey
+                }
+              }, 'widget');
+            }
+          }, true);
+
+          console.log('[OpenAI Host] DOM event listeners attached');
+        } catch (err) {
+          console.warn('[OpenAI Host] Cannot attach DOM listeners (cross-origin):', err);
+        }
+      });
+
+      window.addEventListener('message', function(event) {
+        // Only accept messages from our iframe
+        if (event.source !== iframe.contentWindow) return;
+
+        const message = event.data;
+        console.log('[OpenAI Host] Received:', JSON.stringify(message));
+
+        // Handle widget tool calls
+        if (message && message.type === 'openai:callTool') {
+          // Store for get_widget_state observation
+          window.__inspectorToolCalls = window.__inspectorToolCalls || [];
+          window.__inspectorToolCalls.push({
+            name: message.toolName,
+            args: message.args,
+            timestamp: Date.now()
+          });
+
+          console.log('[WIDGET_TOOL_CALL]', message.toolName, message.args);
 
         if (isDualMode) {
           // In dual mode, wait for synced tool response from external widget
@@ -706,9 +961,10 @@ export class WidgetServer {
           timestamp: Date.now()
         });
       }
-    });
+      });
 
-    console.log('[OpenAI Host] Ready');
+      console.log('[OpenAI Host] Ready');
+    })();
   </script>
 </body>
 </html>`;

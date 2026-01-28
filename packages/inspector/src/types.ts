@@ -143,6 +143,10 @@ export type {
   DomDragPayload,
   DomSyncEventType,
   DomEventPayload,
+  // Inspector event types (for dashboard events panel)
+  EventCategory,
+  InspectorEventType,
+  InspectorEvent,
 } from "./types/index";
 
-export { isDomSyncEventType } from "./types/index";
+export { isDomSyncEventType, getEventCategory, getEventSummary } from "./types/index";
