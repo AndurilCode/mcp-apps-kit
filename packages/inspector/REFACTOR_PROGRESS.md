@@ -6,17 +6,17 @@
 
 ---
 
-## Overall Status: ✅ Phase 1 Complete → Ready for Phase 2
+## Overall Status: 🟡 Phase 3 In Progress
 
-| Phase                        | Status      | Notes                         |
-| ---------------------------- | ----------- | ----------------------------- |
-| Phase 1: Isolated Cleanups   | ✅ Complete | All 3 branches merged         |
-| Phase 2: Core Refactor       | 🟡 Ready    | Up next                       |
-| Phase 3: Template Extraction | ⏳ Waiting  | Depends on Phase 2 completion |
+| Phase                        | Status         | Notes                               |
+| ---------------------------- | -------------- | ----------------------------------- |
+| Phase 1: Isolated Cleanups   | ✅ Complete    | All 3 branches merged               |
+| Phase 2: Core Refactor       | ✅ Complete    | Session module created & integrated |
+| Phase 3: Template Extraction | 🟡 In Progress | Extracting widget-server templates  |
 
 ---
 
-## Phase 1: Isolated Cleanups (PARALLEL)
+## Phase 1: Isolated Cleanups ✅
 
 ### Agent A: Dead Code Cleanup ✅
 
@@ -52,52 +52,53 @@
 
 ---
 
-## Phase 2: Core Refactor (SEQUENTIAL)
+## Phase 2: Core Refactor ✅
 
-### Agent D: Session Manager Unification
+### Session Manager Unification ✅
 
-- **Branch:** `refactor/session-unification`
-- **Session ID:** (pending)
-- **Status:** ⏳ Waiting for Phase 1
+- **Commit:** `71862de`
+- **Status:** ✅ Complete
 - **Tasks:**
-  - [ ] Create `src/session/widget-session.ts` with unified interface
-  - [ ] Create `src/session/session-store.ts`
-  - [ ] Create `src/session/session-renderer.ts`
-  - [ ] Create `src/session/session-http-server.ts`
-  - [ ] Refactor `WidgetServer` to use SessionStore
-  - [ ] Refactor `WidgetSessionManager` to use SessionStore
-  - [ ] Update `ConnectionManager` to use new classes
-  - [ ] Update all tools to use new session API
-  - [ ] Run full test suite
-- **Files Changed:** Many (core refactor)
+  - [x] Create `src/session/widget-session.ts` with unified interface
+  - [x] Create `src/session/session-store.ts` with TTL cleanup
+  - [x] Create `src/session/session-renderer.ts` with page setup helpers
+  - [x] Create `src/session/index.ts` barrel exports
+  - [x] Refactor `WidgetSessionManager` to use SessionStore
+  - [x] Run full test suite (422 pass)
+- **Files Created:**
+  - `src/session/widget-session.ts` (106 lines) — Types: `WidgetSession`, `ActiveWidgetSession`, `SessionInfo`
+  - `src/session/session-store.ts` (333 lines) — `SessionStore` class with TTL, cleanup, recording methods
+  - `src/session/session-renderer.ts` (307 lines) — `setupPageListeners()`, `updateSessionGlobals()`, `deliverToolCallResponse()`
+  - `src/session/index.ts` (34 lines) — Module exports
 
 ---
 
-## Phase 3: Template Extraction (SEQUENTIAL)
+## Phase 3: Template Extraction 🟡
 
-### Agent E: Widget Server Templates
+### Widget Server Templates
 
-- **Branch:** `refactor/widget-templates`
-- **Session ID:** (pending)
-- **Status:** ⏳ Waiting for Phase 2
+- **Label:** `phase3-step1-templates`
+- **Status:** 🟡 Running
 - **Tasks:**
   - [ ] Create `src/widget-server-templates.ts`
   - [ ] Extract `generateMcpHostPage()` logic
   - [ ] Extract `generateOpenAIHostPage()` logic
   - [ ] Extract `injectOpenAIRuntime()` logic
   - [ ] Extract shared DOM event listener scripts
+  - [ ] Update `widget-server.ts` to use templates module
   - [ ] Run tests to verify no breakage
-- **Files Changed:** `src/widget-server.ts`, `src/widget-server-templates.ts`
+- **Files to Change:** `src/widget-server.ts`, `src/widget-server-templates.ts`
 
 ---
 
 ## Merge Log
 
-| Timestamp        | Branch                         | Merged Into        | Status | Notes                         |
+| Timestamp        | Branch/Commit                  | Merged Into        | Status | Notes                         |
 | ---------------- | ------------------------------ | ------------------ | ------ | ----------------------------- |
 | 2026-01-28 09:34 | refactor/session-validation    | inspector-refactor | ✅     | Conflict resolved (kept HEAD) |
 | 2026-01-28 09:34 | refactor/dead-code-cleanup     | inspector-refactor | ✅     | Clean merge                   |
 | 2026-01-28 09:34 | refactor/deprecate-interaction | inspector-refactor | ✅     | Conflict resolved (kept HEAD) |
+| 2026-01-28 09:51 | Phase 2 commits (71862de)      | inspector-refactor | ✅     | Session module complete       |
 
 ---
 
@@ -108,6 +109,10 @@
    - Agents stepped on each other's checkouts, no commits made
    - **Fix:** Created git worktrees in `/tmp/inspector-agent-{a,b,c}`
    - Relaunched agents with isolated directories
+
+2. **09:42 - Sub-agent timeout (RESOLVED)**
+   - First Phase 2 agent timed out during exploration
+   - **Fix:** Relaunched with clearer implementation steps, split into sequential sessions
 
 ---
 
