@@ -490,11 +490,11 @@ export class WidgetSessionManager extends EventEmitter {
           const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
           if (iframe?.contentWindow) {
             // Use the correct MCP Apps protocol method name
-            // Params are flat (not wrapped in hostContext)
+            // Wrap context in hostContext to match ext-apps SDK format
             const message = {
               jsonrpc: "2.0",
               method: "ui/notifications/host-context-changed",
-              params: ctx,
+              params: { hostContext: ctx },
             };
             iframe.contentWindow.postMessage(message, "*");
             // eslint-disable-next-line no-console

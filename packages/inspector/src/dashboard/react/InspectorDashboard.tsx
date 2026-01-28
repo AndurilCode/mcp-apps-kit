@@ -18,6 +18,7 @@ import { Toolbar } from "./components/Toolbar";
 import { GlobalsPanel } from "./components/GlobalsPanel";
 import { BottomPanel, type PanelVisibility } from "./components/BottomPanel";
 import { styles } from "./styles";
+import logoUrl from "../assets/logo.png";
 
 export interface InspectorDashboardProps {
   /** Base URL for the inspector API (default: current origin) */
@@ -221,27 +222,29 @@ export function InspectorDashboard({
       {/* Header */}
       <header style={styles.header}>
         <div style={styles.headerLeft}>
-          <h1 style={styles.title}>MCP Inspector Dashboard</h1>
+          <img src={logoUrl} alt="MCP Agent Inspector" style={styles.logo} />
+          <h1 style={styles.title}>MCP Agent Inspector</h1>
         </div>
         <div style={styles.headerRight}>
           <div style={styles.controls}>
-            <label style={styles.label} htmlFor="session-select">
-              Session
-            </label>
-            <select
-              id="session-select"
-              style={styles.select}
-              value={selectedSessionId || ""}
-              onChange={handleSessionChange}
-              disabled={sessionsLoading}
-            >
-              <option value="">Select a session...</option>
-              {sessions.map((session) => (
-                <option key={session.id} value={session.id}>
-                  {session.toolName} ({session.id.slice(0, 8)}...)
-                </option>
-              ))}
-            </select>
+            {sessions.length > 0 && (
+              <select
+                id="session-select"
+                style={{
+                  ...styles.select,
+                  ...(sessions.length === 1 ? styles.selectSingleSession : {}),
+                }}
+                value={selectedSessionId || ""}
+                onChange={handleSessionChange}
+                disabled={sessionsLoading || sessions.length <= 1}
+              >
+                {sessions.map((session) => (
+                  <option key={session.id} value={session.id}>
+                    {session.toolName} ({session.id.slice(0, 8)}...)
+                  </option>
+                ))}
+              </select>
+            )}
             <div
               style={{
                 ...styles.statusWrapper,
