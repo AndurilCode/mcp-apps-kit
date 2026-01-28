@@ -45,6 +45,11 @@ import type {
   WidgetToolCall,
 } from "./types";
 import { isDomSyncEventType, getEventCategory } from "./types";
+import {
+  getDisplayModeSizing,
+  getPlatformFromDeviceType,
+  type DisplayMode,
+} from "./types/environment-types";
 import { mapConsoleTypeToLogLevel, getLogSourceFromUrl } from "./tools/helpers";
 
 /**
@@ -451,6 +456,7 @@ export class WidgetSessionManager extends EventEmitter {
 
   /**
    * Update globals on a specific session (push hostContext/changed to widget)
+   * Also resizes the iframe when displayMode or viewport changes
    */
   async updateSessionGlobals(
     sessionId: string,
@@ -467,6 +473,28 @@ export class WidgetSessionManager extends EventEmitter {
         return false;
       }
 
+      // Determine platform for sizing calculations
+      const platform = getPlatformFromDeviceType(environmentState.userAgent?.device?.type);
+
+      // Get sizing based on display mode (use viewport from state, or derive from display mode)
+      const displayMode: DisplayMode = environmentState.displayMode ?? "inline";
+      const modeSizing = getDisplayModeSizing(displayMode, platform);
+      const viewport = environmentState.viewport ?? {
+        width: modeSizing.width,
+        height: modeSizing.height,
+      };
+
+      // Resize the Playwright page viewport to match the new display mode sizing
+      // This is the key step - the CDP screencast captures the page at this size
+      // The host page CSS (100% width/height) will automatically fill the new viewport
+      await page.setViewportSize(viewport);
+
+      if (this.debug) {
+        console.log(
+          `[WidgetSessionManager] Resized page viewport to ${viewport.width}x${viewport.height}`
+        );
+      }
+
       // Build the host context update based on protocol
       if (session.protocol === "mcp") {
         // MCP protocol: send ui/notifications/host-context-changed notification via postMessage
@@ -476,7 +504,8 @@ export class WidgetSessionManager extends EventEmitter {
           displayMode: environmentState.displayMode,
           locale: environmentState.locale,
           timeZone: environmentState.timeZone,
-          viewport: environmentState.viewport,
+          viewport: viewport,
+          containerDimensions: viewport,
           platform:
             environmentState.userAgent?.device?.type === "mobile"
               ? "mobile"
@@ -485,8 +514,8 @@ export class WidgetSessionManager extends EventEmitter {
                 : "desktop",
         };
 
+        /* eslint-disable no-undef */
         await page.evaluate((ctx) => {
-          // eslint-disable-next-line no-undef
           const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
           if (iframe?.contentWindow) {
             // Use the correct MCP Apps protocol method name
@@ -501,14 +530,17 @@ export class WidgetSessionManager extends EventEmitter {
             console.log("[MCP Host] Sent ui/notifications/host-context-changed", ctx);
           }
         }, hostContext);
+        /* eslint-enable no-undef */
       } else {
         // OpenAI protocol: send via inspector_sync message from host to iframe
         // This ensures event.source === window.parent (required by SDK security)
+        const maxHeight = environmentState.maxHeight ?? modeSizing.maxHeight;
         const globals = {
           theme: environmentState.theme,
           displayMode: environmentState.displayMode,
           locale: environmentState.locale,
-          maxHeight: environmentState.maxHeight,
+          maxHeight: maxHeight,
+          viewport: viewport,
           safeArea: environmentState.safeAreaInsets,
           userAgent: environmentState.userAgent,
           userLocation: environmentState.userLocation,

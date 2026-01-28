@@ -5,6 +5,82 @@
  */
 
 // =============================================================================
+// DISPLAY MODE SIZE PRESETS
+// =============================================================================
+
+/**
+ * Sizing configuration for a display mode
+ */
+export interface DisplayModeSizing {
+  width: number;
+  height: number;
+  /** Maximum widget height in pixels (null means no limit for fullscreen) */
+  maxHeight: number | null;
+}
+
+/**
+ * Display mode size presets for desktop and mobile platforms
+ *
+ * These presets are used when:
+ * - requestDisplayMode is called from the widget
+ * - set_globals tool changes displayMode without explicit viewport/maxHeight
+ *
+ * Based on OpenAI SDK documentation:
+ * - Inline: Content fits within conversation flow, up to mobile viewport height
+ * - Fullscreen: Immersive view, expands beyond inline card (minus system composer)
+ * - PiP: Floating compact window
+ */
+export const DISPLAY_MODE_SIZES = {
+  desktop: {
+    inline: { width: 400, height: 300, maxHeight: 400 },
+    fullscreen: { width: 1024, height: 768, maxHeight: null },
+    pip: { width: 320, height: 240, maxHeight: 320 },
+  },
+  mobile: {
+    inline: { width: 375, height: 400, maxHeight: 500 },
+    fullscreen: { width: 375, height: 812, maxHeight: null }, // iPhone X dimensions
+    pip: { width: 280, height: 200, maxHeight: 280 },
+  },
+} as const;
+
+/**
+ * Platform type for display mode sizing
+ */
+export type DisplayModePlatform = keyof typeof DISPLAY_MODE_SIZES;
+
+/**
+ * Display mode type
+ */
+export type DisplayMode = keyof (typeof DISPLAY_MODE_SIZES)["desktop"];
+
+/**
+ * Get sizing configuration for a display mode and platform
+ *
+ * @param mode - Display mode (inline, fullscreen, pip)
+ * @param platform - Platform (desktop, mobile)
+ * @returns Sizing configuration with width, height, and maxHeight
+ */
+export function getDisplayModeSizing(
+  mode: DisplayMode,
+  platform: DisplayModePlatform = "desktop"
+): DisplayModeSizing {
+  return { ...DISPLAY_MODE_SIZES[platform][mode] };
+}
+
+/**
+ * Determine platform from device type string
+ *
+ * @param deviceType - Device type from userAgent (e.g., 'desktop', 'mobile', 'tablet')
+ * @returns Platform for sizing ('desktop' or 'mobile')
+ */
+export function getPlatformFromDeviceType(deviceType?: string): DisplayModePlatform {
+  if (deviceType === "mobile" || deviceType === "tablet") {
+    return "mobile";
+  }
+  return "desktop";
+}
+
+// =============================================================================
 // ENVIRONMENT STATE TYPES
 // =============================================================================
 

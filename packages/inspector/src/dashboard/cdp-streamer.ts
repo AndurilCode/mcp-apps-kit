@@ -31,6 +31,14 @@ interface StreamingSession {
   page: Page;
   /** Interval for touching widget session TTL */
   touchInterval: ReturnType<typeof setInterval>;
+  /** Frame callback for restarting screencast */
+  onFrame: (frame: ScreencastFrame) => void;
+  /** Error callback for restarting screencast */
+  onError: (error: Error) => void;
+  /** Touch callback for restarting screencast */
+  onTouch?: () => void;
+  /** Current screencast dimensions */
+  currentDimensions: { width: number; height: number };
 }
 
 /**
@@ -45,10 +53,19 @@ export interface ScreencastOptions {
   quality?: number;
 }
 
-/** Default screencast options for high-quality streaming */
+/**
+ * Default screencast options for high-quality streaming
+ *
+ * Note: maxWidth/maxHeight are the MAXIMUM capture dimensions.
+ * The actual capture size matches the page viewport (up to these limits).
+ * We set these high enough to accommodate all display mode presets:
+ * - inline: 400x300 (desktop), 375x400 (mobile)
+ * - fullscreen: 1024x768 (desktop), 375x812 (mobile)
+ * - pip: 320x240 (desktop), 280x200 (mobile)
+ */
 const DEFAULT_SCREENCAST_OPTIONS: Required<ScreencastOptions> = {
-  maxWidth: 800,
-  maxHeight: 600,
+  maxWidth: 2048,
+  maxHeight: 2048,
   quality: 100,
 };
 
@@ -133,11 +150,15 @@ export class CDPStreamer {
         onTouch?.();
       }, 30_000);
 
-      // Store session
+      // Store session with callbacks for potential restart
       this.sessions.set(sessionId, {
         cdpSession,
         page,
         touchInterval,
+        onFrame,
+        onError,
+        onTouch,
+        currentDimensions: { width: this.options.maxWidth, height: this.options.maxHeight },
       });
 
       if (this.debug) {
@@ -148,6 +169,65 @@ export class CDPStreamer {
       const err = error instanceof Error ? error : new Error(String(error));
       onError(err);
       throw err;
+    }
+  }
+
+  /**
+   * Update screencast dimensions for an active session
+   *
+   * Restarts the screencast with new dimensions if they differ from current.
+   * This is called when viewport/displayMode changes via set_globals.
+   *
+   * @param sessionId - Widget session ID
+   * @param width - New width
+   * @param height - New height
+   */
+  async updateDimensions(sessionId: string, width: number, height: number): Promise<boolean> {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return false;
+    }
+
+    // Skip if dimensions haven't changed
+    if (session.currentDimensions.width === width && session.currentDimensions.height === height) {
+      return true;
+    }
+
+    if (this.debug) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `[CDPStreamer] Updating dimensions for ${sessionId}: ${width}x${height} (was ${session.currentDimensions.width}x${session.currentDimensions.height})`
+      );
+    }
+
+    try {
+      // Stop current screencast
+      await session.cdpSession.send("Page.stopScreencast");
+
+      // Update stored dimensions
+      session.currentDimensions = { width, height };
+
+      // Restart screencast with new dimensions
+      await session.cdpSession.send("Page.startScreencast", {
+        format: "jpeg",
+        quality: this.options.quality,
+        maxWidth: width,
+        maxHeight: height,
+        everyNthFrame: 1,
+      });
+
+      if (this.debug) {
+        // eslint-disable-next-line no-console
+        console.log(`[CDPStreamer] Restarted screencast for ${sessionId} with new dimensions`);
+      }
+
+      return true;
+    } catch (error) {
+      if (this.debug) {
+        // eslint-disable-next-line no-console
+        console.warn(`[CDPStreamer] Failed to update dimensions for ${sessionId}:`, error);
+      }
+      return false;
     }
   }
 
