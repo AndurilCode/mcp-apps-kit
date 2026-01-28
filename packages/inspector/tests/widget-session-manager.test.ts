@@ -14,6 +14,7 @@ interface MockPage {
   evaluate: ReturnType<typeof vi.fn>;
   frames: ReturnType<typeof vi.fn>;
   mainFrame: ReturnType<typeof vi.fn>;
+  setViewportSize: ReturnType<typeof vi.fn>;
 }
 
 function createMockPage(): MockPage {
@@ -25,6 +26,7 @@ function createMockPage(): MockPage {
     evaluate: vi.fn().mockResolvedValue(undefined),
     frames: vi.fn().mockReturnValue([]),
     mainFrame: vi.fn().mockReturnValue({}),
+    setViewportSize: vi.fn().mockResolvedValue(undefined),
   };
 }
 

@@ -132,10 +132,20 @@ export type {
   GetGlobalsOutput,
   ResetGlobalsOutput,
   SyncEventPayload,
+  DisplayModeSizing,
+  DisplayModePlatform,
+  DisplayMode,
 } from "./environment-types";
 
 // Re-export SyncEventType as a value (it's a union type alias, needs special handling)
 export { type SyncEventType } from "./environment-types";
+
+// Export display mode sizing utilities
+export {
+  DISPLAY_MODE_SIZES,
+  getDisplayModeSizing,
+  getPlatformFromDeviceType,
+} from "./environment-types";
 
 // DOM sync types (DOM interaction synchronization)
 export type {

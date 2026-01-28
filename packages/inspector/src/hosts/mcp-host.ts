@@ -11,6 +11,12 @@ import {
   type TrackedToolCall,
   type BaseHostEmulatorOptions,
 } from "./base-host";
+import {
+  DISPLAY_MODE_SIZES,
+  getDisplayModeSizing,
+  type DisplayMode,
+  type DisplayModePlatform,
+} from "../types/environment-types";
 
 // Re-export shared types for backwards compatibility
 export type { TrackedToolCall };
@@ -45,6 +51,36 @@ export interface MCPHostEmulatorOptions extends BaseHostEmulatorOptions {
  * Supports injecting into jsdom or generating Playwright init scripts.
  */
 export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
+  /** Mutable display mode state (updated by requestDisplayMode) */
+  private currentDisplayMode: DisplayMode;
+  /** Mutable viewport state (updated by requestDisplayMode) */
+  private currentViewport: { width: number; height: number };
+  /** Current platform for sizing calculations */
+  private platform: DisplayModePlatform;
+
+  constructor(options: MCPHostEmulatorOptions) {
+    super(options);
+    const env = options.environment ?? {};
+
+    // Determine platform from environment settings
+    this.platform = this.determinePlatform(env.platform);
+
+    // Initialize display mode and viewport with presets
+    this.currentDisplayMode = env.displayMode ?? "inline";
+    const sizing = getDisplayModeSizing(this.currentDisplayMode, this.platform);
+    this.currentViewport = env.viewport ?? { width: sizing.width, height: sizing.height };
+  }
+
+  /**
+   * Determine platform from environment setting
+   */
+  private determinePlatform(platform?: "web" | "desktop" | "mobile"): DisplayModePlatform {
+    if (platform === "mobile") {
+      return "mobile";
+    }
+    return "desktop";
+  }
+
   /**
    * Inject the host emulator into a jsdom window
    */
@@ -86,19 +122,73 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
     const toolName = JSON.stringify(this.options.toolName);
     const env = this.options.environment ?? {};
     const theme = JSON.stringify(env.theme ?? "light");
-    const displayMode = JSON.stringify(env.displayMode ?? "inline");
+    const initialDisplayMode = env.displayMode ?? "inline";
+    const displayMode = JSON.stringify(initialDisplayMode);
     const locale = JSON.stringify(env.locale ?? "en-US");
     const timeZone = JSON.stringify(env.timeZone ?? "UTC");
+    const platform = JSON.stringify(env.platform ?? "desktop");
+
+    // Calculate initial sizing
+    const initialPlatform = this.determinePlatform(env.platform);
+    const typedDisplayMode: DisplayMode = initialDisplayMode;
+    const initialSizing = getDisplayModeSizing(typedDisplayMode, initialPlatform);
+    const viewport = env.viewport ?? { width: initialSizing.width, height: initialSizing.height };
+
+    // Stringify display mode sizes for Playwright
+    const displayModeSizesJson = JSON.stringify(DISPLAY_MODE_SIZES);
 
     return `
       // MCP Host Emulator for Playwright
       (function() {
+        // Display mode size presets
+        var DISPLAY_MODE_SIZES = ${displayModeSizesJson};
+
+        // Helper to get platform for sizing
+        function getSizingPlatform(platform) {
+          if (platform === 'mobile') {
+            return 'mobile';
+          }
+          return 'desktop';
+        }
+
+        // Helper to get sizing for display mode
+        function getDisplayModeSizing(mode, platform) {
+          platform = platform || 'desktop';
+          var sizes = DISPLAY_MODE_SIZES[platform] || DISPLAY_MODE_SIZES.desktop;
+          return sizes[mode] || sizes.inline;
+        }
+
         window.__mcpHostEmulator = {
           toolResult: ${toolResult},
           toolName: ${toolName},
           toolCallHistory: [],
           messageIdCounter: 1,
+          // Mutable state for display mode
+          displayMode: ${displayMode},
+          viewport: ${JSON.stringify(viewport)},
+          platform: ${platform},
         };
+
+        // Helper to build current host context
+        function buildHostContext() {
+          var emu = window.__mcpHostEmulator;
+          return {
+            theme: ${theme},
+            displayMode: emu.displayMode,
+            availableDisplayModes: ['inline', 'fullscreen', 'pip'],
+            locale: ${locale},
+            timeZone: ${timeZone},
+            platform: emu.platform,
+            viewport: emu.viewport,
+            containerDimensions: emu.viewport,
+            toolInfo: {
+              tool: {
+                name: emu.toolName,
+                inputSchema: { type: 'object' },
+              },
+            },
+          };
+        }
 
         // Track messages sent by the widget
         window.__mcpPostMessages = [];
@@ -117,7 +207,7 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
               if (message && message.jsonrpc === '2.0' && message.method === 'ui/initialize') {
                 console.log('[MCP Host Emulator] Received ui/initialize, responding...');
                 // Respond with initialization success
-                const response = {
+                var response = {
                   jsonrpc: '2.0',
                   id: message.id,
                   result: {
@@ -130,25 +220,11 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
                       logging: {},
                       serverTools: {},
                     },
-                    hostContext: {
-                      theme: ${theme},
-                      displayMode: ${displayMode},
-                      availableDisplayModes: ['inline', 'fullscreen'],
-                      locale: ${locale},
-                      timeZone: ${timeZone},
-                      toolInfo: {
-                        tool: {
-                          name: ${toolName},
-                          inputSchema: { type: 'object' },
-                        },
-                      },
-                    },
+                    hostContext: buildHostContext(),
                   },
                 };
 
                 // Dispatch response message event
-                // Use source: window (in top-level page, window.parent === window, but our mock isn't a real Window)
-                // ext-apps SDK checks event.source === window.parent, which equals window in top-level context
                 window.dispatchEvent(new MessageEvent('message', {
                   data: response,
                   origin: '*',
@@ -157,7 +233,6 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
                 console.log('[MCP Host Emulator] Sent ui/initialize response');
 
                 // Then send the tool result after a longer delay to ensure widget is ready
-                // Method: 'ui/notifications/tool-result', params: CallToolResult (not wrapped)
                 setTimeout(function() {
                   console.log('[MCP Host Emulator] Sending ui/notifications/tool-result...');
                   var resultMessage = {
@@ -174,6 +249,46 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
                     source: window,
                   }));
                 }, 100);
+              }
+
+              // Handle ui/requests/display-mode request
+              if (message && message.jsonrpc === '2.0' && message.method === 'ui/requests/display-mode') {
+                var requestedMode = message.params && message.params.mode;
+                if (requestedMode) {
+                  var emu = window.__mcpHostEmulator;
+                  var sizingPlatform = getSizingPlatform(emu.platform);
+                  var sizing = getDisplayModeSizing(requestedMode, sizingPlatform);
+
+                  // Update emulator state
+                  emu.displayMode = requestedMode;
+                  emu.viewport = { width: sizing.width, height: sizing.height };
+
+                  console.log('[MCP Host Emulator] Display mode changed to:', requestedMode, 'sizing:', sizing);
+
+                  // Send response
+                  var displayModeResponse = {
+                    jsonrpc: '2.0',
+                    id: message.id,
+                    result: { mode: requestedMode },
+                  };
+                  window.dispatchEvent(new MessageEvent('message', {
+                    data: displayModeResponse,
+                    origin: '*',
+                    source: window,
+                  }));
+
+                  // Send host context changed notification
+                  var contextChanged = {
+                    jsonrpc: '2.0',
+                    method: 'ui/notifications/host-context-changed',
+                    params: { hostContext: buildHostContext() },
+                  };
+                  window.dispatchEvent(new MessageEvent('message', {
+                    data: contextChanged,
+                    origin: '*',
+                    source: window,
+                  }));
+                }
               }
 
               // Handle tool call requests
@@ -278,6 +393,14 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
         }
         break;
 
+      case "ui/requests/display-mode":
+        // Handle display mode change request from widget
+        if (msg.params) {
+          const requestedMode = msg.params.mode as DisplayMode;
+          this.handleDisplayModeRequest(window, msg.id, requestedMode, debug);
+        }
+        break;
+
       default:
         if (debug) {
           // eslint-disable-next-line no-console
@@ -287,18 +410,51 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
   }
 
   /**
+   * Handle display mode change request
+   * Updates internal state and notifies widget of new host context
+   */
+  private handleDisplayModeRequest(
+    window: Window,
+    messageId: number | string | undefined,
+    mode: DisplayMode,
+    debug: boolean
+  ): void {
+    // Calculate new sizing based on mode and platform
+    const sizing = getDisplayModeSizing(mode, this.platform);
+
+    // Update internal state
+    this.currentDisplayMode = mode;
+    this.currentViewport = { width: sizing.width, height: sizing.height };
+
+    if (debug) {
+      // eslint-disable-next-line no-console
+      console.log("[MCP Host] Display mode changed to:", mode, "sizing:", sizing);
+    }
+
+    // Send response with granted mode
+    this.sendResponse(window, messageId, { mode });
+
+    // Send host context changed notification with updated sizing
+    this.sendNotification(window, "ui/notifications/host-context-changed", {
+      hostContext: this.buildHostContext(),
+    });
+  }
+
+  /**
    * Build host context object
+   * Uses mutable state for displayMode and viewport (updated by requestDisplayMode)
    */
   private buildHostContext(): Record<string, unknown> {
     const env = this.options.environment ?? {};
     return {
       theme: env.theme ?? "light",
-      displayMode: env.displayMode ?? "inline",
-      availableDisplayModes: ["inline", "fullscreen"],
+      displayMode: this.currentDisplayMode,
+      availableDisplayModes: ["inline", "fullscreen", "pip"],
       locale: env.locale ?? "en-US",
       timeZone: env.timeZone ?? "UTC",
       platform: env.platform ?? "desktop",
-      viewport: env.viewport ?? { width: 800, height: 600 },
+      viewport: this.currentViewport,
+      containerDimensions: this.currentViewport,
       toolInfo: {
         tool: {
           name: this.options.toolName,

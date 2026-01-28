@@ -9,6 +9,11 @@ import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
 import type { ConnectionManager } from "../connection";
 import type { SetGlobalsOutput, GetGlobalsOutput, ResetGlobalsOutput } from "../types";
+import {
+  getDisplayModeSizing,
+  getPlatformFromDeviceType,
+  type DisplayMode,
+} from "../types/environment-types";
 
 const viewportSchema = z.object({
   width: z.number().int().positive().describe("Width in pixels"),
@@ -112,7 +117,7 @@ export const resetGlobalsOutputSchema = z.object({
 export function createSetGlobalsTool(connectionManager: ConnectionManager) {
   return defineTool({
     description:
-      "Configure environment settings (theme, locale, device, location) for widget rendering and testing. Settings affect subsequent preview_ui, screenshot_widget, and test_widget_interaction calls. Supports both MCP Apps and OpenAI protocols.",
+      "Configure environment settings (theme, locale, device, location) for widget rendering and testing. Settings affect subsequent preview_ui, screenshot_widget, and test_widget_interaction calls. Supports both MCP Apps and OpenAI protocols. When displayMode is set without explicit viewport/maxHeight, size presets are automatically applied based on the platform (desktop/mobile).",
     input: setGlobalsInputSchema,
     output: setGlobalsOutputSchema,
     handler: async (input): Promise<SetGlobalsOutput> => {
@@ -129,6 +134,26 @@ export function createSetGlobalsTool(connectionManager: ConnectionManager) {
       if (input.userAgent !== undefined) updatePayload.userAgent = input.userAgent;
       if (input.userLocation !== undefined)
         updatePayload.userLocation = input.userLocation ?? undefined;
+
+      // If displayMode is being changed without explicit viewport/maxHeight,
+      // apply display mode size presets based on platform
+      if (input.displayMode !== undefined && input.viewport === undefined) {
+        // Get current environment state to determine platform
+        const currentEnvState = connectionManager.getEnvironmentState();
+        // Use userAgent from input if provided, otherwise use current state
+        const userAgent = input.userAgent ?? currentEnvState.userAgent;
+        const platform = getPlatformFromDeviceType(userAgent?.device?.type);
+        const displayMode: DisplayMode = input.displayMode;
+        const sizing = getDisplayModeSizing(displayMode, platform);
+
+        // Apply preset viewport
+        updatePayload.viewport = { width: sizing.width, height: sizing.height };
+
+        // Apply preset maxHeight if not explicitly set
+        if (input.maxHeight === undefined) {
+          updatePayload.maxHeight = sizing.maxHeight ?? undefined;
+        }
+      }
 
       const currentState = connectionManager.setEnvironmentState(updatePayload);
 

@@ -11,6 +11,12 @@ import {
   type TrackedToolCall,
   type BaseHostEmulatorOptions,
 } from "./base-host";
+import {
+  DISPLAY_MODE_SIZES,
+  getDisplayModeSizing,
+  getPlatformFromDeviceType,
+  type DisplayMode,
+} from "../types/environment-types";
 
 // Re-export shared types for backwards compatibility
 export type { TrackedToolCall };
@@ -95,25 +101,60 @@ export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptio
     const initialState = JSON.stringify(this.state);
     const env = this.options.environment ?? {};
     const theme = JSON.stringify(env.theme ?? "light");
-    const displayMode = JSON.stringify(env.displayMode ?? "inline");
+    const initialDisplayMode = env.displayMode ?? "inline";
+    const displayMode = JSON.stringify(initialDisplayMode);
     const locale = JSON.stringify(env.locale ?? "en-US");
-    const maxHeight = env.maxHeight ?? null;
     const safeArea = JSON.stringify(env.safeAreaInsets ?? { top: 0, right: 0, bottom: 0, left: 0 });
-    const userAgent = JSON.stringify(
-      env.userAgent ?? { device: { type: "desktop" }, capabilities: { hover: true, touch: false } }
-    );
+    const userAgentObj = env.userAgent ?? {
+      device: { type: "desktop" },
+      capabilities: { hover: true, touch: false },
+    };
+    const userAgent = JSON.stringify(userAgentObj);
     const userLocation = env.userLocation ? JSON.stringify(env.userLocation) : "undefined";
+
+    // Calculate initial sizing based on display mode and platform
+    const platform = getPlatformFromDeviceType(userAgentObj.device?.type);
+    const typedInitialDisplayMode: DisplayMode = initialDisplayMode;
+    const initialSizing = getDisplayModeSizing(typedInitialDisplayMode, platform);
+    const maxHeight = env.maxHeight ?? initialSizing.maxHeight;
+    const viewport = env.viewport ?? { width: initialSizing.width, height: initialSizing.height };
+
+    // Stringify the display mode sizes constant for use in Playwright
+    const displayModeSizesJson = JSON.stringify(DISPLAY_MODE_SIZES);
 
     return `
       // OpenAI Host Emulator for Playwright
       (function() {
-        // Emulator state
+        // Display mode size presets
+        var DISPLAY_MODE_SIZES = ${displayModeSizesJson};
+
+        // Helper to get platform from device type
+        function getPlatformFromDeviceType(deviceType) {
+          if (deviceType === 'mobile' || deviceType === 'tablet') {
+            return 'mobile';
+          }
+          return 'desktop';
+        }
+
+        // Helper to get sizing for display mode
+        function getDisplayModeSizing(mode, platform) {
+          platform = platform || 'desktop';
+          var sizes = DISPLAY_MODE_SIZES[platform] || DISPLAY_MODE_SIZES.desktop;
+          return sizes[mode] || sizes.inline;
+        }
+
+        // Emulator state (includes mutable sizing state)
         window.__openaiEmulator = {
           state: ${initialState},
           stateChanges: [],
           toolCalls: [],
           toolOutput: ${toolResult},
           toolName: ${toolName},
+          // Mutable sizing state
+          displayMode: ${displayMode},
+          maxHeight: ${maxHeight ?? "null"},
+          viewport: ${JSON.stringify(viewport)},
+          userAgent: ${userAgent},
         };
 
         // Create the window.openai SDK mock
@@ -131,13 +172,19 @@ export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptio
             toolName: ${toolName},
           },
 
-          // Context properties
+          // Context properties (use getters for dynamic values)
           theme: ${theme},
-          displayMode: ${displayMode},
+          get displayMode() {
+            return window.__openaiEmulator.displayMode;
+          },
           locale: ${locale},
-          maxHeight: ${maxHeight},
+          get maxHeight() {
+            return window.__openaiEmulator.maxHeight;
+          },
           safeArea: ${safeArea},
-          userAgent: ${userAgent},
+          get userAgent() {
+            return window.__openaiEmulator.userAgent;
+          },
           userLocation: ${userLocation},
 
           // State management
@@ -172,9 +219,31 @@ export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptio
             // No-op for emulator
           },
 
-          // Display mode
+          // Display mode - updates sizing and dispatches set_globals
           requestDisplayMode: async function(opts) {
-            return { mode: opts.mode };
+            var mode = opts.mode;
+            var deviceType = window.__openaiEmulator.userAgent?.device?.type;
+            var platform = getPlatformFromDeviceType(deviceType);
+            var sizing = getDisplayModeSizing(mode, platform);
+
+            // Update emulator state
+            window.__openaiEmulator.displayMode = mode;
+            window.__openaiEmulator.maxHeight = sizing.maxHeight;
+            window.__openaiEmulator.viewport = { width: sizing.width, height: sizing.height };
+
+            // Dispatch set_globals event with updated sizing
+            window.dispatchEvent(new CustomEvent('openai:set_globals', {
+              detail: {
+                globals: {
+                  displayMode: mode,
+                  maxHeight: sizing.maxHeight,
+                  viewport: window.__openaiEmulator.viewport,
+                },
+              },
+            }));
+
+            console.log('[OpenAI Host] requestDisplayMode:', mode, 'sizing:', sizing);
+            return { mode: mode };
           },
 
           // Links
@@ -210,12 +279,13 @@ export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptio
                 toolOutput: ${toolResult},
                 toolResponseMetadata: { toolName: ${toolName} },
                 theme: ${theme},
-                displayMode: ${displayMode},
+                displayMode: window.__openaiEmulator.displayMode,
                 locale: ${locale},
-                maxHeight: ${maxHeight},
+                maxHeight: window.__openaiEmulator.maxHeight,
                 safeArea: ${safeArea},
-                userAgent: ${userAgent},
+                userAgent: window.__openaiEmulator.userAgent,
                 userLocation: ${userLocation},
+                viewport: window.__openaiEmulator.viewport,
               },
             },
           }));
@@ -231,6 +301,47 @@ export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptio
     const toolOutputStr = JSON.stringify(this.options.toolResult);
     const env = this.options.environment ?? {};
 
+    // Store initial sizing for display mode calculations
+    const initialUserAgent = env.userAgent ?? {
+      device: { type: "desktop" },
+      capabilities: { hover: true, touch: false },
+    };
+    const platform = getPlatformFromDeviceType(initialUserAgent.device?.type);
+    const initialDisplayMode: DisplayMode = env.displayMode ?? "inline";
+    const initialSizing = getDisplayModeSizing(initialDisplayMode, platform);
+
+    // Create mutable state object that requestDisplayMode and updateTheme can update
+    const sdkState: {
+      theme: "light" | "dark";
+      displayMode: DisplayMode;
+      maxHeight: number | null;
+      viewport: { width: number; height: number };
+      userAgent: typeof initialUserAgent;
+    } = {
+      theme: env.theme ?? "light",
+      displayMode: initialDisplayMode,
+      maxHeight: env.maxHeight ?? initialSizing.maxHeight,
+      viewport: env.viewport ?? { width: initialSizing.width, height: initialSizing.height },
+      userAgent: initialUserAgent,
+    };
+
+    // Helper to dispatch set_globals event (stored for use in requestDisplayMode)
+    const dispatchGlobalsUpdate = (
+      win: Window,
+      globals: Record<string, unknown>,
+      debugMode: boolean
+    ) => {
+      const CustomEventCtor = (win as unknown as { CustomEvent: typeof CustomEvent }).CustomEvent;
+      const event = new CustomEventCtor("openai:set_globals", {
+        detail: { globals },
+      });
+      win.dispatchEvent(event);
+      if (debugMode) {
+        // eslint-disable-next-line no-console
+        console.log("[OpenAI Host] Dispatched set_globals:", globals);
+      }
+    };
+
     return {
       // Tool output as JSON string (ChatGPT convention)
       toolOutput: toolOutputStr,
@@ -243,15 +354,23 @@ export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptio
         toolName: this.options.toolName,
       },
 
-      // Context properties
-      theme: env.theme ?? "light",
-      displayMode: env.displayMode ?? "inline",
+      // Context properties (getters/setters for mutable state, static for others)
+      get theme() {
+        return sdkState.theme;
+      },
+      set theme(value: "light" | "dark") {
+        sdkState.theme = value;
+      },
+      get displayMode() {
+        return sdkState.displayMode;
+      },
       locale: env.locale ?? "en-US",
-      maxHeight: env.maxHeight ?? null,
+      get maxHeight() {
+        return sdkState.maxHeight;
+      },
       safeArea: env.safeAreaInsets ?? { top: 0, right: 0, bottom: 0, left: 0 },
-      userAgent: env.userAgent ?? {
-        device: { type: "desktop" },
-        capabilities: { hover: true, touch: false },
+      get userAgent() {
+        return sdkState.userAgent;
       },
       userLocation: env.userLocation,
 
@@ -289,9 +408,44 @@ export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptio
         // No-op for emulator
       },
 
-      // Display mode
-      requestDisplayMode: async (opts: { mode: string }) => {
-        return { mode: opts.mode };
+      // Display mode - updates sizing and dispatches set_globals
+      requestDisplayMode: async function (
+        this: { dispatchGlobals?: (globals: Record<string, unknown>) => void },
+        opts: { mode: string }
+      ) {
+        const mode = opts.mode as DisplayMode;
+        const deviceType = sdkState.userAgent?.device?.type;
+        const plat = getPlatformFromDeviceType(deviceType);
+        const sizing = getDisplayModeSizing(mode, plat);
+
+        // Update SDK state
+        sdkState.displayMode = mode;
+        sdkState.maxHeight = sizing.maxHeight;
+        sdkState.viewport = { width: sizing.width, height: sizing.height };
+
+        // Dispatch set_globals event with updated sizing
+        // Note: In jsdom context, we need to access window from the test
+        // The actual dispatch happens via the window reference
+        /* eslint-disable no-undef */
+        if (typeof window !== "undefined") {
+          dispatchGlobalsUpdate(
+            window,
+            /* eslint-enable no-undef */
+            {
+              displayMode: mode,
+              maxHeight: sizing.maxHeight,
+              viewport: sdkState.viewport,
+            },
+            debug
+          );
+        }
+
+        if (debug) {
+          // eslint-disable-next-line no-console
+          console.log("[OpenAI Host] requestDisplayMode:", mode, "sizing:", sizing);
+        }
+
+        return { mode };
       },
 
       // Links
