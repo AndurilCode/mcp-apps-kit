@@ -7,6 +7,11 @@ export {
   type UseResizablePanelResult,
 } from "./useResizablePanel";
 export {
+  useResizablePanelWidth,
+  type UseResizablePanelWidthOptions,
+  type UseResizablePanelWidthResult,
+} from "./useResizablePanelWidth";
+export {
   useGlobals,
   type GlobalsState,
   type UseGlobalsResult,
@@ -20,7 +25,6 @@ export { useAgentEventStream, type UseAgentEventStreamResult } from "./useAgentE
 export {
   useMcpPrimitives,
   type McpTool,
-  type McpToolInputSchema,
   type McpResource,
   type McpPrompt,
   type McpPrimitives,

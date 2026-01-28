@@ -193,16 +193,26 @@ export const styles: Record<string, CSSProperties> = {
     flexShrink: 0,
   },
 
-  // Content Wrapper
+  // Content Wrapper - horizontal layout with side panels and center column
   contentWrapper: {
     flex: 1,
     display: "flex",
-    flexDirection: "column",
+    flexDirection: "row",
     minHeight: 0,
     overflow: "hidden",
   },
 
-  // Content Row (Main + Globals Panel)
+  // Center Column - contains main content and bottom panel
+  centerColumn: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    minHeight: 0,
+    minWidth: 0,
+    overflow: "hidden",
+  },
+
+  // Content Row (legacy - kept for compatibility but not used in new layout)
   contentRow: {
     flex: 1,
     display: "flex",

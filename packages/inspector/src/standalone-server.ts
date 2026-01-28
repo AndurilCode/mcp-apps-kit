@@ -390,6 +390,12 @@ export function createStandaloneInspectorServer(
       return;
     }
 
+    // Handle /mcp/primitives before routing to MCP app
+    if (url === "/mcp/primitives" && req.method === "GET") {
+      const handled = await handleDashboardRequest(req, res, connectionManager);
+      if (handled) return;
+    }
+
     // Route MCP requests to the app
     if (url.startsWith("/mcp")) {
       // Convert to Web Request

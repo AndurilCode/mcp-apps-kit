@@ -37,6 +37,12 @@ export interface McpPrimitivesPanelProps {
   onToggleCollapse?: () => void;
   /** Panel position affects styling */
   position: "center" | "left";
+  /** Panel width (for resizable left panel) */
+  panelWidth?: number;
+  /** Resize handle props (for resizable left panel) */
+  resizeHandleProps?: React.HTMLAttributes<HTMLDivElement>;
+  /** Whether resize is active */
+  isResizing?: boolean;
 }
 
 // =============================================================================
@@ -49,7 +55,7 @@ const localStyles: Record<string, React.CSSProperties> = {
     display: "flex",
     flexDirection: "column",
     overflow: "hidden",
-    transition: "width 0.25s ease, opacity 0.2s ease",
+    transition: "width 0.25s ease, opacity 0.3s ease, transform 0.3s ease",
     height: "100%",
   },
   panelLeft: {
@@ -59,9 +65,12 @@ const localStyles: Record<string, React.CSSProperties> = {
   },
   panelCenter: {
     width: "100%",
-    maxWidth: "800px",
+    height: "100%",
     border: "1px solid #2d2f2f",
     borderRadius: "8px",
+  },
+  panelCenterAppear: {
+    animation: "panelAppear 0.4s ease-out forwards",
   },
   panelCollapsed: {
     width: 0,
@@ -224,28 +233,31 @@ const localStyles: Record<string, React.CSSProperties> = {
   },
   schemaItem: {
     display: "flex",
-    alignItems: "flex-start",
-    gap: "0.5rem",
-    padding: "0.25rem 0",
+    flexDirection: "column",
+    gap: "0.25rem",
+    padding: "0.375rem 0",
     borderBottom: "1px solid #1a1a1a",
   },
   schemaItemLast: {
     borderBottom: "none",
+  },
+  schemaItemHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    flexWrap: "wrap" as const,
   },
   schemaName: {
     fontFamily:
       "'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace",
     fontSize: "0.6875rem",
     color: "#9cdcfe",
-    flexShrink: 0,
-    minWidth: "80px",
   },
   schemaType: {
     fontFamily:
       "'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace",
     fontSize: "0.625rem",
     color: "#b5cea8",
-    flexShrink: 0,
   },
   schemaRequired: {
     fontSize: "0.5rem",
@@ -256,7 +268,30 @@ const localStyles: Record<string, React.CSSProperties> = {
   schemaDesc: {
     fontSize: "0.625rem",
     color: "#6b7280",
-    flex: 1,
+    lineHeight: 1.4,
+    paddingLeft: "0.25rem",
+  },
+  // Widget badge for tools with UI
+  widgetBadge: {
+    fontSize: "0.5rem",
+    fontWeight: 600,
+    color: "#b39ddb",
+    backgroundColor: "rgba(179, 157, 219, 0.15)",
+    padding: "0.125rem 0.375rem",
+    borderRadius: "3px",
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.03em",
+  },
+  // Resize handle for left panel
+  resizeHandle: {
+    width: "6px",
+    backgroundColor: "#2d2f2f",
+    cursor: "ew-resize",
+    flexShrink: 0,
+    transition: "background-color 0.15s ease",
+  },
+  resizeHandleActive: {
+    backgroundColor: "#20b2aa",
   },
   resourceUri: {
     fontFamily:
@@ -278,6 +313,47 @@ const localStyles: Record<string, React.CSSProperties> = {
     borderRadius: "3px",
     marginTop: "0.25rem",
   },
+  // Metadata section (annotations, _meta)
+  metaSection: {
+    marginTop: "0.5rem",
+    padding: "0.5rem",
+    backgroundColor: "rgba(255, 255, 255, 0.02)",
+    borderRadius: "4px",
+    border: "1px solid #1a1a1a",
+  },
+  metaSectionTitle: {
+    fontSize: "0.5625rem",
+    fontWeight: 600,
+    color: "#6b7280",
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.05em",
+    marginBottom: "0.375rem",
+  },
+  metaItem: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "0.5rem",
+    padding: "0.125rem 0",
+    fontSize: "0.625rem",
+  },
+  metaKey: {
+    fontFamily:
+      "'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace",
+    color: "#9cdcfe",
+    flexShrink: 0,
+  },
+  metaValue: {
+    fontFamily:
+      "'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace",
+    color: "#ce9178",
+    wordBreak: "break-all" as const,
+  },
+  metaValueBool: {
+    color: "#569cd6",
+  },
+  metaValueNumber: {
+    color: "#b5cea8",
+  },
 };
 
 // =============================================================================
@@ -298,15 +374,31 @@ function formatType(prop: JsonSchemaProperty): string {
 }
 
 /**
+ * Inject keyframe animations
+ */
+function KeyframeStyles(): React.ReactElement {
+  return (
+    <style>{`
+      @keyframes spin { to { transform: rotate(360deg); } }
+      @keyframes panelAppear {
+        from {
+          opacity: 0;
+          transform: scale(0.95) translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1) translateY(0);
+        }
+      }
+    `}</style>
+  );
+}
+
+/**
  * Spinner component for loading state
  */
 function Spinner(): React.ReactElement {
-  return (
-    <>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      <div style={localStyles.spinner} />
-    </>
-  );
+  return <div style={localStyles.spinner} />;
 }
 
 /**
@@ -371,10 +463,12 @@ function SchemaProperties({
             ...(index === entries.length - 1 ? localStyles.schemaItemLast : {}),
           }}
         >
-          <span style={localStyles.schemaName}>{name}</span>
-          <span style={localStyles.schemaType}>{formatType(prop)}</span>
-          {required.includes(name) && <span style={localStyles.schemaRequired}>req</span>}
-          {prop.description && <span style={localStyles.schemaDesc}>{prop.description}</span>}
+          <div style={localStyles.schemaItemHeader}>
+            <span style={localStyles.schemaName}>{name}</span>
+            <span style={localStyles.schemaType}>{formatType(prop)}</span>
+            {required.includes(name) && <span style={localStyles.schemaRequired}>req</span>}
+          </div>
+          {prop.description && <div style={localStyles.schemaDesc}>{prop.description}</div>}
         </div>
       ))}
     </div>
@@ -398,11 +492,90 @@ function PromptArguments({ args }: { args: McpPromptArgument[] }): React.ReactEl
             ...(index === args.length - 1 ? localStyles.schemaItemLast : {}),
           }}
         >
-          <span style={localStyles.schemaName}>{arg.name}</span>
-          {arg.required && <span style={localStyles.schemaRequired}>req</span>}
-          {arg.description && <span style={localStyles.schemaDesc}>{arg.description}</span>}
+          <div style={localStyles.schemaItemHeader}>
+            <span style={localStyles.schemaName}>{arg.name}</span>
+            {arg.required && <span style={localStyles.schemaRequired}>req</span>}
+          </div>
+          {arg.description && <div style={localStyles.schemaDesc}>{arg.description}</div>}
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Check if a tool has UI (widget)
+ */
+function hasToolUI(tool: McpTool): boolean {
+  const meta = tool._meta;
+  if (!meta) return false;
+
+  // MCP Apps format: _meta.ui.resourceUri
+  const uiMeta = meta.ui as Record<string, unknown> | undefined;
+  if (uiMeta?.resourceUri) return true;
+
+  // Alternative MCP format: _meta["ui/resourceUri"]
+  if (meta["ui/resourceUri"]) return true;
+
+  // OpenAI format: _meta["openai/outputTemplate"]
+  if (meta["openai/outputTemplate"]) return true;
+
+  return false;
+}
+
+/**
+ * Format a metadata value for display
+ */
+function formatMetaValue(value: unknown): { text: string; style: React.CSSProperties } {
+  const defaultStyle = localStyles.metaValue as React.CSSProperties;
+  const boolStyle = localStyles.metaValueBool as React.CSSProperties;
+  const numberStyle = localStyles.metaValueNumber as React.CSSProperties;
+
+  if (value === null) {
+    return { text: "null", style: boolStyle };
+  }
+  if (typeof value === "boolean") {
+    return { text: String(value), style: boolStyle };
+  }
+  if (typeof value === "number") {
+    return { text: String(value), style: numberStyle };
+  }
+  if (typeof value === "string") {
+    return { text: value, style: defaultStyle };
+  }
+  if (Array.isArray(value)) {
+    return { text: JSON.stringify(value), style: defaultStyle };
+  }
+  if (typeof value === "object") {
+    return { text: JSON.stringify(value), style: defaultStyle };
+  }
+  return { text: String(value), style: defaultStyle };
+}
+
+/**
+ * Render a metadata section (annotations or _meta)
+ */
+function MetadataSection({
+  title,
+  data,
+}: {
+  title: string;
+  data: Record<string, unknown> | undefined;
+}): React.ReactElement | null {
+  if (!data || Object.keys(data).length === 0) return null;
+
+  return (
+    <div style={localStyles.metaSection}>
+      <div style={localStyles.metaSectionTitle}>{title}</div>
+      {Object.entries(data).map(([key, value]) => {
+        const formatted = formatMetaValue(value);
+        return (
+          <div key={key} style={localStyles.metaItem}>
+            <span style={localStyles.metaKey}>{key}:</span>
+            <span style={formatted.style}>{formatted.text}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -412,10 +585,15 @@ function PromptArguments({ args }: { args: McpPromptArgument[] }): React.ReactEl
 // =============================================================================
 
 function ToolCard({ tool }: { tool: McpTool }): React.ReactElement {
+  const hasUI = hasToolUI(tool);
+
   return (
     <div style={localStyles.card}>
       <div style={localStyles.cardHeader}>
-        <span style={localStyles.cardName}>{tool.name}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <span style={localStyles.cardName}>{tool.name}</span>
+          {hasUI && <span style={localStyles.widgetBadge}>Widget</span>}
+        </div>
         <CopyButton data={tool} />
       </div>
       {tool.description && <div style={localStyles.cardDescription}>{tool.description}</div>}
@@ -436,13 +614,20 @@ function ToolCard({ tool }: { tool: McpTool }): React.ReactElement {
                 ...(index === arr.length - 1 ? localStyles.schemaItemLast : {}),
               }}
             >
-              <span style={localStyles.schemaName}>{name}</span>
-              <span style={localStyles.schemaType}>{formatType(prop)}</span>
-              {prop.description && <span style={localStyles.schemaDesc}>{prop.description}</span>}
+              <div style={localStyles.schemaItemHeader}>
+                <span style={localStyles.schemaName}>{name}</span>
+                <span style={localStyles.schemaType}>{formatType(prop)}</span>
+              </div>
+              {prop.description && <div style={localStyles.schemaDesc}>{prop.description}</div>}
             </div>
           ))}
         </div>
       )}
+      <MetadataSection
+        title="Annotations"
+        data={tool.annotations as Record<string, unknown> | undefined}
+      />
+      <MetadataSection title="Metadata" data={tool._meta} />
     </div>
   );
 }
@@ -459,6 +644,11 @@ function ResourceCard({ resource }: { resource: McpResource }): React.ReactEleme
         <div style={localStyles.cardDescription}>{resource.description}</div>
       )}
       {resource.mimeType && <span style={localStyles.resourceMimeType}>{resource.mimeType}</span>}
+      <MetadataSection
+        title="Annotations"
+        data={resource.annotations as Record<string, unknown> | undefined}
+      />
+      <MetadataSection title="Metadata" data={resource._meta} />
     </div>
   );
 }
@@ -474,6 +664,7 @@ function PromptCard({ prompt }: { prompt: McpPrompt }): React.ReactElement {
       {prompt.arguments && prompt.arguments.length > 0 && (
         <PromptArguments args={prompt.arguments} />
       )}
+      <MetadataSection title="Metadata" data={prompt._meta} />
     </div>
   );
 }
@@ -491,6 +682,9 @@ export function McpPrimitivesPanel({
   isCollapsed = false,
   onToggleCollapse,
   position,
+  panelWidth,
+  resizeHandleProps,
+  isResizing,
 }: McpPrimitivesPanelProps): React.ReactElement {
   const [activeTab, setActiveTab] = useState<TabType>("tools");
 
@@ -499,6 +693,8 @@ export function McpPrimitivesPanel({
     ...localStyles.panel,
     ...(position === "left" ? localStyles.panelLeft : localStyles.panelCenter),
     ...(position === "left" && !isVisible ? localStyles.panelCollapsed : {}),
+    ...(position === "center" ? localStyles.panelCenterAppear : {}),
+    ...(position === "left" && panelWidth ? { width: panelWidth } : {}),
   };
 
   // Handle collapsed state for left position
@@ -565,8 +761,64 @@ export function McpPrimitivesPanel({
     }
   };
 
+  // Wrapper for left position with resize handle
+  if (position === "left" && resizeHandleProps) {
+    return (
+      <>
+        <div style={panelStyle}>
+          <KeyframeStyles />
+          <div style={localStyles.header}>
+            <span style={localStyles.title}>MCP Primitives</span>
+            {onToggleCollapse && (
+              <button
+                style={localStyles.collapseBtn}
+                onClick={onToggleCollapse}
+                title="Collapse panel"
+              >
+                ◀
+              </button>
+            )}
+          </div>
+
+          <div style={localStyles.tabs}>
+            {tabs.map((tab) => (
+              <button
+                key={tab.type}
+                style={{
+                  ...localStyles.tab,
+                  ...(activeTab === tab.type ? localStyles.tabActive : {}),
+                }}
+                onClick={() => setActiveTab(tab.type)}
+              >
+                {tab.label}
+                <span
+                  style={{
+                    ...localStyles.tabCount,
+                    ...(activeTab === tab.type ? localStyles.tabCountActive : {}),
+                  }}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div style={localStyles.content}>{renderContent()}</div>
+        </div>
+        <div
+          {...resizeHandleProps}
+          style={{
+            ...localStyles.resizeHandle,
+            ...(isResizing ? localStyles.resizeHandleActive : {}),
+          }}
+        />
+      </>
+    );
+  }
+
   return (
     <div style={panelStyle}>
+      <KeyframeStyles />
       <div style={localStyles.header}>
         <span style={localStyles.title}>MCP Primitives</span>
         {position === "left" && onToggleCollapse && (
