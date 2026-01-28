@@ -118,6 +118,11 @@ export class WidgetSessionManager extends EventEmitter {
   ): InspectorEvent | null {
     const session = this.store.peek(sessionId);
     if (!session) {
+      if (this.debug) {
+        console.log(
+          `[WidgetSessionManager] Dropping event ${type} - session ${sessionId} not found`
+        );
+      }
       return null;
     }
 
