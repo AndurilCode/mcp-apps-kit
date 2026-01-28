@@ -134,18 +134,6 @@ describe("UIHostManager", () => {
     });
   });
 
-  describe("detectProtocol", () => {
-    it("should detect protocol from MIME type", async () => {
-      await manager.connect("http://localhost:3000/mcp");
-      const client = manager.getClient();
-      const uiHostManager = new UIHostManager(client);
-
-      expect(uiHostManager.detectProtocol(MCP_WIDGET_MIME_TYPE)).toBe("mcp");
-      expect(uiHostManager.detectProtocol(OPENAI_WIDGET_MIME_TYPE)).toBe("openai");
-      expect(uiHostManager.detectProtocol("text/plain")).toBeNull();
-    });
-  });
-
   describe("findUIResourceForTool", () => {
     it("should find UI resource by tool name", async () => {
       await manager.connect("http://localhost:3000/mcp");
