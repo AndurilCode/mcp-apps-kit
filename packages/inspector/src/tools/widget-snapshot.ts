@@ -232,42 +232,13 @@ export function createWidgetSnapshotTool(connectionManager: ConnectionManager) {
     output: widgetSnapshotOutputSchema,
     handler: async (input): Promise<WidgetSnapshotOutput> => {
       const sessionManager = connectionManager.getWidgetSessionManager();
-      const session = sessionManager.getSession(input.sessionId);
-
-      if (!session) {
-        return {
-          success: false,
-          error: `Session not found: ${input.sessionId}`,
-          hints: {
-            next: "Create a new session with preview_ui or call_tool(renderWidget=true)",
-          },
-        };
+      const validation = validateWidgetSession(sessionManager, input.sessionId);
+      if (!validation.success) {
+        return { success: false, error: validation.error, hints: validation.hints };
       }
-
-      if (session.page.isClosed()) {
-        return {
-          success: false,
-          error: "Page closed",
-          hints: {
-            next: "Create a new session with preview_ui or call_tool(renderWidget=true)",
-          },
-        };
-      }
+      const { session, frame } = validation;
 
       try {
-        // Target the widget iframe
-        const frame = session.page.frame({ url: /\/widget\// });
-        if (!frame) {
-          return {
-            success: false,
-            error: "Widget iframe not found",
-            hints: {
-              next: "Wait for widget to load, or verify session is valid",
-              warning: "Widget may still be loading",
-            },
-          };
-        }
-
         // Get accessibility tree using Playwright's ariaSnapshot() API
         // This returns a YAML representation of the accessibility tree
         const ariaSnapshot = await frame.locator("body").ariaSnapshot();
