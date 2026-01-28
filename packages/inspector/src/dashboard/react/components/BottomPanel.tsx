@@ -1,81 +1,143 @@
 /**
  * BottomPanel Component
  *
- * Container for logs and events panels with view mode selector.
+ * Container for logs, events, and agent panels with toggle controls.
  * Features:
- * - View mode selector buttons: Logs, Events, Split
- * - Single panel mode shows LogsPanel or EventsPanel
- * - Split mode shows both side-by-side with vertical divider
+ * - Toggle buttons for each panel: Logs, Events, Agent
+ * - Dynamic layout based on visible panels (1, 2, or 3 side-by-side)
  * - Collapse/expand toggle
  * - Clear all button
+ * - Panel visibility persisted to localStorage
  */
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useCallback, useMemo } from "react";
 import type { LogEntry } from "../hooks/useLogStream";
-import type { InspectorEvent } from "../../../types";
+import type { InspectorEvent, AgnosticInspectorEvent } from "../../../types";
 import { styles } from "../styles";
 import { LogsPanel } from "./LogsPanel";
 import { EventsPanel } from "./EventsPanel";
+import { AgentPanel } from "./AgentPanel";
 
-export type ViewMode = "logs" | "events" | "split";
+/**
+ * Panel visibility state
+ */
+export interface PanelVisibility {
+  logs: boolean;
+  events: boolean;
+  agent: boolean;
+}
 
 export interface BottomPanelProps {
   /** Array of log entries */
   logs: LogEntry[];
   /** Array of inspector events */
   events: InspectorEvent[];
+  /** Array of agent events */
+  agentEvents: AgnosticInspectorEvent[];
   /** Callback to clear all logs */
   onClearLogs: () => void;
   /** Callback to clear all events */
   onClearEvents: () => void;
+  /** Callback to clear all agent events */
+  onClearAgentEvents: () => void;
   /** Current panel height */
   panelHeight: number;
   /** Whether the panel is collapsed */
   isCollapsed: boolean;
   /** Toggle panel collapse state */
   onToggleCollapse: () => void;
+  /** Current panel visibility state */
+  panelVisibility: PanelVisibility;
+  /** Callback to toggle a panel's visibility */
+  onTogglePanel: (panel: keyof PanelVisibility) => void;
 }
 
 export function BottomPanel({
   logs,
   events,
+  agentEvents,
   onClearLogs,
   onClearEvents,
+  onClearAgentEvents,
   panelHeight,
   isCollapsed,
   onToggleCollapse,
+  panelVisibility,
+  onTogglePanel,
 }: BottomPanelProps): React.ReactElement {
-  // Persist view mode in localStorage
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("mcp-dashboard-view-mode");
-      if (stored === "logs" || stored === "events" || stored === "split") {
-        return stored;
-      }
-    }
-    return "split";
-  });
-
-  // Save view mode
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("mcp-dashboard-view-mode", viewMode);
-    }
-  }, [viewMode]);
-
-  const handleViewModeChange = useCallback((mode: ViewMode) => {
-    setViewMode(mode);
-  }, []);
-
   const handleClearAll = useCallback(() => {
     onClearLogs();
     onClearEvents();
-  }, [onClearLogs, onClearEvents]);
+    onClearAgentEvents();
+  }, [onClearLogs, onClearEvents, onClearAgentEvents]);
 
-  const getViewModeBtnStyle = (mode: ViewMode): React.CSSProperties => ({
+  const getToggleBtnStyle = (isActive: boolean): React.CSSProperties => ({
     ...(styles.viewModeBtn as React.CSSProperties),
-    ...(viewMode === mode ? (styles.viewModeBtnActive as React.CSSProperties) : {}),
+    ...(isActive ? (styles.viewModeBtnActive as React.CSSProperties) : {}),
   });
+
+  // Count visible panels
+  const visiblePanelCount = useMemo(() => {
+    let count = 0;
+    if (panelVisibility.logs) count++;
+    if (panelVisibility.events) count++;
+    if (panelVisibility.agent) count++;
+    return count;
+  }, [panelVisibility]);
+
+  // Render visible panels
+  const renderPanels = useCallback(() => {
+    const panels: React.ReactNode[] = [];
+
+    if (panelVisibility.logs) {
+      panels.push(
+        <div key="logs" style={styles.splitPane as React.CSSProperties}>
+          <LogsPanel logs={logs} onClearLogs={onClearLogs} showHeader={visiblePanelCount > 1} />
+        </div>
+      );
+    }
+
+    if (panelVisibility.events) {
+      if (panels.length > 0) {
+        panels.push(<div key="divider1" style={styles.splitDivider as React.CSSProperties} />);
+      }
+      panels.push(
+        <div key="events" style={styles.splitPane as React.CSSProperties}>
+          <EventsPanel
+            events={events}
+            onClearEvents={onClearEvents}
+            showHeader={visiblePanelCount > 1}
+          />
+        </div>
+      );
+    }
+
+    if (panelVisibility.agent) {
+      if (panels.length > 0) {
+        panels.push(<div key="divider2" style={styles.splitDivider as React.CSSProperties} />);
+      }
+      panels.push(
+        <div key="agent" style={styles.splitPane as React.CSSProperties}>
+          <AgentPanel
+            events={agentEvents}
+            onClearEvents={onClearAgentEvents}
+            showHeader={visiblePanelCount > 1}
+          />
+        </div>
+      );
+    }
+
+    return panels;
+  }, [
+    panelVisibility,
+    logs,
+    events,
+    agentEvents,
+    onClearLogs,
+    onClearEvents,
+    onClearAgentEvents,
+    visiblePanelCount,
+  ]);
 
   return (
     <>
@@ -83,25 +145,25 @@ export function BottomPanel({
       <div style={styles.logsHeader}>
         <div style={styles.viewModeSelector as React.CSSProperties}>
           <button
-            style={getViewModeBtnStyle("logs")}
-            onClick={() => handleViewModeChange("logs")}
-            title="Show logs only"
+            style={getToggleBtnStyle(panelVisibility.logs)}
+            onClick={() => onTogglePanel("logs")}
+            title={panelVisibility.logs ? "Hide logs panel" : "Show logs panel"}
           >
             Logs ({logs.length})
           </button>
           <button
-            style={getViewModeBtnStyle("events")}
-            onClick={() => handleViewModeChange("events")}
-            title="Show events only"
+            style={getToggleBtnStyle(panelVisibility.events)}
+            onClick={() => onTogglePanel("events")}
+            title={panelVisibility.events ? "Hide events panel" : "Show events panel"}
           >
             Events ({events.length})
           </button>
           <button
-            style={getViewModeBtnStyle("split")}
-            onClick={() => handleViewModeChange("split")}
-            title="Show logs and events side by side"
+            style={getToggleBtnStyle(panelVisibility.agent)}
+            onClick={() => onTogglePanel("agent")}
+            title={panelVisibility.agent ? "Hide agent panel" : "Show agent panel"}
           >
-            Split
+            Agent ({agentEvents.length})
           </button>
         </div>
         <div style={styles.logsControls}>
@@ -129,24 +191,12 @@ export function BottomPanel({
             height: panelHeight - 36, // Subtract header height
           }}
         >
-          {viewMode === "logs" && (
-            <LogsPanel logs={logs} onClearLogs={onClearLogs} showHeader={false} />
-          )}
-
-          {viewMode === "events" && (
-            <EventsPanel events={events} onClearEvents={onClearEvents} showHeader={false} />
-          )}
-
-          {viewMode === "split" && (
-            <>
-              <div style={styles.splitPane as React.CSSProperties}>
-                <LogsPanel logs={logs} onClearLogs={onClearLogs} showHeader={true} />
-              </div>
-              <div style={styles.splitDivider as React.CSSProperties} />
-              <div style={styles.splitPane as React.CSSProperties}>
-                <EventsPanel events={events} onClearEvents={onClearEvents} showHeader={true} />
-              </div>
-            </>
+          {visiblePanelCount === 0 ? (
+            <div style={styles.eventsEmpty as React.CSSProperties}>
+              No panels selected. Click a panel button above to show it.
+            </div>
+          ) : (
+            renderPanels()
           )}
         </div>
       )}

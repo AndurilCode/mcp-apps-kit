@@ -750,6 +750,11 @@ export const styles: Record<string, CSSProperties> = {
     color: "#ffc107",
   },
 
+  eventBadgeAgent: {
+    backgroundColor: "rgba(255, 152, 0, 0.15)",
+    color: "#ff9800",
+  },
+
   eventType: {
     fontSize: "0.625rem",
     color: "#6b7280",

@@ -238,15 +238,29 @@ export function createStandaloneInspectorServer(
         }
         const bodyData = Buffer.concat(chunks);
 
+        // Parse body outside of try/catch so toolName is available in catch
+        let sessionId: string | undefined;
+        let toolName: string;
+        let args: Record<string, unknown>;
+
         try {
-          const { sessionId, toolName, args } = JSON.parse(bodyData.toString("utf-8")) as {
+          const parsed = JSON.parse(bodyData.toString("utf-8")) as {
             sessionId?: string;
             toolName: string;
             args: Record<string, unknown>;
             messageId?: string | number;
             callId?: number;
           };
+          sessionId = parsed.sessionId;
+          toolName = parsed.toolName;
+          args = parsed.args;
+        } catch {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Invalid JSON body" }));
+          return;
+        }
 
+        try {
           // Check if connected to a server
           const state = connectionManager.getState();
           if (!state.connected) {
@@ -305,6 +319,7 @@ export function createStandaloneInspectorServer(
           );
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
+
           res.writeHead(500, { "Content-Type": "application/json" });
           res.end(
             JSON.stringify({
@@ -389,6 +404,33 @@ export function createStandaloneInspectorServer(
       }
       const body = Buffer.concat(chunks);
 
+      // Track inspector tool calls for the Agent panel
+      let inspectorToolCall: { name: string; arguments: unknown; startTime: number } | null = null;
+      if (body.length > 0) {
+        try {
+          const parsed = JSON.parse(body.toString("utf-8")) as {
+            method?: string;
+            params?: { name?: string; arguments?: unknown };
+          };
+          // Check if this is a tools/call request (MCP JSON-RPC)
+          if (parsed.method === "tools/call" && parsed.params?.name) {
+            inspectorToolCall = {
+              name: parsed.params.name,
+              arguments: parsed.params.arguments,
+              startTime: Date.now(),
+            };
+            // Record inspector tool call event
+            connectionManager.recordAgentEvent("agent-tool-call", {
+              name: inspectorToolCall.name,
+              arguments: inspectorToolCall.arguments,
+              source: "inspector",
+            });
+          }
+        } catch {
+          // Not valid JSON or not a tool call, ignore
+        }
+      }
+
       const webRequest = new Request(requestUrl, {
         method: req.method ?? "GET",
         headers: Object.entries(req.headers)
@@ -398,6 +440,45 @@ export function createStandaloneInspectorServer(
       });
 
       const webResponse = await app.handleRequest(webRequest);
+
+      // Record inspector tool result if this was a tool call
+      if (inspectorToolCall) {
+        const duration = Date.now() - inspectorToolCall.startTime;
+        // Try to parse response to check for errors and extract result
+        let isError = webResponse.status >= 400;
+        let result: unknown;
+        try {
+          const responseClone = webResponse.clone();
+          const responseText = await responseClone.text();
+          const responseJson = JSON.parse(responseText) as {
+            error?: unknown;
+            result?: unknown & { isError?: boolean };
+          };
+          if (responseJson.error) {
+            isError = true;
+            result = responseJson.error;
+          } else if (responseJson.result) {
+            if (
+              typeof responseJson.result === "object" &&
+              responseJson.result !== null &&
+              "isError" in responseJson.result &&
+              responseJson.result.isError
+            ) {
+              isError = true;
+            }
+            result = responseJson.result;
+          }
+        } catch {
+          // Ignore parse errors
+        }
+        connectionManager.recordAgentEvent("agent-tool-result", {
+          name: inspectorToolCall.name,
+          isError,
+          duration,
+          result,
+          source: "inspector",
+        });
+      }
 
       // Convert Web Response to Node response
       res.writeHead(webResponse.status, Object.fromEntries(webResponse.headers.entries()));

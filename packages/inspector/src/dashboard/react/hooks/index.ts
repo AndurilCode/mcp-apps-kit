@@ -15,3 +15,5 @@ export {
   type UserAgentInfo,
   type UserLocationInfo,
 } from "./useGlobals";
+export { useEventStream, type UseEventStreamResult } from "./useEventStream";
+export { useAgentEventStream, type UseAgentEventStreamResult } from "./useAgentEventStream";

@@ -16,7 +16,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ConnectionManager } from "../connection";
-import type { InspectorEvent } from "../types";
+import type { InspectorEvent, AgnosticInspectorEvent } from "../types";
 import { CDPStreamer } from "./cdp-streamer";
 
 // Dashboard HTML file path (built by Vite)
@@ -104,6 +104,12 @@ export async function handleDashboardRequest(
   // GET /dashboard/globals - Get current environment state
   if (pathname === "/dashboard/globals" && req.method === "GET") {
     serveGlobals(res, connectionManager);
+    return true;
+  }
+
+  // GET /dashboard/agent-events - SSE agent event stream (session-agnostic)
+  if (pathname === "/dashboard/agent-events" && req.method === "GET") {
+    startAgentEventStream(req, res, connectionManager);
     return true;
   }
 
@@ -411,6 +417,49 @@ function startEventStream(
   // Clean up on connection close
   const cleanup = (): void => {
     sessionManager.off("event", eventHandler);
+  };
+
+  req.on("close", cleanup);
+  req.on("error", cleanup);
+}
+
+/**
+ * Start SSE stream for session-agnostic agent events
+ *
+ * Agent events are tool calls made by the inspector agent on the connected
+ * MCP server that are not tied to a specific widget session.
+ */
+function startAgentEventStream(
+  req: IncomingMessage,
+  res: ServerResponse,
+  connectionManager: ConnectionManager
+): void {
+  // Set up SSE headers
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "Access-Control-Allow-Origin": "*",
+  });
+
+  // Send initial batch of existing agent events
+  const existingEvents = connectionManager.getAgentEvents();
+  if (existingEvents.length > 0) {
+    res.write(`event: events\ndata: ${JSON.stringify({ events: existingEvents })}\n\n`);
+  }
+
+  // Subscribe to real-time agent events via EventEmitter
+  const eventHandler = (event: AgnosticInspectorEvent): void => {
+    if (!res.writableEnded) {
+      res.write(`event: event\ndata: ${JSON.stringify(event)}\n\n`);
+    }
+  };
+
+  connectionManager.on("agentEvent", eventHandler);
+
+  // Clean up on connection close
+  const cleanup = (): void => {
+    connectionManager.off("agentEvent", eventHandler);
   };
 
   req.on("close", cleanup);
