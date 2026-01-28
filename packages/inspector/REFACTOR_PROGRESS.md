@@ -6,13 +6,13 @@
 
 ---
 
-## Overall Status: 🟡 Phase 3 In Progress
+## Overall Status: ✅ All Phases Complete
 
-| Phase                        | Status         | Notes                               |
-| ---------------------------- | -------------- | ----------------------------------- |
-| Phase 1: Isolated Cleanups   | ✅ Complete    | All 3 branches merged               |
-| Phase 2: Core Refactor       | ✅ Complete    | Session module created & integrated |
-| Phase 3: Template Extraction | 🟡 In Progress | Extracting widget-server templates  |
+| Phase                        | Status      | Notes                               |
+| ---------------------------- | ----------- | ----------------------------------- |
+| Phase 1: Isolated Cleanups   | ✅ Complete | All 3 branches merged               |
+| Phase 2: Core Refactor       | ✅ Complete | Session module created & integrated |
+| Phase 3: Template Extraction | ✅ Complete | widget-server-templates.ts created  |
 
 ---
 
@@ -73,21 +73,23 @@
 
 ---
 
-## Phase 3: Template Extraction 🟡
+## Phase 3: Template Extraction ✅
 
-### Widget Server Templates
+### Widget Server Templates ✅
 
-- **Label:** `phase3-step1-templates`
-- **Status:** 🟡 Running
+- **Commit:** `7affc12`
+- **Status:** ✅ Complete
 - **Tasks:**
-  - [ ] Create `src/widget-server-templates.ts`
-  - [ ] Extract `generateMcpHostPage()` logic
-  - [ ] Extract `generateOpenAIHostPage()` logic
-  - [ ] Extract `injectOpenAIRuntime()` logic
-  - [ ] Extract shared DOM event listener scripts
-  - [ ] Update `widget-server.ts` to use templates module
-  - [ ] Run tests to verify no breakage
-- **Files to Change:** `src/widget-server.ts`, `src/widget-server-templates.ts`
+  - [x] Create `src/widget-server-templates.ts`
+  - [x] Extract `generateMcpHostPage()` logic
+  - [x] Extract `generateOpenAIHostPage()` logic
+  - [x] Extract `injectOpenAIRuntime()` logic
+  - [x] Extract shared DOM event listener scripts
+  - [x] Update `widget-server.ts` to use templates module
+  - [x] Run tests to verify no breakage (422 pass)
+- **Files Created/Changed:**
+  - `src/widget-server-templates.ts` — New templates module with shared utilities
+  - `src/widget-server.ts` — Reduced by ~80% by delegating to templates
 
 ---
 
@@ -99,6 +101,7 @@
 | 2026-01-28 09:34 | refactor/dead-code-cleanup     | inspector-refactor | ✅     | Clean merge                   |
 | 2026-01-28 09:34 | refactor/deprecate-interaction | inspector-refactor | ✅     | Conflict resolved (kept HEAD) |
 | 2026-01-28 09:51 | Phase 2 commits (71862de)      | inspector-refactor | ✅     | Session module complete       |
+| 2026-01-28 10:04 | Phase 3 commit (7affc12)       | inspector-refactor | ✅     | Template extraction complete  |
 
 ---
 
