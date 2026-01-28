@@ -98,6 +98,12 @@ export interface MCPResourceClient {
   readResource(params: { uri: string }): Promise<{
     contents: Array<{ text?: string } | Record<string, unknown>>;
   }>;
+  listTools(): Promise<{
+    tools: Array<{
+      name: string;
+      _meta?: Record<string, unknown>;
+    }>;
+  }>;
 }
 
 /**
@@ -144,17 +150,82 @@ export function extractToolResult(callResult: MCPCallToolResponse): unknown {
 }
 
 /**
+ * Extract UI resource URI from tool metadata
+ *
+ * Supports multiple formats:
+ * - MCP Apps format: _meta.ui.resourceUri
+ * - Flat MCP format: _meta["ui/resourceUri"]
+ * - OpenAI format: _meta["openai/outputTemplate"]
+ */
+function extractUIResourceUriFromMeta(meta: Record<string, unknown> | undefined): string | null {
+  if (!meta) return null;
+
+  // MCP Apps format: _meta.ui.resourceUri
+  const uiMeta = meta.ui as Record<string, unknown> | undefined;
+  if (uiMeta?.resourceUri) {
+    return uiMeta.resourceUri as string;
+  }
+
+  // Flat MCP format: _meta["ui/resourceUri"]
+  const flatResourceUri = meta["ui/resourceUri"] as string | undefined;
+  if (flatResourceUri) {
+    return flatResourceUri;
+  }
+
+  // OpenAI format: _meta["openai/outputTemplate"]
+  const openaiOutputTemplate = meta["openai/outputTemplate"] as string | undefined;
+  if (openaiOutputTemplate) {
+    return openaiOutputTemplate;
+  }
+
+  return null;
+}
+
+/**
  * Find UI resource for a tool by name
  *
- * Searches through resources looking for matching MIME types and URI patterns.
+ * First looks at the tool's _meta to find the resourceUri binding,
+ * then falls back to URI pattern matching for backwards compatibility.
  */
 export async function findUIResourceForTool(
   rawClient: MCPResourceClient,
   toolName: string
 ): Promise<UIResourceInfo | null> {
+  // Step 1: Get the tool's metadata to find the resourceUri binding
+  let targetUri: string | null = null;
+
+  try {
+    const toolsResult = await rawClient.listTools();
+    const tool = toolsResult.tools.find((t) => t.name === toolName);
+    if (tool?._meta) {
+      targetUri = extractUIResourceUriFromMeta(tool._meta);
+    }
+  } catch {
+    // If listTools fails, continue with pattern matching fallback
+  }
+
   const resourcesResult = await rawClient.listResources();
 
-  // Patterns to match tool name in URI
+  // Step 2: If we have a target URI from metadata, find that exact resource
+  if (targetUri) {
+    for (const resource of resourcesResult.resources) {
+      if (resource.uri === targetUri) {
+        const mimeType = resource.mimeType;
+        if (!mimeType) continue;
+
+        const protocol = detectProtocolFromMimeType(mimeType);
+        if (protocol) {
+          return {
+            uri: resource.uri,
+            mimeType,
+            protocol,
+          };
+        }
+      }
+    }
+  }
+
+  // Step 3: Fallback to pattern matching (backwards compatibility)
   const toolNamePatterns = [
     `__ui_${toolName}`,
     `/${toolName}?`,

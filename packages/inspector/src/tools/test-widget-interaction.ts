@@ -391,6 +391,7 @@ export function createTestWidgetInteractionTool(connectionManager: ConnectionMan
           protocol,
           toolResult,
           input.tool,
+          input.arguments ?? {},
           environmentState,
           viewport,
           undefined, // externalHostContext

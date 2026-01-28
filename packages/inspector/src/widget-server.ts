@@ -41,6 +41,8 @@ export interface WidgetSession {
   html: string;
   toolResult: unknown;
   toolName: string;
+  /** Arguments passed to the tool (tool input) */
+  toolArgs: Record<string, unknown>;
   protocol: "mcp" | "openai";
   createdAt: number;
   environmentState?: EnvironmentState;
@@ -165,6 +167,7 @@ export class WidgetServer {
   /**
    * Create a new widget session
    *
+   * @param toolArgs - Arguments passed to the tool (tool input)
    * @param externalHostContext - Raw MCP hostContext from external widget's ui/initialize response
    * @param inspectorUrl - Inspector server URL for tool call execution (e.g., "http://localhost:6274")
    */
@@ -172,6 +175,7 @@ export class WidgetServer {
     html: string,
     toolResult: unknown,
     toolName: string,
+    toolArgs: Record<string, unknown>,
     protocol: "mcp" | "openai",
     environmentState?: EnvironmentState,
     externalHostContext?: Record<string, unknown>,
@@ -184,6 +188,7 @@ export class WidgetServer {
       html,
       toolResult,
       toolName,
+      toolArgs,
       protocol,
       createdAt: Date.now(),
       environmentState,
@@ -321,6 +326,7 @@ export class WidgetServer {
   private generateMcpHostPage(session: WidgetSession): string {
     const toolResultJson = JSON.stringify(session.toolResult);
     const toolNameJson = JSON.stringify(session.toolName);
+    const toolArgsJson = JSON.stringify(session.toolArgs);
     const widgetUrl = `http://127.0.0.1:${this.port}/widget/${session.id}`;
     const env = session.environmentState;
 
@@ -340,6 +346,7 @@ export class WidgetServer {
       widgetUrl,
       toolResultJson,
       toolNameJson,
+      toolArgsJson,
       theme,
       displayMode,
       locale,

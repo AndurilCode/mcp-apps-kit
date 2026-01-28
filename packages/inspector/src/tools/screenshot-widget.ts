@@ -206,6 +206,7 @@ export function createScreenshotWidgetTool(connectionManager: ConnectionManager)
           protocol,
           toolResult,
           input.tool,
+          input.arguments ?? {},
           environmentState,
           viewport,
           undefined, // externalHostContext
