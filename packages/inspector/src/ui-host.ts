@@ -102,9 +102,7 @@ export class UIHostManager {
    * Detect protocol from MIME type
    */
   detectProtocol(mimeType: string): DetectedProtocol | null {
-    if (mimeType === MCP_WIDGET_MIME_TYPE) return "mcp";
-    if (mimeType === OPENAI_WIDGET_MIME_TYPE) return "openai";
-    return null;
+    return _detectProtocolFromMimeType(mimeType);
   }
 
   /**
