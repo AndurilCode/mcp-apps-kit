@@ -17,3 +17,12 @@ export {
 } from "./useGlobals";
 export { useEventStream, type UseEventStreamResult } from "./useEventStream";
 export { useAgentEventStream, type UseAgentEventStreamResult } from "./useAgentEventStream";
+export {
+  useMcpPrimitives,
+  type McpTool,
+  type McpToolInputSchema,
+  type McpResource,
+  type McpPrompt,
+  type McpPrimitives,
+  type UseMcpPrimitivesResult,
+} from "./useMcpPrimitives";
