@@ -34,7 +34,7 @@ export interface CreateSessionOptions {
 
 export class SessionStore {
   private sessions = new Map<string, ActiveWidgetSession>();
-  private cleanupTimer?: NodeJS.Timeout;
+  private cleanupTimer?: ReturnType<typeof setInterval>;
   private ttlMs: number;
   private debug: boolean;
 
@@ -43,7 +43,9 @@ export class SessionStore {
     this.ttlMs = options?.ttl ?? options?.ttlMs ?? 30 * 60 * 1000;
     this.debug = options?.debug ?? false;
     const cleanupInterval = options?.cleanupIntervalMs ?? 5 * 60 * 1000;
-    this.cleanupTimer = setInterval(() => this.cleanup(), cleanupInterval);
+    this.cleanupTimer = setInterval(() => {
+      this.cleanup();
+    }, cleanupInterval);
   }
 
   /**
