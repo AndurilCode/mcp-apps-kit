@@ -16,7 +16,7 @@
 import { createApp, type App, type ToolDefs } from "@mcp-apps-kit/core";
 import type { Server } from "http";
 import http from "http";
-import { ConnectionManager } from "./connection";
+import { ConnectionManager, inferProtocolType, type ProtocolType } from "./connection";
 import type {
   InspectorServerOptions,
   TargetServerSchema,
@@ -221,6 +221,9 @@ export function createDualInspectorServer(
     // Health check
     if (url === "/health") {
       const state = connectionManager.getState();
+      const schema = connectionManager.getTargetSchema();
+      const protocolType: ProtocolType | null =
+        state.connected && schema ? inferProtocolType(schema.tools) : null;
       const body = JSON.stringify({
         status: "ok",
         name: "mcp-inspector-dual",
@@ -232,11 +235,149 @@ export function createDualInspectorServer(
         connection: {
           connected: state.connected,
           serverUrl: state.serverUrl,
-          toolCount: connectionManager.getTargetSchema()?.tools.length ?? 0,
+          serverName: state.serverInfo?.name ?? null,
+          toolCount: schema?.tools.length ?? 0,
+          resourceCount: schema?.resources.length ?? 0,
+          promptCount: schema?.prompts.length ?? 0,
+          protocolType,
         },
       });
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(body);
+      return;
+    }
+
+    // API: Connect to a target server
+    if (url === "/api/connect") {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+      if (req.method === "OPTIONS") {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+
+      if (req.method === "POST") {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) {
+          chunks.push(chunk as Buffer);
+        }
+        const bodyData = Buffer.concat(chunks);
+
+        try {
+          const data = JSON.parse(bodyData.toString("utf-8")) as {
+            url?: string;
+            force?: boolean;
+          };
+
+          if (!data.url) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: false, error: "Missing url parameter" }));
+            return;
+          }
+
+          // Check if already connected
+          const currentState = connectionManager.getState();
+          if (currentState.connected && currentState.serverUrl) {
+            // If same URL, return success
+            if (currentState.serverUrl === data.url) {
+              const schema = connectionManager.getTargetSchema();
+              const protocolType = schema ? inferProtocolType(schema.tools) : "mcp";
+              res.writeHead(200, { "Content-Type": "application/json" });
+              res.end(
+                JSON.stringify({
+                  success: true,
+                  connected: true,
+                  serverUrl: data.url,
+                  serverInfo: currentState.serverInfo,
+                  toolCount: schema?.tools.length ?? 0,
+                  resourceCount: schema?.resources.length ?? 0,
+                  promptCount: schema?.prompts.length ?? 0,
+                  protocolType,
+                })
+              );
+              return;
+            }
+
+            // If different URL without force, return error
+            if (!data.force) {
+              res.writeHead(409, { "Content-Type": "application/json" });
+              res.end(
+                JSON.stringify({
+                  success: false,
+                  error: `Already connected to ${currentState.serverUrl}. Use force=true to disconnect and connect to ${data.url}.`,
+                })
+              );
+              return;
+            }
+          }
+
+          // Connect (will disconnect first if force=true and already connected)
+          const result = await connectionManager.connect(data.url);
+          const schema = connectionManager.getTargetSchema();
+          const protocolType = schema ? inferProtocolType(schema.tools) : "mcp";
+
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              success: true,
+              connected: true,
+              serverUrl: data.url,
+              serverInfo: result.serverInfo,
+              toolCount: result.toolCount,
+              resourceCount: result.resourceCount,
+              promptCount: result.promptCount,
+              protocolType,
+            })
+          );
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: false, error: message }));
+        }
+        return;
+      }
+
+      res.writeHead(405, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Method not allowed" }));
+      return;
+    }
+
+    // API: Disconnect from current server
+    if (url === "/api/disconnect") {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+      if (req.method === "OPTIONS") {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+
+      if (req.method === "POST") {
+        try {
+          const previousUrl = await connectionManager.disconnect();
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              success: true,
+              disconnected: true,
+              previousUrl,
+            })
+          );
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: false, error: message }));
+        }
+        return;
+      }
+
+      res.writeHead(405, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Method not allowed" }));
       return;
     }
 

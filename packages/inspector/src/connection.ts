@@ -14,12 +14,54 @@ import type {
   HistoryEntry,
   EnvironmentState,
   TargetServerSchema,
+  TargetToolInfo,
   AgnosticInspectorEvent,
   InspectorEventType,
 } from "./types";
 import { getEventCategory } from "./types";
 import { WidgetSessionManager } from "./widget-session-manager";
 import { WidgetServer } from "./widget-server";
+
+/**
+ * Protocol type inferred from connected server's tools
+ */
+export type ProtocolType = "chatgpt-apps" | "mcp-apps" | "mcp";
+
+/**
+ * Infer the protocol type from connected server's tools
+ *
+ * Checks tool metadata to determine if the server uses OpenAI Apps UI,
+ * MCP Apps UI, or is a plain MCP server.
+ *
+ * Detection logic based on tool _meta fields:
+ * - OpenAI format: _meta["openai/outputTemplate"] exists
+ * - MCP Apps format: _meta.ui.resourceUri or _meta["ui/resourceUri"] exists
+ *
+ * @param tools - Array of tool info from the target server
+ * @returns Protocol type: "chatgpt-apps", "mcp-apps", or "mcp"
+ */
+export function inferProtocolType(tools: TargetToolInfo[]): ProtocolType {
+  for (const tool of tools) {
+    const meta = tool._meta as Record<string, unknown> | undefined;
+    if (!meta) continue;
+
+    // Check for OpenAI Apps UI metadata
+    // OpenAI format uses _meta["openai/outputTemplate"]
+    if (meta["openai/outputTemplate"] !== undefined) {
+      return "chatgpt-apps";
+    }
+
+    // Check for MCP Apps UI metadata
+    // MCP Apps format uses _meta.ui.resourceUri or _meta["ui/resourceUri"]
+    const uiMeta = meta.ui as Record<string, unknown> | undefined;
+    if (uiMeta?.resourceUri !== undefined || meta["ui/resourceUri"] !== undefined) {
+      return "mcp-apps";
+    }
+  }
+
+  // No UI metadata found - plain MCP server
+  return "mcp";
+}
 
 /**
  * Events emitted by ConnectionManager

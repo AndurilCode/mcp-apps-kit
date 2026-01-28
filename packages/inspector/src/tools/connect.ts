@@ -19,6 +19,10 @@ export const connectInputSchema = z.object({
     .string()
     .describe("URL of the MCP server to connect to (e.g., http://localhost:3000/v1/mcp)"),
   options: connectOptionsSchema,
+  force: z
+    .boolean()
+    .optional()
+    .describe("Force reconnection if already connected to a different server"),
 });
 
 export const connectOutputSchema = z.object({
@@ -43,6 +47,31 @@ export function createConnectTool(connectionManager: ConnectionManager) {
     output: connectOutputSchema,
     handler: async (input): Promise<ConnectOutput> => {
       try {
+        // Check if already connected
+        const currentState = connectionManager.getState();
+        if (currentState.connected && currentState.serverUrl) {
+          // If already connected to the same URL, return success silently
+          if (currentState.serverUrl === input.url) {
+            const schema = connectionManager.getTargetSchema();
+            return {
+              connected: true,
+              serverUrl: input.url,
+              serverInfo: currentState.serverInfo,
+              toolCount: schema?.tools.length ?? 0,
+              resourceCount: schema?.resources.length ?? 0,
+              promptCount: schema?.prompts.length ?? 0,
+            };
+          }
+
+          // If already connected to a different URL without force, throw error
+          if (!input.force) {
+            throw new Error(
+              `Already connected to ${currentState.serverUrl}. Use force=true to disconnect and connect to ${input.url}.`
+            );
+          }
+          // If force=true, disconnect first (handled by connectionManager.connect)
+        }
+
         const result = await connectionManager.connect(input.url, input.options);
 
         return {

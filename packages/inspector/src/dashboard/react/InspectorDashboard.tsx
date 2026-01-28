@@ -14,9 +14,10 @@ import { useAgentEventStream } from "./hooks/useAgentEventStream";
 import { useResizablePanel } from "./hooks/useResizablePanel";
 import { useResizablePanelWidth } from "./hooks/useResizablePanelWidth";
 import { useGlobals } from "./hooks/useGlobals";
-import { useConnectionStatus } from "./hooks/useConnectionStatus";
+import { useConnection } from "./hooks/useConnection";
 import { useMcpPrimitives } from "./hooks/useMcpPrimitives";
 import { Toolbar } from "./components/Toolbar";
+import { ConnectionBar } from "./components/ConnectionBar";
 import { GlobalsPanel } from "./components/GlobalsPanel";
 import { McpPrimitivesPanel } from "./components/McpPrimitivesPanel";
 import { BottomPanel, type PanelVisibility } from "./components/BottomPanel";
@@ -64,8 +65,15 @@ export function InspectorDashboard({
   // Globals state
   const { globals } = useGlobals(baseUrl);
 
-  // Connection status state
-  const { status: connectionStatus } = useConnectionStatus(baseUrl);
+  // Connection state (includes actions and history)
+  const {
+    status: connectionStatus,
+    isConnecting,
+    error: connectionError,
+    connect,
+    disconnect,
+    getMatchingEntries,
+  } = useConnection(baseUrl);
 
   // MCP Primitives state (refreshes on connection)
   const {
@@ -255,6 +263,17 @@ export function InspectorDashboard({
           <img src={logoUrl} alt="MCP Agent Inspector" style={styles.logo} />
           <h1 style={styles.title}>MCP Agent Inspector</h1>
         </div>
+
+        {/* Connection Bar */}
+        <ConnectionBar
+          status={connectionStatus}
+          isConnecting={isConnecting}
+          error={connectionError}
+          onConnect={connect}
+          onDisconnect={disconnect}
+          getMatchingEntries={getMatchingEntries}
+        />
+
         <div style={styles.headerRight}>
           <div style={styles.controls}>
             {sessions.length > 0 && (

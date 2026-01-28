@@ -30,3 +30,10 @@ export {
   type McpPrimitives,
   type UseMcpPrimitivesResult,
 } from "./useMcpPrimitives";
+export {
+  useServerHistory,
+  type ProtocolType,
+  type ServerHistoryEntry,
+  type UseServerHistoryResult,
+} from "./useServerHistory";
+export { useConnection, type ConnectionStatus, type UseConnectionResult } from "./useConnection";
