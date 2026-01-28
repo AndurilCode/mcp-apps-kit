@@ -16,6 +16,7 @@ import type {
   SnapshotDiffSummary,
   WidgetSnapshotDiffOutput,
 } from "../types";
+import { validateWidgetSession } from "./helpers";
 
 // =============================================================================
 // SCHEMAS
@@ -289,27 +290,11 @@ export function createWidgetSnapshotDiffTool(connectionManager: ConnectionManage
     output: widgetSnapshotDiffOutputSchema,
     handler: async (input): Promise<WidgetSnapshotDiffOutput> => {
       const sessionManager = connectionManager.getWidgetSessionManager();
-      const session = sessionManager.getSession(input.sessionId);
-
-      if (!session) {
-        return {
-          success: false,
-          error: `Session not found: ${input.sessionId}`,
-          hints: {
-            next: "Create a new session with preview_ui or call_tool(renderWidget=true)",
-          },
-        };
+      const validation = validateWidgetSession(sessionManager, input.sessionId);
+      if (!validation.success) {
+        return { success: false, error: validation.error, hints: validation.hints };
       }
-
-      if (session.page.isClosed()) {
-        return {
-          success: false,
-          error: "Page closed",
-          hints: {
-            next: "Create a new session with preview_ui or call_tool(renderWidget=true)",
-          },
-        };
-      }
+      const { session, frame } = validation;
 
       // Determine which snapshot to use (explicit or cached)
       let previousSnapshot: unknown;
@@ -347,19 +332,6 @@ export function createWidgetSnapshotDiffTool(connectionManager: ConnectionManage
       }
 
       try {
-        // Target the widget iframe
-        const frame = session.page.frame({ url: /\/widget\// });
-        if (!frame) {
-          return {
-            success: false,
-            error: "Widget iframe not found",
-            hints: {
-              next: "Wait for widget to load, or verify session is valid",
-              warning: "Widget may still be loading",
-            },
-          };
-        }
-
         // Get current accessibility tree
         const ariaSnapshot = await frame.locator("body").ariaSnapshot();
 

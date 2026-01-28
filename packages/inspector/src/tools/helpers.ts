@@ -7,7 +7,70 @@
 
 import { MCP_WIDGET_MIME_TYPE, OPENAI_WIDGET_MIME_TYPE } from "@mcp-apps-kit/core";
 import type { Frame, Locator } from "playwright";
-import type { SemanticLocatorOptions, WaitForStabilityOptions } from "../types";
+import type { SemanticLocatorOptions, WaitForStabilityOptions, ToolHints } from "../types";
+import type { ActiveWidgetSession, WidgetSessionManager } from "../widget-session-manager";
+
+// =============================================================================
+// SESSION VALIDATION
+// =============================================================================
+
+export interface SessionValidationSuccess {
+  success: true;
+  session: ActiveWidgetSession;
+  frame: Frame;
+}
+
+export interface SessionValidationError {
+  success: false;
+  error: string;
+  hints: ToolHints;
+}
+
+export type SessionValidationResult = SessionValidationSuccess | SessionValidationError;
+
+/**
+ * Validate a widget session exists, is open, and has a widget iframe
+ *
+ * Returns a discriminated union for easy pattern matching:
+ * - success=true: session and frame are available
+ * - success=false: error message and hints for recovery
+ */
+export function validateWidgetSession(
+  sessionManager: WidgetSessionManager,
+  sessionId: string
+): SessionValidationResult {
+  const session = sessionManager.getSession(sessionId);
+
+  if (!session) {
+    return {
+      success: false,
+      error: `Session not found: ${sessionId}`,
+      hints: { next: "Create a new session with preview_ui or call_tool(renderWidget=true)" },
+    };
+  }
+
+  if (session.page.isClosed()) {
+    return {
+      success: false,
+      error: "Page closed",
+      hints: { next: "Create a new session with preview_ui or call_tool(renderWidget=true)" },
+    };
+  }
+
+  const frame = session.page.frame({ url: /\/widget\// });
+  if (!frame) {
+    return {
+      success: false,
+      error: "Widget iframe not found",
+      hints: {
+        next: "Wait for widget to load, or verify session is valid",
+        warning: "Widget may still be loading",
+      },
+    };
+  }
+
+  return { success: true, session, frame };
+}
 
 /**
  * Detected protocol for a UI widget
