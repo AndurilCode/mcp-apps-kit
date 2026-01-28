@@ -8,7 +8,6 @@
 
 import type { TestClient } from "@mcp-apps-kit/testing";
 import { JSDOM } from "jsdom";
-import { MCP_WIDGET_MIME_TYPE, OPENAI_WIDGET_MIME_TYPE } from "@mcp-apps-kit/core";
 import {
   detectProtocolFromMimeType as _detectProtocolFromMimeType,
   findUIResourceForTool as findUIResourceForToolHelper,
