@@ -121,7 +121,7 @@ export {
 } from "./dual-server";
 
 // Proxy tool generation (for advanced usage)
-export { generateProxyTools, hasTargetSchema } from "./proxy-tools";
+export { hasTargetSchema, registerProxyToolsDirectly } from "./proxy-tools";
 
 // Proxy resource generation (for advanced usage)
 export { registerProxyResources, hasUIResources, type ProxyResourceInfo } from "./proxy-resources";
