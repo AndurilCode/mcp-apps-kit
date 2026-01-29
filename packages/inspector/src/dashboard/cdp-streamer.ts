@@ -204,9 +204,6 @@ export class CDPStreamer {
       // Stop current screencast
       await session.cdpSession.send("Page.stopScreencast");
 
-      // Update stored dimensions
-      session.currentDimensions = { width, height };
-
       // Restart screencast with new dimensions
       await session.cdpSession.send("Page.startScreencast", {
         format: "jpeg",
@@ -215,6 +212,9 @@ export class CDPStreamer {
         maxHeight: height,
         everyNthFrame: 1,
       });
+
+      // Only update stored dimensions after Page.startScreencast succeeds
+      session.currentDimensions = { width, height };
 
       if (this.debug) {
         // eslint-disable-next-line no-console

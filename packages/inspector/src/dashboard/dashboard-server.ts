@@ -39,6 +39,20 @@ function getCDPStreamer(debug: boolean): CDPStreamer {
 }
 
 /**
+ * Clean up the CDP streamer singleton
+ *
+ * Should be called during server shutdown to properly stop all active
+ * screencasts and release resources. After cleanup, a new streamer will
+ * be created on the next getCDPStreamer call.
+ */
+export async function cleanupCDPStreamer(): Promise<void> {
+  if (cdpStreamer) {
+    await cdpStreamer.stopAll();
+    cdpStreamer = null;
+  }
+}
+
+/**
  * Handle dashboard requests
  *
  * @param req - Incoming HTTP request
