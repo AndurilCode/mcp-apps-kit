@@ -6,7 +6,7 @@
 
 /* global window, document */
 import type React from "react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 export interface UseResizablePanelWidthOptions {
   initialWidth: number;
@@ -75,38 +75,74 @@ export function useResizablePanelWidth({
     }
   }, [panelWidth, storageKey, isResizing]);
 
-  const handleMouseDown = (e: React.MouseEvent): void => {
-    if (disabled || typeof document === "undefined") return;
+  // Refs to store handlers for cleanup
+  const mouseMoveRef = useRef<((e: MouseEvent) => void) | null>(null);
+  const mouseUpRef = useRef<(() => void) | null>(null);
+  const isMountedRef = useRef(true);
 
-    e.preventDefault();
-
-    const startX = e.clientX;
-    const startWidth = widthRef.current;
-
-    setIsResizing(true);
-    document.body.style.cursor = "ew-resize";
-    document.body.style.userSelect = "none";
-
-    const handleMouseMove = (moveEvent: MouseEvent): void => {
-      const deltaX = moveEvent.clientX - startX;
-      const reservedWidth = 400;
-      const effectiveMaxWidth = Math.min(maxWidth, window.innerWidth - reservedWidth);
-      const newWidth = Math.min(effectiveMaxWidth, Math.max(minWidth, startWidth + deltaX));
-
-      setPanelWidth(newWidth);
-    };
-
-    const handleMouseUp = (): void => {
-      setIsResizing(false);
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (mouseMoveRef.current) {
+        document.removeEventListener("mousemove", mouseMoveRef.current);
+      }
+      if (mouseUpRef.current) {
+        document.removeEventListener("mouseup", mouseUpRef.current);
+      }
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
     };
+  }, []);
 
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-  };
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent): void => {
+      if (disabled || typeof document === "undefined") return;
+
+      e.preventDefault();
+
+      const startX = e.clientX;
+      const startWidth = widthRef.current;
+
+      setIsResizing(true);
+      document.body.style.cursor = "ew-resize";
+      document.body.style.userSelect = "none";
+
+      const handleMouseMove = (moveEvent: MouseEvent): void => {
+        if (!isMountedRef.current) return;
+        const deltaX = moveEvent.clientX - startX;
+        const reservedWidth = 400;
+        const effectiveMaxWidth = Math.min(maxWidth, window.innerWidth - reservedWidth);
+        const newWidth = Math.min(effectiveMaxWidth, Math.max(minWidth, startWidth + deltaX));
+
+        setPanelWidth(newWidth);
+      };
+
+      const handleMouseUp = (): void => {
+        if (isMountedRef.current) {
+          setIsResizing(false);
+        }
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        if (mouseMoveRef.current) {
+          document.removeEventListener("mousemove", mouseMoveRef.current);
+        }
+        if (mouseUpRef.current) {
+          document.removeEventListener("mouseup", mouseUpRef.current);
+        }
+        mouseMoveRef.current = null;
+        mouseUpRef.current = null;
+      };
+
+      mouseMoveRef.current = handleMouseMove;
+      mouseUpRef.current = handleMouseUp;
+
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    },
+    [disabled, minWidth, maxWidth]
+  );
 
   return {
     panelWidth,

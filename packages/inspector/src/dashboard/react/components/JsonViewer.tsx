@@ -242,7 +242,7 @@ function JsonNode({
               <JsonNode
                 key={key}
                 keyName={key}
-                value={obj[key]}
+                value={obj[key] ?? null}
                 depth={depth + 1}
                 initialExpandDepth={initialExpandDepth}
                 maxStringLength={maxStringLength}

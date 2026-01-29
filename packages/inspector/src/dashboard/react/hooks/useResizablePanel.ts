@@ -6,7 +6,7 @@
 
 /* global window, document */
 import type React from "react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 export interface UseResizablePanelOptions {
   initialHeight: number;
@@ -73,38 +73,74 @@ export function useResizablePanel({
     }
   }, [panelHeight, storageKey, isResizing]);
 
-  const handleMouseDown = (e: React.MouseEvent): void => {
-    if (disabled || typeof document === "undefined") return;
+  // Refs to store handlers for cleanup
+  const mouseMoveRef = useRef<((e: MouseEvent) => void) | null>(null);
+  const mouseUpRef = useRef<(() => void) | null>(null);
+  const isMountedRef = useRef(true);
 
-    e.preventDefault();
-
-    const startY = e.clientY;
-    const startHeight = heightRef.current;
-
-    setIsResizing(true);
-    document.body.style.cursor = "ns-resize";
-    document.body.style.userSelect = "none";
-
-    const handleMouseMove = (moveEvent: MouseEvent): void => {
-      const deltaY = startY - moveEvent.clientY;
-      const reservedHeight = 250;
-      const maxHeight = window.innerHeight - reservedHeight;
-      const newHeight = Math.min(maxHeight, Math.max(minHeight, startHeight + deltaY));
-
-      setPanelHeight(newHeight);
-    };
-
-    const handleMouseUp = (): void => {
-      setIsResizing(false);
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (mouseMoveRef.current) {
+        document.removeEventListener("mousemove", mouseMoveRef.current);
+      }
+      if (mouseUpRef.current) {
+        document.removeEventListener("mouseup", mouseUpRef.current);
+      }
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
     };
+  }, []);
 
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-  };
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent): void => {
+      if (disabled || typeof document === "undefined") return;
+
+      e.preventDefault();
+
+      const startY = e.clientY;
+      const startHeight = heightRef.current;
+
+      setIsResizing(true);
+      document.body.style.cursor = "ns-resize";
+      document.body.style.userSelect = "none";
+
+      const handleMouseMove = (moveEvent: MouseEvent): void => {
+        if (!isMountedRef.current) return;
+        const deltaY = startY - moveEvent.clientY;
+        const reservedHeight = 250;
+        const maxHeight = window.innerHeight - reservedHeight;
+        const newHeight = Math.min(maxHeight, Math.max(minHeight, startHeight + deltaY));
+
+        setPanelHeight(newHeight);
+      };
+
+      const handleMouseUp = (): void => {
+        if (isMountedRef.current) {
+          setIsResizing(false);
+        }
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        if (mouseMoveRef.current) {
+          document.removeEventListener("mousemove", mouseMoveRef.current);
+        }
+        if (mouseUpRef.current) {
+          document.removeEventListener("mouseup", mouseUpRef.current);
+        }
+        mouseMoveRef.current = null;
+        mouseUpRef.current = null;
+      };
+
+      mouseMoveRef.current = handleMouseMove;
+      mouseUpRef.current = handleMouseUp;
+
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    },
+    [disabled, minHeight]
+  );
 
   return {
     panelHeight,

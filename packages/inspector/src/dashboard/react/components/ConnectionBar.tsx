@@ -262,7 +262,17 @@ export function ConnectionBar({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && !status.connected) {
+      if (e.key === "Enter" && showDropdown && hoveredIndex >= 0) {
+        // Handle dropdown selection first (before generic connect)
+        e.preventDefault();
+        const entry = filteredHistory[hoveredIndex];
+        if (entry) {
+          setInputValue(entry.url);
+          setShowDropdown(false);
+          void onConnect(entry.url);
+        }
+      } else if (e.key === "Enter" && !status.connected) {
+        // Fallback: generic connect when no dropdown selection
         void handleConnect();
       } else if (e.key === "Escape") {
         setShowDropdown(false);
@@ -273,14 +283,6 @@ export function ConnectionBar({
       } else if (e.key === "ArrowUp" && showDropdown) {
         e.preventDefault();
         setHoveredIndex((prev) => Math.max(prev - 1, 0));
-      } else if (e.key === "Enter" && showDropdown && hoveredIndex >= 0) {
-        e.preventDefault();
-        const entry = filteredHistory[hoveredIndex];
-        if (entry) {
-          setInputValue(entry.url);
-          setShowDropdown(false);
-          void onConnect(entry.url);
-        }
       }
     },
     [status.connected, handleConnect, showDropdown, hoveredIndex, filteredHistory, onConnect]

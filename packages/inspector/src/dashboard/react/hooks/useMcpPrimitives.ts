@@ -65,6 +65,9 @@ export function useMcpPrimitives(
   }, [isConnected, wasConnected, fetchPrimitives]);
 
   useEffect(() => {
+    if (!isConnected) {
+      return;
+    }
     void fetchPrimitives();
     const interval = setInterval(() => {
       void fetchPrimitives();
@@ -72,7 +75,7 @@ export function useMcpPrimitives(
     return () => {
       clearInterval(interval);
     };
-  }, [fetchPrimitives, pollInterval]);
+  }, [fetchPrimitives, pollInterval, isConnected]);
 
   return {
     tools: primitives?.tools ?? [],

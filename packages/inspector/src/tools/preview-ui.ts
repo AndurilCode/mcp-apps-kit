@@ -116,7 +116,7 @@ export function createPreviewUITool(connectionManager: ConnectionManager) {
           // Check if tool result data appears in the rendered DOM
           const toolResultStr = JSON.stringify(toolResult);
           const toolResultDisplayed =
-            textContent?.includes(toolResultStr) ||
+            (textContent?.includes(toolResultStr) ?? false) ||
             // Check for partial matches (common values from result)
             (typeof toolResult === "object" &&
               toolResult !== null &&
