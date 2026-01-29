@@ -12,6 +12,21 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createStandaloneInspectorServer } from "../src/standalone-server";
 import type { InspectorEvent } from "../src/types";
+import type { Page } from "playwright";
+
+/** Minimal mock page interface for testing */
+interface MockPage {
+  isClosed: () => boolean;
+  close: () => Promise<void>;
+}
+
+/** Create a mock page for testing */
+function createMockPage(): MockPage {
+  return {
+    isClosed: () => false,
+    close: async () => {},
+  };
+}
 
 describe("DOM Event Full Flow", () => {
   const port = 16274; // Use a different port to avoid conflicts
@@ -43,15 +58,13 @@ describe("DOM Event Full Flow", () => {
     // Create a mock session first (we need a session to record events against)
     // In real usage, this would be created via call_tool or screenshot_widget
     // For testing, we'll use the internal _injectSession method
+    const mockPage = createMockPage();
     const mockSession = {
       id: "test-session-001",
       toolName: "test_tool",
       toolArgs: {},
       toolResult: { test: "result" },
-      page: {
-        isClosed: () => false,
-        close: async () => {}, // Mock close method
-      } as any, // Mock page
+      page: mockPage as unknown as Page,
       protocol: "mcp" as const,
       consoleLogs: [],
       pageErrors: [],
@@ -154,15 +167,13 @@ describe("DOM Event Full Flow", () => {
     const sessionManager = connectionManager.getWidgetSessionManager();
 
     // Create a mock session
+    const mockPageSse = createMockPage();
     const mockSession = {
       id: "test-session-sse",
       toolName: "test_tool",
       toolArgs: {},
       toolResult: { test: "result" },
-      page: {
-        isClosed: () => false,
-        close: async () => {},
-      } as any,
+      page: mockPageSse as unknown as Page,
       protocol: "mcp" as const,
       consoleLogs: [],
       pageErrors: [],

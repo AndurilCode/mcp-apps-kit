@@ -44,19 +44,22 @@ describe("WidgetSessionManager", () => {
   });
 
   describe("constructor", () => {
-    it("should use default TTL when not provided", () => {
+    it("should use default TTL when not provided", async () => {
       const defaultManager = new WidgetSessionManager();
       expect(defaultManager).toBeDefined();
+      await defaultManager.dispose();
     });
 
-    it("should accept debug option", () => {
+    it("should accept debug option", async () => {
       const debugManager = new WidgetSessionManager({ debug: true });
       expect(debugManager).toBeDefined();
+      await debugManager.dispose();
     });
 
-    it("should accept custom TTL", () => {
+    it("should accept custom TTL", async () => {
       const customManager = new WidgetSessionManager({ ttl: 1000 });
       expect(customManager).toBeDefined();
+      await customManager.dispose();
     });
   });
 

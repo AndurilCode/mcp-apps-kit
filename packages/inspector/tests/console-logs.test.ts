@@ -49,6 +49,10 @@ describe("get_console_logs Tool", () => {
     await manager.connect("http://localhost:3000/mcp");
   });
 
+  afterEach(async () => {
+    await manager.disconnect();
+  });
+
   describe("standalone mode validation", () => {
     it("should return error when neither sessionId nor tool/arguments provided", async () => {
       const tool = createGetConsoleLogsTool(manager);

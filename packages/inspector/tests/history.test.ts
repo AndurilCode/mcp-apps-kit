@@ -45,6 +45,10 @@ describe("History Tools", () => {
     mockClearHistory.mockReturnValue(undefined);
   });
 
+  afterEach(async () => {
+    await manager.disconnect();
+  });
+
   describe("get_call_history", () => {
     it("should return empty history when no calls made", async () => {
       await manager.connect("http://localhost:3000/mcp");
