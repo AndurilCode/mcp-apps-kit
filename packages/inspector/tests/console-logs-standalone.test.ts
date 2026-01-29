@@ -80,7 +80,14 @@ describe("get_console_logs Standalone Mode", () => {
     await manager.connect("http://localhost:3000/mcp");
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    if (manager) {
+      try {
+        await manager.disconnect();
+      } catch {
+        // Ignore disconnect errors during cleanup
+      }
+    }
     vi.clearAllMocks();
   });
 

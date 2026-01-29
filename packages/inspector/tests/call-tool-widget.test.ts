@@ -2,7 +2,7 @@
  * Tests for call_tool widget rendering and session management paths
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import { createCallToolTool } from "../src/tools/call-tool";
 
@@ -50,6 +50,13 @@ describe("call_tool Widget Rendering", () => {
     });
 
     await manager.connect("http://localhost:3000/mcp");
+  });
+
+  afterEach(async () => {
+    if (manager) {
+      await manager.disconnect();
+    }
+    vi.clearAllMocks();
   });
 
   describe("without renderWidget", () => {

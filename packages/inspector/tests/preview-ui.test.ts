@@ -2,7 +2,7 @@
  * Tests for preview_ui tool
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import { createPreviewUITool } from "../src/tools/preview-ui";
 
@@ -51,6 +51,13 @@ describe("preview_ui Tool", () => {
 
     // Connect
     await manager.connect("http://localhost:3000/mcp");
+  });
+
+  afterEach(async () => {
+    if (manager) {
+      await manager.disconnect();
+    }
+    vi.clearAllMocks();
   });
 
   describe("standalone mode validation", () => {

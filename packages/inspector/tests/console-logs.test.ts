@@ -2,7 +2,7 @@
  * Tests for get_console_logs tool
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import { createGetConsoleLogsTool } from "../src/tools/get-console-logs";
 

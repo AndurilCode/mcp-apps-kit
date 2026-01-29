@@ -2,7 +2,7 @@
  * Tests for screenshot_widget tool
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import { createScreenshotWidgetTool } from "../src/tools/screenshot-widget";
 
@@ -47,6 +47,13 @@ describe("screenshot_widget Tool", () => {
     mockListPrompts.mockResolvedValue([]);
 
     await manager.connect("http://localhost:3000/mcp");
+  });
+
+  afterEach(async () => {
+    if (manager) {
+      await manager.disconnect();
+    }
+    vi.clearAllMocks();
   });
 
   describe("standalone mode validation", () => {

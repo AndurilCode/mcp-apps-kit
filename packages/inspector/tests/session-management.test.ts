@@ -2,7 +2,7 @@
  * Tests for session management tools
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import {
   createListSessionsTool,
@@ -34,6 +34,11 @@ describe("Session Management Tools", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     manager = new ConnectionManager();
+  });
+
+  afterEach(async () => {
+    await manager?.disconnect?.();
+    vi.clearAllMocks();
   });
 
   describe("list_sessions", () => {
