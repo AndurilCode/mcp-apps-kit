@@ -9,6 +9,9 @@ import { defineTool } from "@mcp-apps-kit/core";
 import type { ConnectionRegistry } from "../connection-registry";
 import type { ConnectionStatusOutput } from "../types";
 
+/**
+ * Zod schema for get connection status tool input.
+ */
 export const getConnectionStatusInputSchema = z.object({
   connectionId: z
     .string()
@@ -30,6 +33,9 @@ const connectionStatusSchema = z.object({
   callCount: z.number(),
 });
 
+/**
+ * Zod schema for get connection status tool output.
+ */
 export const getConnectionStatusOutputSchema = z.object({
   connections: z.array(connectionStatusSchema),
   activeConnectionId: z.string().nullable(),
@@ -44,6 +50,12 @@ interface StatusOutput {
   activeConnectionId: string | null;
 }
 
+/**
+ * Create the get connection status tool bound to a registry instance.
+ *
+ * @param registry - Connection registry to query.
+ * @returns A configured MCP tool definition.
+ */
 export function createGetConnectionStatusTool(registry: ConnectionRegistry) {
   return defineTool({
     description:

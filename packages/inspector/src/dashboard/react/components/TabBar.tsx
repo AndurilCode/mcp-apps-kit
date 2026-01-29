@@ -7,6 +7,9 @@
 
 import React from "react";
 
+/**
+ * Metadata for a single connection tab.
+ */
 export interface TabInfo {
   id: string;
   url: string;
@@ -14,6 +17,9 @@ export interface TabInfo {
   status: string;
 }
 
+/**
+ * Props for the TabBar component.
+ */
 export interface TabBarProps {
   tabs: TabInfo[];
   activeTabId: string | null;
@@ -98,6 +104,12 @@ const tabBarStyles: Record<string, React.CSSProperties> = {
   },
 };
 
+/**
+ * Render a Chrome-like tab bar for multiple connections.
+ *
+ * @param props - TabBar props.
+ * @returns The tab bar UI.
+ */
 export function TabBar({
   tabs,
   activeTabId,
@@ -153,4 +165,7 @@ export function TabBar({
   );
 }
 
+/**
+ * Default export for the TabBar component.
+ */
 export default TabBar;

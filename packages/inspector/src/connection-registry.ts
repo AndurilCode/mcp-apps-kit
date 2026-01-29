@@ -8,26 +8,38 @@ import { EventEmitter } from "node:events";
 import { ConnectionManager } from "./connection";
 import type { ConnectOptions, ConnectionStatusOutput, InspectorServerOptions } from "./types";
 
+/**
+ * Event map emitted by the connection registry.
+ */
 export interface ConnectionRegistryEvents {
-  /** Emitted when a new connection is created */
+  /** Emitted when a new connection is created. */
   created: [id: string, connectionManager: ConnectionManager];
-  /** Emitted when a connection is closed */
+  /** Emitted when a connection is closed. */
   closed: [id: string];
-  /** Emitted when a connection is activated */
+  /** Emitted when a connection is activated. */
   activated: [id: string];
 }
 
+/**
+ * Options for configuring a ConnectionRegistry instance.
+ */
 export interface ConnectionRegistryOptions {
-  /** Maximum number of concurrent connections. Default: 20 */
+  /** Maximum number of concurrent connections. Default: 20. */
   maxConnections?: number;
-  /** Base options for each ConnectionManager instance */
+  /** Base options for each ConnectionManager instance. */
   connectionManagerOptions?: InspectorServerOptions;
 }
 
+/**
+ * Connection status augmented with the registry connection id.
+ */
 export interface ConnectionInfo extends ConnectionStatusOutput {
   id: string;
 }
 
+/**
+ * Tracks multiple ConnectionManager instances and the active connection.
+ */
 export class ConnectionRegistry extends EventEmitter {
   private readonly connections: Map<string, ConnectionManager> = new Map();
   private activeConnectionId: string | null = null;
@@ -35,6 +47,11 @@ export class ConnectionRegistry extends EventEmitter {
   private readonly connectionManagerOptions: InspectorServerOptions;
   private nextId = 1;
 
+  /**
+   * Create a ConnectionRegistry instance.
+   *
+   * @param options - Registry configuration options.
+   */
   constructor(options: ConnectionRegistryOptions = {}) {
     super();
     this.maxConnections = options.maxConnections ?? 20;
@@ -43,6 +60,10 @@ export class ConnectionRegistry extends EventEmitter {
 
   /**
    * Create a new connection and connect to the target server.
+   *
+   * @param url - MCP server URL to connect to.
+   * @param options - Connection options passed to the ConnectionManager.
+   * @returns The new connection id and manager instance.
    */
   async createConnection(
     url: string,
@@ -77,7 +98,11 @@ export class ConnectionRegistry extends EventEmitter {
   }
 
   /**
-   * Get a connection by ID (throws if not found)
+   * Get a connection by ID.
+   *
+   * @param id - Connection id to look up.
+   * @returns The ConnectionManager for the id.
+   * @throws If the connection cannot be found.
    */
   getConnection(id: string): ConnectionManager {
     const connection = this.connections.get(id);
@@ -88,7 +113,10 @@ export class ConnectionRegistry extends EventEmitter {
   }
 
   /**
-   * Get the active connection (throws if none)
+   * Get the active connection.
+   *
+   * @returns The active ConnectionManager.
+   * @throws If no active connection exists.
    */
   getActiveConnection(): ConnectionManager {
     if (!this.activeConnectionId) {
@@ -98,7 +126,11 @@ export class ConnectionRegistry extends EventEmitter {
   }
 
   /**
-   * Resolve a connection: explicit ID > active > throw
+   * Resolve a connection: explicit id > active > throw.
+   *
+   * @param connectionId - Optional connection id to resolve.
+   * @returns The resolved ConnectionManager.
+   * @throws If the connection id is invalid or no active connection exists.
    */
   resolveConnection(connectionId?: string): ConnectionManager {
     if (connectionId) {
@@ -111,7 +143,9 @@ export class ConnectionRegistry extends EventEmitter {
   }
 
   /**
-   * Close and remove a connection
+   * Close and remove a connection.
+   *
+   * @param id - Connection id to close.
    */
   async closeConnection(id: string): Promise<void> {
     const connection = this.getConnection(id);
@@ -126,7 +160,9 @@ export class ConnectionRegistry extends EventEmitter {
   }
 
   /**
-   * List all connections with status
+   * List all connections with status.
+   *
+   * @returns Snapshot of connection status objects.
    */
   listConnections(): ConnectionInfo[] {
     return Array.from(this.connections.entries()).map(([id, connection]) => {
@@ -144,7 +180,10 @@ export class ConnectionRegistry extends EventEmitter {
   }
 
   /**
-   * Track which connection was last used
+   * Set the active connection by id.
+   *
+   * @param id - Connection id to activate.
+   * @throws If the connection id is not registered.
    */
   setActive(id: string): void {
     if (this.activeConnectionId === id) {
@@ -160,7 +199,7 @@ export class ConnectionRegistry extends EventEmitter {
   }
 
   /**
-   * Close all connections
+   * Close all active connections.
    */
   async closeAll(): Promise<void> {
     const ids = Array.from(this.connections.keys());

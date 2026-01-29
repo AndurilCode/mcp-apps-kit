@@ -61,6 +61,11 @@ export async function cleanupCDPStreamer(): Promise<void> {
  * @param connectionManager - Connection manager for accessing sessions
  * @returns true if the request was handled, false otherwise
  */
+/**
+ * Apply CORS headers for dashboard connection endpoints.
+ *
+ * @param res - Server response to mutate.
+ */
 function setCorsHeaders(res: ServerResponse): void {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
@@ -78,7 +83,9 @@ export async function handleDashboardRequest(
 
   // ===== Connection management endpoints =====
 
-  // GET /dashboard/connections — list all connections
+  /**
+   * GET /dashboard/connections — list all connections.
+   */
   if (pathname === "/dashboard/connections" && req.method === "GET") {
     setCorsHeaders(res);
     if (!registry) {
@@ -97,7 +104,9 @@ export async function handleDashboardRequest(
     return true;
   }
 
-  // POST /dashboard/connections — create new connection
+  /**
+   * POST /dashboard/connections — create new connection.
+   */
   if (pathname === "/dashboard/connections" && req.method === "POST") {
     setCorsHeaders(res);
     if (!registry) {
@@ -134,7 +143,9 @@ export async function handleDashboardRequest(
     return true;
   }
 
-  // DELETE /dashboard/connections/:id — close connection
+  /**
+   * DELETE /dashboard/connections/:id — close connection.
+   */
   if (pathname.startsWith("/dashboard/connections/") && req.method === "DELETE") {
     setCorsHeaders(res);
     if (!registry) {
@@ -155,7 +166,9 @@ export async function handleDashboardRequest(
     return true;
   }
 
-  // CORS preflight for connection endpoints
+  /**
+   * OPTIONS /dashboard/connections — CORS preflight for connection endpoints.
+   */
   if (pathname.startsWith("/dashboard/connections") && req.method === "OPTIONS") {
     setCorsHeaders(res);
     res.writeHead(204);

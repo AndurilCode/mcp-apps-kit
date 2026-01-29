@@ -9,6 +9,9 @@ import { defineTool } from "@mcp-apps-kit/core";
 import type { ConnectionRegistry } from "../connection-registry";
 import type { ConnectOutput } from "../types";
 
+/**
+ * Zod schema for optional connection options.
+ */
 export const connectOptionsSchema = z
   .object({
     trackHistory: z.boolean().optional().describe("Track call history. Default: true"),
@@ -16,6 +19,9 @@ export const connectOptionsSchema = z
   })
   .optional();
 
+/**
+ * Zod schema for connect tool input.
+ */
 export const connectInputSchema = z.object({
   url: z
     .string()
@@ -23,6 +29,9 @@ export const connectInputSchema = z.object({
   options: connectOptionsSchema,
 });
 
+/**
+ * Zod schema for connect tool output.
+ */
 export const connectOutputSchema = z.object({
   connectionId: z.string().describe("Unique ID for this connection"),
   connected: z.boolean(),
@@ -38,10 +47,19 @@ export const connectOutputSchema = z.object({
   promptCount: z.number(),
 });
 
+/**
+ * Connect tool output including the assigned connection id.
+ */
 export interface ConnectOutputWithId extends ConnectOutput {
   connectionId: string;
 }
 
+/**
+ * Create the connect tool bound to a registry instance.
+ *
+ * @param registry - Connection registry to create connections with.
+ * @returns A configured MCP tool definition.
+ */
 export function createConnectTool(registry: ConnectionRegistry) {
   return defineTool({
     description:

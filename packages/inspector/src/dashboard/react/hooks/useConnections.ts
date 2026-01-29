@@ -9,8 +9,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { useServerHistory, type ServerHistoryEntry } from "./useServerHistory";
 
+/**
+ * Dashboard connection lifecycle status.
+ */
 export type DashboardConnectionStatus = "connected" | "disconnected" | "connecting" | "error";
 
+/**
+ * Connection data used by the dashboard UI.
+ */
 export interface DashboardConnection {
   id: string;
   url: string;
@@ -33,6 +39,9 @@ interface CreateConnectionResponse {
   serverInfo?: { name?: string; version?: string } | null;
 }
 
+/**
+ * Return shape for the useConnections hook.
+ */
 export interface UseConnectionsResult {
   connections: DashboardConnection[];
   activeConnectionId: string | null;
@@ -60,6 +69,12 @@ function normalizeConnection(entry: {
   };
 }
 
+/**
+ * Manage dashboard connections and related UI state.
+ *
+ * @param baseUrl - Base URL for the inspector dashboard API.
+ * @returns Hook state and connection actions.
+ */
 export function useConnections(baseUrl: string): UseConnectionsResult {
   const [connections, setConnections] = useState<DashboardConnection[]>([]);
   const [activeConnectionId, setActiveConnectionId] = useState<string | null>(null);
@@ -175,4 +190,7 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
   };
 }
 
+/**
+ * Default export for the useConnections hook.
+ */
 export default useConnections;

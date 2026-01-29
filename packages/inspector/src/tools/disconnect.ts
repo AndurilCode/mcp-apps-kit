@@ -9,6 +9,9 @@ import { defineTool } from "@mcp-apps-kit/core";
 import type { ConnectionRegistry } from "../connection-registry";
 import type { DisconnectOutput } from "../types";
 
+/**
+ * Zod schema for disconnect tool input.
+ */
 export const disconnectInputSchema = z.object({
   connectionId: z
     .string()
@@ -16,16 +19,28 @@ export const disconnectInputSchema = z.object({
     .describe("Connection ID to disconnect. Defaults to active connection."),
 });
 
+/**
+ * Zod schema for disconnect tool output.
+ */
 export const disconnectOutputSchema = z.object({
   disconnected: z.boolean(),
   connectionId: z.string(),
   previousUrl: z.string().nullable(),
 });
 
+/**
+ * Disconnect tool output including the resolved connection id.
+ */
 export interface DisconnectOutputWithId extends DisconnectOutput {
   connectionId: string;
 }
 
+/**
+ * Create the disconnect tool bound to a registry instance.
+ *
+ * @param registry - Connection registry used to resolve and close connections.
+ * @returns A configured MCP tool definition.
+ */
 export function createDisconnectTool(registry: ConnectionRegistry) {
   return defineTool({
     description:

@@ -8,8 +8,14 @@ import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
 import type { ConnectionRegistry, ConnectionInfo } from "../connection-registry";
 
+/**
+ * Zod schema for list connections tool input.
+ */
 export const listConnectionsInputSchema = z.object({});
 
+/**
+ * Zod schema for list connections tool output.
+ */
 export const listConnectionsOutputSchema = z.object({
   connections: z.array(
     z.object({
@@ -34,6 +40,12 @@ interface ListConnectionsOutput {
   count: number;
 }
 
+/**
+ * Create the list connections tool bound to a registry instance.
+ *
+ * @param registry - Connection registry to query.
+ * @returns A configured MCP tool definition.
+ */
 export function createListConnectionsTool(registry: ConnectionRegistry) {
   return defineTool({
     description: "List all active MCP server connections with their status and server info.",
