@@ -17,6 +17,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type { InspectorEvent, AgnosticInspectorEvent } from "../types";
 import { CDPStreamer } from "./cdp-streamer";
 
@@ -60,13 +61,107 @@ export async function cleanupCDPStreamer(): Promise<void> {
  * @param connectionManager - Connection manager for accessing sessions
  * @returns true if the request was handled, false otherwise
  */
+function setCorsHeaders(res: ServerResponse): void {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
 export async function handleDashboardRequest(
   req: IncomingMessage,
   res: ServerResponse,
-  connectionManager: ConnectionManager
+  connectionManager: ConnectionManager,
+  registry?: ConnectionRegistry
 ): Promise<boolean> {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
   const pathname = url.pathname;
+
+  // ===== Connection management endpoints =====
+
+  // GET /dashboard/connections — list all connections
+  if (pathname === "/dashboard/connections" && req.method === "GET") {
+    setCorsHeaders(res);
+    if (!registry) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ connections: [] }));
+      return true;
+    }
+    const connections = registry.listConnections().map((c) => ({
+      id: c.id,
+      connected: c.connected,
+      serverUrl: c.serverUrl,
+      serverInfo: c.serverInfo,
+    }));
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ connections }));
+    return true;
+  }
+
+  // POST /dashboard/connections — create new connection
+  if (pathname === "/dashboard/connections" && req.method === "POST") {
+    setCorsHeaders(res);
+    if (!registry) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Registry not available" }));
+      return true;
+    }
+    try {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(chunk as Buffer);
+      }
+      const body = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as { url?: string };
+      if (!body.url) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Missing url" }));
+        return true;
+      }
+      const { id, connectionManager: cm } = await registry.createConnection(body.url);
+      const state = cm.getState();
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          id,
+          url: body.url,
+          serverInfo: state.serverInfo,
+        })
+      );
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: message }));
+    }
+    return true;
+  }
+
+  // DELETE /dashboard/connections/:id — close connection
+  if (pathname.startsWith("/dashboard/connections/") && req.method === "DELETE") {
+    setCorsHeaders(res);
+    if (!registry) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Registry not available" }));
+      return true;
+    }
+    const connId = pathname.replace("/dashboard/connections/", "");
+    try {
+      await registry.closeConnection(connId);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: true }));
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: message }));
+    }
+    return true;
+  }
+
+  // CORS preflight for connection endpoints
+  if (pathname.startsWith("/dashboard/connections") && req.method === "OPTIONS") {
+    setCorsHeaders(res);
+    res.writeHead(204);
+    res.end();
+    return true;
+  }
 
   // GET /dashboard - Serve HTML
   if (pathname === "/dashboard" && req.method === "GET") {

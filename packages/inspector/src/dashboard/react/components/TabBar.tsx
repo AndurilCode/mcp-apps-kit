@@ -1,0 +1,156 @@
+/**
+ * TabBar Component
+ *
+ * Chrome-like tab bar for multi-connection support.
+ * Each tab represents an active MCP server connection.
+ */
+
+import React from "react";
+
+export interface TabInfo {
+  id: string;
+  url: string;
+  serverInfo: { name?: string; version?: string } | null;
+  status: string;
+}
+
+export interface TabBarProps {
+  tabs: TabInfo[];
+  activeTabId: string | null;
+  onSelect: (id: string) => void;
+  onClose: (id: string) => void;
+  onAdd: () => void;
+}
+
+const tabBarStyles: Record<string, React.CSSProperties> = {
+  container: {
+    display: "flex",
+    alignItems: "flex-end",
+    backgroundColor: "#111111",
+    borderBottom: "1px solid #2d2f2f",
+    padding: "0 0.5rem",
+    gap: "0.25rem",
+    minHeight: "36px",
+  },
+  tabs: {
+    display: "flex",
+    alignItems: "flex-end",
+    gap: "0.25rem",
+    overflowX: "auto",
+    flex: 1,
+  },
+  tab: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    backgroundColor: "#1a1a1a",
+    color: "#e0e0e0",
+    border: "1px solid #2d2f2f",
+    borderBottom: "none",
+    borderRadius: "8px 8px 0 0",
+    padding: "0.35rem 0.65rem",
+    fontSize: "0.75rem",
+    cursor: "pointer",
+    minWidth: "140px",
+    maxWidth: "260px",
+  },
+  tabActive: {
+    backgroundColor: "#2d2f2f",
+  },
+  tabTitle: {
+    flex: 1,
+    overflow: "hidden",
+    whiteSpace: "nowrap" as const,
+    textOverflow: "ellipsis",
+    color: "#e0e0e0",
+  },
+  tabUrl: {
+    color: "#9aa0a6",
+    fontSize: "0.6875rem",
+    overflow: "hidden",
+    whiteSpace: "nowrap" as const,
+    textOverflow: "ellipsis",
+  },
+  closeButton: {
+    background: "transparent",
+    border: "none",
+    color: "#9aa0a6",
+    cursor: "pointer",
+    padding: "2px",
+    borderRadius: "4px",
+    lineHeight: 1,
+    fontSize: "14px",
+  },
+  addButton: {
+    backgroundColor: "#1a1a1a",
+    border: "1px solid #2d2f2f",
+    color: "#e0e0e0",
+    borderRadius: "8px",
+    width: "28px",
+    height: "28px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    fontSize: "16px",
+    marginBottom: "2px",
+  },
+};
+
+export function TabBar({
+  tabs,
+  activeTabId,
+  onSelect,
+  onClose,
+  onAdd,
+}: TabBarProps): React.ReactElement {
+  if (tabs.length === 0) {
+    return <></>;
+  }
+
+  return (
+    <div style={tabBarStyles.container}>
+      <div style={tabBarStyles.tabs}>
+        {tabs.map((tab) => {
+          const isActive = tab.id === activeTabId;
+          const title = tab.serverInfo?.name ?? tab.url ?? "Unknown";
+          return (
+            <div
+              key={tab.id}
+              style={{
+                ...tabBarStyles.tab,
+                ...(isActive ? tabBarStyles.tabActive : {}),
+              }}
+              onClick={() => onSelect(tab.id)}
+              title={tab.url}
+              role="button"
+            >
+              <div style={tabBarStyles.tabTitle}>{title}</div>
+              {tab.serverInfo?.name && tab.url ? (
+                <div style={tabBarStyles.tabUrl}>{tab.url}</div>
+              ) : null}
+              <button
+                type="button"
+                style={tabBarStyles.closeButton}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose(tab.id);
+                }}
+                aria-label="Close tab"
+                title="Close connection"
+              >
+                ×
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      <button type="button" style={tabBarStyles.addButton} onClick={onAdd} title="New connection">
+        +
+      </button>
+    </div>
+  );
+}
+
+export default TabBar;

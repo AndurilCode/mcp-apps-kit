@@ -613,7 +613,12 @@ export function createDualInspectorServer(
 
     // Dashboard routes (including /mcp/primitives)
     if (url.startsWith("/dashboard") || url === "/mcp/primitives") {
-      const handled = await handleDashboardRequest(req, res, getActiveConnectionManager()!);
+      const handled = await handleDashboardRequest(
+        req,
+        res,
+        getActiveConnectionManager()!,
+        registry
+      );
       if (handled) return;
     }
 

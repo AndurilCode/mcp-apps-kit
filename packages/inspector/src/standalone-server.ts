@@ -665,7 +665,12 @@ export function createStandaloneInspectorServer(
 
     // Handle /mcp/primitives before routing to MCP app
     if (url === "/mcp/primitives" && req.method === "GET") {
-      const handled = await handleDashboardRequest(req, res, getActiveConnectionManager()!);
+      const handled = await handleDashboardRequest(
+        req,
+        res,
+        getActiveConnectionManager()!,
+        registry
+      );
       if (handled) return;
     }
 
@@ -768,7 +773,12 @@ export function createStandaloneInspectorServer(
 
     // Dashboard routes
     if (url.startsWith("/dashboard")) {
-      const handled = await handleDashboardRequest(req, res, getActiveConnectionManager()!);
+      const handled = await handleDashboardRequest(
+        req,
+        res,
+        getActiveConnectionManager()!,
+        registry
+      );
       if (handled) return;
     }
 
