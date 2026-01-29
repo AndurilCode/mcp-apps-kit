@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type {
   GetWidgetStateOutput,
   WidgetStateSnapshot,
@@ -17,6 +17,7 @@ import type {
 } from "../types";
 
 export const getWidgetStateInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   sessionId: z.string().describe("Session ID of the widget to get state from"),
   includeDOM: z.boolean().optional().describe("Whether to include DOM snapshot (default: false)"),
 });
@@ -126,13 +127,14 @@ export const getWidgetStateOutputSchema = z.object({
   error: z.string().optional(),
 });
 
-export function createGetWidgetStateTool(connectionManager: ConnectionManager) {
+export function createGetWidgetStateTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Get comprehensive state from a widget session. Returns tool input/output, environment globals, tool calls made by the widget, state changes, console logs, and optionally a DOM snapshot.",
     input: getWidgetStateInputSchema,
     output: getWidgetStateOutputSchema,
     handler: async (input): Promise<GetWidgetStateOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const session = sessionManager.getSession(input.sessionId);
 

@@ -4,7 +4,7 @@
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type { GetUIMetadataOutput, UIProtocol } from "../types";
 
 // MCP Apps MIME type
@@ -140,6 +140,7 @@ function toOpenaiFormat(meta: Record<string, unknown> | undefined): Record<strin
 }
 
 export const getUIMetadataInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   uri: z.string().describe("URI of the UI widget to get metadata for"),
 });
 
@@ -152,13 +153,14 @@ export const getUIMetadataOutputSchema = z.object({
   raw: z.record(z.string(), z.unknown()),
 });
 
-export function createGetUIMetadataTool(connectionManager: ConnectionManager) {
+export function createGetUIMetadataTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Get parsed metadata for a UI widget in both MCP Apps and OpenAI formats. Useful for debugging CSP configurations and understanding protocol-specific metadata.",
     input: getUIMetadataInputSchema,
     output: getUIMetadataOutputSchema,
     handler: async (input): Promise<GetUIMetadataOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       // Validate connection before accessing client
       const state = connectionManager.getState();
       if (!state.connected) {

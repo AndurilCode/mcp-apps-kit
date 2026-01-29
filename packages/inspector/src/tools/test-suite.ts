@@ -5,7 +5,7 @@
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
 import { defineTestSuite, runTestSuite } from "@mcp-apps-kit/testing";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type { RunTestSuiteOutput } from "../types";
 
 export const testCaseSchema = z.object({
@@ -25,6 +25,7 @@ export const testSuiteSchema = z.object({
 });
 
 export const runTestSuiteInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   suite: testSuiteSchema.describe("Test suite configuration"),
 });
 
@@ -47,13 +48,14 @@ export const runTestSuiteOutputSchema = z.object({
   ),
 });
 
-export function createRunTestSuiteTool(connectionManager: ConnectionManager) {
+export function createRunTestSuiteTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Run a test suite against a tool on the connected MCP server. Executes all test cases and returns results including pass/fail status and timing.",
     input: runTestSuiteInputSchema,
     output: runTestSuiteOutputSchema,
     handler: async (input): Promise<RunTestSuiteOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const client = connectionManager.getClient();
 
       // Convert input to test suite format

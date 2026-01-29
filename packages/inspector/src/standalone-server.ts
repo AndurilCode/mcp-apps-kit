@@ -14,6 +14,7 @@ import { createApp, type App, type ToolDefs } from "@mcp-apps-kit/core";
 import type { Server } from "http";
 import http from "http";
 import { ConnectionManager, inferProtocolType, type ProtocolType } from "./connection";
+import { ConnectionRegistry } from "./connection-registry";
 import type { InspectorServerOptions } from "./types";
 import { handleDashboardRequest } from "./dashboard/dashboard-server";
 import {
@@ -54,6 +55,7 @@ import {
   createWidgetSnapshotTool,
   createWidgetQueryTool,
   createWidgetSnapshotDiffTool,
+  createListConnectionsTool,
 } from "./tools";
 import type { InspectorEventType } from "./types";
 
@@ -136,6 +138,8 @@ function filterConnectionTools(tools: ToolDefs, exclude: boolean): ToolDefs {
 export interface StandaloneInspectorServerOptions extends InspectorServerOptions {
   /** Port to run on. Default: 6274 */
   port?: number;
+  /** Maximum number of concurrent connections. Default: 20 */
+  maxConnections?: number;
 }
 
 /**
@@ -146,8 +150,10 @@ export interface StandaloneInspectorServer {
   start: (port?: number) => Promise<void>;
   /** Stop the server */
   stop: () => Promise<void>;
-  /** Get the connection manager */
+  /** Get the connection manager (active connection) */
   getConnectionManager: () => ConnectionManager;
+  /** Get the connection registry */
+  getRegistry: () => ConnectionRegistry;
   /** Get the MCP app */
   getApp: () => App;
   /** Get the underlying HTTP server */
@@ -157,49 +163,50 @@ export interface StandaloneInspectorServer {
 /**
  * Create all inspector tools with the shared connection manager
  */
-function createInspectorTools(connectionManager: ConnectionManager): ToolDefs {
+function createInspectorTools(registry: ConnectionRegistry): ToolDefs {
   return {
-    connect_to_server: createConnectTool(connectionManager),
-    disconnect: createDisconnectTool(connectionManager),
-    list_tools: createListToolsTool(connectionManager),
-    call_tool: createCallToolTool(connectionManager),
-    list_resources: createListResourcesTool(connectionManager),
-    read_resource: createReadResourceTool(connectionManager),
-    list_prompts: createListPromptsTool(connectionManager),
-    get_prompt: createGetPromptTool(connectionManager),
-    get_call_history: createGetCallHistoryTool(connectionManager),
-    clear_history: createClearHistoryTool(connectionManager),
-    run_test_suite: createRunTestSuiteTool(connectionManager),
-    get_connection_status: createGetConnectionStatusTool(connectionManager),
+    connect_to_server: createConnectTool(registry),
+    disconnect: createDisconnectTool(registry),
+    list_tools: createListToolsTool(registry),
+    call_tool: createCallToolTool(registry),
+    list_resources: createListResourcesTool(registry),
+    read_resource: createReadResourceTool(registry),
+    list_prompts: createListPromptsTool(registry),
+    get_prompt: createGetPromptTool(registry),
+    get_call_history: createGetCallHistoryTool(registry),
+    clear_history: createClearHistoryTool(registry),
+    run_test_suite: createRunTestSuiteTool(registry),
+    get_connection_status: createGetConnectionStatusTool(registry),
+    list_connections: createListConnectionsTool(registry),
     // UI Inspection tools
-    list_ui_widgets: createListUIWidgetsTool(connectionManager),
-    get_ui_widget: createGetUIWidgetTool(connectionManager),
-    inspect_tool_ui: createInspectToolUITool(connectionManager),
-    get_ui_metadata: createGetUIMetadataTool(connectionManager),
+    list_ui_widgets: createListUIWidgetsTool(registry),
+    get_ui_widget: createGetUIWidgetTool(registry),
+    inspect_tool_ui: createInspectToolUITool(registry),
+    get_ui_metadata: createGetUIMetadataTool(registry),
     // UI Rendering tools
-    preview_ui: createPreviewUITool(connectionManager),
-    screenshot_widget: createScreenshotWidgetTool(connectionManager),
-    get_console_logs: createGetConsoleLogsTool(connectionManager),
+    preview_ui: createPreviewUITool(registry),
+    screenshot_widget: createScreenshotWidgetTool(registry),
+    get_console_logs: createGetConsoleLogsTool(registry),
     // Environment Configuration tools
-    set_globals: createSetGlobalsTool(connectionManager),
-    get_globals: createGetGlobalsTool(connectionManager),
-    reset_globals: createResetGlobalsTool(connectionManager),
+    set_globals: createSetGlobalsTool(registry),
+    get_globals: createGetGlobalsTool(registry),
+    reset_globals: createResetGlobalsTool(registry),
     // Session Management tools
-    list_sessions: createListSessionsTool(connectionManager),
-    close_session: createCloseSessionTool(connectionManager),
-    close_all_sessions: createCloseAllSessionsTool(connectionManager),
+    list_sessions: createListSessionsTool(registry),
+    close_session: createCloseSessionTool(registry),
+    close_all_sessions: createCloseAllSessionsTool(registry),
     // Widget control tools (standalone mode - agent owns session flow)
-    widget_evaluate: createWidgetEvaluateTool(connectionManager),
-    widget_click: createWidgetClickTool(connectionManager),
-    widget_fill: createWidgetFillTool(connectionManager),
-    widget_wait_for_selector: createWidgetWaitForSelectorTool(connectionManager),
-    widget_drag: createWidgetDragTool(connectionManager),
-    widget_refresh: createWidgetRefreshTool(connectionManager),
-    get_widget_state: createGetWidgetStateTool(connectionManager),
+    widget_evaluate: createWidgetEvaluateTool(registry),
+    widget_click: createWidgetClickTool(registry),
+    widget_fill: createWidgetFillTool(registry),
+    widget_wait_for_selector: createWidgetWaitForSelectorTool(registry),
+    widget_drag: createWidgetDragTool(registry),
+    widget_refresh: createWidgetRefreshTool(registry),
+    get_widget_state: createGetWidgetStateTool(registry),
     // Widget snapshot, query, and diff tools (widget_query supersedes widget_locator)
-    widget_snapshot: createWidgetSnapshotTool(connectionManager),
-    widget_query: createWidgetQueryTool(connectionManager),
-    widget_snapshot_diff: createWidgetSnapshotDiffTool(connectionManager),
+    widget_snapshot: createWidgetSnapshotTool(registry),
+    widget_query: createWidgetQueryTool(registry),
+    widget_snapshot_diff: createWidgetSnapshotDiffTool(registry),
   };
 }
 
@@ -220,13 +227,31 @@ function createInspectorTools(connectionManager: ConnectionManager): ToolDefs {
 export function createStandaloneInspectorServer(
   options: StandaloneInspectorServerOptions = {}
 ): StandaloneInspectorServer {
-  const connectionManager = new ConnectionManager(options);
+  const registry = new ConnectionRegistry({
+    connectionManagerOptions: options,
+    maxConnections: options.maxConnections ?? 20,
+  });
+  // Keep a reference for backward-compat APIs that need a single ConnectionManager
+  let connectionManager: ConnectionManager | null = null;
+  registry.on("created", (_id: string, cm: ConnectionManager) => {
+    connectionManager = cm;
+  });
+
+  /** Get the active connection manager, or null if none */
+  const getActiveConnectionManager = (): ConnectionManager | null => {
+    try {
+      return registry.getActiveConnection();
+    } catch {
+      return connectionManager;
+    }
+  };
+
   const defaultPort = options.port ?? 6274;
   const targetUrl = options.targetUrl;
 
   // Create MCP app with inspector tools
   // Filter out connection tools when auto-connect mode is enabled (targetUrl provided)
-  const allTools = createInspectorTools(connectionManager);
+  const allTools = createInspectorTools(registry);
   const tools = filterConnectionTools(allTools, !!targetUrl);
   const app = createApp({
     name: "mcp-inspector",
@@ -266,14 +291,16 @@ export function createStandaloneInspectorServer(
 
     // Health check
     if (url === "/health") {
-      const state = connectionManager.getState();
-      const schema = connectionManager.getTargetSchema();
+      const cm = getActiveConnectionManager();
+      const state = cm?.getState() ?? { connected: false, serverUrl: null, serverInfo: null };
+      const schema = cm?.getTargetSchema() ?? null;
       const protocolType: ProtocolType | null =
         state.connected && schema ? inferProtocolType(schema.tools) : null;
       const body = JSON.stringify({
         status: "ok",
         name: "mcp-inspector",
         mode: "standalone",
+        connectionCount: registry.listConnections().length,
         connection: {
           connected: state.connected,
           serverUrl: state.serverUrl,
@@ -320,57 +347,23 @@ export function createStandaloneInspectorServer(
             return;
           }
 
-          // Check if already connected
-          const currentState = connectionManager.getState();
-          if (currentState.connected && currentState.serverUrl) {
-            // If same URL, return success
-            if (currentState.serverUrl === data.url) {
-              const schema = connectionManager.getTargetSchema();
-              const protocolType = schema ? inferProtocolType(schema.tools) : "mcp";
-              res.writeHead(200, { "Content-Type": "application/json" });
-              res.end(
-                JSON.stringify({
-                  success: true,
-                  connected: true,
-                  serverUrl: data.url,
-                  serverInfo: currentState.serverInfo,
-                  toolCount: schema?.tools.length ?? 0,
-                  resourceCount: schema?.resources.length ?? 0,
-                  promptCount: schema?.prompts.length ?? 0,
-                  protocolType,
-                })
-              );
-              return;
-            }
-
-            // If different URL without force, return error
-            if (!data.force) {
-              res.writeHead(409, { "Content-Type": "application/json" });
-              res.end(
-                JSON.stringify({
-                  success: false,
-                  error: `Already connected to ${currentState.serverUrl}. Use force=true to disconnect and connect to ${data.url}.`,
-                })
-              );
-              return;
-            }
-          }
-
-          // Connect (will disconnect first if force=true and already connected)
-          const result = await connectionManager.connect(data.url);
-          const schema = connectionManager.getTargetSchema();
+          // Create a new connection via registry
+          const { id, connectionManager: cm } = await registry.createConnection(data.url);
+          const schema = cm.getTargetSchema();
           const protocolType = schema ? inferProtocolType(schema.tools) : "mcp";
 
+          const result = cm.getState();
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(
             JSON.stringify({
               success: true,
+              connectionId: id,
               connected: true,
               serverUrl: data.url,
               serverInfo: result.serverInfo,
-              toolCount: result.toolCount,
-              resourceCount: result.resourceCount,
-              promptCount: result.promptCount,
+              toolCount: schema?.tools.length ?? 0,
+              resourceCount: schema?.resources.length ?? 0,
+              promptCount: schema?.prompts.length ?? 0,
               protocolType,
             })
           );
@@ -401,7 +394,14 @@ export function createStandaloneInspectorServer(
 
       if (req.method === "POST") {
         try {
-          const previousUrl = await connectionManager.disconnect();
+          const cm = getActiveConnectionManager();
+          if (!cm) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: false, error: "No active connection" }));
+            return;
+          }
+          const previousUrl = cm.getState().serverUrl;
+          await registry.closeConnection(cm.id);
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(
             JSON.stringify({
@@ -468,7 +468,7 @@ export function createStandaloneInspectorServer(
 
         try {
           // Check if connected to a server
-          const state = connectionManager.getState();
+          const state = getActiveConnectionManager()!.getState();
           if (!state.connected) {
             res.writeHead(503, { "Content-Type": "application/json" });
             res.end(
@@ -481,7 +481,7 @@ export function createStandaloneInspectorServer(
           }
 
           // Execute the tool on the connected server
-          const client = connectionManager.getClient();
+          const client = getActiveConnectionManager()!.getClient();
           const result = await client.callTool(toolName, args);
 
           // Extract structured result for recording
@@ -503,7 +503,7 @@ export function createStandaloneInspectorServer(
 
           // Record the tool call with result in the session (if sessionId provided)
           if (sessionId) {
-            const sessionManager = connectionManager.getWidgetSessionManager();
+            const sessionManager = getActiveConnectionManager()!.getWidgetSessionManager();
             sessionManager.recordToolCall(
               sessionId,
               toolName,
@@ -585,7 +585,7 @@ export function createStandaloneInspectorServer(
             return;
           }
 
-          const sessionManager = connectionManager.getWidgetSessionManager();
+          const sessionManager = getActiveConnectionManager()!.getWidgetSessionManager();
           sessionManager.recordEvent(sessionId, type, payload, source ?? "host", protocol);
 
           res.writeHead(200, { "Content-Type": "application/json" });
@@ -629,11 +629,11 @@ export function createStandaloneInspectorServer(
           };
 
           // Update the connection manager's environment state
-          connectionManager.updateEnvironmentFromGlobals(data.globals);
+          getActiveConnectionManager()!.updateEnvironmentFromGlobals(data.globals);
 
           // Resize the Playwright viewport for the specific session
-          const sessionManager = connectionManager.getWidgetSessionManager();
-          const currentEnvState = connectionManager.getEnvironmentState();
+          const sessionManager = getActiveConnectionManager()!.getWidgetSessionManager();
+          const currentEnvState = getActiveConnectionManager()!.getEnvironmentState();
 
           // Use the environment state which now includes the updated displayMode/viewport
           const updated = await sessionManager.updateSessionGlobals(
@@ -665,7 +665,7 @@ export function createStandaloneInspectorServer(
 
     // Handle /mcp/primitives before routing to MCP app
     if (url === "/mcp/primitives" && req.method === "GET") {
-      const handled = await handleDashboardRequest(req, res, connectionManager);
+      const handled = await handleDashboardRequest(req, res, getActiveConnectionManager()!);
       if (handled) return;
     }
 
@@ -699,7 +699,7 @@ export function createStandaloneInspectorServer(
               startTime: Date.now(),
             };
             // Record inspector tool call event
-            connectionManager.recordAgentEvent("agent-tool-call", {
+            getActiveConnectionManager()!.recordAgentEvent("agent-tool-call", {
               name: inspectorToolCall.name,
               arguments: inspectorToolCall.arguments,
               source: "inspector",
@@ -750,7 +750,7 @@ export function createStandaloneInspectorServer(
         } catch {
           // Ignore parse errors
         }
-        connectionManager.recordAgentEvent("agent-tool-result", {
+        getActiveConnectionManager()!.recordAgentEvent("agent-tool-result", {
           name: inspectorToolCall.name,
           isError,
           duration,
@@ -768,7 +768,7 @@ export function createStandaloneInspectorServer(
 
     // Dashboard routes
     if (url.startsWith("/dashboard")) {
-      const handled = await handleDashboardRequest(req, res, connectionManager);
+      const handled = await handleDashboardRequest(req, res, getActiveConnectionManager()!);
       if (handled) return;
     }
 
@@ -794,12 +794,16 @@ export function createStandaloneInspectorServer(
           httpServer.listen(port, () => {
             // Set inspector URL for widget tool call execution
             // Use 127.0.0.1 instead of localhost to match widget server origin (avoids CORS issues)
-            connectionManager.setInspectorUrl(`http://127.0.0.1:${port}`);
+            // Set inspector URL on any future connections
+            const inspectorUrl = `http://127.0.0.1:${port}`;
+            registry.on("created", (_id: string, cm: ConnectionManager) => {
+              cm.setInspectorUrl(inspectorUrl);
+            });
 
             // Auto-connect if targetUrl is provided
             if (targetUrl) {
-              void connectionManager
-                .connect(targetUrl, { trackHistory: true })
+              void registry
+                .createConnection(targetUrl, { trackHistory: true })
                 .then(() => {
                   // Mark server as ready now that auto-connect succeeded
                   isReady = true;
@@ -831,13 +835,8 @@ export function createStandaloneInspectorServer(
     },
 
     stop: async () => {
-      // Close all widget sessions
-      await connectionManager.getWidgetSessionManager().dispose();
-
-      // Disconnect from target if connected
-      if (connectionManager.getState().connected) {
-        await connectionManager.disconnect();
-      }
+      // Close all connections (including their widget sessions)
+      await registry.closeAll();
 
       // Close HTTP server
       return new Promise<void>((resolve, reject) => {
@@ -856,7 +855,13 @@ export function createStandaloneInspectorServer(
       });
     },
 
-    getConnectionManager: () => connectionManager,
+    getConnectionManager: () => {
+      if (!connectionManager) {
+        throw new Error("No active connection. Call connect_to_server first.");
+      }
+      return connectionManager;
+    },
+    getRegistry: () => registry,
     getApp: () => app,
     getHttpServer: () => httpServer,
   };

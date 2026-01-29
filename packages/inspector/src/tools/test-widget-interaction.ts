@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type { TestWidgetInteractionOutput } from "../types";
 import { UIHostManager, type DetectedProtocol } from "../ui-host";
 import {
@@ -42,6 +42,7 @@ const interactionActionSchema = z.object({
 });
 
 export const testWidgetInteractionInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   sessionId: z
     .string()
     .optional()
@@ -102,7 +103,7 @@ export const testWidgetInteractionOutputSchema = z.object({
  * - For snapshots: use widget_snapshot (returns accessibility tree)
  * - For assertions: use widget_snapshot_diff to compare states
  */
-export function createTestWidgetInteractionTool(connectionManager: ConnectionManager) {
+export function createTestWidgetInteractionTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "[DEPRECATED - Use widget_click, widget_fill, widget_drag, widget_snapshot instead] " +
@@ -110,6 +111,7 @@ export function createTestWidgetInteractionTool(connectionManager: ConnectionMan
     input: testWidgetInteractionInputSchema,
     output: testWidgetInteractionOutputSchema,
     handler: async (input): Promise<TestWidgetInteractionOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const snapshots: Array<{ afterAction: number; dom: string; textContent: string }> = [];
       const toolCalls: Array<{ name: string; args: unknown }> = [];
       const stateChanges: Array<{ state: unknown; timestamp: number }> = [];

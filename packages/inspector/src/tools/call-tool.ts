@@ -4,7 +4,7 @@
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type { CallToolOutput, ToolHints } from "../types";
 import { UIHostManager } from "../ui-host";
 import {
@@ -18,6 +18,7 @@ import {
 const DEFAULT_TOOL_TIMEOUT_MS = 30000;
 
 export const callToolInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   name: z.string().describe("Name of the tool to call"),
   arguments: z.record(z.string(), z.unknown()).describe("Arguments to pass to the tool"),
   renderWidget: z
@@ -54,13 +55,14 @@ export const callToolOutputSchema = z.object({
   hints: toolHintsSchema.optional(),
 });
 
-export function createCallToolTool(connectionManager: ConnectionManager) {
+export function createCallToolTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Call a tool on the connected MCP server with the specified arguments. Returns the tool result including content blocks, errors, and execution duration. Optionally renders the UI widget and returns a session ID for subsequent inspection operations.",
     input: callToolInputSchema,
     output: callToolOutputSchema,
     handler: async (input): Promise<CallToolOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const client = connectionManager.getClient();
       const startTime = Date.now();
 

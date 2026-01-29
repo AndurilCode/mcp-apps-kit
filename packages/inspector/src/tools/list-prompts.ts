@@ -4,10 +4,12 @@
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type { PromptInfo } from "../types";
 
-export const listPromptsInputSchema = z.object({}).describe("No input required");
+export const listPromptsInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
+});
 
 export const listPromptsOutputSchema = z.object({
   prompts: z.array(
@@ -18,12 +20,13 @@ export const listPromptsOutputSchema = z.object({
   ),
 });
 
-export function createListPromptsTool(connectionManager: ConnectionManager) {
+export function createListPromptsTool(registry: ConnectionRegistry) {
   return defineTool({
     description: "List all prompts available on the connected MCP server.",
     input: listPromptsInputSchema,
     output: listPromptsOutputSchema,
-    handler: async (): Promise<{ prompts: PromptInfo[] }> => {
+    handler: async (input): Promise<{ prompts: PromptInfo[] }> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const client = connectionManager.getClient();
 
       try {

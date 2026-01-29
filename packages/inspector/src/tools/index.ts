@@ -13,6 +13,7 @@ export { createGetPromptTool } from "./get-prompt";
 export { createGetCallHistoryTool, createClearHistoryTool } from "./history";
 export { createRunTestSuiteTool } from "./test-suite";
 export { createGetConnectionStatusTool } from "./status";
+export { createListConnectionsTool } from "./list-connections";
 
 // UI Inspection tools
 export { createListUIWidgetsTool } from "./list-ui-widgets";

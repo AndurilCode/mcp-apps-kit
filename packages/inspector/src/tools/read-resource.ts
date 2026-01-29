@@ -4,10 +4,11 @@
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type { ReadResourceOutput } from "../types";
 
 export const readResourceInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   uri: z.string().describe("URI of the resource to read"),
 });
 
@@ -26,12 +27,13 @@ export const readResourceOutputSchema = z.object({
   ),
 });
 
-export function createReadResourceTool(connectionManager: ConnectionManager) {
+export function createReadResourceTool(registry: ConnectionRegistry) {
   return defineTool({
     description: "Read a resource from the connected MCP server by URI.",
     input: readResourceInputSchema,
     output: readResourceOutputSchema,
     handler: async (input): Promise<ReadResourceOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       // Validate connection before accessing client
       const state = connectionManager.getState();
       if (!state.connected) {

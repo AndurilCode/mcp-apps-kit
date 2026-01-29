@@ -4,7 +4,7 @@
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type { InspectToolUIOutput, UIBinding, ToolHints } from "../types";
 
 /**
@@ -122,6 +122,7 @@ function buildOpenaiMeta(
 }
 
 export const inspectToolUIInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   toolName: z.string().describe("Name of the tool to inspect for UI binding"),
 });
 
@@ -145,13 +146,14 @@ export const inspectToolUIOutputSchema = z.object({
   hints: toolHintsSchema.optional(),
 });
 
-export function createInspectToolUITool(connectionManager: ConnectionManager) {
+export function createInspectToolUITool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Inspect a tool's UI binding and metadata. Returns the tool's resource URI, visibility settings, and metadata in both MCP Apps and OpenAI formats.",
     input: inspectToolUIInputSchema,
     output: inspectToolUIOutputSchema,
     handler: async (input): Promise<InspectToolUIOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const client = connectionManager.getClient();
       const rawClient = client.raw;
 

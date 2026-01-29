@@ -4,7 +4,7 @@
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type { GetUIWidgetOutput, UIWidgetMetadata, UIWidgetCSP } from "../types";
 
 // MCP Apps MIME type
@@ -101,6 +101,7 @@ function parseMetadata(meta: Record<string, unknown> | undefined): UIWidgetMetad
 }
 
 export const getUIWidgetInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   uri: z.string().describe("URI of the UI widget to retrieve"),
 });
 
@@ -127,13 +128,14 @@ export const getUIWidgetOutputSchema = z.object({
   }),
 });
 
-export function createGetUIWidgetTool(connectionManager: ConnectionManager) {
+export function createGetUIWidgetTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Get the HTML content and metadata for a specific UI widget by URI. Returns the full widget HTML, parsed metadata, and CSP configuration.",
     input: getUIWidgetInputSchema,
     output: getUIWidgetOutputSchema,
     handler: async (input): Promise<GetUIWidgetOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const client = connectionManager.getClient();
       const rawClient = client.raw;
 

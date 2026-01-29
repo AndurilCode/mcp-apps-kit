@@ -4,10 +4,11 @@
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type { GetPromptOutput } from "../types";
 
 export const getPromptInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   name: z.string().describe("Name of the prompt to retrieve"),
   arguments: z
     .record(z.string(), z.string())
@@ -30,12 +31,13 @@ export const getPromptOutputSchema = z.object({
   ),
 });
 
-export function createGetPromptTool(connectionManager: ConnectionManager) {
+export function createGetPromptTool(registry: ConnectionRegistry) {
   return defineTool({
     description: "Get a prompt from the connected MCP server by name, optionally with arguments.",
     input: getPromptInputSchema,
     output: getPromptOutputSchema,
     handler: async (input): Promise<GetPromptOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const client = connectionManager.getClient();
 
       try {

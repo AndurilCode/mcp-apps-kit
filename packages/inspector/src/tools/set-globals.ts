@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type { SetGlobalsOutput, GetGlobalsOutput, ResetGlobalsOutput } from "../types";
 import {
   getDisplayModeSizing,
@@ -49,6 +49,7 @@ const userLocationSchema = z.object({
 });
 
 export const setGlobalsInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   theme: z.enum(["light", "dark"]).optional().describe("UI theme"),
   locale: z.string().optional().describe("BCP 47 locale code (e.g., 'en-US', 'fr-FR')"),
   timeZone: z.string().optional().describe("IANA timezone (e.g., 'UTC', 'America/New_York')"),
@@ -114,13 +115,14 @@ export const resetGlobalsOutputSchema = z.object({
   }),
 });
 
-export function createSetGlobalsTool(connectionManager: ConnectionManager) {
+export function createSetGlobalsTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Configure environment settings (theme, locale, device, location) for widget rendering and testing. Settings affect subsequent preview_ui, screenshot_widget, and test_widget_interaction calls. Supports both MCP Apps and OpenAI protocols. When displayMode is set without explicit viewport/maxHeight, size presets are automatically applied based on the platform (desktop/mobile).",
     input: setGlobalsInputSchema,
     output: setGlobalsOutputSchema,
     handler: async (input): Promise<SetGlobalsOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       // Handle null values (used to unset optional fields)
       const updatePayload: Record<string, unknown> = {};
 
@@ -176,13 +178,14 @@ export function createSetGlobalsTool(connectionManager: ConnectionManager) {
   });
 }
 
-export function createGetGlobalsTool(connectionManager: ConnectionManager) {
+export function createGetGlobalsTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Get current environment settings for widget rendering and testing. Returns theme, locale, device, location, and other configuration.",
     input: z.object({}),
     output: getGlobalsOutputSchema,
-    handler: async (): Promise<GetGlobalsOutput> => {
+    handler: async (input): Promise<GetGlobalsOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const currentState = connectionManager.getEnvironmentState();
 
       return {
@@ -192,13 +195,14 @@ export function createGetGlobalsTool(connectionManager: ConnectionManager) {
   });
 }
 
-export function createResetGlobalsTool(connectionManager: ConnectionManager) {
+export function createResetGlobalsTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Reset all environment settings to defaults (light theme, en-US locale, desktop device, etc.). Use this to start testing from a clean state.",
     input: z.object({}),
     output: resetGlobalsOutputSchema,
-    handler: async (): Promise<ResetGlobalsOutput> => {
+    handler: async (input): Promise<ResetGlobalsOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const currentState = connectionManager.resetEnvironmentState();
 
       return {

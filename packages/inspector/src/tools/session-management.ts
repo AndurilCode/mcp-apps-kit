@@ -6,7 +6,7 @@
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type { SessionInfo } from "../widget-session-manager";
 
 /**
@@ -26,15 +26,18 @@ export const listSessionsOutputSchema = z.object({
   count: z.number(),
 });
 
-export function createListSessionsTool(connectionManager: ConnectionManager) {
+export function createListSessionsTool(registry: ConnectionRegistry) {
   return defineTool({
     description: "List all active widget rendering sessions",
     input: z.object({}),
     output: listSessionsOutputSchema,
-    handler: async (): Promise<{
+    handler: async (
+      input
+    ): Promise<{
       sessions: SessionInfo[];
       count: number;
     }> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const sessions = sessionManager.listSessions();
 
@@ -50,6 +53,7 @@ export function createListSessionsTool(connectionManager: ConnectionManager) {
  * close_session tool
  */
 export const closeSessionInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   sessionId: z.string().describe("ID of the session to close"),
 });
 
@@ -58,12 +62,13 @@ export const closeSessionOutputSchema = z.object({
   message: z.string().optional(),
 });
 
-export function createCloseSessionTool(connectionManager: ConnectionManager) {
+export function createCloseSessionTool(registry: ConnectionRegistry) {
   return defineTool({
     description: "Close a specific widget rendering session and clean up resources",
     input: closeSessionInputSchema,
     output: closeSessionOutputSchema,
     handler: async (input): Promise<{ closed: boolean; message?: string }> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const closed = await sessionManager.closeSession(input.sessionId);
 
@@ -90,12 +95,13 @@ export const closeAllSessionsOutputSchema = z.object({
   message: z.string().optional(),
 });
 
-export function createCloseAllSessionsTool(connectionManager: ConnectionManager) {
+export function createCloseAllSessionsTool(registry: ConnectionRegistry) {
   return defineTool({
     description: "Close all active widget rendering sessions and clean up resources",
     input: z.object({}),
     output: closeAllSessionsOutputSchema,
-    handler: async (): Promise<{ closed: number; message?: string }> => {
+    handler: async (input): Promise<{ closed: number; message?: string }> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const closed = await sessionManager.closeAllSessions();
 

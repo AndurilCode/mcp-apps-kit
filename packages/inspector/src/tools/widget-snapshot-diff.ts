@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type {
   ToolHints,
   AccessibilityNode,
@@ -23,6 +23,7 @@ import { validateWidgetSession } from "./helpers";
 // =============================================================================
 
 export const widgetSnapshotDiffInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   sessionId: z.string().describe("Session ID of the widget"),
   previousSnapshot: z
     .unknown()
@@ -280,7 +281,7 @@ function indexTree(node: Record<string, unknown>, counter: { index: number }): A
 // TOOL IMPLEMENTATION
 // =============================================================================
 
-export function createWidgetSnapshotDiffTool(connectionManager: ConnectionManager) {
+export function createWidgetSnapshotDiffTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Compare the current widget accessibility tree with a previous snapshot. " +
@@ -289,6 +290,7 @@ export function createWidgetSnapshotDiffTool(connectionManager: ConnectionManage
     input: widgetSnapshotDiffInputSchema,
     output: widgetSnapshotDiffOutputSchema,
     handler: async (input): Promise<WidgetSnapshotDiffOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const validation = validateWidgetSession(sessionManager, input.sessionId);
       if (!validation.success) {
