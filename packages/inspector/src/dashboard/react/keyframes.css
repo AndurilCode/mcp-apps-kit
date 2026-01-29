@@ -1,0 +1,15 @@
+/**
+ * Dashboard Keyframes
+ *
+ * CSS keyframes animations used by the dashboard.
+ * These cannot be defined inline and must be in a stylesheet.
+ */
+
+@keyframes snakeBorder {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}

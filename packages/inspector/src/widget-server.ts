@@ -152,8 +152,12 @@ export class WidgetServer {
 
     if (this.server) {
       const server = this.server;
-      return new Promise((resolve) => {
-        server.close(() => {
+      return new Promise((resolve, reject) => {
+        server.close((err) => {
+          if (err) {
+            reject(err);
+            return;
+          }
           this.server = null;
           this.sessions.clear();
           this.port = 0;
@@ -254,14 +258,25 @@ export class WidgetServer {
    * Handle incoming HTTP requests
    */
   private handleRequest(req: IncomingMessage, res: ServerResponse): void {
-    const url = req.url ?? "/";
+    const rawUrl = req.url ?? "/";
 
-    // Parse the URL path
-    if (url.startsWith("/host/")) {
-      const sessionId = url.slice(6); // Remove "/host/"
+    // Parse the URL to extract clean pathname (without query strings)
+    let pathname: string;
+    try {
+      // Use URL constructor with a dummy base to parse the path
+      const parsedUrl = new URL(rawUrl, "http://localhost");
+      pathname = parsedUrl.pathname;
+    } catch {
+      // Fallback: split on '?' to remove query string if URL parsing fails
+      pathname = rawUrl.split("?")[0] ?? "/";
+    }
+
+    // Route based on pathname
+    if (pathname.startsWith("/host/")) {
+      const sessionId = decodeURIComponent(pathname.slice(6)); // Remove "/host/" and decode
       this.serveHost(sessionId, res);
-    } else if (url.startsWith("/widget/")) {
-      const sessionId = url.slice(8); // Remove "/widget/"
+    } else if (pathname.startsWith("/widget/")) {
+      const sessionId = decodeURIComponent(pathname.slice(8)); // Remove "/widget/" and decode
       this.serveWidget(sessionId, res);
     } else {
       res.writeHead(404, { "Content-Type": "text/plain" });

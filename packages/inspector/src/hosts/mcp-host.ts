@@ -22,6 +22,18 @@ import {
 export type { TrackedToolCall };
 
 /**
+ * Valid display mode values for validation
+ */
+const VALID_DISPLAY_MODES: readonly DisplayMode[] = ["inline", "fullscreen", "pip"] as const;
+
+/**
+ * Type guard to validate if a value is a valid DisplayMode
+ */
+function isValidDisplayMode(value: unknown): value is DisplayMode {
+  return typeof value === "string" && VALID_DISPLAY_MODES.includes(value as DisplayMode);
+}
+
+/**
  * Environment settings for the emulator
  */
 export interface MCPEnvironmentSettings {
@@ -358,9 +370,26 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
 
       case "tools/call":
         // Handle bidirectional tool call
-        if (msg.params) {
-          const name = msg.params.name as string;
-          const args = msg.params.arguments ?? {};
+        if (msg.params && typeof msg.params === "object") {
+          const name = msg.params.name;
+          const rawArgs = msg.params.arguments;
+
+          // Validate name is a non-empty string
+          if (typeof name !== "string" || name.length === 0) {
+            this.sendError(
+              window,
+              msg.id,
+              -32602,
+              "Invalid params: name must be a non-empty string"
+            );
+            break;
+          }
+
+          // Validate arguments is an object or default to empty object
+          const args =
+            rawArgs !== undefined && rawArgs !== null && typeof rawArgs === "object"
+              ? (rawArgs as Record<string, unknown>)
+              : {};
 
           this.recordToolCall(name, args);
 
@@ -382,6 +411,8 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
               content: [{ type: "text", text: '{"mock": true}' }],
             });
           }
+        } else {
+          this.sendError(window, msg.id, -32602, "Invalid params: params object is required");
         }
         break;
 
@@ -395,9 +426,32 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
 
       case "ui/requests/display-mode":
         // Handle display mode change request from widget
-        if (msg.params) {
-          const requestedMode = msg.params.mode as DisplayMode;
+        if (msg.params && typeof msg.params === "object") {
+          const requestedMode = msg.params.mode;
+
+          // Validate that mode is a valid DisplayMode value
+          if (!isValidDisplayMode(requestedMode)) {
+            if (debug) {
+              // eslint-disable-next-line no-console
+              console.log("[MCP Host] Invalid display mode requested:", requestedMode);
+            }
+            this.sendError(
+              window,
+              msg.id,
+              -32602,
+              `Invalid params: mode must be one of ${VALID_DISPLAY_MODES.join(", ")}`
+            );
+            break;
+          }
+
           this.handleDisplayModeRequest(window, msg.id, requestedMode, debug);
+        } else {
+          this.sendError(
+            window,
+            msg.id,
+            -32602,
+            "Invalid params: params object with mode is required"
+          );
         }
         break;
 

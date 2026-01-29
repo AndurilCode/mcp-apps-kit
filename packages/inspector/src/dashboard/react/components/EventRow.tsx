@@ -74,6 +74,16 @@ export function EventRow({ event }: EventRowProps): React.ReactElement {
     setIsHovered(false);
   }, []);
 
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        toggleExpand();
+      }
+    },
+    [toggleExpand]
+  );
+
   const summary = getEventSummary(event);
   const badgeStyle = getCategoryBadgeStyle(event.category);
 
@@ -99,6 +109,10 @@ export function EventRow({ event }: EventRowProps): React.ReactElement {
         onClick={toggleExpand}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
+        role="button"
+        aria-expanded={isExpanded}
       >
         <span style={expandIconStyle}>▶</span>
         <span style={styles.eventTime as React.CSSProperties}>{formatTime(event.timestamp)}</span>

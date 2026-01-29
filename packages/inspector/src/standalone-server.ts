@@ -16,33 +16,6 @@ import http from "http";
 import { ConnectionManager, inferProtocolType, type ProtocolType } from "./connection";
 import type { InspectorServerOptions } from "./types";
 import { handleDashboardRequest } from "./dashboard/dashboard-server";
-
-// =============================================================================
-// TOOL FILTERING (for auto-connect mode)
-// =============================================================================
-
-/**
- * Connection tools to filter out when auto-connect mode is enabled
- */
-const CONNECTION_TOOLS = ["connect_to_server", "disconnect"] as const;
-
-/**
- * Filter connection tools from the tool definitions
- * @param tools - All inspector tools
- * @param exclude - Whether to exclude connection tools
- * @returns Filtered tool definitions
- */
-function filterConnectionTools(tools: ToolDefs, exclude: boolean): ToolDefs {
-  if (!exclude) return tools;
-
-  const filtered: ToolDefs = {};
-  for (const [name, tool] of Object.entries(tools)) {
-    if (!CONNECTION_TOOLS.includes(name as (typeof CONNECTION_TOOLS)[number])) {
-      filtered[name] = tool;
-    }
-  }
-  return filtered;
-}
 import {
   createConnectTool,
   createDisconnectTool,
@@ -82,6 +55,80 @@ import {
   createWidgetQueryTool,
   createWidgetSnapshotDiffTool,
 } from "./tools";
+import type { InspectorEventType } from "./types";
+
+// =============================================================================
+// VALID INSPECTOR EVENT TYPES (for validation)
+// =============================================================================
+
+/**
+ * Set of valid InspectorEventType values for runtime validation
+ */
+const VALID_INSPECTOR_EVENT_TYPES: ReadonlySet<string> = new Set([
+  "tool-input",
+  "tool-input-partial",
+  "tool-output",
+  "tool-result",
+  "tool-cancelled",
+  "call-tool",
+  "call-tool-response",
+  "globals",
+  "host-context-changed",
+  "dom-click",
+  "dom-dblclick",
+  "dom-input",
+  "dom-change",
+  "dom-focus",
+  "dom-blur",
+  "dom-scroll",
+  "dom-keydown",
+  "dom-keyup",
+  "dom-select",
+  "dom-hover",
+  "dom-drag",
+  "initialize",
+  "teardown",
+  "session-created",
+  "session-closed",
+  "page-error",
+  "dialog",
+  "agent-tool-call",
+  "agent-tool-result",
+]);
+
+/**
+ * Type guard to check if a string is a valid InspectorEventType
+ */
+function isValidInspectorEventType(type: unknown): type is InspectorEventType {
+  return typeof type === "string" && VALID_INSPECTOR_EVENT_TYPES.has(type);
+}
+
+// =============================================================================
+// TOOL FILTERING (for auto-connect mode)
+// =============================================================================
+
+/**
+ * Connection tools to filter out when auto-connect mode is enabled
+ */
+const CONNECTION_TOOLS = ["connect_to_server", "disconnect"] as const;
+
+/**
+ * Filter connection tools from the tool definitions
+ * @param tools - All inspector tools
+ * @param exclude - Whether to exclude connection tools
+ * @returns Filtered tool definitions
+ */
+function filterConnectionTools(tools: ToolDefs, exclude: boolean): ToolDefs {
+  if (!exclude) return tools;
+
+  const filtered: ToolDefs = {};
+  for (const [name, tool] of Object.entries(tools)) {
+    if (!CONNECTION_TOOLS.includes(name as (typeof CONNECTION_TOOLS)[number])) {
+      filtered[name] = tool;
+    }
+  }
+  return filtered;
+}
 
 /**
  * Options for creating a standalone inspector server
@@ -526,14 +573,20 @@ export function createStandaloneInspectorServer(
             protocol?: "mcp" | "openai";
           };
 
+          // Validate that type is a valid InspectorEventType
+          if (!isValidInspectorEventType(type)) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                error: "Invalid event type",
+                message: `Type "${type}" is not a valid InspectorEventType`,
+              })
+            );
+            return;
+          }
+
           const sessionManager = connectionManager.getWidgetSessionManager();
-          sessionManager.recordEvent(
-            sessionId,
-            type as import("./types").InspectorEventType,
-            payload,
-            source ?? "host",
-            protocol
-          );
+          sessionManager.recordEvent(sessionId, type, payload, source ?? "host", protocol);
 
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true }));

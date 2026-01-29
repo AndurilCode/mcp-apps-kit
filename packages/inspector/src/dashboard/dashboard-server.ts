@@ -251,12 +251,17 @@ async function startScreencastStream(
     "Access-Control-Allow-Origin": "*",
   });
 
-  // If no session or page, send noSession event and keep connection open
+  // If no session or page, send noSession event and close after a short delay
   if (!page) {
     res.write(
       `event: noSession\ndata: ${JSON.stringify({ message: "Session not found or closed" })}\n\n`
     );
-    // Don't close - let client reconnect or wait for session
+    // Close connection after a brief delay to allow the event to be sent
+    setTimeout(() => {
+      if (!res.writableEnded) {
+        res.end();
+      }
+    }, 100);
     return;
   }
 

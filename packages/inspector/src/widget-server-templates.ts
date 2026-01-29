@@ -426,8 +426,7 @@ ${generateDomEventListenersScript()}
             args: message.params.arguments,
           }));
 
-          const inspectorUrl = ${JSON.stringify(session.inspectorUrl ?? null)};
-          const isDualMode = ${JSON.stringify(session.isDualMode ?? false)};
+          // Use outer-scope inspectorUrl and isDualMode variables (declared at top of IIFE)
 
           if (isDualMode) {
             // In dual mode, wait for synced tool response from external widget

@@ -143,6 +143,7 @@ export const styles: Record<string, CSSProperties> = {
     background: "transparent",
   },
 
+  // Note: The "snakeBorder" keyframes are defined in keyframes.css (imported in main.tsx)
   statusWrapperStreaming: {
     background: "linear-gradient(90deg, #20b2aa, #00d4ff, #20b2aa)",
     backgroundSize: "200% 100%",
