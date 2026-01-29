@@ -712,6 +712,87 @@ ${generateDomEventListenersScript()}
           timestamp: Date.now()
         });
       }
+
+      // Handle requestDisplayMode from widget
+      if (message && message.type === 'openai:requestDisplayMode') {
+        var mode = message.mode;
+        console.log('[OpenAI Host] Display mode requested:', mode);
+        
+        // Calculate new sizing based on mode
+        var DISPLAY_MODE_SIZES = {
+          inline: { desktop: { width: 800, height: 600, maxHeight: 600 }, mobile: { width: 375, height: 400, maxHeight: 400 } },
+          fullscreen: { desktop: { width: 1280, height: 800, maxHeight: null }, mobile: { width: 375, height: 667, maxHeight: null } },
+          pip: { desktop: { width: 320, height: 240, maxHeight: 240 }, mobile: { width: 280, height: 210, maxHeight: 210 } }
+        };
+        var platform = 'desktop'; // Could be derived from userAgent if needed
+        var sizing = DISPLAY_MODE_SIZES[mode] ? DISPLAY_MODE_SIZES[mode][platform] : DISPLAY_MODE_SIZES.inline[platform];
+        
+        // Update host state
+        window.__hostState = window.__hostState || {};
+        window.__hostState.displayMode = mode;
+        window.__hostState.viewport = { width: sizing.width, height: sizing.height };
+        
+        // Record the event
+        recordEvent('globals', { displayMode: mode, viewport: window.__hostState.viewport }, 'widget');
+        
+        // Notify inspector to resize Playwright viewport
+        if (inspectorUrl) {
+          fetch(inspectorUrl + '/update-environment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId: sessionId,
+              globals: { 
+                displayMode: mode, 
+                viewport: window.__hostState.viewport,
+                maxHeight: sizing.maxHeight
+              }
+            })
+          })
+          .then(function(res) {
+            console.log('[OpenAI Host] Environment update sent for displayMode:', mode, 'status:', res.status);
+          })
+          .catch(function(err) {
+            console.warn('[OpenAI Host] Failed to update environment for displayMode:', err);
+          });
+        }
+        
+        // Send response back to widget
+        iframe.contentWindow.postMessage({
+          type: 'openai:requestDisplayMode:response',
+          mode: mode
+        }, '*');
+      }
+      });
+
+      // Listen for openai:set_globals CustomEvents (from requestDisplayMode, etc.)
+      // These events are dispatched by the OpenAI host emulator when widget changes environment
+      window.addEventListener('openai:set_globals', function(e) {
+        var globals = (e.detail && e.detail.globals) ? e.detail.globals : e.detail;
+        if (!globals) return;
+        
+        console.log('[OpenAI Host] Captured set_globals event:', globals);
+        
+        // Record the event for the dashboard events panel
+        recordEvent('globals', globals, 'widget');
+        
+        // If displayMode or viewport changed, notify inspector to resize Playwright viewport
+        if ((globals.displayMode !== undefined || globals.viewport !== undefined) && inspectorUrl) {
+          fetch(inspectorUrl + '/update-environment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId: sessionId,
+              globals: globals
+            })
+          })
+          .then(function(res) {
+            console.log('[OpenAI Host] Environment update sent, status:', res.status);
+          })
+          .catch(function(err) {
+            console.warn('[OpenAI Host] Failed to update environment:', err);
+          });
+        }
       });
 
       console.log('[OpenAI Host] Ready');

@@ -218,6 +218,12 @@ export function createDualInspectorServer(
   ): Promise<void> => {
     const url = req.url ?? "/";
 
+    // Debug: log all incoming requests
+    if (options.debug) {
+      // eslint-disable-next-line no-console
+      console.log(`[inspector] Request: ${req.method} ${url}`);
+    }
+
     // Health check
     if (url === "/health") {
       const state = connectionManager.getState();
@@ -428,6 +434,73 @@ export function createDualInspectorServer(
       return;
     }
 
+    // Environment update endpoint (for standalone mode widgets)
+    // Called when the widget requests display mode or other environment changes
+    if (url === "/update-environment") {
+      // eslint-disable-next-line no-console
+      console.log(`[inspector] /update-environment request: method=${req.method}`);
+
+      // Handle CORS
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+      if (req.method === "OPTIONS") {
+        // eslint-disable-next-line no-console
+        console.log(`[inspector] /update-environment OPTIONS preflight - sending CORS headers`);
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+
+      if (req.method === "POST") {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) {
+          chunks.push(chunk as Buffer);
+        }
+        const bodyData = Buffer.concat(chunks);
+
+        try {
+          const data = JSON.parse(bodyData.toString("utf-8")) as {
+            sessionId: string;
+            globals: Record<string, unknown>;
+          };
+
+          // Update the connection manager's environment state
+          connectionManager.updateEnvironmentFromGlobals(data.globals);
+
+          // Resize the Playwright viewport for the specific session
+          const sessionManager = connectionManager.getWidgetSessionManager();
+          const currentEnvState = connectionManager.getEnvironmentState();
+
+          // Use the environment state which now includes the updated displayMode/viewport
+          const updated = await sessionManager.updateSessionGlobals(
+            data.sessionId,
+            currentEnvState
+          );
+
+          if (options.debug) {
+            // eslint-disable-next-line no-console
+            console.log(
+              `[inspector] Environment updated from widget, session ${data.sessionId}, resized: ${updated}`
+            );
+          }
+
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true, updated, environmentState: currentEnvState }));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: message }));
+        }
+        return;
+      }
+
+      res.writeHead(405, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Method not allowed" }));
+      return;
+    }
+
     // Legacy endpoint for backwards compatibility (redirects to /sync-events)
     if (url === "/sync-globals") {
       // Handle CORS for cross-origin widget requests
@@ -550,7 +623,8 @@ export function createDualInspectorServer(
           });
           httpServer.listen(port, () => {
             // Set inspector URL for sync script injection
-            connectionManager.setInspectorUrl(`http://localhost:${port}`);
+            // Use 127.0.0.1 instead of localhost to match widget server origin (avoids CORS issues)
+            connectionManager.setInspectorUrl(`http://127.0.0.1:${port}`);
 
             // eslint-disable-next-line no-console
             console.log(`[dual-inspector] Started on port ${port}`);

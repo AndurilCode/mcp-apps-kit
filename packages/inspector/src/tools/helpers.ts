@@ -150,32 +150,54 @@ export function extractToolResult(callResult: MCPCallToolResponse): unknown {
 }
 
 /**
+ * Result of extracting UI resource from tool metadata
+ */
+interface ExtractedUIResource {
+  uri: string;
+  /** Protocol inferred from the metadata format used */
+  inferredProtocol: DetectedProtocol;
+}
+
+/**
  * Extract UI resource URI from tool metadata
  *
  * Supports multiple formats:
  * - MCP Apps format: _meta.ui.resourceUri
  * - Flat MCP format: _meta["ui/resourceUri"]
  * - OpenAI format: _meta["openai/outputTemplate"]
+ *
+ * Also returns the inferred protocol based on which metadata format was used.
  */
-function extractUIResourceUriFromMeta(meta: Record<string, unknown> | undefined): string | null {
+function extractUIResourceUriFromMeta(
+  meta: Record<string, unknown> | undefined
+): ExtractedUIResource | null {
   if (!meta) return null;
 
-  // MCP Apps format: _meta.ui.resourceUri
+  // MCP Apps format: _meta.ui.resourceUri (SEP-1865)
   const uiMeta = meta.ui as Record<string, unknown> | undefined;
   if (uiMeta?.resourceUri) {
-    return uiMeta.resourceUri as string;
+    return {
+      uri: uiMeta.resourceUri as string,
+      inferredProtocol: "mcp",
+    };
   }
 
   // Flat MCP format: _meta["ui/resourceUri"]
   const flatResourceUri = meta["ui/resourceUri"] as string | undefined;
   if (flatResourceUri) {
-    return flatResourceUri;
+    return {
+      uri: flatResourceUri,
+      inferredProtocol: "mcp",
+    };
   }
 
   // OpenAI format: _meta["openai/outputTemplate"]
   const openaiOutputTemplate = meta["openai/outputTemplate"] as string | undefined;
   if (openaiOutputTemplate) {
-    return openaiOutputTemplate;
+    return {
+      uri: openaiOutputTemplate,
+      inferredProtocol: "openai",
+    };
   }
 
   return null;
@@ -186,19 +208,24 @@ function extractUIResourceUriFromMeta(meta: Record<string, unknown> | undefined)
  *
  * First looks at the tool's _meta to find the resourceUri binding,
  * then falls back to URI pattern matching for backwards compatibility.
+ *
+ * When the tool metadata specifies a UI resource, we trust it even if the
+ * resource's mimeType is missing or unknown. The protocol is inferred from
+ * the metadata format used (e.g., openai/outputTemplate → openai protocol).
+ * This follows how MCPJam inspector handles widget detection.
  */
 export async function findUIResourceForTool(
   rawClient: MCPResourceClient,
   toolName: string
 ): Promise<UIResourceInfo | null> {
   // Step 1: Get the tool's metadata to find the resourceUri binding
-  let targetUri: string | null = null;
+  let extractedResource: ExtractedUIResource | null = null;
 
   try {
     const toolsResult = await rawClient.listTools();
     const tool = toolsResult.tools.find((t) => t.name === toolName);
     if (tool?._meta) {
-      targetUri = extractUIResourceUriFromMeta(tool._meta);
+      extractedResource = extractUIResourceUriFromMeta(tool._meta);
     }
   } catch {
     // If listTools fails, continue with pattern matching fallback
@@ -207,22 +234,34 @@ export async function findUIResourceForTool(
   const resourcesResult = await rawClient.listResources();
 
   // Step 2: If we have a target URI from metadata, find that exact resource
-  if (targetUri) {
+  // Trust the metadata even if the resource's mimeType is missing/unknown
+  if (extractedResource) {
     for (const resource of resourcesResult.resources) {
-      if (resource.uri === targetUri) {
+      if (resource.uri === extractedResource.uri) {
         const mimeType = resource.mimeType;
-        if (!mimeType) continue;
 
-        const protocol = detectProtocolFromMimeType(mimeType);
-        if (protocol) {
-          return {
-            uri: resource.uri,
-            mimeType,
-            protocol,
-          };
-        }
+        // Try to detect protocol from mimeType first
+        const protocolFromMime = mimeType ? detectProtocolFromMimeType(mimeType) : null;
+
+        // Use mimeType-based protocol if available, otherwise use inferred protocol from metadata
+        const protocol = protocolFromMime ?? extractedResource.inferredProtocol;
+
+        return {
+          uri: resource.uri,
+          mimeType: mimeType ?? "text/html", // Default to text/html if missing
+          protocol,
+        };
       }
     }
+
+    // Resource URI from metadata exists but resource not found in list
+    // This can happen if the server doesn't list the resource but serves it on-demand
+    // Trust the metadata and assume it's valid
+    return {
+      uri: extractedResource.uri,
+      mimeType: "text/html", // Default
+      protocol: extractedResource.inferredProtocol,
+    };
   }
 
   // Step 3: Fallback to pattern matching (backwards compatibility)

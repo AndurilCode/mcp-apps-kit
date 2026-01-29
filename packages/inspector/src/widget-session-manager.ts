@@ -506,6 +506,12 @@ export class WidgetSessionManager extends EventEmitter {
       return;
     }
 
+    // For globals/host-context-changed events with displayMode, resize the Playwright viewport
+    // This is critical for 1:1 sync when the external widget requests a display mode change
+    if (type === "globals" || type === "host-context-changed") {
+      await this.handleGlobalsSync(data, sessionId, protocol);
+    }
+
     // If sessionId specified, sync to that session only
     if (sessionId) {
       const session = this.store.peek(sessionId);
@@ -530,6 +536,78 @@ export class WidgetSessionManager extends EventEmitter {
       }
     }
     await Promise.all(promises);
+  }
+
+  /**
+   * Handle globals/host-context-changed sync events
+   *
+   * When the external widget requests a displayMode change, we need to:
+   * 1. Resize the Playwright viewport to match the new display mode sizing
+   * 2. The postMessage delivery happens separately in deliverEvent
+   *
+   * This ensures the Playwright page viewport matches what the external widget sees.
+   */
+  private async handleGlobalsSync(
+    data: unknown,
+    sessionId: string | undefined,
+    protocol: "openai" | "mcp"
+  ): Promise<void> {
+    const globals = data as Record<string, unknown> | undefined;
+    if (!globals) return;
+
+    // Check if displayMode is in the globals
+    const displayMode = globals.displayMode as DisplayMode | undefined;
+    const viewport = globals.viewport as { width: number; height: number } | undefined;
+
+    // If no displayMode or viewport change, nothing to resize
+    if (!displayMode && !viewport) return;
+
+    // Determine which sessions to update
+    const sessionsToUpdate: ActiveWidgetSession[] = [];
+    if (sessionId) {
+      const session = this.store.peek(sessionId);
+      if (session && !session.page.isClosed()) {
+        sessionsToUpdate.push(session);
+      }
+    } else {
+      // All sessions matching protocol
+      for (const session of this.store.values()) {
+        if (session.protocol === protocol && !session.page.isClosed()) {
+          sessionsToUpdate.push(session);
+        }
+      }
+    }
+
+    // Resize viewports for all matching sessions
+    for (const session of sessionsToUpdate) {
+      try {
+        // Calculate new viewport size based on displayMode
+        let newViewport = viewport;
+        if (!newViewport && displayMode) {
+          // Infer viewport from displayMode using platform
+          const userAgent = globals.userAgent as { device?: { type?: string } } | undefined;
+          const platform = getPlatformFromDeviceType(userAgent?.device?.type);
+          const sizing = getDisplayModeSizing(displayMode, platform);
+          newViewport = { width: sizing.width, height: sizing.height };
+        }
+
+        if (newViewport) {
+          await session.page.setViewportSize(newViewport);
+          if (this.debug) {
+            console.log(
+              `[WidgetSessionManager] Resized viewport for session ${session.id} to ${newViewport.width}x${newViewport.height} (displayMode: ${displayMode ?? "unchanged"})`
+            );
+          }
+        }
+      } catch (error) {
+        if (this.debug) {
+          console.warn(
+            `[WidgetSessionManager] Failed to resize viewport for session ${session.id}:`,
+            error
+          );
+        }
+      }
+    }
   }
 
   /**
