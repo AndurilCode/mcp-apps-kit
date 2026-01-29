@@ -193,12 +193,29 @@ export function createStandaloneInspectorServer(
   // HTTP server (created on start)
   let httpServer: Server | null = null;
 
+  // Ready flag to prevent handling requests before auto-connect completes
+  // When targetUrl is provided, server is not ready until connect succeeds
+  let isReady = !targetUrl;
+
   // Helper to handle requests
   const handleRequest = async (
     req: http.IncomingMessage,
     res: http.ServerResponse
   ): Promise<void> => {
     const url = req.url ?? "/";
+
+    // Return 503 if server is not ready (auto-connect in progress)
+    // Allow health check to always respond for monitoring purposes
+    if (!isReady && url !== "/health") {
+      res.writeHead(503, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          error: "Service unavailable",
+          message: "Server is starting up, auto-connect in progress",
+        })
+      );
+      return;
+    }
 
     // Health check
     if (url === "/health") {
@@ -731,6 +748,8 @@ export function createStandaloneInspectorServer(
               void connectionManager
                 .connect(targetUrl, { trackHistory: true })
                 .then(() => {
+                  // Mark server as ready now that auto-connect succeeded
+                  isReady = true;
                   if (options.debug) {
                     // eslint-disable-next-line no-console
                     console.log(`[inspector] Auto-connected to: ${targetUrl}`);

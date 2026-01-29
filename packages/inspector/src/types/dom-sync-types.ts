@@ -107,6 +107,20 @@ export interface DomDragPayload {
   targetPosition?: { x: number; y: number };
 }
 
+/**
+ * Payload for hover events
+ */
+export interface DomHoverPayload {
+  /** CSS selector path to the hovered element */
+  selector: string;
+  /** X position relative to element (optional) */
+  x?: number;
+  /** Y position relative to element (optional) */
+  y?: number;
+  /** Modifier keys state (optional) */
+  modifiers?: DomKeyModifiers;
+}
+
 // =============================================================================
 // DOM SYNC EVENT TYPE
 // =============================================================================
@@ -129,10 +143,29 @@ export type DomSyncEventType =
   | "dom-drag";
 
 /**
+ * Set of valid DOM sync event type literals
+ */
+const DOM_SYNC_EVENT_TYPES: ReadonlySet<string> = new Set<DomSyncEventType>([
+  "dom-click",
+  "dom-dblclick",
+  "dom-input",
+  "dom-change",
+  "dom-focus",
+  "dom-blur",
+  "dom-scroll",
+  "dom-keydown",
+  "dom-keyup",
+  "dom-select",
+  "dom-hover",
+  "dom-drag",
+]);
+
+/**
  * Type guard to check if an event type is a DOM sync event
+ * Only accepts the exact DomSyncEventType literals
  */
 export function isDomSyncEventType(type: string): type is DomSyncEventType {
-  return type.startsWith("dom-");
+  return DOM_SYNC_EVENT_TYPES.has(type);
 }
 
 /**
@@ -145,4 +178,5 @@ export type DomEventPayload =
   | DomFocusPayload
   | DomKeyPayload
   | DomSelectPayload
-  | DomDragPayload;
+  | DomDragPayload
+  | DomHoverPayload;

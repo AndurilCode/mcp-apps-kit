@@ -105,6 +105,19 @@ export const HOST_PAGE_STYLES = `
 export const IFRAME_SANDBOX = "allow-scripts allow-same-origin allow-forms allow-modals";
 
 /**
+ * Escape HTML special characters to prevent XSS
+ * Used when inserting user-controlled strings into HTML templates
+ */
+export function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
  * Generate the getSelector helper function for DOM event recording
  * This function creates a CSS selector string for a given element
  */
@@ -273,7 +286,7 @@ export function generateMcpHostPage(ctx: McpHostContext): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MCP Widget Host - ${session.toolName}</title>
+  <title>MCP Widget Host - ${escapeHtml(session.toolName)}</title>
   <style>${HOST_PAGE_STYLES}</style>
 </head>
 <body>
@@ -522,7 +535,7 @@ export function generateOpenAIHostPage(ctx: OpenAIHostContext): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OpenAI Widget Host - ${session.toolName}</title>
+  <title>OpenAI Widget Host - ${escapeHtml(session.toolName)}</title>
   <style>${HOST_PAGE_STYLES}</style>
 </head>
 <body>

@@ -265,12 +265,28 @@ export async function deliverToolCallResponse(options: DeliverToolResponseOption
 
   /* eslint-disable no-undef */
   await page.evaluate((responseData: unknown) => {
-    const d = responseData as { name?: string; result?: unknown; toolName?: string };
-    const toolName = d.name ?? d.toolName;
+    // Validate responseData is a non-null object before accessing properties
+    if (typeof responseData !== "object" || responseData === null) {
+      // eslint-disable-next-line no-console
+      console.log("[MCP Host] Tool response is not a valid object:", responseData);
+      return;
+    }
+
+    const d = responseData as Record<string, unknown>;
+    const nameValue = d.name;
+    const toolNameValue = d.toolName;
+
+    // Validate that name or toolName exists and is a string
+    const toolName =
+      typeof nameValue === "string" && nameValue
+        ? nameValue
+        : typeof toolNameValue === "string" && toolNameValue
+          ? toolNameValue
+          : null;
 
     if (!toolName) {
       // eslint-disable-next-line no-console
-      console.log("[MCP Host] Tool response missing name, cannot match:", responseData);
+      console.log("[MCP Host] Tool response missing valid name/toolName string:", responseData);
       return;
     }
 
