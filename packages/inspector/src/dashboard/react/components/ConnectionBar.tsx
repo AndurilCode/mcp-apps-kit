@@ -9,14 +9,14 @@
  */
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
-import type { ConnectionStatus, ServerHistoryEntry, ProtocolType } from "../hooks";
+import type { ServerHistoryEntry } from "../hooks";
 
 export interface ConnectionBarProps {
-  status: ConnectionStatus;
-  isConnecting: boolean;
+  isOpen: boolean;
+  isCreating: boolean;
   error: string | null;
-  onConnect: (url: string, force?: boolean) => Promise<boolean>;
-  onDisconnect: () => Promise<boolean>;
+  onCreateConnection: (url: string) => Promise<boolean>;
+  onClose: () => void;
   getMatchingEntries: (filter: string) => ServerHistoryEntry[];
 }
 
@@ -97,12 +97,13 @@ const connectionBarStyles: Record<string, React.CSSProperties> = {
   connectButton: {
     color: "#20b2aa",
   },
-  disconnectButton: {
-    color: "#ef4444",
-  },
   buttonDisabled: {
     opacity: 0.5,
     cursor: "not-allowed",
+  },
+  closeButton: {
+    color: "#9aa0a6",
+    borderLeft: "1px solid #2d2f2f",
   },
   dropdown: {
     position: "absolute",
@@ -174,42 +175,14 @@ const connectionBarStyles: Record<string, React.CSSProperties> = {
 };
 
 /**
- * Get badge text for protocol type
- */
-function getProtocolBadgeText(protocolType: ProtocolType | null): string | null {
-  switch (protocolType) {
-    case "chatgpt-apps":
-      return "ChatGPT Apps";
-    case "mcp-apps":
-      return "MCP Apps";
-    default:
-      return null;
-  }
-}
-
-/**
- * Get badge style for protocol type
- */
-function getProtocolBadgeStyle(protocolType: ProtocolType | null): React.CSSProperties {
-  switch (protocolType) {
-    case "chatgpt-apps":
-      return connectionBarStyles.badgeChatgptApps as React.CSSProperties;
-    case "mcp-apps":
-      return connectionBarStyles.badgeMcpApps as React.CSSProperties;
-    default:
-      return {};
-  }
-}
-
-/**
  * ConnectionBar Component
  */
 export function ConnectionBar({
-  status,
-  isConnecting,
+  isOpen,
+  isCreating,
   error,
-  onConnect,
-  onDisconnect,
+  onCreateConnection,
+  onClose,
   getMatchingEntries,
 }: ConnectionBarProps): React.ReactElement {
   const [inputValue, setInputValue] = useState("");
@@ -227,8 +200,8 @@ export function ConnectionBar({
 
   // Show dropdown when focused and there are entries
   useEffect(() => {
-    setShowDropdown(isFocused && filteredHistory.length > 0 && !status.connected);
-  }, [isFocused, filteredHistory.length, status.connected]);
+    setShowDropdown(isFocused && filteredHistory.length > 0);
+  }, [isFocused, filteredHistory.length]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -242,23 +215,16 @@ export function ConnectionBar({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Update input when status changes
-  useEffect(() => {
-    if (status.connected && status.serverUrl) {
-      setInputValue(status.serverUrl);
+  const handleCreate = useCallback(async () => {
+    if (!inputValue.trim() || isCreating) return;
+    const created = await onCreateConnection(inputValue.trim());
+    if (created) {
+      setInputValue("");
+      setShowDropdown(false);
+      setIsFocused(false);
+      onClose();
     }
-  }, [status.connected, status.serverUrl]);
-
-  const handleConnect = useCallback(async () => {
-    if (!inputValue.trim() || isConnecting) return;
-    await onConnect(inputValue.trim());
-  }, [inputValue, isConnecting, onConnect]);
-
-  const handleDisconnect = useCallback(async () => {
-    if (isConnecting) return;
-    await onDisconnect();
-    setInputValue("");
-  }, [isConnecting, onDisconnect]);
+  }, [inputValue, isCreating, onCreateConnection, onClose]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -269,11 +235,11 @@ export function ConnectionBar({
         if (entry) {
           setInputValue(entry.url);
           setShowDropdown(false);
-          void onConnect(entry.url);
+          void onCreateConnection(entry.url);
         }
-      } else if (e.key === "Enter" && !status.connected) {
-        // Fallback: generic connect when no dropdown selection
-        void handleConnect();
+      } else if (e.key === "Enter") {
+        // Fallback: create when no dropdown selection
+        void handleCreate();
       } else if (e.key === "Escape") {
         setShowDropdown(false);
         inputRef.current?.blur();
@@ -285,19 +251,21 @@ export function ConnectionBar({
         setHoveredIndex((prev) => Math.max(prev - 1, 0));
       }
     },
-    [status.connected, handleConnect, showDropdown, hoveredIndex, filteredHistory, onConnect]
+    [handleCreate, showDropdown, hoveredIndex, filteredHistory, onCreateConnection]
   );
 
   const handleSelectHistory = useCallback(
     (entry: ServerHistoryEntry) => {
       setInputValue(entry.url);
       setShowDropdown(false);
-      void onConnect(entry.url);
+      void onCreateConnection(entry.url);
     },
-    [onConnect]
+    [onCreateConnection]
   );
 
-  const badgeText = getProtocolBadgeText(status.protocolType);
+  if (!isOpen) {
+    return <></>;
+  }
 
   return (
     <div ref={containerRef} style={connectionBarStyles.container}>
@@ -311,18 +279,6 @@ export function ConnectionBar({
           ...(error ? connectionBarStyles.inputWrapperError : {}),
         }}
       >
-        {/* Protocol Badge (when connected) */}
-        {status.connected && badgeText && (
-          <div
-            style={{
-              ...connectionBarStyles.protocolBadge,
-              ...getProtocolBadgeStyle(status.protocolType),
-            }}
-          >
-            {badgeText}
-          </div>
-        )}
-
         {/* URL Input */}
         <input
           ref={inputRef}
@@ -333,68 +289,52 @@ export function ConnectionBar({
           onFocus={() => setIsFocused(true)}
           onBlur={() => setTimeout(() => setIsFocused(false), 200)}
           onKeyDown={handleKeyDown}
-          placeholder={status.connected ? (status.serverUrl ?? "") : "(Connect your Agent)"}
-          readOnly={status.connected}
+          placeholder="(Connect your Agent)"
         />
 
         {/* Action Button */}
-        {status.connected ? (
-          <button
-            type="button"
-            style={{
-              ...connectionBarStyles.actionButton,
-              ...connectionBarStyles.disconnectButton,
-              ...(isConnecting ? connectionBarStyles.buttonDisabled : {}),
-            }}
-            onClick={() => void handleDisconnect()}
-            disabled={isConnecting}
-            title="Disconnect"
-          >
-            {isConnecting ? (
-              <div style={connectionBarStyles.loadingSpinner} />
-            ) : (
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            )}
-          </button>
-        ) : (
-          <button
-            type="button"
-            style={{
-              ...connectionBarStyles.actionButton,
-              ...connectionBarStyles.connectButton,
-              ...(!inputValue.trim() || isConnecting ? connectionBarStyles.buttonDisabled : {}),
-            }}
-            onClick={() => void handleConnect()}
-            disabled={!inputValue.trim() || isConnecting}
-            title="Connect"
-          >
-            {isConnecting ? (
-              <div style={connectionBarStyles.loadingSpinner} />
-            ) : (
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <line x1="5" y1="12" x2="19" y2="12" />
-                <polyline points="12 5 19 12 12 19" />
-              </svg>
-            )}
-          </button>
-        )}
+        <button
+          type="button"
+          style={{
+            ...connectionBarStyles.actionButton,
+            ...connectionBarStyles.connectButton,
+            ...(!inputValue.trim() || isCreating ? connectionBarStyles.buttonDisabled : {}),
+          }}
+          onClick={() => void handleCreate()}
+          disabled={!inputValue.trim() || isCreating}
+          title="Create connection"
+        >
+          {isCreating ? (
+            <div style={connectionBarStyles.loadingSpinner} />
+          ) : (
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <line x1="5" y1="12" x2="19" y2="12" />
+              <polyline points="12 5 19 12 12 19" />
+            </svg>
+          )}
+        </button>
+
+        <button
+          type="button"
+          style={{
+            ...connectionBarStyles.actionButton,
+            ...connectionBarStyles.closeButton,
+          }}
+          onClick={onClose}
+          title="Close"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
       </div>
 
       {/* History Dropdown */}
@@ -416,7 +356,9 @@ export function ConnectionBar({
                 <span
                   style={{
                     ...connectionBarStyles.dropdownItemBadge,
-                    ...getProtocolBadgeStyle(entry.protocolType),
+                    ...(entry.protocolType === "chatgpt-apps"
+                      ? connectionBarStyles.badgeChatgptApps
+                      : connectionBarStyles.badgeMcpApps),
                   }}
                 >
                   {entry.protocolType === "chatgpt-apps" ? "ChatGPT" : "MCP Apps"}

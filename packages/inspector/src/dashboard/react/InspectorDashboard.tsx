@@ -14,10 +14,11 @@ import { useAgentEventStream } from "./hooks/useAgentEventStream";
 import { useResizablePanel } from "./hooks/useResizablePanel";
 import { useResizablePanelWidth } from "./hooks/useResizablePanelWidth";
 import { useGlobals } from "./hooks/useGlobals";
-import { useConnection } from "./hooks/useConnection";
+import { useConnections } from "./hooks/useConnections";
 import { useMcpPrimitives } from "./hooks/useMcpPrimitives";
 import { Toolbar } from "./components/Toolbar";
 import { ConnectionBar } from "./components/ConnectionBar";
+import { TabBar } from "./components/TabBar";
 import { GlobalsPanel } from "./components/GlobalsPanel";
 import { McpPrimitivesPanel } from "./components/McpPrimitivesPanel";
 import { BottomPanel, type PanelVisibility } from "./components/BottomPanel";
@@ -47,8 +48,32 @@ export function InspectorDashboard({
   minPanelHeight = 100,
 }: InspectorDashboardProps): React.ReactElement {
   // Session state
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [selectedSessionByConnection, setSelectedSessionByConnection] = useState<
+    Record<string, string | null>
+  >({});
+  const [isConnectionFormOpen, setIsConnectionFormOpen] = useState(false);
   const { sessions, isLoading: sessionsLoading } = useSessions(baseUrl);
+
+  // Connection state (includes actions and history)
+  const {
+    connections,
+    activeConnectionId,
+    setActiveConnectionId,
+    isCreating,
+    error: connectionError,
+    createConnection,
+    closeConnection,
+    getMatchingEntries,
+  } = useConnections(baseUrl);
+
+  const activeConnection = useMemo(
+    () => connections.find((connection) => connection.id === activeConnectionId) ?? null,
+    [connections, activeConnectionId]
+  );
+
+  const selectedSessionId = activeConnectionId
+    ? (selectedSessionByConnection[activeConnectionId] ?? null)
+    : null;
 
   // Screencast state
   const { imageData, status, error } = useScreencast(baseUrl, selectedSessionId);
@@ -65,23 +90,13 @@ export function InspectorDashboard({
   // Globals state
   const { globals } = useGlobals(baseUrl);
 
-  // Connection state (includes actions and history)
-  const {
-    status: connectionStatus,
-    isConnecting,
-    error: connectionError,
-    connect,
-    disconnect,
-    getMatchingEntries,
-  } = useConnection(baseUrl);
-
   // MCP Primitives state (refreshes on connection)
   const {
     tools,
     resources,
     prompts,
     isLoading: primitivesLoading,
-  } = useMcpPrimitives(baseUrl, connectionStatus.connected);
+  } = useMcpPrimitives(baseUrl, activeConnection?.status === "connected");
 
   // Left panel state (for MCP primitives when session is active)
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
@@ -155,12 +170,37 @@ export function InspectorDashboard({
   // Auto-select first session when available
   useEffect(() => {
     const firstSession = sessions[0];
-    if (firstSession && !selectedSessionId) {
-      setSelectedSessionId(firstSession.id);
-    } else if (sessions.length === 0 && selectedSessionId) {
-      setSelectedSessionId(null);
+    if (!activeConnectionId) {
+      return;
     }
-  }, [sessions, selectedSessionId]);
+    const currentSelected = selectedSessionByConnection[activeConnectionId] ?? null;
+    if (firstSession && !currentSelected) {
+      setSelectedSessionByConnection((prev) => ({
+        ...prev,
+        [activeConnectionId]: firstSession.id,
+      }));
+      clearLogs();
+      clearEvents();
+      return;
+    }
+    if (sessions.length === 0 && currentSelected) {
+      setSelectedSessionByConnection((prev) => ({
+        ...prev,
+        [activeConnectionId]: null,
+      }));
+      clearLogs();
+      clearEvents();
+      return;
+    }
+    if (currentSelected && !sessions.some((session) => session.id === currentSelected)) {
+      setSelectedSessionByConnection((prev) => ({
+        ...prev,
+        [activeConnectionId]: firstSession?.id ?? null,
+      }));
+      clearLogs();
+      clearEvents();
+    }
+  }, [sessions, activeConnectionId, selectedSessionByConnection, clearLogs, clearEvents]);
 
   // Save collapsed state
   useEffect(() => {
@@ -193,12 +233,23 @@ export function InspectorDashboard({
   const handleSessionChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       const value = e.target.value;
-      setSelectedSessionId(value || null);
+      if (!activeConnectionId) {
+        return;
+      }
+      setSelectedSessionByConnection((prev) => ({
+        ...prev,
+        [activeConnectionId]: value || null,
+      }));
       clearLogs();
       clearEvents();
     },
-    [clearLogs, clearEvents]
+    [activeConnectionId, clearLogs, clearEvents]
   );
+
+  useEffect(() => {
+    clearLogs();
+    clearEvents();
+  }, [activeConnectionId, clearLogs, clearEvents]);
 
   const togglePanel = useCallback(() => {
     setIsPanelCollapsed((prev) => !prev);
@@ -219,7 +270,57 @@ export function InspectorDashboard({
     }));
   }, []);
 
+  const handleCreateConnection = useCallback(
+    async (url: string): Promise<boolean> => {
+      const created = await createConnection(url);
+      if (created) {
+        setIsConnectionFormOpen(false);
+        return true;
+      }
+      return false;
+    },
+    [createConnection]
+  );
+
+  const handleCloseConnection = useCallback(
+    async (id: string): Promise<void> => {
+      const closed = await closeConnection(id);
+      if (!closed) {
+        return;
+      }
+      setSelectedSessionByConnection((prev) => {
+        if (!(id in prev)) {
+          return prev;
+        }
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    },
+    [closeConnection]
+  );
+
+  const tabs = useMemo(
+    () =>
+      connections.map((connection) => ({
+        id: connection.id,
+        url: connection.url,
+        serverInfo: connection.serverInfo,
+        status: connection.status,
+      })),
+    [connections]
+  );
+
   const isStreaming = status === "streaming";
+  const connectionStatusLabel = activeConnection
+    ? activeConnection.status === "connected"
+      ? "Connected"
+      : activeConnection.status === "connecting"
+        ? "Connecting"
+        : activeConnection.status === "error"
+          ? "Error"
+          : "Disconnected"
+    : "Disconnected";
 
   // Determine if UI session is active (has screencast)
   const hasActiveSession = !!selectedSessionId && !!imageData;
@@ -266,11 +367,11 @@ export function InspectorDashboard({
 
         {/* Connection Bar */}
         <ConnectionBar
-          status={connectionStatus}
-          isConnecting={isConnecting}
+          isOpen={isConnectionFormOpen}
+          isCreating={isCreating}
           error={connectionError}
-          onConnect={connect}
-          onDisconnect={disconnect}
+          onCreateConnection={handleCreateConnection}
+          onClose={() => setIsConnectionFormOpen(false)}
           getMatchingEntries={getMatchingEntries}
         />
 
@@ -306,18 +407,12 @@ export function InspectorDashboard({
                     ...styles.statusDot,
                     ...(status === "streaming"
                       ? styles.statusDotStreaming
-                      : connectionStatus.connected
+                      : activeConnection?.status === "connected"
                         ? styles.statusDotConnected
                         : styles.statusDotDisconnected),
                   }}
                 />
-                <span>
-                  {status === "streaming"
-                    ? "Streaming"
-                    : connectionStatus.connected
-                      ? "Connected"
-                      : "Disconnected"}
-                </span>
+                <span>{status === "streaming" ? "Streaming" : connectionStatusLabel}</span>
               </div>
             </div>
           </div>
@@ -332,6 +427,14 @@ export function InspectorDashboard({
           />
         </div>
       </header>
+
+      <TabBar
+        tabs={tabs}
+        activeTabId={activeConnectionId}
+        onSelect={(id) => setActiveConnectionId(id)}
+        onClose={(id) => void handleCloseConnection(id)}
+        onAdd={() => setIsConnectionFormOpen(true)}
+      />
 
       {/* Error Banner */}
       {error && <div style={styles.errorBanner}>{error}</div>}
