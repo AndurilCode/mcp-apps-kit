@@ -28,6 +28,7 @@ import {
   hasLocatorOptions,
   describeLocatorStrategy,
   waitForDOMStability,
+  validateWidgetSession,
 } from "./helpers";
 
 // =============================================================================

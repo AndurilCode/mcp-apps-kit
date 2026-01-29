@@ -15,7 +15,7 @@ import type {
   WidgetDOMSnapshot,
   ToolHints,
 } from "../types";
-// validateWidgetSession helper is available in ./helpers for session validation refactoring
+import { validateWidgetSession } from "./helpers";
 
 // =============================================================================
 // SCHEMAS
@@ -391,7 +391,7 @@ export function createWidgetSnapshotTool(connectionManager: ConnectionManager) {
               frame
                 .locator("body")
                 .textContent()
-                .then((t) => t?.trim() ?? ""),
+                .then((t: string | null) => t?.trim() ?? ""),
             ]);
 
             // Apply compact mode: strip inline styles for readability
