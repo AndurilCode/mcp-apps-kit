@@ -76,10 +76,10 @@ export function useScreencast(baseUrl: string, sessionId: string | null): UseScr
       });
 
       eventSource.addEventListener("error", (event: Event) => {
-        const messageEvent = event as MessageEvent;
-        if (messageEvent.data) {
+        // Only attempt to parse data if this is actually a MessageEvent with data
+        if (event instanceof MessageEvent && typeof event.data === "string") {
           try {
-            const data = JSON.parse(messageEvent.data as string) as ErrorData;
+            const data = JSON.parse(event.data) as ErrorData;
             setError(data.message);
           } catch {
             // Ignore parse errors

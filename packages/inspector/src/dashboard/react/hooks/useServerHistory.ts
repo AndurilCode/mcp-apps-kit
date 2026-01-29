@@ -40,6 +40,7 @@ function loadHistory(): ServerHistoryEntry[] {
     if (!stored) return [];
 
     const parsed = JSON.parse(stored) as unknown[];
+    const validProtocolTypes: ProtocolType[] = ["chatgpt-apps", "mcp-apps", "mcp"];
     // Validate and filter entries
     return parsed
       .filter(
@@ -48,6 +49,7 @@ function loadHistory(): ServerHistoryEntry[] {
           entry !== null &&
           typeof (entry as ServerHistoryEntry).url === "string" &&
           typeof (entry as ServerHistoryEntry).protocolType === "string" &&
+          validProtocolTypes.includes((entry as ServerHistoryEntry).protocolType) &&
           typeof (entry as ServerHistoryEntry).lastConnected === "number"
       )
       .slice(0, MAX_ENTRIES);

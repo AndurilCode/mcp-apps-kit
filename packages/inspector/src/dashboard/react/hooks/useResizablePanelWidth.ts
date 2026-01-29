@@ -37,8 +37,12 @@ export function useResizablePanelWidth({
       const saved = window.localStorage.getItem(storageKey);
       if (saved) {
         const parsed = parseInt(saved, 10);
-        if (!isNaN(parsed) && parsed >= minWidth) {
+        if (!isNaN(parsed) && parsed >= minWidth && parsed <= maxWidth) {
           return parsed;
+        }
+        // Clamp to valid range if out of bounds
+        if (!isNaN(parsed)) {
+          return Math.min(maxWidth, Math.max(minWidth, parsed));
         }
       }
     }

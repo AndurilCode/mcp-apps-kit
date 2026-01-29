@@ -4,7 +4,7 @@
  * Polls the inspector backend for current environment/globals state.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 export interface ViewportInfo {
   width: number;
@@ -79,10 +79,21 @@ export function useGlobals(baseUrl: string, pollInterval = 2000): UseGlobalsResu
   const [globals, setGlobals] = useState<GlobalsState | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchGlobals = useCallback(async () => {
+    // Abort any previous in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      const res = await fetch(`${baseUrl}/dashboard/globals`);
+      const res = await fetch(`${baseUrl}/dashboard/globals`, {
+        signal: controller.signal,
+      });
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
       }
@@ -90,9 +101,16 @@ export function useGlobals(baseUrl: string, pollInterval = 2000): UseGlobalsResu
       setGlobals(data.globals ?? defaultGlobals);
       setError(null);
     } catch (e) {
+      // Skip state updates for aborted requests
+      if (e instanceof Error && e.name === "AbortError") {
+        return;
+      }
       setError(e instanceof Error ? e.message : "Failed to fetch globals");
     } finally {
-      setIsLoading(false);
+      // Only update loading state if this request wasn't aborted
+      if (!controller.signal.aborted) {
+        setIsLoading(false);
+      }
     }
   }, [baseUrl]);
 
@@ -103,6 +121,10 @@ export function useGlobals(baseUrl: string, pollInterval = 2000): UseGlobalsResu
     }, pollInterval);
     return () => {
       clearInterval(interval);
+      // Abort any in-flight request on cleanup
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     };
   }, [fetchGlobals, pollInterval]);
 
