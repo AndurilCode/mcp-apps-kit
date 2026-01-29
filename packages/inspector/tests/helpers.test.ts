@@ -307,3 +307,179 @@ describe("calculateLogSummary", () => {
     });
   });
 });
+
+// Import additional functions for testing
+import {
+  hasLocatorOptions,
+  describeLocatorStrategy,
+  detectProtocolFromMimeType,
+  validateWidgetSession,
+} from "../src/tools/helpers";
+
+describe("hasLocatorOptions", () => {
+  it("should return true when selector is provided", () => {
+    expect(hasLocatorOptions({ selector: "#btn" })).toBe(true);
+  });
+
+  it("should return true when text is provided", () => {
+    expect(hasLocatorOptions({ text: "Click me" })).toBe(true);
+  });
+
+  it("should return true when role is provided", () => {
+    expect(hasLocatorOptions({ role: "button" })).toBe(true);
+  });
+
+  it("should return true when label is provided", () => {
+    expect(hasLocatorOptions({ label: "Email" })).toBe(true);
+  });
+
+  it("should return true when placeholder is provided", () => {
+    expect(hasLocatorOptions({ placeholder: "Enter email" })).toBe(true);
+  });
+
+  it("should return true when testId is provided", () => {
+    expect(hasLocatorOptions({ testId: "submit-btn" })).toBe(true);
+  });
+
+  it("should return false when no options provided", () => {
+    expect(hasLocatorOptions({})).toBe(false);
+  });
+
+  it("should return false when only empty strings provided", () => {
+    expect(hasLocatorOptions({ text: "", selector: "" })).toBe(false);
+  });
+});
+
+describe("describeLocatorStrategy", () => {
+  it("should describe CSS selector", () => {
+    expect(describeLocatorStrategy({ selector: "#btn" })).toBe("CSS selector: #btn");
+  });
+
+  it("should describe testId", () => {
+    expect(describeLocatorStrategy({ testId: "submit-btn" })).toBe("data-testid: submit-btn");
+  });
+
+  it("should describe role without name", () => {
+    expect(describeLocatorStrategy({ role: "button" })).toBe('role "button"');
+  });
+
+  it("should describe role with name", () => {
+    expect(describeLocatorStrategy({ role: "button", name: "Submit" })).toBe(
+      'role "button" with name "Submit"'
+    );
+  });
+
+  it("should describe label", () => {
+    expect(describeLocatorStrategy({ label: "Email" })).toBe("label: Email");
+  });
+
+  it("should describe placeholder", () => {
+    expect(describeLocatorStrategy({ placeholder: "Enter email" })).toBe(
+      "placeholder: Enter email"
+    );
+  });
+
+  it("should describe text", () => {
+    expect(describeLocatorStrategy({ text: "Click me" })).toBe("text: Click me");
+  });
+
+  it("should return unknown when no options", () => {
+    expect(describeLocatorStrategy({})).toBe("unknown");
+  });
+
+  it("should prioritize selector over other options", () => {
+    expect(describeLocatorStrategy({ selector: "#btn", text: "Click" })).toBe("CSS selector: #btn");
+  });
+
+  it("should prioritize testId over role/text", () => {
+    expect(describeLocatorStrategy({ testId: "btn", text: "Click" })).toBe("data-testid: btn");
+  });
+});
+
+describe("detectProtocolFromMimeType", () => {
+  it("should return mcp for MCP widget mime type", () => {
+    expect(detectProtocolFromMimeType("text/html;profile=mcp-app")).toBe("mcp");
+  });
+
+  it("should return openai for OpenAI widget mime type", () => {
+    expect(detectProtocolFromMimeType("text/html+skybridge")).toBe("openai");
+  });
+
+  it("should return null for unknown mime type", () => {
+    expect(detectProtocolFromMimeType("text/html")).toBeNull();
+    expect(detectProtocolFromMimeType("application/json")).toBeNull();
+  });
+
+  it("should return null for undefined mime type", () => {
+    expect(detectProtocolFromMimeType(undefined)).toBeNull();
+  });
+});
+
+describe("validateWidgetSession", () => {
+  it("should return error when session is null", () => {
+    const mockSessionManager = {
+      getSession: vi.fn().mockReturnValue(null),
+    };
+    const result = validateWidgetSession(
+      mockSessionManager as unknown as Parameters<typeof validateWidgetSession>[0],
+      "test-session"
+    );
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("Session not found");
+    }
+  });
+
+  it("should return error when page is closed", () => {
+    const mockSession = {
+      page: { isClosed: () => true, frame: vi.fn() },
+    };
+    const mockSessionManager = {
+      getSession: vi.fn().mockReturnValue(mockSession),
+    };
+    const result = validateWidgetSession(
+      mockSessionManager as unknown as Parameters<typeof validateWidgetSession>[0],
+      "test-session"
+    );
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("Page closed");
+    }
+  });
+
+  it("should return error when widget iframe not found", () => {
+    const mockSession = {
+      page: { isClosed: () => false, frame: () => null },
+    };
+    const mockSessionManager = {
+      getSession: vi.fn().mockReturnValue(mockSession),
+    };
+    const result = validateWidgetSession(
+      mockSessionManager as unknown as Parameters<typeof validateWidgetSession>[0],
+      "test-session"
+    );
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("Widget iframe not found");
+    }
+  });
+
+  it("should return success when session and frame are valid", () => {
+    const mockFrame = { url: () => "http://localhost/widget/test" };
+    const mockSession = {
+      page: { isClosed: () => false, frame: () => mockFrame },
+    };
+    const mockSessionManager = {
+      getSession: vi.fn().mockReturnValue(mockSession),
+    };
+    const result = validateWidgetSession(
+      mockSessionManager as unknown as Parameters<typeof validateWidgetSession>[0],
+      "test-session"
+    );
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.session).toBe(mockSession);
+      expect(result.frame).toBe(mockFrame);
+    }
+  });
+});

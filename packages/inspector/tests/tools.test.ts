@@ -77,6 +77,39 @@ describe("Inspector Tools", () => {
         "Invalid URL format"
       );
     });
+
+    it("should return existing connection when already connected to same URL", async () => {
+      // First connection
+      await manager.connect("http://localhost:3000/mcp");
+
+      const tool = createConnectTool(manager);
+      const result = await tool.handler({ url: "http://localhost:3000/mcp" }, {} as never);
+
+      expect(result.connected).toBe(true);
+      expect(result.serverUrl).toBe("http://localhost:3000/mcp");
+    });
+
+    it("should throw when connected to different URL without force", async () => {
+      await manager.connect("http://localhost:3000/mcp");
+
+      const tool = createConnectTool(manager);
+      await expect(tool.handler({ url: "http://localhost:4000/mcp" }, {} as never)).rejects.toThrow(
+        "Already connected"
+      );
+    });
+
+    it("should reconnect when force=true with different URL", async () => {
+      await manager.connect("http://localhost:3000/mcp");
+
+      const tool = createConnectTool(manager);
+      const result = await tool.handler(
+        { url: "http://localhost:4000/mcp", force: true },
+        {} as never
+      );
+
+      expect(result.connected).toBe(true);
+      expect(result.serverUrl).toBe("http://localhost:4000/mcp");
+    });
   });
 
   describe("disconnect", () => {
@@ -170,6 +203,189 @@ describe("Inspector Tools", () => {
       await expect(tool.handler({ name: "greet", arguments: {} }, {} as never)).rejects.toThrow(
         "No active connection"
       );
+    });
+  });
+
+  describe("list_tools with UI metadata", () => {
+    it("should detect MCP nested UI metadata", async () => {
+      mockListTools.mockResolvedValue([
+        {
+          name: "widget-tool",
+          description: "Has widget",
+          _meta: {
+            ui: {
+              resourceUri: "app://widgets/__ui_test",
+              visibility: ["model", "app"],
+            },
+          },
+        },
+      ]);
+      await manager.connect("http://localhost:3000/mcp");
+
+      const tool = createListToolsTool(manager);
+      const result = await tool.handler({}, {} as never);
+
+      expect(result.tools[0].hasUI).toBe(true);
+      expect(result.tools[0].visibility).toEqual(["model", "app"]);
+      expect(result.hints?.next).toContain("hasUI=true");
+    });
+
+    it("should detect MCP nested UI metadata with default visibility", async () => {
+      mockListTools.mockResolvedValue([
+        {
+          name: "widget-tool",
+          description: "Has widget",
+          _meta: {
+            ui: {
+              resourceUri: "app://widgets/__ui_test",
+            },
+          },
+        },
+      ]);
+      await manager.connect("http://localhost:3000/mcp");
+
+      const tool = createListToolsTool(manager);
+      const result = await tool.handler({}, {} as never);
+
+      expect(result.tools[0].hasUI).toBe(true);
+      expect(result.tools[0].visibility).toEqual(["model", "app"]);
+    });
+
+    it("should detect flat UI metadata format", async () => {
+      mockListTools.mockResolvedValue([
+        {
+          name: "flat-tool",
+          description: "Has flat UI",
+          _meta: {
+            "ui/resourceUri": "app://widgets/__ui_flat",
+            "ui/visibility": ["model"],
+          },
+        },
+      ]);
+      await manager.connect("http://localhost:3000/mcp");
+
+      const tool = createListToolsTool(manager);
+      const result = await tool.handler({}, {} as never);
+
+      expect(result.tools[0].hasUI).toBe(true);
+      expect(result.tools[0].visibility).toEqual(["model"]);
+    });
+
+    it("should detect flat UI metadata with default visibility", async () => {
+      mockListTools.mockResolvedValue([
+        {
+          name: "flat-tool-default",
+          description: "Has flat UI",
+          _meta: {
+            "ui/resourceUri": "app://widgets/__ui_flat",
+          },
+        },
+      ]);
+      await manager.connect("http://localhost:3000/mcp");
+
+      const tool = createListToolsTool(manager);
+      const result = await tool.handler({}, {} as never);
+
+      expect(result.tools[0].hasUI).toBe(true);
+      expect(result.tools[0].visibility).toEqual(["model", "app"]);
+    });
+
+    it("should detect OpenAI output template format", async () => {
+      mockListTools.mockResolvedValue([
+        {
+          name: "openai-tool",
+          description: "Has OpenAI widget",
+          _meta: {
+            "openai/outputTemplate": "app://widgets/openai_test",
+            "openai/visibility": "public",
+            "openai/widgetAccessible": true,
+          },
+        },
+      ]);
+      await manager.connect("http://localhost:3000/mcp");
+
+      const tool = createListToolsTool(manager);
+      const result = await tool.handler({}, {} as never);
+
+      expect(result.tools[0].hasUI).toBe(true);
+      expect(result.tools[0].visibility).toContain("model");
+      expect(result.tools[0].visibility).toContain("app");
+    });
+
+    it("should handle OpenAI template with private visibility", async () => {
+      mockListTools.mockResolvedValue([
+        {
+          name: "openai-private",
+          description: "Private OpenAI widget",
+          _meta: {
+            "openai/outputTemplate": "app://widgets/openai_private",
+            "openai/visibility": "private",
+            "openai/widgetAccessible": false,
+          },
+        },
+      ]);
+      await manager.connect("http://localhost:3000/mcp");
+
+      const tool = createListToolsTool(manager);
+      const result = await tool.handler({}, {} as never);
+
+      expect(result.tools[0].hasUI).toBe(true);
+      // Private visibility means model is not added, widgetAccessible=false means app is not added
+      // Fallback: ["model"]
+      expect(result.tools[0].visibility).toEqual(["model"]);
+    });
+
+    it("should handle OpenAI template with no visibility set", async () => {
+      mockListTools.mockResolvedValue([
+        {
+          name: "openai-default",
+          description: "Default OpenAI widget",
+          _meta: {
+            "openai/outputTemplate": "app://widgets/openai_default",
+          },
+        },
+      ]);
+      await manager.connect("http://localhost:3000/mcp");
+
+      const tool = createListToolsTool(manager);
+      const result = await tool.handler({}, {} as never);
+
+      expect(result.tools[0].hasUI).toBe(true);
+      expect(result.tools[0].visibility).toContain("model");
+    });
+
+    it("should handle tool without _meta", async () => {
+      mockListTools.mockResolvedValue([
+        {
+          name: "plain-tool",
+          description: "No UI",
+        },
+      ]);
+      await manager.connect("http://localhost:3000/mcp");
+
+      const tool = createListToolsTool(manager);
+      const result = await tool.handler({}, {} as never);
+
+      expect(result.tools[0].hasUI).toBe(false);
+      expect(result.tools[0].visibility).toBeUndefined();
+    });
+
+    it("should handle _meta.ui without resourceUri", async () => {
+      mockListTools.mockResolvedValue([
+        {
+          name: "no-uri-tool",
+          description: "Has meta but no uri",
+          _meta: {
+            ui: { someOther: "data" },
+          },
+        },
+      ]);
+      await manager.connect("http://localhost:3000/mcp");
+
+      const tool = createListToolsTool(manager);
+      const result = await tool.handler({}, {} as never);
+
+      expect(result.tools[0].hasUI).toBe(false);
     });
   });
 
