@@ -422,8 +422,10 @@ export function createWidgetSnapshotTool(connectionManager: ConnectionManager) {
         const duplicateRoleNames = Array.from(roleNameCounts.entries())
           .filter(([, count]) => count > 1)
           .map(([key, count]) => {
-            const [role, name] = key.split(":");
-            return { role: role ?? "", name: name ?? "", count };
+            const colonIndex = key.indexOf(":");
+            const role = colonIndex >= 0 ? key.slice(0, colonIndex) : key;
+            const name = colonIndex >= 0 ? key.slice(colonIndex + 1) : "";
+            return { role, name, count };
           });
 
         // Build contextual hints based on what was found

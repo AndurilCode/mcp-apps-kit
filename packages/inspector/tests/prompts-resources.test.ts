@@ -224,9 +224,7 @@ describe("Prompts and Resources Tools", () => {
   describe("read_resource", () => {
     it("should read a resource by URI", async () => {
       mockReadResource.mockResolvedValue({
-        contents: [
-          { type: "text", text: "# README\n\nProject description", mimeType: "text/markdown" },
-        ],
+        contents: [{ text: "# README\n\nProject description", mimeType: "text/markdown" }],
       });
 
       const tool = createReadResourceTool(manager);
@@ -234,23 +232,23 @@ describe("Prompts and Resources Tools", () => {
 
       expect(result.contents).toHaveLength(1);
       expect(result.contents[0]).toEqual({
-        type: "text",
+        uri: "file://readme.md",
         text: "# README\n\nProject description",
-        data: undefined,
+        blob: undefined,
         mimeType: "text/markdown",
       });
     });
 
     it("should handle binary content", async () => {
       mockReadResource.mockResolvedValue({
-        contents: [{ type: "image", data: "base64encodeddata", mimeType: "image/png" }],
+        contents: [{ blob: "base64encodeddata", mimeType: "image/png" }],
       });
 
       const tool = createReadResourceTool(manager);
       const result = await tool.handler({ uri: "file://image.png" }, {} as never);
 
-      expect(result.contents[0]?.type).toBe("image");
-      expect(result.contents[0]?.data).toBe("base64encodeddata");
+      expect(result.contents[0]?.uri).toBe("file://image.png");
+      expect(result.contents[0]?.blob).toBe("base64encodeddata");
       expect(result.contents[0]?.mimeType).toBe("image/png");
     });
 

@@ -602,8 +602,8 @@ export function createTestWidgetInteractionTool(connectionManager: ConnectionMan
           hasUI: true,
           protocol,
           snapshots,
-          toolCalls: [],
-          stateChanges: [],
+          toolCalls,
+          stateChanges,
           errors: [`Interaction test failed: ${message}`],
         };
       }

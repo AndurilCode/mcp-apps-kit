@@ -200,6 +200,9 @@ export function createScreenshotWidgetTool(connectionManager: ConnectionManager)
       const environmentState = connectionManager.getEnvironmentState();
       const inspectorUrl = connectionManager.getInspectorUrl();
 
+      type PageType = Awaited<ReturnType<typeof uiHostManager.renderInBrowser>>["page"];
+      let page: PageType | undefined;
+
       try {
         const renderResult = await uiHostManager.renderInBrowser(
           html,
@@ -213,7 +216,8 @@ export function createScreenshotWidgetTool(connectionManager: ConnectionManager)
           inspectorUrl ?? undefined
         );
 
-        const { page, errors } = renderResult;
+        page = renderResult.page;
+        const { errors } = renderResult;
 
         // Target the widget iframe for screenshot (unless fullPage is requested)
         const frame = page.frame({ url: /\/widget\// });
@@ -231,12 +235,6 @@ export function createScreenshotWidgetTool(connectionManager: ConnectionManager)
             fullPage: input.fullPage,
           });
         }
-
-        // Close the page
-        await page.close();
-
-        // Dispose of the browser pool
-        await uiHostManager.dispose();
 
         // Save screenshot to temp file
         await mkdir(SCREENSHOTS_DIR, { recursive: true });
@@ -256,18 +254,17 @@ export function createScreenshotWidgetTool(connectionManager: ConnectionManager)
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
 
-        // Clean up on error
-        try {
-          await uiHostManager.dispose();
-        } catch {
-          // Ignore cleanup errors
-        }
-
         return {
           hasUI: true,
           protocol,
           errors: [`Screenshot failed: ${message}`],
         };
+      } finally {
+        // Clean up resources
+        if (page) {
+          await page.close().catch(() => {});
+        }
+        await uiHostManager.dispose().catch(() => {});
       }
     },
   });

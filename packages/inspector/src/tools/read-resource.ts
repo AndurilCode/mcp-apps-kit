@@ -13,12 +13,16 @@ export const readResourceInputSchema = z.object({
 
 export const readResourceOutputSchema = z.object({
   contents: z.array(
-    z.object({
-      type: z.enum(["text", "image", "resource"]),
-      text: z.string().optional(),
-      data: z.string().optional(),
-      mimeType: z.string().optional(),
-    })
+    z
+      .object({
+        uri: z.string(),
+        mimeType: z.string().optional(),
+        text: z.string().optional(),
+        blob: z.string().optional(),
+      })
+      .refine((item) => !(item.text !== undefined && item.blob !== undefined), {
+        message: "ResourceContents must have either text or blob, not both",
+      })
   ),
 });
 
@@ -35,10 +39,10 @@ export function createReadResourceTool(connectionManager: ConnectionManager) {
 
         return {
           contents: result.contents.map((content) => ({
-            type: content.type,
-            text: content.text,
-            data: content.data,
+            uri: input.uri,
             mimeType: content.mimeType,
+            text: "text" in content ? content.text : undefined,
+            blob: "blob" in content ? (content.blob as string) : undefined,
           })),
         };
       } catch (error) {

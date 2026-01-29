@@ -89,10 +89,20 @@ export interface ReadResourceInput {
 }
 
 /**
+ * Resource content from read_resource
+ */
+export interface ResourceContent {
+  uri: string;
+  mimeType?: string;
+  text?: string;
+  blob?: string;
+}
+
+/**
  * Output from read_resource
  */
 export interface ReadResourceOutput {
-  contents: ContentBlock[];
+  contents: ResourceContent[];
 }
 
 // =============================================================================

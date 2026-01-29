@@ -14,6 +14,9 @@ import {
   type MCPCallToolResponse,
 } from "./helpers";
 
+/** Default timeout for tool calls in milliseconds */
+const DEFAULT_TOOL_TIMEOUT_MS = 30000;
+
 export const callToolInputSchema = z.object({
   name: z.string().describe("Name of the tool to call"),
   arguments: z.record(z.string(), z.unknown()).describe("Arguments to pass to the tool"),
@@ -203,11 +206,16 @@ export function createCallToolTool(connectionManager: ConnectionManager) {
         // Check for timeout
         if (message.includes("timeout") || message.includes("Timeout")) {
           return {
-            content: [{ type: "text", text: `Tool '${input.name}' timed out after 30000ms` }],
+            content: [
+              {
+                type: "text",
+                text: `Tool '${input.name}' timed out after ${DEFAULT_TOOL_TIMEOUT_MS}ms`,
+              },
+            ],
             isError: true,
             error: {
               code: "TIMEOUT",
-              message: `Tool '${input.name}' timed out after 30000ms`,
+              message: `Tool '${input.name}' timed out after ${DEFAULT_TOOL_TIMEOUT_MS}ms`,
             },
             duration,
           };

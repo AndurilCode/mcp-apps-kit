@@ -90,7 +90,8 @@ export function createConnectTool(connectionManager: ConnectionManager) {
           throw new Error(`Connection refused: ECONNREFUSED ${input.url}`);
         }
         if (message.includes("timeout") || message.includes("Timeout")) {
-          throw new Error(`Connection timeout after 30000ms to ${input.url}`);
+          const timeout = input.options?.timeout ?? 30000;
+          throw new Error(`Connection timeout after ${timeout}ms to ${input.url}`);
         }
         if (message.includes("Invalid URL")) {
           throw new Error(message);

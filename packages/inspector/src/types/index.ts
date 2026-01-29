@@ -38,6 +38,7 @@ export type {
   CallToolOutput,
   ResourceInfo,
   ReadResourceInput,
+  ResourceContent,
   ReadResourceOutput,
   PromptInfo,
   GetPromptInput,
