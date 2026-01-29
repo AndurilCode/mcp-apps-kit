@@ -159,6 +159,12 @@ export function createGetUIMetadataTool(connectionManager: ConnectionManager) {
     input: getUIMetadataInputSchema,
     output: getUIMetadataOutputSchema,
     handler: async (input): Promise<GetUIMetadataOutput> => {
+      // Validate connection before accessing client
+      const state = connectionManager.getState();
+      if (!state.connected) {
+        throw new Error("No active connection. Call connect_to_server first.");
+      }
+
       const client = connectionManager.getClient();
       const rawClient = client.raw;
 

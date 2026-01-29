@@ -150,7 +150,15 @@ export function createCallToolTool(connectionManager: ConnectionManager) {
               // The session ID is in the URL path
               const pageUrl = page.url();
               const urlMatch = pageUrl.match(/\/host\/([a-f0-9-]+)/);
-              const widgetSessionId = urlMatch?.[1] ?? "";
+              const widgetSessionId = urlMatch?.[1];
+
+              if (!widgetSessionId) {
+                console.warn(
+                  `[call_tool] Failed to extract widgetSessionId from page URL: ${pageUrl}`
+                );
+                // Widget session ID extraction failed, return result without session
+                return baseResponse;
+              }
 
               // Create touch callback to keep WidgetServer session alive
               const widgetServerTouch = uiHostManager.createSessionTouchCallback(widgetSessionId);

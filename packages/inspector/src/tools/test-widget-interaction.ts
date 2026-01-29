@@ -181,9 +181,7 @@ export function createTestWidgetInteractionTool(connectionManager: ConnectionMan
                   break;
 
                 case "wait":
-                  if (ms) {
-                    await page.waitForTimeout(ms);
-                  }
+                  await page.waitForTimeout(ms ?? 100);
                   break;
 
                 case "scroll":
@@ -485,7 +483,20 @@ export function createTestWidgetInteractionTool(connectionManager: ConnectionMan
                 break;
 
               case "scroll":
-                if (position) {
+                if (selector) {
+                  if (position) {
+                    // Scroll element to specific position
+                    await frame.locator(selector).evaluate(
+                      (el, { x, y }: { x: number; y: number }) => {
+                        el.scrollTo(x, y);
+                      },
+                      { x: position.x, y: position.y }
+                    );
+                  } else {
+                    // Scroll element into view
+                    await frame.locator(selector).scrollIntoViewIfNeeded();
+                  }
+                } else if (position) {
                   const scrollX = position.x;
                   const scrollY = position.y;
                   // Function runs in browser context via Playwright frame.evaluate
