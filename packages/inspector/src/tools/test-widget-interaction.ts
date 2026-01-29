@@ -406,11 +406,20 @@ export function createTestWidgetInteractionTool(connectionManager: ConnectionMan
           const text = msg.text();
           if (text.startsWith("[WIDGET_TOOL_CALL] ")) {
             try {
-              const data = JSON.parse(text.replace("[WIDGET_TOOL_CALL] ", "")) as {
-                name: string;
-                args: unknown;
-              };
-              toolCalls.push(data);
+              const parsed: unknown = JSON.parse(text.replace("[WIDGET_TOOL_CALL] ", ""));
+              // Validate shape: must be an object with string 'name' and 'args' property
+              if (
+                typeof parsed === "object" &&
+                parsed !== null &&
+                "name" in parsed &&
+                typeof (parsed as Record<string, unknown>).name === "string" &&
+                "args" in parsed
+              ) {
+                toolCalls.push({
+                  name: (parsed as Record<string, unknown>).name as string,
+                  args: (parsed as Record<string, unknown>).args,
+                });
+              }
             } catch {
               // Ignore parse errors
             }

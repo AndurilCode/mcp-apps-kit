@@ -25,14 +25,20 @@ export function createListPromptsTool(connectionManager: ConnectionManager) {
     output: listPromptsOutputSchema,
     handler: async (): Promise<{ prompts: PromptInfo[] }> => {
       const client = connectionManager.getClient();
-      const prompts = await client.listPrompts();
 
-      return {
-        prompts: prompts.map((prompt) => ({
-          name: prompt.name,
-          description: prompt.description,
-        })),
-      };
+      try {
+        const prompts = await client.listPrompts();
+
+        return {
+          prompts: prompts.map((prompt) => ({
+            name: prompt.name,
+            description: prompt.description,
+          })),
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Failed to list prompts: ${message}`);
+      }
     },
   });
 }

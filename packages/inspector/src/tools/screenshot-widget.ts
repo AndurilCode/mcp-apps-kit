@@ -114,12 +114,31 @@ export function createScreenshotWidgetTool(connectionManager: ConnectionManager)
           const screenshotPath = join(SCREENSHOTS_DIR, filename);
           await writeFile(screenshotPath, screenshotResult.data);
 
+          // Get actual viewport dimensions from the page
+          let actualDimensions: { width: number; height: number } | undefined;
+          try {
+            const pageViewport = page.viewportSize?.();
+            if (pageViewport) {
+              actualDimensions = pageViewport;
+            } else {
+              /* eslint-disable no-undef */
+              actualDimensions = await page.evaluate(() => ({
+                width: window.innerWidth,
+                height: window.innerHeight,
+              }));
+              /* eslint-enable no-undef */
+            }
+          } catch {
+            // Fall back to input viewport if we can't get actual dimensions
+            actualDimensions = viewport;
+          }
+
           return {
             hasUI: true,
             protocol,
             screenshotPath,
             format,
-            dimensions: viewport,
+            dimensions: actualDimensions,
             errors: [],
           };
         } catch (error) {

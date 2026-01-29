@@ -401,7 +401,9 @@ export function createWidgetFillTool(connectionManager: ConnectionManager) {
             // Fallback: click, clear, and type
             fillMethod = "type";
             await locator.click({ timeout });
-            await locator.press("Control+a");
+            // Use platform-aware select-all key (same as contenteditable branch)
+            const selectAllKey = process.platform === "darwin" ? "Meta+a" : "Control+a";
+            await locator.press(selectAllKey);
             await locator.pressSequentially(input.value, { delay: 10 });
           }
         } else if (tagName === "input") {
