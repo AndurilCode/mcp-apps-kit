@@ -198,41 +198,45 @@ describe("test_widget_interaction Tool", () => {
   });
 
   describe("interaction types", () => {
+    // Helper to get action enum options from the Zod schema
+    // Zod 4 API: tool.input.shape.interactions.element.shape.action.options
+    const getActionOptions = () => {
+      const tool = createTestWidgetInteractionTool(manager);
+      const inputSchema = tool.input;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const interactionsSchema = (inputSchema as any).shape.interactions;
+      // Zod 4 uses .element instead of ._def.type for arrays
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const elementSchema = interactionsSchema.element;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const actionSchema = elementSchema.shape.action;
+      return actionSchema.options as string[];
+    };
+
     it("should have inputSchema that accepts click action", () => {
       const tool = createTestWidgetInteractionTool(manager);
-      const schema = tool.inputSchema;
-      expect(schema.properties.interactions).toBeDefined();
-      expect(schema.properties.interactions.items.properties.action.enum).toContain("click");
+      expect(tool.input).toBeDefined();
+      expect(getActionOptions()).toContain("click");
     });
 
     it("should have inputSchema that accepts type action", () => {
-      const tool = createTestWidgetInteractionTool(manager);
-      const schema = tool.inputSchema;
-      expect(schema.properties.interactions.items.properties.action.enum).toContain("type");
+      expect(getActionOptions()).toContain("type");
     });
 
     it("should have inputSchema that accepts hover action", () => {
-      const tool = createTestWidgetInteractionTool(manager);
-      const schema = tool.inputSchema;
-      expect(schema.properties.interactions.items.properties.action.enum).toContain("hover");
+      expect(getActionOptions()).toContain("hover");
     });
 
     it("should have inputSchema that accepts wait action", () => {
-      const tool = createTestWidgetInteractionTool(manager);
-      const schema = tool.inputSchema;
-      expect(schema.properties.interactions.items.properties.action.enum).toContain("wait");
+      expect(getActionOptions()).toContain("wait");
     });
 
     it("should have inputSchema that accepts scroll action", () => {
-      const tool = createTestWidgetInteractionTool(manager);
-      const schema = tool.inputSchema;
-      expect(schema.properties.interactions.items.properties.action.enum).toContain("scroll");
+      expect(getActionOptions()).toContain("scroll");
     });
 
     it("should have inputSchema that accepts snapshot action", () => {
-      const tool = createTestWidgetInteractionTool(manager);
-      const schema = tool.inputSchema;
-      expect(schema.properties.interactions.items.properties.action.enum).toContain("snapshot");
+      expect(getActionOptions()).toContain("snapshot");
     });
   });
 

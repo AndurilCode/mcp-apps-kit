@@ -273,11 +273,23 @@ export class WidgetServer {
 
     // Route based on pathname
     if (pathname.startsWith("/host/")) {
-      const sessionId = decodeURIComponent(pathname.slice(6)); // Remove "/host/" and decode
-      this.serveHost(sessionId, res);
+      try {
+        const sessionId = decodeURIComponent(pathname.slice(6)); // Remove "/host/" and decode
+        this.serveHost(sessionId, res);
+      } catch (err) {
+        this.log(`Failed to decode host session ID: ${err}`);
+        res.writeHead(400, { "Content-Type": "text/plain" });
+        res.end("Bad Request: Invalid session ID encoding");
+      }
     } else if (pathname.startsWith("/widget/")) {
-      const sessionId = decodeURIComponent(pathname.slice(8)); // Remove "/widget/" and decode
-      this.serveWidget(sessionId, res);
+      try {
+        const sessionId = decodeURIComponent(pathname.slice(8)); // Remove "/widget/" and decode
+        this.serveWidget(sessionId, res);
+      } catch (err) {
+        this.log(`Failed to decode widget session ID: ${err}`);
+        res.writeHead(400, { "Content-Type": "text/plain" });
+        res.end("Bad Request: Invalid session ID encoding");
+      }
     } else {
       res.writeHead(404, { "Content-Type": "text/plain" });
       res.end("Not Found");

@@ -50,6 +50,7 @@ const mockPage = {
   }),
   screenshot: vi.fn().mockResolvedValue(mockScreenshotData),
   close: vi.fn().mockResolvedValue(undefined),
+  isClosed: vi.fn().mockReturnValue(false),
 };
 
 const mockRenderInBrowser = vi.fn();
@@ -334,7 +335,7 @@ describe("screenshot_widget Standalone Mode", () => {
       // Create a session in the manager
       const sessionManager = manager.getWidgetSessionManager();
 
-      // Create a mock session with page
+      // Create a mock session with page (include isClosed and close for cleanup)
       const mockSessionPage = {
         frame: vi.fn().mockReturnValue({
           locator: vi.fn().mockReturnValue({
@@ -342,6 +343,8 @@ describe("screenshot_widget Standalone Mode", () => {
           }),
         }),
         screenshot: vi.fn().mockResolvedValue(mockScreenshotData),
+        isClosed: vi.fn().mockReturnValue(false),
+        close: vi.fn().mockResolvedValue(undefined),
       };
 
       const mockSession = {
@@ -354,6 +357,9 @@ describe("screenshot_widget Standalone Mode", () => {
         page: mockSessionPage as never,
         consoleLogs: [],
         pageErrors: [],
+        events: [],
+        toolCalls: [],
+        dialogs: [],
         createdAt: Date.now(),
         lastAccessedAt: Date.now(),
       };
@@ -373,13 +379,15 @@ describe("screenshot_widget Standalone Mode", () => {
     it("should handle session screenshot failure gracefully", async () => {
       const sessionManager = manager.getWidgetSessionManager();
 
-      // Create a mock session that throws on screenshot
+      // Create a mock session that throws on screenshot (include isClosed and close for cleanup)
       const mockSessionPage = {
         frame: vi.fn().mockReturnValue({
           locator: vi.fn().mockReturnValue({
             screenshot: vi.fn().mockRejectedValue(new Error("Screenshot failed")),
           }),
         }),
+        isClosed: vi.fn().mockReturnValue(false),
+        close: vi.fn().mockResolvedValue(undefined),
       };
 
       const mockSession = {
@@ -392,6 +400,9 @@ describe("screenshot_widget Standalone Mode", () => {
         page: mockSessionPage as never,
         consoleLogs: [],
         pageErrors: [],
+        events: [],
+        toolCalls: [],
+        dialogs: [],
         createdAt: Date.now(),
         lastAccessedAt: Date.now(),
       };

@@ -46,6 +46,8 @@ export class SessionStore {
     this.cleanupTimer = setInterval(() => {
       this.cleanup();
     }, cleanupInterval);
+    // Allow Node to exit even if the timer is still running
+    this.cleanupTimer.unref();
   }
 
   /**
@@ -131,7 +133,7 @@ export class SessionStore {
    */
   recordEvent(sessionId: string, event: InspectorEvent): void {
     const session = this.sessions.get(sessionId);
-    if (session) {
+    if (session?.events) {
       session.events.push(event);
     }
   }
@@ -141,7 +143,7 @@ export class SessionStore {
    */
   recordConsoleLog(sessionId: string, log: ConsoleLogEntry): void {
     const session = this.sessions.get(sessionId);
-    if (session) {
+    if (session?.consoleLogs) {
       session.consoleLogs.push(log);
     }
   }
@@ -151,7 +153,7 @@ export class SessionStore {
    */
   recordPageError(sessionId: string, error: string): void {
     const session = this.sessions.get(sessionId);
-    if (session) {
+    if (session?.pageErrors) {
       session.pageErrors.push(error);
     }
   }
@@ -161,7 +163,7 @@ export class SessionStore {
    */
   recordDialog(sessionId: string, dialog: TrackedDialog): void {
     const session = this.sessions.get(sessionId);
-    if (session) {
+    if (session?.dialogs) {
       session.dialogs.push(dialog);
     }
   }
@@ -171,7 +173,7 @@ export class SessionStore {
    */
   recordToolCall(sessionId: string, toolCall: WidgetToolCall): void {
     const session = this.sessions.get(sessionId);
-    if (session) {
+    if (session?.toolCalls) {
       session.toolCalls.push(toolCall);
       session.lastAccessedAt = Date.now();
     }

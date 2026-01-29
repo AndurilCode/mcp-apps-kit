@@ -215,10 +215,9 @@ export function createCallToolTool(connectionManager: ConnectionManager) {
         if (message.includes("timeout") || message.includes("Timeout")) {
           // Extract timeout value from error message if present, otherwise use default
           const timeoutMatch = message.match(/(\d+)\s*ms/);
-          const timeoutValue =
-            timeoutMatch && timeoutMatch[1]
-              ? parseInt(timeoutMatch[1], 10)
-              : DEFAULT_TOOL_TIMEOUT_MS;
+          const timeoutValue = timeoutMatch?.[1]
+            ? parseInt(timeoutMatch[1], 10)
+            : DEFAULT_TOOL_TIMEOUT_MS;
           const timeoutMsg = `Tool '${input.name}' timed out after ${timeoutValue}ms`;
 
           return {

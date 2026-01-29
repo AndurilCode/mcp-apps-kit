@@ -110,6 +110,6 @@ await app.start({ port: 6274 });
 
 ### Connect and List Tools
 
-```
+```text
 User: Connect to my server at http://localhost:3000/v1/mcp
 ```

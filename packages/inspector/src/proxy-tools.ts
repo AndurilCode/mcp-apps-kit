@@ -135,7 +135,7 @@ export function registerProxyToolsDirectly(
           let toolResult: unknown;
           if (result.structuredContent) {
             toolResult = result.structuredContent;
-          } else if (result.content.length > 0) {
+          } else if (Array.isArray(result.content) && result.content.length > 0) {
             const textContent = result.content.find(
               (c: { type: string; text?: string }) => c.type === "text"
             );

@@ -621,7 +621,7 @@ export class UIHostManager {
     }
 
     // Rethrow first error if any occurred
-    if (errors.length > 0) {
+    if (errors.length > 0 && errors[0]) {
       throw errors[0];
     }
   }
