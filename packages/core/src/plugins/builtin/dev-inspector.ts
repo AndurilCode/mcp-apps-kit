@@ -11,8 +11,6 @@ import { spawn, type ChildProcess } from "child_process";
 import type { Plugin } from "../types";
 import type { AutoInspectorConfig } from "../../types/config";
 
-let inspectorProcess: ChildProcess | null = null;
-
 /**
  * Resolve auto-inspector config to full config object with defaults
  */
@@ -45,6 +43,9 @@ export function createDevInspectorPlugin(
   serverRoute: string
 ): Plugin {
   const resolvedConfig = resolveConfig(config);
+
+  // Keep inspector process state scoped to this plugin instance
+  let inspectorProcess: ChildProcess | null = null;
 
   return {
     name: "dev-inspector",

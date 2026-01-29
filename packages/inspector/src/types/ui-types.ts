@@ -361,11 +361,9 @@ export interface WidgetEvaluateOutput {
 /**
  * Input for widget_click tool
  */
-export interface WidgetClickInput {
+export interface WidgetClickInput extends SemanticLocatorOptions {
   /** Session ID of the widget */
   sessionId: string;
-  /** CSS selector of the element to click */
-  selector: string;
   /** Optional timeout in ms (default: 5000) */
   timeout?: number;
 }
@@ -391,11 +389,9 @@ export interface WidgetClickOutput {
 /**
  * Input for widget_fill tool
  */
-export interface WidgetFillInput {
+export interface WidgetFillInput extends SemanticLocatorOptions {
   /** Session ID of the widget */
   sessionId: string;
-  /** CSS selector of the input element */
-  selector: string;
   /** Value to fill in the input */
   value: string;
   /** Optional timeout in ms (default: 5000) */

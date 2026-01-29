@@ -147,9 +147,14 @@ export async function updateSessionGlobals(options: UpdateGlobalsOptions): Promi
     // Build the host context update based on protocol
     if (protocol === "mcp") {
       await updateMcpGlobals(page, environmentState, viewport);
-    } else {
+    } else if (protocol === "openai") {
       const maxHeight: number = modeSizing.maxHeight ?? 600;
       await updateOpenAIGlobals(page, environmentState, viewport, maxHeight);
+    } else {
+      // Log warning for unexpected protocol values
+      if (debug) {
+        console.warn(`[SessionRenderer] Unknown protocol "${protocol}", skipping globals update`);
+      }
     }
 
     return true;

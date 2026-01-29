@@ -164,9 +164,29 @@ Dual Mode Usage:
 async function main(): Promise<void> {
   const options = parseArgs();
 
+  // Declare server in outer scope so signal handlers can access it
+  let server:
+    | ReturnType<typeof createDualInspectorServer>
+    | ReturnType<typeof createStandaloneInspectorServer>
+    | undefined;
+
+  // Handle graceful shutdown
+  const shutdown = async (signal: string) => {
+    console.log(`\n${signal} received. Shutting down...`);
+    try {
+      await server?.stop();
+    } catch (error) {
+      console.error("Error during shutdown:", error);
+    }
+    process.exit(0);
+  };
+
+  process.on("SIGINT", () => void shutdown("SIGINT"));
+  process.on("SIGTERM", () => void shutdown("SIGTERM"));
+
   if (options.dual) {
     // Dual mode: separate endpoints for agent and apps
-    const server = createDualInspectorServer({
+    server = createDualInspectorServer({
       port: options.port,
       debug: options.debug,
       maxHistorySize: options.maxHistory,
@@ -190,7 +210,7 @@ async function main(): Promise<void> {
     }
   } else {
     // Single mode: all tools on one endpoint with custom /execute-tool endpoint
-    const server = createStandaloneInspectorServer({
+    server = createStandaloneInspectorServer({
       port: options.port,
       debug: options.debug,
       maxHistorySize: options.maxHistory,
@@ -222,17 +242,6 @@ async function main(): Promise<void> {
       process.exit(1);
     }
   }
-
-  // Handle graceful shutdown
-  process.on("SIGINT", () => {
-    console.log("\nShutting down...");
-    process.exit(0);
-  });
-
-  process.on("SIGTERM", () => {
-    console.log("\nShutting down...");
-    process.exit(0);
-  });
 }
 
 main().catch((error: unknown) => {

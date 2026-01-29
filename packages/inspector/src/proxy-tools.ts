@@ -185,30 +185,39 @@ export function registerProxyToolsDirectly(
                 // Extract widget session ID from URL
                 const pageUrl = page.url();
                 const urlMatch = pageUrl.match(/\/host\/([a-f0-9-]+)/);
-                const widgetSessionId = urlMatch?.[1] ?? "";
+                const widgetSessionId = urlMatch?.[1];
 
-                // Create touch callback to keep WidgetServer session alive
-                const widgetServerTouch = uiHostManager.createSessionTouchCallback(widgetSessionId);
+                if (!widgetSessionId) {
+                  // eslint-disable-next-line no-console
+                  console.warn(
+                    `[proxy] Failed to extract widget session ID from URL: ${pageUrl}. Skipping session creation.`
+                  );
+                  // Skip session creation but continue with tool result
+                } else {
+                  // Create touch callback to keep WidgetServer session alive
+                  const widgetServerTouch =
+                    uiHostManager.createSessionTouchCallback(widgetSessionId);
 
-                // Create widget session with 'apps' source
-                const sessionManager = connectionManager.getWidgetSessionManager();
-                const targetServerUrl = connectionManager.getState().serverUrl ?? "";
-                const session = await sessionManager.createSession(
-                  toolInfo.name,
-                  args,
-                  toolResult,
-                  page,
-                  widgetSessionId,
-                  uiResource.protocol,
-                  "apps", // Mark as created from /apps/mcp endpoint
-                  {
-                    targetServerUrl,
-                    targetToolName: toolInfo.name,
-                  },
-                  widgetServerTouch
-                );
+                  // Create widget session with 'apps' source
+                  const sessionManager = connectionManager.getWidgetSessionManager();
+                  const targetServerUrl = connectionManager.getState().serverUrl ?? "";
+                  const session = await sessionManager.createSession(
+                    toolInfo.name,
+                    args,
+                    toolResult,
+                    page,
+                    widgetSessionId,
+                    uiResource.protocol,
+                    "apps", // Mark as created from /apps/mcp endpoint
+                    {
+                      targetServerUrl,
+                      targetToolName: toolInfo.name,
+                    },
+                    widgetServerTouch
+                  );
 
-                sessionId = session.id;
+                  sessionId = session.id;
+                }
               }
             }
           } catch (error) {
