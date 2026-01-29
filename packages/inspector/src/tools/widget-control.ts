@@ -372,9 +372,23 @@ export function createWidgetFillTool(connectionManager: ConnectionManager) {
           fillMethod = "contenteditable";
           elementType = `${tagName}[contenteditable]`;
           await locator.click({ timeout });
-          // Select all and delete existing content
-          await locator.press("Control+a");
-          await locator.press("Backspace");
+
+          // Try to clear using fill("") first (works on some contenteditable elements)
+          let cleared = false;
+          try {
+            await locator.fill("", { timeout: 500 });
+            cleared = true;
+          } catch {
+            // fill("") not supported, fall back to select-all + delete
+          }
+
+          if (!cleared) {
+            // Select all and delete existing content (platform-aware)
+            const selectAllKey = process.platform === "darwin" ? "Meta+a" : "Control+a";
+            await locator.press(selectAllKey);
+            await locator.press("Backspace");
+          }
+
           // Type the new value
           await locator.pressSequentially(input.value, { delay: 10 });
         } else if (tagName === "textarea") {
@@ -849,6 +863,10 @@ export const widgetRefreshOutputSchema = z.object({
   error: z.string().optional(),
   newToolResult: z.unknown().optional(),
   widgetUpdated: z.boolean().optional(),
+  widgetUpdateError: z
+    .string()
+    .optional()
+    .describe("Error message if widget update failed but tool call succeeded"),
 });
 
 export function createWidgetRefreshTool(connectionManager: ConnectionManager) {
@@ -916,6 +934,7 @@ export function createWidgetRefreshTool(connectionManager: ConnectionManager) {
         // Push the new data to the widget via postMessage
         const frame = session.page.frame({ url: /\/widget\// });
         let widgetUpdated = false;
+        let widgetUpdateError: string | undefined;
 
         if (frame) {
           try {
@@ -968,8 +987,15 @@ export function createWidgetRefreshTool(connectionManager: ConnectionManager) {
               /* eslint-enable no-undef */
               widgetUpdated = true;
             }
-          } catch {
+          } catch (updateError) {
             // Widget update failed, but tool call succeeded
+            const updateErrorMessage =
+              updateError instanceof Error ? updateError.message : String(updateError);
+            console.warn(
+              `[widget-refresh] Failed to push update to widget (session: ${input.sessionId}, protocol: ${session.protocol}):`,
+              updateErrorMessage
+            );
+            widgetUpdateError = updateErrorMessage;
           }
         }
 
@@ -977,6 +1003,7 @@ export function createWidgetRefreshTool(connectionManager: ConnectionManager) {
           success: true,
           newToolResult,
           widgetUpdated,
+          widgetUpdateError,
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

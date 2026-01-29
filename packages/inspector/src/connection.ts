@@ -42,7 +42,7 @@ export type ProtocolType = "chatgpt-apps" | "mcp-apps" | "mcp";
  */
 export function inferProtocolType(tools: TargetToolInfo[]): ProtocolType {
   for (const tool of tools) {
-    const meta = tool._meta as Record<string, unknown> | undefined;
+    const meta = tool._meta;
     if (!meta) continue;
 
     // Check for OpenAI Apps UI metadata

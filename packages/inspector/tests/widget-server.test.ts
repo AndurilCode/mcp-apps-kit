@@ -47,6 +47,7 @@ describe("WidgetServer", () => {
         "<html><body>Test Widget</body></html>",
         { data: "test" },
         "test_tool",
+        {},
         "mcp"
       );
 
@@ -63,6 +64,7 @@ describe("WidgetServer", () => {
         "<html><body>Test Widget</body></html>",
         { data: "test" },
         "test_tool",
+        {},
         "openai"
       );
 
@@ -75,7 +77,13 @@ describe("WidgetServer", () => {
       server = new WidgetServer();
       await server.start();
 
-      const result = server.createSession("<html><body>Test</body></html>", {}, "test_tool", "mcp");
+      const result = server.createSession(
+        "<html><body>Test</body></html>",
+        {},
+        "test_tool",
+        {},
+        "mcp"
+      );
 
       // Should not throw
       server.deleteSession(result.sessionId);
@@ -90,7 +98,7 @@ describe("WidgetServer", () => {
       await server.start();
 
       const widgetHtml = "<html><body>Widget Content</body></html>";
-      const result = server.createSession(widgetHtml, {}, "test_tool", "mcp");
+      const result = server.createSession(widgetHtml, {}, "test_tool", {}, "mcp");
 
       const response = await fetch(result.widgetUrl);
       expect(response.status).toBe(200);
@@ -108,6 +116,7 @@ describe("WidgetServer", () => {
         "<html><body>Widget</body></html>",
         { weather: "sunny" },
         "get_weather",
+        {},
         "mcp"
       );
 
@@ -130,6 +139,7 @@ describe("WidgetServer", () => {
         "<html><body>Widget</body></html>",
         { temperature: 72 },
         "get_weather",
+        {},
         "openai"
       );
 
@@ -152,6 +162,7 @@ describe("WidgetServer", () => {
         "<html><head></head><body>Widget</body></html>",
         { temperature: 72 },
         "get_weather",
+        {},
         "openai"
       );
 
@@ -209,6 +220,7 @@ describe("WidgetServer", () => {
           "<html><head></head><body>Widget</body></html>",
           { temperature: 72 },
           "get_weather",
+          {},
           "openai"
         );
 
@@ -229,6 +241,7 @@ describe("WidgetServer", () => {
           "<html><head></head><body>Widget</body></html>",
           {},
           "test_tool",
+          {},
           "openai"
         );
 
@@ -249,6 +262,7 @@ describe("WidgetServer", () => {
           "<html><body>Widget</body></html>",
           {},
           "test_tool",
+          {},
           "openai"
         );
 
@@ -269,6 +283,7 @@ describe("WidgetServer", () => {
           "<html><head></head><body>Widget</body></html>",
           {},
           "test_tool",
+          {},
           "openai"
         );
 
@@ -287,6 +302,7 @@ describe("WidgetServer", () => {
           "<html><head></head><body>Widget</body></html>",
           {},
           "test_tool",
+          {},
           "openai"
         );
 
@@ -306,6 +322,7 @@ describe("WidgetServer", () => {
           "<html><body>Widget</body></html>",
           {},
           "test_tool",
+          {},
           "openai"
         );
 
@@ -328,6 +345,7 @@ describe("WidgetServer", () => {
           "<html><head></head><body>Widget</body></html>",
           {},
           "test_tool",
+          {},
           "openai"
         );
 
@@ -348,6 +366,7 @@ describe("WidgetServer", () => {
           "<html><body>Widget</body></html>",
           {},
           "test_tool",
+          {},
           "openai"
         );
 
@@ -369,6 +388,7 @@ describe("WidgetServer", () => {
           "<html><head></head><body>Widget</body></html>",
           {},
           "test_tool",
+          {},
           "openai"
         );
 
@@ -388,6 +408,7 @@ describe("WidgetServer", () => {
           "<html><head></head><body>Widget</body></html>",
           {},
           "test_tool",
+          {},
           "openai"
         );
 
@@ -408,6 +429,7 @@ describe("WidgetServer", () => {
           "<html><body>Widget</body></html>",
           {},
           "test_tool",
+          {},
           "openai"
         );
 
@@ -428,6 +450,7 @@ describe("WidgetServer", () => {
           "<html><head></head><body>Widget</body></html>",
           {},
           "test_tool",
+          {},
           "openai"
         );
 
@@ -450,6 +473,7 @@ describe("WidgetServer", () => {
           "<html><head></head><body>Widget</body></html>",
           {},
           "test_tool",
+          {},
           "openai"
         );
 
@@ -468,6 +492,7 @@ describe("WidgetServer", () => {
           "<html><head></head><body>Widget</body></html>",
           {},
           "test_tool",
+          {},
           "openai"
         );
 
@@ -490,6 +515,7 @@ describe("WidgetServer", () => {
           "<html><head></head><body>Widget</body></html>",
           {},
           "test_tool",
+          {},
           "openai"
         );
 
@@ -509,6 +535,7 @@ describe("WidgetServer", () => {
           "<html><body>Widget</body></html>",
           {},
           "test_tool",
+          {},
           "openai"
         );
 
@@ -529,6 +556,7 @@ describe("WidgetServer", () => {
           "<html><head></head><body>Widget</body></html>",
           {},
           "test_tool",
+          {},
           "openai"
         );
 
@@ -549,6 +577,7 @@ describe("WidgetServer", () => {
           "<html><head></head><body>Widget</body></html>",
           {},
           "test_tool",
+          {},
           "openai"
         );
 

@@ -661,7 +661,7 @@ export function createStandaloneInspectorServer(
           const responseText = await responseClone.text();
           const responseJson = JSON.parse(responseText) as {
             error?: unknown;
-            result?: unknown & { isError?: boolean };
+            result?: { isError?: boolean };
           };
           if (responseJson.error) {
             isError = true;

@@ -15,7 +15,7 @@ export interface UseConnectionStatusResult {
   status: ConnectionStatus;
   isLoading: boolean;
   error: string | null;
-  refresh: () => void;
+  refresh: () => Promise<void>;
 }
 
 /**
@@ -67,7 +67,9 @@ export function useConnectionStatus(
       void fetchStatus();
     }, pollInterval);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+    };
   }, [fetchStatus, pollInterval]);
 
   return {

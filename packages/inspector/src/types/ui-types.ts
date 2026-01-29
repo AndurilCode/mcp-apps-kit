@@ -468,6 +468,8 @@ export interface WidgetRefreshOutput {
   newToolResult?: unknown;
   /** Whether the widget was updated */
   widgetUpdated?: boolean;
+  /** Error message if widget update failed but tool call succeeded */
+  widgetUpdateError?: string;
 }
 
 /**

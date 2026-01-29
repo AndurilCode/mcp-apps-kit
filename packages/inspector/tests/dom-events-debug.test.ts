@@ -126,6 +126,7 @@ describe("DOM Event Recording Debug", () => {
         "<html><body>Test</body></html>",
         { test: "result" },
         "test_tool",
+        {}, // toolArgs
         "mcp",
         undefined, // environmentState
         undefined, // externalHostContext
@@ -150,6 +151,7 @@ describe("DOM Event Recording Debug", () => {
         "<html><body>Test</body></html>",
         { test: "result" },
         "test_tool",
+        {}, // toolArgs
         "mcp",
         undefined, // environmentState
         undefined, // externalHostContext

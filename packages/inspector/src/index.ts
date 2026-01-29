@@ -151,6 +151,7 @@ export {
   // UI Rendering tools
   createPreviewUITool,
   createScreenshotWidgetTool,
+  // eslint-disable-next-line @typescript-eslint/no-deprecated -- Exported for backwards compatibility
   createTestWidgetInteractionTool,
   // Widget snapshot, query, and diff tools
   createWidgetSnapshotTool,

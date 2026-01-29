@@ -23,6 +23,7 @@ export { createGetUIMetadataTool } from "./get-ui-metadata";
 // UI Rendering tools
 export { createPreviewUITool } from "./preview-ui";
 export { createScreenshotWidgetTool } from "./screenshot-widget";
+// eslint-disable-next-line @typescript-eslint/no-deprecated -- Exported for backwards compatibility
 export { createTestWidgetInteractionTool } from "./test-widget-interaction";
 export { createGetConsoleLogsTool } from "./get-console-logs";
 

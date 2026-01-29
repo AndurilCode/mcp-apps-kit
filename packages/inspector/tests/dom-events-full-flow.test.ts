@@ -21,7 +21,8 @@ describe("DOM Event Full Flow", () => {
   beforeAll(async () => {
     server = createStandaloneInspectorServer({ debug: true });
     await server.start(port);
-    serverUrl = `http://localhost:${port}`;
+    // Server uses 127.0.0.1 instead of localhost to match widget server origin (avoids CORS)
+    serverUrl = `http://127.0.0.1:${port}`;
   });
 
   afterAll(async () => {
