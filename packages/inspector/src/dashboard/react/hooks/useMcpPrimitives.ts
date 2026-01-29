@@ -31,7 +31,7 @@ export function useMcpPrimitives(
   pollInterval = 30000
 ): UseMcpPrimitivesResult {
   const [primitives, setPrimitives] = useState<McpPrimitives | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [wasConnected, setWasConnected] = useState(false);
 
@@ -68,7 +68,6 @@ export function useMcpPrimitives(
     if (!isConnected) {
       return;
     }
-    void fetchPrimitives();
     const interval = setInterval(() => {
       void fetchPrimitives();
     }, pollInterval);

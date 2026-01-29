@@ -49,7 +49,11 @@ export function useEventStream(baseUrl: string, sessionId: string | null): UseEv
         const data = JSON.parse(event.data as string) as EventsBatchData;
         const newEvents = data.events;
         if (newEvents && Array.isArray(newEvents)) {
-          setEvents((prev) => [...prev, ...newEvents]);
+          setEvents((prev) => {
+            const existingIds = new Set(prev.map((e) => e.id));
+            const uniqueNew = newEvents.filter((e) => !existingIds.has(e.id));
+            return [...prev, ...uniqueNew];
+          });
         }
       } catch {
         // Ignore parse errors

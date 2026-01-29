@@ -7,6 +7,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
 export interface LogEntry {
+  /** Stable unique identifier for this log entry */
+  id: string;
   level: "log" | "info" | "warn" | "error" | "debug";
   text: string;
   source: "widget" | "host" | "unknown";
@@ -22,6 +24,19 @@ interface LogsBatchData {
 export interface UseLogStreamResult {
   logs: LogEntry[];
   clearLogs: () => void;
+}
+
+let logIdCounter = 0;
+
+function generateLogId(): string {
+  return `log-${Date.now()}-${++logIdCounter}`;
+}
+
+function ensureLogId(log: Omit<LogEntry, "id"> & { id?: string }): LogEntry {
+  return {
+    ...log,
+    id: log.id ?? generateLogId(),
+  };
 }
 
 export function useLogStream(baseUrl: string, sessionId: string | null): UseLogStreamResult {
@@ -56,7 +71,12 @@ export function useLogStream(baseUrl: string, sessionId: string | null): UseLogS
         const data = JSON.parse(event.data as string) as LogsBatchData;
         const newLogs = data.logs;
         if (newLogs && Array.isArray(newLogs)) {
-          setLogs((prev) => [...prev, ...newLogs]);
+          const logsWithIds = newLogs.map(ensureLogId);
+          setLogs((prev) => {
+            const existingIds = new Set(prev.map((l) => l.id));
+            const uniqueNew = logsWithIds.filter((l) => !existingIds.has(l.id));
+            return [...prev, ...uniqueNew];
+          });
         }
       } catch {
         // Ignore parse errors
@@ -66,8 +86,13 @@ export function useLogStream(baseUrl: string, sessionId: string | null): UseLogS
     // Handle individual log entries
     eventSource.addEventListener("log", (event: MessageEvent) => {
       try {
-        const log = JSON.parse(event.data as string) as LogEntry;
-        setLogs((prev) => [...prev, log]);
+        const log = ensureLogId(JSON.parse(event.data as string) as LogEntry);
+        setLogs((prev) => {
+          if (prev.some((l) => l.id === log.id)) {
+            return prev;
+          }
+          return [...prev, log];
+        });
       } catch {
         // Ignore parse errors
       }

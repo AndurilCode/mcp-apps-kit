@@ -90,7 +90,7 @@ export function LogsPanel({
         {logs.length === 0 ? (
           <div style={styles.logsEmpty}>No logs yet</div>
         ) : (
-          logs.map((log, index) => <LogEntryRow key={index} log={log} />)
+          logs.map((log) => <LogEntryRow key={log.id} log={log} />)
         )}
       </div>
     </div>
