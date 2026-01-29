@@ -2,7 +2,7 @@
  * Tests for list_prompts, get_prompt, list_resources, read_resource tools
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import { createListPromptsTool } from "../src/tools/list-prompts";
 import { createGetPromptTool } from "../src/tools/get-prompt";
@@ -49,6 +49,10 @@ describe("Prompts and Resources Tools", () => {
 
     // Connect to enable client access
     await manager.connect("http://localhost:3000/mcp");
+  });
+
+  afterEach(async () => {
+    await manager.disconnect();
   });
 
   describe("list_prompts", () => {

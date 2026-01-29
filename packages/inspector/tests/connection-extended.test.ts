@@ -2,7 +2,7 @@
  * Extended tests for ConnectionManager
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 
 // Mock the testing module
@@ -52,6 +52,10 @@ describe("ConnectionManager Extended", () => {
     mockDisconnect.mockResolvedValue(undefined);
     mockGetCallHistory.mockReturnValue([]);
     mockClearHistory.mockReturnValue(undefined);
+  });
+
+  afterEach(async () => {
+    await manager.disconnect();
   });
 
   describe("constructor options", () => {

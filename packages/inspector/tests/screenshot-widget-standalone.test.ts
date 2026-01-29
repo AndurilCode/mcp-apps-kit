@@ -100,7 +100,8 @@ describe("screenshot_widget Standalone Mode", () => {
     await manager.connect("http://localhost:3000/mcp");
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await manager.disconnect();
     vi.clearAllMocks();
   });
 

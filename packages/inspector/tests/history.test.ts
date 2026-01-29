@@ -2,7 +2,7 @@
  * History tracking tests
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import { createGetCallHistoryTool, createClearHistoryTool } from "../src/tools";
 

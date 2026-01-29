@@ -2,7 +2,7 @@
  * Additional tests for call_tool error handling and edge cases
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import { createCallToolTool } from "../src/tools/call-tool";
 
@@ -46,6 +46,10 @@ describe("call_tool Error Handling", () => {
 
     // Connect
     await manager.connect("http://localhost:3000/mcp");
+  });
+
+  afterEach(async () => {
+    await manager.disconnect();
   });
 
   describe("timeout errors", () => {

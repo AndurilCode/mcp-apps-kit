@@ -2,7 +2,7 @@
  * UI Inspection tools tests
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import {
   createListUIWidgetsTool,
@@ -127,6 +127,10 @@ describe("UI Inspection Tools", () => {
     mockDisconnect.mockResolvedValue(undefined);
     mockGetCallHistory.mockReturnValue([]);
     mockClearHistory.mockReturnValue(undefined);
+  });
+
+  afterEach(async () => {
+    await manager.disconnect();
   });
 
   describe("list_ui_widgets", () => {

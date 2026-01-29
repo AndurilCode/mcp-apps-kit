@@ -2,7 +2,7 @@
  * Tests for run_test_suite tool
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import { createRunTestSuiteTool } from "../src/tools/test-suite";
 
@@ -56,6 +56,10 @@ describe("run_test_suite Tool", () => {
     mocks.listPrompts.mockResolvedValue([]);
 
     await manager.connect("http://localhost:3000/mcp");
+  });
+
+  afterEach(async () => {
+    await manager.disconnect();
   });
 
   it("should run a test suite and return results", async () => {

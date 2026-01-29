@@ -2,7 +2,7 @@
  * Tests for test_widget_interaction tool
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import { createTestWidgetInteractionTool } from "../src/tools/test-widget-interaction";
 
@@ -47,6 +47,10 @@ describe("test_widget_interaction Tool", () => {
     mockListPrompts.mockResolvedValue([]);
 
     await manager.connect("http://localhost:3000/mcp");
+  });
+
+  afterEach(async () => {
+    await manager.disconnect();
   });
 
   describe("standalone mode validation", () => {
@@ -194,40 +198,41 @@ describe("test_widget_interaction Tool", () => {
   });
 
   describe("interaction types", () => {
-    it("should accept click action", async () => {
+    it("should have inputSchema that accepts click action", () => {
       const tool = createTestWidgetInteractionTool(manager);
-      // Just validate the tool accepts click actions
-      expect(tool).toBeDefined();
+      const schema = tool.inputSchema;
+      expect(schema.properties.interactions).toBeDefined();
+      expect(schema.properties.interactions.items.properties.action.enum).toContain("click");
     });
 
-    it("should accept type action", async () => {
+    it("should have inputSchema that accepts type action", () => {
       const tool = createTestWidgetInteractionTool(manager);
-      // Just validate the tool accepts type actions
-      expect(tool).toBeDefined();
+      const schema = tool.inputSchema;
+      expect(schema.properties.interactions.items.properties.action.enum).toContain("type");
     });
 
-    it("should accept hover action", async () => {
+    it("should have inputSchema that accepts hover action", () => {
       const tool = createTestWidgetInteractionTool(manager);
-      // Just validate the tool accepts hover actions
-      expect(tool).toBeDefined();
+      const schema = tool.inputSchema;
+      expect(schema.properties.interactions.items.properties.action.enum).toContain("hover");
     });
 
-    it("should accept wait action", async () => {
+    it("should have inputSchema that accepts wait action", () => {
       const tool = createTestWidgetInteractionTool(manager);
-      // Just validate the tool accepts wait actions
-      expect(tool).toBeDefined();
+      const schema = tool.inputSchema;
+      expect(schema.properties.interactions.items.properties.action.enum).toContain("wait");
     });
 
-    it("should accept scroll action", async () => {
+    it("should have inputSchema that accepts scroll action", () => {
       const tool = createTestWidgetInteractionTool(manager);
-      // Just validate the tool accepts scroll actions
-      expect(tool).toBeDefined();
+      const schema = tool.inputSchema;
+      expect(schema.properties.interactions.items.properties.action.enum).toContain("scroll");
     });
 
-    it("should accept snapshot action", async () => {
+    it("should have inputSchema that accepts snapshot action", () => {
       const tool = createTestWidgetInteractionTool(manager);
-      // Just validate the tool accepts snapshot actions
-      expect(tool).toBeDefined();
+      const schema = tool.inputSchema;
+      expect(schema.properties.interactions.items.properties.action.enum).toContain("snapshot");
     });
   });
 
