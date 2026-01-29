@@ -43,13 +43,13 @@ describe("MCPHostEmulator", () => {
       // Wait for the deferred emission
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      // Should have received hostContext/changed and ui/notifications/tool-result notifications
+      // Should have received ui/notifications/host-context-changed and ui/notifications/tool-result notifications
       const methods = messagesReceived
         .filter((m) => typeof m === "object" && m !== null)
         .map((m) => (m as { method?: string }).method)
         .filter(Boolean);
 
-      expect(methods).toContain("hostContext/changed");
+      expect(methods).toContain("ui/notifications/host-context-changed");
       expect(methods).toContain("ui/notifications/tool-result");
     });
   });

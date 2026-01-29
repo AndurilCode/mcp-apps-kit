@@ -284,11 +284,43 @@ export function createDualInspectorServer(
             return;
           }
 
+          // Validate URL format and protocol
+          const trimmedUrl = data.url.trim();
+          let parsedUrl: URL;
+          try {
+            parsedUrl = new URL(trimmedUrl);
+          } catch {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: false, error: "Invalid URL format" }));
+            return;
+          }
+
+          const allowedProtocols = ["http:", "https:", "ws:", "wss:"];
+          if (!allowedProtocols.includes(parsedUrl.protocol)) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                success: false,
+                error: `Invalid protocol: ${parsedUrl.protocol}. Allowed: ${allowedProtocols.join(", ")}`,
+              })
+            );
+            return;
+          }
+
+          if (!parsedUrl.hostname) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: false, error: "URL must have a hostname" }));
+            return;
+          }
+
+          // Use validated URL
+          const validatedUrl = trimmedUrl;
+
           // Check if already connected
           const currentState = connectionManager.getState();
           if (currentState.connected && currentState.serverUrl) {
             // If same URL, return success
-            if (currentState.serverUrl === data.url) {
+            if (currentState.serverUrl === validatedUrl) {
               const schema = connectionManager.getTargetSchema();
               const protocolType = schema ? inferProtocolType(schema.tools) : "mcp";
               res.writeHead(200, { "Content-Type": "application/json" });
@@ -296,7 +328,7 @@ export function createDualInspectorServer(
                 JSON.stringify({
                   success: true,
                   connected: true,
-                  serverUrl: data.url,
+                  serverUrl: validatedUrl,
                   serverInfo: currentState.serverInfo,
                   toolCount: schema?.tools.length ?? 0,
                   resourceCount: schema?.resources.length ?? 0,
@@ -313,7 +345,7 @@ export function createDualInspectorServer(
               res.end(
                 JSON.stringify({
                   success: false,
-                  error: `Already connected to ${currentState.serverUrl}. Use force=true to disconnect and connect to ${data.url}.`,
+                  error: `Already connected to ${currentState.serverUrl}. Use force=true to disconnect and connect to ${validatedUrl}.`,
                 })
               );
               return;
@@ -321,7 +353,7 @@ export function createDualInspectorServer(
           }
 
           // Connect (will disconnect first if force=true and already connected)
-          const result = await connectionManager.connect(data.url);
+          const result = await connectionManager.connect(validatedUrl);
           const schema = connectionManager.getTargetSchema();
           const protocolType = schema ? inferProtocolType(schema.tools) : "mcp";
 
@@ -330,7 +362,7 @@ export function createDualInspectorServer(
             JSON.stringify({
               success: true,
               connected: true,
-              serverUrl: data.url,
+              serverUrl: validatedUrl,
               serverInfo: result.serverInfo,
               toolCount: result.toolCount,
               resourceCount: result.resourceCount,

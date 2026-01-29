@@ -386,23 +386,8 @@ export function createTestWidgetInteractionTool(connectionManager: ConnectionMan
       const inspectorUrl = connectionManager.getInspectorUrl();
 
       try {
-        const renderResult = await uiHostManager.renderInBrowser(
-          html,
-          protocol,
-          toolResult,
-          input.tool,
-          input.arguments ?? {},
-          environmentState,
-          viewport,
-          undefined, // externalHostContext
-          inspectorUrl ?? undefined
-        );
-
-        const { page } = renderResult;
-        errors.push(...renderResult.errors);
-
-        // Capture tool calls from console messages (host page logs them)
-        page.on("console", (msg) => {
+        // Set up console listener BEFORE rendering to capture all tool calls from initial render
+        const consoleHandler = (msg: import("playwright").ConsoleMessage) => {
           const text = msg.text();
           if (text.startsWith("[WIDGET_TOOL_CALL] ")) {
             try {
@@ -424,7 +409,25 @@ export function createTestWidgetInteractionTool(connectionManager: ConnectionMan
               // Ignore parse errors
             }
           }
-        });
+        };
+
+        const renderResult = await uiHostManager.renderInBrowser(
+          html,
+          protocol,
+          toolResult,
+          input.tool,
+          input.arguments ?? {},
+          environmentState,
+          viewport,
+          undefined, // externalHostContext
+          inspectorUrl ?? undefined
+        );
+
+        const { page } = renderResult;
+        errors.push(...renderResult.errors);
+
+        // Attach console handler to capture any future tool calls
+        page.on("console", consoleHandler);
 
         // Get the widget iframe for interactions
         const frame = page.frame({ url: /\/widget\// });

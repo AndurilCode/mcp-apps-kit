@@ -75,8 +75,8 @@ export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptio
     const win = dom.window as Window & typeof globalThis;
     const debug = this.options.debug ?? false;
 
-    // Create the window.openai SDK mock
-    const openaiSDK = this.createOpenAISDKForWindow(debug);
+    // Create the window.openai SDK mock, passing the jsdom window
+    const openaiSDK = this.createOpenAISDKForWindow(debug, win);
 
     // Define window.openai
     Object.defineProperty(win, "openai", {
@@ -160,11 +160,11 @@ export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptio
         // Create the window.openai SDK mock
         window.openai = {
           // Tool output as JSON string (ChatGPT convention)
-          toolOutput: JSON.stringify(${toolResult}),
+          toolOutput: ${toolResult},
 
           // Get tool output as parsed object
           getToolOutput: function() {
-            return JSON.stringify(${toolResult});
+            return ${toolResult};
           },
 
           // Tool metadata
@@ -296,8 +296,10 @@ export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptio
 
   /**
    * Create the window.openai SDK mock object for injection into window
+   * @param debug - Enable debug logging
+   * @param jsdomWindow - The jsdom Window instance to use (captured to avoid global window checks)
    */
-  private createOpenAISDKForWindow(debug: boolean): Record<string, unknown> {
+  private createOpenAISDKForWindow(debug: boolean, jsdomWindow?: Window): Record<string, unknown> {
     const toolOutputStr = JSON.stringify(this.options.toolResult);
     const env = this.options.environment ?? {};
 
@@ -324,6 +326,10 @@ export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptio
       viewport: env.viewport ?? { width: initialSizing.width, height: initialSizing.height },
       userAgent: initialUserAgent,
     };
+
+    // Capture the jsdom window reference for use in SDK methods
+    // This avoids using global `typeof window` checks which can pick up Node globals
+    const capturedWindow = jsdomWindow;
 
     // Helper to dispatch set_globals event (stored for use in requestDisplayMode)
     const dispatchGlobalsUpdate = (
@@ -424,13 +430,10 @@ export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptio
         sdkState.viewport = { width: sizing.width, height: sizing.height };
 
         // Dispatch set_globals event with updated sizing
-        // Note: In jsdom context, we need to access window from the test
-        // The actual dispatch happens via the window reference
-        /* eslint-disable no-undef */
-        if (typeof window !== "undefined") {
+        // Use the captured jsdom window reference instead of global window check
+        if (capturedWindow) {
           dispatchGlobalsUpdate(
-            window,
-            /* eslint-enable no-undef */
+            capturedWindow,
             {
               displayMode: mode,
               maxHeight: sizing.maxHeight,

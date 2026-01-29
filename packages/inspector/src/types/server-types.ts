@@ -176,7 +176,7 @@ export interface InspectorServerOptions {
   /** Enable debug logging. Default: false */
   debug?: boolean;
 
-  /** Session TTL in milliseconds. Default: 300000 (5 minutes) */
+  /** Session TTL in milliseconds. Default: 1800000 (30 minutes) */
   sessionTtl?: number;
 
   /**

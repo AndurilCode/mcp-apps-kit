@@ -885,7 +885,9 @@ export class WidgetSessionManager extends EventEmitter {
 
       case "dom-select": {
         const { selector, value, values } = data as DomSelectPayload;
-        await frame.selectOption(selector, values ?? value, { timeout });
+        // Use values only if it's a non-empty array, otherwise fall back to single value
+        const selectValue = Array.isArray(values) && values.length > 0 ? values : value;
+        await frame.selectOption(selector, selectValue, { timeout });
         break;
       }
 

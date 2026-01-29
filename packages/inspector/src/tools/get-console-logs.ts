@@ -267,8 +267,8 @@ export function createGetConsoleLogsTool(connectionManager: ConnectionManager) {
             text: msg.text(),
             source: getLogSourceFromUrl(location.url),
             timestamp: Date.now(),
-            url: location.url || undefined,
-            lineNumber: location.lineNumber || undefined,
+            url: location.url ?? undefined,
+            lineNumber: location.lineNumber ?? undefined,
           });
         });
 

@@ -522,7 +522,7 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
    * Emit host context update to the widget
    */
   private emitHostContext(window: Window): void {
-    this.sendNotification(window, "hostContext/changed", {
+    this.sendNotification(window, "ui/notifications/host-context-changed", {
       hostContext: this.buildHostContext(),
     });
   }

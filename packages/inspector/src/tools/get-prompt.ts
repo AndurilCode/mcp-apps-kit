@@ -43,15 +43,38 @@ export function createGetPromptTool(connectionManager: ConnectionManager) {
 
         return {
           description: result.description,
-          messages: result.messages.map((message) => ({
-            role: message.role,
-            content: {
-              type: message.content.type,
-              text: message.content.text,
-              data: message.content.data,
-              mimeType: message.content.mimeType,
-            },
-          })),
+          messages: result.messages.map((message) => {
+            const contentType = message.content.type;
+            // Build content object based on content type
+            if (contentType === "text") {
+              return {
+                role: message.role,
+                content: {
+                  type: contentType,
+                  text: message.content.text,
+                },
+              };
+            } else if (contentType === "image" || contentType === "resource") {
+              return {
+                role: message.role,
+                content: {
+                  type: contentType,
+                  data: message.content.data,
+                  mimeType: message.content.mimeType,
+                },
+              };
+            }
+            // Fallback for any other types - preserve all fields
+            return {
+              role: message.role,
+              content: {
+                type: contentType,
+                text: message.content.text,
+                data: message.content.data,
+                mimeType: message.content.mimeType,
+              },
+            };
+          }),
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

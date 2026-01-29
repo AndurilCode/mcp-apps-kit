@@ -598,13 +598,31 @@ export class UIHostManager {
    * Cleanup resources
    */
   async dispose(): Promise<void> {
+    const errors: Error[] = [];
+
+    // Attempt to close browser pool
     if (this.browserPool) {
-      await this.browserPool.close();
+      try {
+        await this.browserPool.close();
+      } catch (error) {
+        errors.push(error instanceof Error ? error : new Error(String(error)));
+      }
       this.browserPool = null;
     }
+
+    // Attempt to stop widget server
     if (this.widgetServer) {
-      await this.widgetServer.stop();
+      try {
+        await this.widgetServer.stop();
+      } catch (error) {
+        errors.push(error instanceof Error ? error : new Error(String(error)));
+      }
       this.widgetServer = undefined;
+    }
+
+    // Rethrow first error if any occurred
+    if (errors.length > 0) {
+      throw errors[0];
     }
   }
 }

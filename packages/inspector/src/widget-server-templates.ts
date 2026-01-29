@@ -296,7 +296,7 @@ export function generateMcpHostPage(ctx: McpHostContext): string {
       const toolResult = ${toolResultJson};
       const toolName = ${toolNameJson};
       const toolArgs = ${toolArgsJson};
-      const sessionId = '${session.id}';
+      const sessionId = ${JSON.stringify(session.id)};
       const inspectorUrl = ${JSON.stringify(session.inspectorUrl ?? null)};
       const isDualMode = ${JSON.stringify(session.isDualMode ?? false)};
       const iframe = document.getElementById('widget-frame');
@@ -462,7 +462,7 @@ ${generateDomEventListenersScript()}
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                sessionId: '${session.id}',
+                sessionId: sessionId,
                 toolName: message.params.name,
                 args: message.params.arguments,
                 messageId: message.id
@@ -541,8 +541,8 @@ export function generateOpenAIHostPage(ctx: OpenAIHostContext): string {
   <iframe id="widget-frame" src="${widgetUrl}" sandbox="${IFRAME_SANDBOX}"></iframe>
   <script>
     (function() {
-      const sessionId = '${session.id}';
-      const toolName = '${session.toolName}';
+      const sessionId = ${JSON.stringify(session.id)};
+      const toolName = ${JSON.stringify(session.toolName)};
       const inspectorUrl = ${JSON.stringify(session.inspectorUrl ?? null)};
       const isDualMode = ${JSON.stringify(session.isDualMode ?? false)};
       const iframe = document.getElementById('widget-frame');
@@ -621,7 +621,7 @@ ${generateDomEventListenersScript()}
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              sessionId: '${session.id}',
+              sessionId: sessionId,
               toolName: message.toolName,
               args: message.args,
               callId: message.callId
@@ -858,7 +858,7 @@ export function generateOpenAIRuntimeScript(ctx: OpenAIRuntimeContext): string {
     userAgent: ${userAgentJson},
     view: { mode: ${displayModeJson}, params: {} },
     widgetState: null,
-    widgetSessionId: '${session.id}',
+    widgetSessionId: ${JSON.stringify(session.id)},
     subjectId: ${subjectIdJson},
     sessionId: ${sessionIdJson},
     userLocation: ${userLocationJson},
