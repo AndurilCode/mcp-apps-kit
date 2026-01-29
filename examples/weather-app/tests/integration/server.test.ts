@@ -47,8 +47,8 @@ describe("Weather App MCP Server", () => {
     it("should list all weather tools", async () => {
       const tools = await env.client.listTools();
 
-      // 4 weather tools + 1 log_debug tool (from debug.logTool config)
-      expect(tools.length).toBe(5);
+      // 4 weather tools: getCurrentWeather, getForecast, getWeatherAlerts, dailyBriefing
+      expect(tools.length).toBe(4);
       // File-based naming: get-current-weather.ts -> getCurrentWeather (camelCase)
       expect(tools.some((t) => t.name === "getCurrentWeather")).toBe(true);
       expect(tools.some((t) => t.name === "getForecast")).toBe(true);

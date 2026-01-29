@@ -1,0 +1,153 @@
+/**
+ * Types for MCP Inspector Server
+ *
+ * This module re-exports all types from domain-specific modules for backwards compatibility.
+ * New code should import from specific modules (e.g., ./types/server-types) when possible.
+ */
+
+// Export session types from widget-session-manager
+export type {
+  ActiveWidgetSession,
+  SessionInfo,
+  SessionSource,
+  ProxyMetadata,
+} from "./widget-session-manager";
+
+// Re-export all types from the types directory
+export type {
+  // Server types
+  ResourceMetadata,
+  ResourceContents,
+  ToolCallResult,
+  McpServerLike,
+  TargetToolInfo,
+  TargetResourceInfo,
+  TargetPromptInfo,
+  TargetServerSchema,
+  ServerInfo,
+  InspectorServerOptions,
+  // Connection types
+  ConnectOptions,
+  ConnectionState,
+  ConnectInput,
+  ConnectOutput,
+  DisconnectOutput,
+  ConnectionStatusOutput,
+  // Tool types (with hints)
+  ToolHints,
+  ToolInfo,
+  CallToolInput,
+  ContentBlock,
+  CallToolOutput,
+  ResourceInfo,
+  ReadResourceInput,
+  ReadResourceOutput,
+  PromptInfo,
+  GetPromptInput,
+  PromptMessage,
+  GetPromptOutput,
+  // History types
+  HistoryEntry,
+  HistoryOutput,
+  ClearHistoryOutput,
+  // Test types
+  TestCaseInput,
+  TestSuiteInput,
+  RunTestSuiteInput,
+  TestCaseResultOutput,
+  RunTestSuiteOutput,
+  // UI types
+  UIProtocol,
+  UIWidgetInfo,
+  ListUIWidgetsOutput,
+  GetUIWidgetInput,
+  UIWidgetCSP,
+  UIWidgetMetadata,
+  GetUIWidgetOutput,
+  InspectToolUIInput,
+  UIBinding,
+  InspectToolUIOutput,
+  GetUIMetadataInput,
+  GetUIMetadataOutput,
+  ElementInfo,
+  PreviewUIInput,
+  PreviewUIOutput,
+  ScreenshotWidgetInput,
+  ScreenshotWidgetOutput,
+  InteractionAction,
+  TestWidgetInteractionInput,
+  TestWidgetInteractionOutput,
+  ConsoleLogEntry,
+  GetConsoleLogsInput,
+  GetConsoleLogsOutput,
+  WidgetEvaluateInput,
+  WidgetEvaluateOutput,
+  WidgetClickInput,
+  WidgetClickOutput,
+  WidgetFillInput,
+  WidgetFillOutput,
+  WidgetDragOutput,
+  TrackedDialog,
+  WidgetRefreshOutput,
+  WidgetWaitForSelectorInput,
+  WidgetWaitForSelectorOutput,
+  WidgetLocatorInput,
+  LocatorElementInfo,
+  WidgetLocatorOutput,
+  GetWidgetStateInput,
+  WidgetToolCall,
+  WidgetStateChange,
+  WidgetDOMSnapshot,
+  WidgetStateSnapshot,
+  GetWidgetStateOutput,
+  // Accessibility tree types (widget_snapshot)
+  AccessibilityNode,
+  InteractiveElementSummary,
+  WidgetSnapshotInput,
+  WidgetSnapshotOutput,
+  // Semantic locator types
+  SemanticLocatorOptions,
+  WaitForStabilityOptions,
+  // Widget query types
+  WidgetQueryInput,
+  QueryElementInfo,
+  WidgetQueryOutput,
+  // Widget snapshot diff types
+  ElementChange,
+  WidgetSnapshotDiffInput,
+  WidgetSnapshotDiffOutput,
+  CountChange,
+  SnapshotDiffSummary,
+  // Environment types
+  DeviceType,
+  DeviceCapabilitiesInfo,
+  UserAgentInfo,
+  UserLocationInfo,
+  SafeAreaInsetsInfo,
+  ViewportInfo,
+  EnvironmentState,
+  SetGlobalsInput,
+  SetGlobalsOutput,
+  GetGlobalsOutput,
+  ResetGlobalsOutput,
+  SyncEventPayload,
+  SyncEventType,
+  // DOM sync types
+  DomClickPayload,
+  DomInputPayload,
+  DomScrollPayload,
+  DomFocusPayload,
+  DomKeyModifiers,
+  DomKeyPayload,
+  DomSelectPayload,
+  DomDragPayload,
+  DomSyncEventType,
+  DomEventPayload,
+  // Inspector event types (for dashboard events panel)
+  EventCategory,
+  InspectorEventType,
+  InspectorEvent,
+  AgnosticInspectorEvent,
+} from "./types/index";
+
+export { isDomSyncEventType, getEventCategory, getEventSummary } from "./types/index";

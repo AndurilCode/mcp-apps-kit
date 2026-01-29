@@ -31,7 +31,6 @@ export default defineConfig({
       origin: true,
     },
     debug: {
-      logTool: true,
       level: "debug",
     },
   },

@@ -18,6 +18,7 @@ export default [
       "packages/testing/**/*.ts",
       "packages/ui-react-builder/**/*.ts",
       "packages/codegen/**/*.ts",
+      "packages/inspector/**/*.ts",
     ],
     languageOptions: {
       parser: tsparser,
@@ -28,6 +29,7 @@ export default [
           "./packages/testing/tsconfig.json",
           "./packages/ui-react-builder/tsconfig.json",
           "./packages/codegen/tsconfig.json",
+          "./packages/inspector/tsconfig.json",
         ],
         tsconfigRootDir: import.meta.dirname,
       },

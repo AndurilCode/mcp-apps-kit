@@ -473,6 +473,21 @@ function createSingleVersionApp<T extends ToolDefs>(config: AppConfig<T>): App<T
     configureDebugLogger(normalizedConfig.config.debug);
   }
 
+  // Handle autoInspector config - inject dev-inspector plugin
+  if (normalizedConfig.config?.autoInspector) {
+    // Dynamic import to avoid bundling inspector in production builds
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { createDevInspectorPlugin } = require("./plugins/builtin/dev-inspector") as {
+      createDevInspectorPlugin: typeof import("./plugins/builtin/dev-inspector").createDevInspectorPlugin;
+    };
+    const serverRoute = normalizedConfig.config.serverRoute ?? "/mcp";
+    const inspectorPlugin = createDevInspectorPlugin(
+      normalizedConfig.config.autoInspector,
+      serverRoute
+    );
+    normalizedConfig.plugins = [...(normalizedConfig.plugins ?? []), inspectorPlugin];
+  }
+
   // Initialize plugin manager (but defer init() call to app.start())
   const pluginManager = new PluginManager(normalizedConfig.plugins ?? []);
   let pluginInitialized = false;
@@ -767,6 +782,26 @@ function createMultiVersionApp<T extends ToolDefs>(config: VersionsConfig<T>): A
     // For single-version apps, it's configured at line 573-575. We don't reconfigure it per-version
     // because it's a global singleton. If version-specific debug configs are needed, they would
     // require per-version logger instances, which is a larger architectural change.
+
+    // Handle autoInspector config - inject dev-inspector plugin
+    // Only inject for the first version to avoid multiple inspectors
+    if (normalizedVersionConfig.config?.autoInspector && versionApps.size === 0) {
+      // Dynamic import to avoid bundling inspector in production builds
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { createDevInspectorPlugin } = require("./plugins/builtin/dev-inspector") as {
+        createDevInspectorPlugin: typeof import("./plugins/builtin/dev-inspector").createDevInspectorPlugin;
+      };
+      // For multi-version, use the version-specific route
+      const serverRoute = `/${versionKey}/mcp`;
+      const inspectorPlugin = createDevInspectorPlugin(
+        normalizedVersionConfig.config.autoInspector,
+        serverRoute
+      );
+      normalizedVersionConfig.plugins = [
+        ...(normalizedVersionConfig.plugins ?? []),
+        inspectorPlugin,
+      ];
+    }
 
     // Initialize version-specific plugin manager
     const versionPluginManager = new PluginManager(normalizedVersionConfig.plugins ?? []);
