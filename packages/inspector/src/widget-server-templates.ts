@@ -18,6 +18,7 @@
  */
 
 import type { WidgetSession } from "./widget-server";
+import { DISPLAY_MODE_SIZES } from "./types/environment-types";
 
 // ============================================================================
 // Types
@@ -280,6 +281,8 @@ export function generateMcpHostPage(ctx: McpHostContext): string {
   const { session, widgetUrl, toolResultJson, toolNameJson, toolArgsJson } = ctx;
   const { theme, displayMode, locale, timeZone, platform, externalHostContextJson } = ctx;
   const env = session.environmentState;
+  const sizingPlatform = platform === "mobile" ? "mobile" : "desktop";
+  const displayModeSizesJson = JSON.stringify(DISPLAY_MODE_SIZES);
 
   return `<!DOCTYPE html>
 <html>
@@ -302,6 +305,21 @@ export function generateMcpHostPage(ctx: McpHostContext): string {
       const iframe = document.getElementById('widget-frame');
       let initialized = false;
 
+      // Display mode size presets (canonical format: [platform][mode])
+      var DISPLAY_MODE_SIZES = ${displayModeSizesJson};
+      var currentDisplayMode = '${displayMode}';
+      var currentPlatform = '${sizingPlatform}';
+      var currentSizing = (DISPLAY_MODE_SIZES[currentPlatform] && DISPLAY_MODE_SIZES[currentPlatform][currentDisplayMode]) || DISPLAY_MODE_SIZES.desktop.inline;
+
+      // Set initial iframe CSS based on display mode (Bug 4 fix)
+      if (currentDisplayMode !== 'fullscreen') {
+        iframe.style.width = currentSizing.width + 'px';
+        iframe.style.height = 'auto';
+        if (currentSizing.maxHeight) {
+          iframe.style.maxHeight = currentSizing.maxHeight + 'px';
+        }
+      }
+
       // External hostContext from ui/initialize sync (captured before session creation)
       const externalHostContext = ${externalHostContextJson};
 
@@ -314,6 +332,9 @@ export function generateMcpHostPage(ctx: McpHostContext): string {
         timeZone: '${timeZone}',
         platform: '${platform}',
         viewport: ${JSON.stringify(env?.viewport ?? { width: 800, height: 600 })},
+        containerDimensions: currentDisplayMode === 'fullscreen'
+          ? { width: currentSizing.width, height: currentSizing.height }
+          : { width: currentSizing.width, maxHeight: currentSizing.maxHeight },
         toolInfo: {
           tool: { name: toolName, inputSchema: { type: 'object' } },
         },
@@ -510,30 +531,36 @@ ${generateDomEventListenersScript()}
           var scHeight = message.params.height;
           console.log('[MCP Host] Size changed:', scWidth, 'x', scHeight);
 
-          // Resize iframe CSS
-          var scIframe = document.getElementById('widget-frame');
-          if (scIframe && scHeight) {
-            scIframe.style.height = scHeight + 'px';
-          }
+          // In fullscreen mode, skip iframe CSS mutation and environment update (Bug 1 fix)
+          if (currentDisplayMode === 'fullscreen') {
+            console.log('[MCP Host] Fullscreen mode - ignoring size change');
+          } else {
+            // Resize iframe CSS
+            var scIframe = document.getElementById('widget-frame');
+            if (scIframe && scHeight) {
+              scIframe.style.height = scHeight + 'px';
+            }
 
-          // Forward to /update-environment (debounced, dedup)
-          if (inspectorUrl && scHeight !== window.__mcpLastSentHeight) {
-            window.__mcpLastSentHeight = scHeight;
-            clearTimeout(window.__mcpSizeTimer);
-            window.__mcpSizeTimer = setTimeout(function() {
-              fetch(inspectorUrl + '/update-environment', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  sessionId: sessionId,
-                  globals: { viewport: { width: scWidth || 800, height: scHeight } }
-                })
-              }).then(function(res) {
-                console.log('[MCP Host] Size change forwarded, status:', res.status);
-              }).catch(function(err) {
-                console.warn('[MCP Host] Failed to forward size change:', err);
-              });
-            }, 100);
+            // Forward to /update-environment (debounced, dedup)
+            if (inspectorUrl && scHeight !== window.__mcpLastSentHeight) {
+              window.__mcpLastSentHeight = scHeight;
+              clearTimeout(window.__mcpSizeTimer);
+              window.__mcpSizeTimer = setTimeout(function() {
+                var resolvedWidth = (scWidth != null ? scWidth : 800);
+                fetch(inspectorUrl + '/update-environment', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    sessionId: sessionId,
+                    globals: { viewport: { width: resolvedWidth, height: scHeight } }
+                  })
+                }).then(function(res) {
+                  console.log('[MCP Host] Size change forwarded, status:', res.status);
+                }).catch(function(err) {
+                  console.warn('[MCP Host] Failed to forward size change:', err);
+                });
+              }, 100);
+            }
           }
         }
       });
@@ -561,6 +588,11 @@ ${generateDomEventListenersScript()}
  */
 export function generateOpenAIHostPage(ctx: OpenAIHostContext): string {
   const { session, widgetUrl } = ctx;
+  const openaiEnv = session.environmentState;
+  const openaiInitialDisplayMode = openaiEnv?.displayMode ?? "inline";
+  const openaiSizingPlatform =
+    openaiEnv?.userAgent?.device?.type === "mobile" ? "mobile" : "desktop";
+  const openaiDisplayModeSizesJson = JSON.stringify(DISPLAY_MODE_SIZES);
 
   return `<!DOCTYPE html>
 <html>
@@ -580,6 +612,33 @@ export function generateOpenAIHostPage(ctx: OpenAIHostContext): string {
       const isDualMode = ${JSON.stringify(session.isDualMode ?? false)};
       const iframe = document.getElementById('widget-frame');
       let initialized = false;
+
+      // Display mode size presets (canonical format: [platform][mode])
+      var DISPLAY_MODE_SIZES = ${openaiDisplayModeSizesJson};
+      var initialPlatform = '${openaiSizingPlatform}';
+      var initialMode = '${openaiInitialDisplayMode}';
+      var initialSizing = (DISPLAY_MODE_SIZES[initialPlatform] && DISPLAY_MODE_SIZES[initialPlatform][initialMode]) || DISPLAY_MODE_SIZES.desktop.inline;
+
+      // Initialize __hostState with display mode and viewport (Bug 1 + Bug 2 prerequisite)
+      window.__hostState = {
+        displayMode: initialMode,
+        viewport: { width: initialSizing.width, height: initialSizing.height },
+        heights: [],
+        navigations: [],
+        cspViolations: [],
+        errors: [],
+        storageChanges: []
+      };
+
+      // Set initial iframe CSS based on display mode (Bug 4 fix)
+      if (initialMode !== 'fullscreen') {
+        iframe.style.width = initialSizing.width + 'px';
+        iframe.style.height = 'auto';
+        if (initialSizing.maxHeight) {
+          iframe.style.maxHeight = initialSizing.maxHeight + 'px';
+        }
+      }
+
 ${generateRecordEventScript("openai")}
 ${generateGetSelectorScript()}
 
@@ -698,34 +757,38 @@ ${generateDomEventListenersScript()}
         var newHeight = message.height;
         console.log('[OpenAI Host] Widget height:', newHeight);
         // Track height changes for test assertions
-        window.__hostState = window.__hostState || {};
-        window.__hostState.heights = window.__hostState.heights || [];
         window.__hostState.heights.push({ height: newHeight, timestamp: Date.now() });
 
-        // Resize iframe CSS
-        var iframeEl = document.getElementById('widget-frame');
-        if (iframeEl) {
-          iframeEl.style.height = newHeight + 'px';
-        }
+        // In fullscreen mode, skip iframe CSS mutation and environment update (Bug 1 fix)
+        if (window.__hostState.displayMode === 'fullscreen') {
+          console.log('[OpenAI Host] Fullscreen mode - ignoring resize');
+        } else {
+          // Resize iframe CSS
+          var iframeEl = document.getElementById('widget-frame');
+          if (iframeEl) {
+            iframeEl.style.height = newHeight + 'px';
+          }
 
-        // Forward to /update-environment (debounced, dedup)
-        if (inspectorUrl && newHeight !== window.__lastSentHeight) {
-          window.__lastSentHeight = newHeight;
-          clearTimeout(window.__resizeTimer);
-          window.__resizeTimer = setTimeout(function() {
-            fetch(inspectorUrl + '/update-environment', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                sessionId: sessionId,
-                globals: { viewport: { width: 800, height: newHeight } }
-              })
-            }).then(function(res) {
-              console.log('[OpenAI Host] Resize forwarded, status:', res.status);
-            }).catch(function(err) {
-              console.warn('[OpenAI Host] Failed to forward resize:', err);
-            });
-          }, 100);
+          // Forward to /update-environment using current viewport width (Bug 2 fix)
+          var currentWidth = (window.__hostState && window.__hostState.viewport) ? window.__hostState.viewport.width : 800;
+          if (inspectorUrl && newHeight !== window.__lastSentHeight) {
+            window.__lastSentHeight = newHeight;
+            clearTimeout(window.__resizeTimer);
+            window.__resizeTimer = setTimeout(function() {
+              fetch(inspectorUrl + '/update-environment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  sessionId: sessionId,
+                  globals: { viewport: { width: currentWidth, height: newHeight } }
+                })
+              }).then(function(res) {
+                console.log('[OpenAI Host] Resize forwarded, status:', res.status);
+              }).catch(function(err) {
+                console.warn('[OpenAI Host] Failed to forward resize:', err);
+              });
+            }, 100);
+          }
         }
       }
 
@@ -790,19 +853,23 @@ ${generateDomEventListenersScript()}
         var mode = message.mode;
         console.log('[OpenAI Host] Display mode requested:', mode);
         
-        // Calculate new sizing based on mode
-        var DISPLAY_MODE_SIZES = {
-          inline: { desktop: { width: 800, height: 600, maxHeight: 600 }, mobile: { width: 375, height: 400, maxHeight: 400 } },
-          fullscreen: { desktop: { width: 1280, height: 800, maxHeight: null }, mobile: { width: 375, height: 667, maxHeight: null } },
-          pip: { desktop: { width: 320, height: 240, maxHeight: 240 }, mobile: { width: 280, height: 210, maxHeight: 210 } }
-        };
-        var platform = 'desktop'; // Could be derived from userAgent if needed
-        var sizing = DISPLAY_MODE_SIZES[mode] ? DISPLAY_MODE_SIZES[mode][platform] : DISPLAY_MODE_SIZES.inline[platform];
+        // Calculate new sizing using top-level DISPLAY_MODE_SIZES (canonical: [platform][mode])
+        var sizing = (DISPLAY_MODE_SIZES[initialPlatform] && DISPLAY_MODE_SIZES[initialPlatform][mode]) || DISPLAY_MODE_SIZES.desktop.inline;
         
         // Update host state
-        window.__hostState = window.__hostState || {};
         window.__hostState.displayMode = mode;
         window.__hostState.viewport = { width: sizing.width, height: sizing.height };
+
+        // Update iframe CSS based on new display mode (Bug 4 - dynamic mode switch)
+        if (mode === 'fullscreen') {
+          iframe.style.width = '100%';
+          iframe.style.height = '100%';
+          iframe.style.maxHeight = '';
+        } else {
+          iframe.style.width = sizing.width + 'px';
+          iframe.style.height = 'auto';
+          iframe.style.maxHeight = sizing.maxHeight ? (sizing.maxHeight + 'px') : '';
+        }
         
         // Record the event
         recordEvent('globals', { displayMode: mode, viewport: window.__hostState.viewport }, 'widget');
