@@ -85,7 +85,7 @@ function getDefaultEnvironmentState(): EnvironmentState {
     timeZone: "UTC",
     displayMode: "inline",
     viewport: { width: 800, height: 600 },
-    maxHeight: undefined,
+    maxHeight: 600,
     safeAreaInsets: { top: 0, right: 0, bottom: 0, left: 0 },
     userAgent: {
       device: { type: "desktop" },

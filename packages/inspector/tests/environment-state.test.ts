@@ -22,7 +22,7 @@ describe("Environment State Management", () => {
       expect(state.timeZone).toBe("UTC");
       expect(state.displayMode).toBe("inline");
       expect(state.viewport).toEqual({ width: 800, height: 600 });
-      expect(state.maxHeight).toBeUndefined();
+      expect(state.maxHeight).toBe(600);
       expect(state.safeAreaInsets).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
       expect(state.userAgent).toEqual({
         device: { type: "desktop" },
@@ -178,7 +178,7 @@ describe("Environment State Management", () => {
       expect(reset.timeZone).toBe("UTC");
       expect(reset.displayMode).toBe("inline");
       expect(reset.viewport).toEqual({ width: 800, height: 600 });
-      expect(reset.maxHeight).toBeUndefined();
+      expect(reset.maxHeight).toBe(600);
       expect(reset.userLocation).toBeUndefined();
     });
   });
