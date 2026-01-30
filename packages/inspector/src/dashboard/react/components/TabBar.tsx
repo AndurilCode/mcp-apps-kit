@@ -135,8 +135,16 @@ export function TabBar({
                 ...(isActive ? tabBarStyles.tabActive : {}),
               }}
               onClick={() => onSelect(tab.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelect(tab.id);
+                }
+              }}
               title={tab.url}
-              role="button"
+              role="tab"
+              tabIndex={0}
+              aria-selected={isActive}
             >
               <div style={tabBarStyles.tabTitle}>{title}</div>
               {tab.serverInfo?.name && tab.url ? (

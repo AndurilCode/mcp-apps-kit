@@ -125,6 +125,13 @@ export async function handleDashboardRequest(
         res.end(JSON.stringify({ error: "Missing url" }));
         return true;
       }
+      try {
+        new URL(body.url);
+      } catch {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Invalid URL format" }));
+        return true;
+      }
       const { id, connectionManager: cm } = await registry.createConnection(body.url);
       const state = cm.getState();
       res.writeHead(200, { "Content-Type": "application/json" });

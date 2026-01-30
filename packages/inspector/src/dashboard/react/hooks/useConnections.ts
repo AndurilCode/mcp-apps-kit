@@ -161,11 +161,14 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}`);
         }
-        setConnections((prev) => prev.filter((c) => c.id !== id));
-        setActiveConnectionId((prev) => {
-          if (prev !== id) return prev;
-          const remaining = connections.filter((c) => c.id !== id);
-          return remaining[0]?.id ?? null;
+        setConnections((prev) => {
+          const updated = prev.filter((c) => c.id !== id);
+          // Use functional update for activeConnectionId to avoid stale closure
+          setActiveConnectionId((prevActive) => {
+            if (prevActive !== id) return prevActive;
+            return updated[0]?.id ?? null;
+          });
+          return updated;
         });
         return true;
       } catch (e) {
@@ -173,7 +176,7 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
         return false;
       }
     },
-    [baseUrl, connections]
+    [baseUrl]
   );
 
   return {

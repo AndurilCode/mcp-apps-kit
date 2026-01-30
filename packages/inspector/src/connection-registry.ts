@@ -128,6 +128,12 @@ export class ConnectionRegistry extends EventEmitter {
   /**
    * Resolve a connection: explicit id > active > throw.
    *
+   * **Side effect:** When an explicit `connectionId` is provided, that
+   * connection becomes the new active connection. This ensures the "last
+   * used" connection is always active, matching the expected agent workflow
+   * (tools target a specific connection, which then becomes the default
+   * for subsequent calls without an explicit id).
+   *
    * @param connectionId - Optional connection id to resolve.
    * @returns The resolved ConnectionManager.
    * @throws If the connection id is invalid or no active connection exists.
@@ -153,7 +159,8 @@ export class ConnectionRegistry extends EventEmitter {
     this.connections.delete(id);
 
     if (this.activeConnectionId === id) {
-      this.activeConnectionId = null;
+      const remaining = Array.from(this.connections.keys());
+      this.activeConnectionId = remaining[0] ?? null;
     }
 
     this.emit("closed", id);
