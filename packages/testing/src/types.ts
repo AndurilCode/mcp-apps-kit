@@ -69,6 +69,8 @@ export interface TestClientOptions {
   timeout?: number;
   /** Number of retries on failure (default: 0) */
   retries?: number;
+  /** Called when the underlying transport closes (e.g., stdio process exits) */
+  onTransportClose?: () => void;
 }
 
 /**
@@ -564,3 +566,23 @@ export interface PromptResultAssertion {
   /** Assert prompt has description */
   toHaveDescription(description?: string): void;
 }
+
+// =============================================================================
+// CONNECTION PARAMS
+// =============================================================================
+
+/**
+ * Discriminated union for MCP transport connection parameters.
+ *
+ * - `"http"`: Connect to an MCP server over Streamable HTTP.
+ * - `"stdio"`: Spawn a child process and communicate over stdin/stdout.
+ */
+export type ConnectionParams =
+  | { transport: "http"; url: string }
+  | {
+      transport: "stdio";
+      command: string;
+      args?: string[];
+      env?: Record<string, string>;
+      cwd?: string;
+    };

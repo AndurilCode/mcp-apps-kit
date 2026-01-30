@@ -556,7 +556,7 @@ describe("${name} MCP Server", () => {
     const server = await startTestServer(app, { port: 0 });
     await new Promise((r) => setTimeout(r, 100));
 
-    const client = await createTestClient(server.mcpUrl, {
+    const client = await createTestClient({ transport: "http", url: server.mcpUrl }, {
       trackHistory: true,
       timeout: 10000,
     });
@@ -1106,7 +1106,7 @@ describe("${name} MCP Server", () => {
     const server = await startTestServer(app, { port: 0 });
     await new Promise((r) => setTimeout(r, 100));
 
-    const client = await createTestClient(server.mcpUrl, {
+    const client = await createTestClient({ transport: "http", url: server.mcpUrl }, {
       trackHistory: true,
       timeout: 10000,
     });

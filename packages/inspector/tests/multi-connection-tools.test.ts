@@ -93,8 +93,14 @@ describe("Multi-connection tools", () => {
 
   it("disconnect tool closes specific connection by connectionId", async () => {
     const registry = new ConnectionRegistry();
-    const first = await registry.createConnection("http://localhost:3000/mcp");
-    const second = await registry.createConnection("http://localhost:3001/mcp");
+    const first = await registry.createConnection({
+      transport: "http",
+      url: "http://localhost:3000/mcp",
+    });
+    const second = await registry.createConnection({
+      transport: "http",
+      url: "http://localhost:3001/mcp",
+    });
     const tool = createDisconnectTool(registry);
 
     const result = await tool.handler({ connectionId: first.id }, {} as never);
@@ -107,8 +113,14 @@ describe("Multi-connection tools", () => {
 
   it("disconnect tool closes active connection when connectionId is omitted", async () => {
     const registry = new ConnectionRegistry();
-    const first = await registry.createConnection("http://localhost:3000/mcp");
-    const second = await registry.createConnection("http://localhost:3001/mcp");
+    const first = await registry.createConnection({
+      transport: "http",
+      url: "http://localhost:3000/mcp",
+    });
+    const second = await registry.createConnection({
+      transport: "http",
+      url: "http://localhost:3001/mcp",
+    });
     const tool = createDisconnectTool(registry);
 
     const result = await tool.handler({}, {} as never);
@@ -120,8 +132,14 @@ describe("Multi-connection tools", () => {
 
   it("list_connections tool returns all connections", async () => {
     const registry = new ConnectionRegistry();
-    const first = await registry.createConnection("http://localhost:3000/mcp");
-    const second = await registry.createConnection("http://localhost:3001/mcp");
+    const first = await registry.createConnection({
+      transport: "http",
+      url: "http://localhost:3000/mcp",
+    });
+    const second = await registry.createConnection({
+      transport: "http",
+      url: "http://localhost:3001/mcp",
+    });
     const tool = createListConnectionsTool(registry);
 
     const result = await tool.handler({}, {} as never);
@@ -132,8 +150,11 @@ describe("Multi-connection tools", () => {
 
   it("status tool returns single connection when connectionId given", async () => {
     const registry = new ConnectionRegistry();
-    const first = await registry.createConnection("http://localhost:3000/mcp");
-    await registry.createConnection("http://localhost:3001/mcp");
+    const first = await registry.createConnection({
+      transport: "http",
+      url: "http://localhost:3000/mcp",
+    });
+    await registry.createConnection({ transport: "http", url: "http://localhost:3001/mcp" });
     const tool = createGetConnectionStatusTool(registry);
 
     const result = await tool.handler({ connectionId: first.id }, {} as never);
@@ -145,8 +166,8 @@ describe("Multi-connection tools", () => {
 
   it("status tool returns all connections when connectionId is omitted", async () => {
     const registry = new ConnectionRegistry();
-    await registry.createConnection("http://localhost:3000/mcp");
-    await registry.createConnection("http://localhost:3001/mcp");
+    await registry.createConnection({ transport: "http", url: "http://localhost:3000/mcp" });
+    await registry.createConnection({ transport: "http", url: "http://localhost:3001/mcp" });
     const tool = createGetConnectionStatusTool(registry);
 
     const result = await tool.handler({}, {} as never);
@@ -157,8 +178,11 @@ describe("Multi-connection tools", () => {
 
   it("list_tools resolves connection by connectionId", async () => {
     const registry = new ConnectionRegistry();
-    const first = await registry.createConnection("http://localhost:3000/mcp");
-    await registry.createConnection("http://localhost:3001/mcp");
+    const first = await registry.createConnection({
+      transport: "http",
+      url: "http://localhost:3000/mcp",
+    });
+    await registry.createConnection({ transport: "http", url: "http://localhost:3001/mcp" });
     const tool = createListToolsTool(registry);
 
     const initialA = clientA.listTools.mock.calls.length;
@@ -172,8 +196,11 @@ describe("Multi-connection tools", () => {
 
   it("list_resources resolves connection by connectionId", async () => {
     const registry = new ConnectionRegistry();
-    await registry.createConnection("http://localhost:3000/mcp");
-    const second = await registry.createConnection("http://localhost:3001/mcp");
+    await registry.createConnection({ transport: "http", url: "http://localhost:3000/mcp" });
+    const second = await registry.createConnection({
+      transport: "http",
+      url: "http://localhost:3001/mcp",
+    });
     const tool = createListResourcesTool(registry);
 
     const initialA = clientA.listResources.mock.calls.length;
@@ -187,8 +214,11 @@ describe("Multi-connection tools", () => {
 
   it("list_prompts resolves connection by connectionId", async () => {
     const registry = new ConnectionRegistry();
-    const first = await registry.createConnection("http://localhost:3000/mcp");
-    await registry.createConnection("http://localhost:3001/mcp");
+    const first = await registry.createConnection({
+      transport: "http",
+      url: "http://localhost:3000/mcp",
+    });
+    await registry.createConnection({ transport: "http", url: "http://localhost:3001/mcp" });
     const tool = createListPromptsTool(registry);
 
     const initialA = clientA.listPrompts.mock.calls.length;
@@ -202,8 +232,11 @@ describe("Multi-connection tools", () => {
 
   it("call_tool resolves connection by connectionId", async () => {
     const registry = new ConnectionRegistry();
-    await registry.createConnection("http://localhost:3000/mcp");
-    const second = await registry.createConnection("http://localhost:3001/mcp");
+    await registry.createConnection({ transport: "http", url: "http://localhost:3000/mcp" });
+    const second = await registry.createConnection({
+      transport: "http",
+      url: "http://localhost:3001/mcp",
+    });
     const tool = createCallToolTool(registry);
 
     const result = await tool.handler(

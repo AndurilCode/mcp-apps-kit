@@ -4,34 +4,72 @@
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
-import type { TestClient, TestClientOptions, ToolResult, ToolCall } from "../types";
+import type {
+  TestClient,
+  TestClientOptions,
+  ToolResult,
+  ToolCall,
+  ConnectionParams,
+} from "../types";
 import { ConnectionError, TimeoutError } from "../errors";
 import { clientLogger } from "../debug";
+
+/** Human-readable label for connection params (used in logs and errors) */
+function connectionLabel(params: ConnectionParams): string {
+  return params.transport === "stdio"
+    ? `stdio:${params.command}${params.args?.length ? " " + params.args.join(" ") : ""}`
+    : params.url;
+}
 
 /**
  * Create a test client connected to an MCP server
  */
 export async function createTestClient(
-  url: string,
+  params: ConnectionParams,
   options: TestClientOptions = {}
 ): Promise<TestClient> {
   const { trackHistory = false, timeout = 30000, retries = 0 } = options;
 
-  clientLogger("Creating test client for %s", url);
+  const label = connectionLabel(params);
+  clientLogger("Creating test client for %s", label);
 
   const client = new Client({ name: "mcp-testing-client", version: "1.0.0" }, { capabilities: {} });
 
-  let transport: StreamableHTTPClientTransport | undefined;
+  let transport: StreamableHTTPClientTransport | StdioClientTransport;
   const callHistory: ToolCall[] = [];
 
   try {
-    transport = new StreamableHTTPClientTransport(new URL(url));
+    if (params.transport === "stdio") {
+      // Merge process.env with user-provided env, filtering out undefined values
+      const mergedEnv = params.env
+        ? Object.fromEntries(
+            Object.entries({ ...process.env, ...params.env }).filter(
+              (entry): entry is [string, string] => entry[1] !== undefined
+            )
+          )
+        : undefined;
+      transport = new StdioClientTransport({
+        command: params.command,
+        args: params.args,
+        env: mergedEnv,
+        cwd: params.cwd,
+        stderr: "pipe",
+      });
+    } else {
+      transport = new StreamableHTTPClientTransport(new URL(params.url));
+    }
+
+    if (options.onTransportClose) {
+      transport.onclose = options.onTransportClose;
+    }
+
     await client.connect(transport);
-    clientLogger("Connected to server at %s", url);
+    clientLogger("Connected to server at %s", label);
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
-    throw new ConnectionError(url, `Failed to connect: ${err.message}`, err);
+    throw new ConnectionError(label, `Failed to connect: ${err.message}`, err);
   }
 
   async function callToolWithRetry(name: string, args: unknown, attempt = 0): Promise<ToolResult> {

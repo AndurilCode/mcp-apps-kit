@@ -44,7 +44,7 @@ describe("ConnectionManager", () => {
 
   describe("connect", () => {
     it("should connect to a valid server", async () => {
-      const result = await manager.connect("http://localhost:3000/mcp");
+      const result = await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       expect(result.toolCount).toBe(0);
       expect(result.resourceCount).toBe(0);
@@ -56,27 +56,32 @@ describe("ConnectionManager", () => {
     });
 
     it("should reject invalid URLs", async () => {
-      await expect(manager.connect("not-a-url")).rejects.toThrow("Invalid URL format");
+      await expect(manager.connect({ transport: "http", url: "not-a-url" })).rejects.toThrow(
+        "Invalid URL format"
+      );
     });
 
     it("should disconnect existing connection before reconnecting", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
       expect(manager.getState().connected).toBe(true);
 
-      await manager.connect("http://localhost:3001/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3001/mcp" });
       expect(manager.getState().connected).toBe(true);
       expect(manager.getState().serverUrl).toBe("http://localhost:3001/mcp");
     });
 
     it("should respect trackHistory option", async () => {
-      await manager.connect("http://localhost:3000/mcp", { trackHistory: false });
+      await manager.connect(
+        { transport: "http", url: "http://localhost:3000/mcp" },
+        { trackHistory: false }
+      );
       expect(manager.isHistoryEnabled()).toBe(false);
     });
   });
 
   describe("disconnect", () => {
     it("should disconnect from server", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
       const previousUrl = await manager.disconnect();
 
       expect(previousUrl).toBe("http://localhost:3000/mcp");
@@ -96,14 +101,14 @@ describe("ConnectionManager", () => {
     });
 
     it("should return client when connected", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
       expect(manager.getClient()).toBeDefined();
     });
   });
 
   describe("call count", () => {
     it("should track call count", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
       expect(manager.getState().callCount).toBe(0);
 
       manager.incrementCallCount();
@@ -116,13 +121,13 @@ describe("ConnectionManager", () => {
 
   describe("history", () => {
     it("should return empty history when nothing tracked", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
       const history = manager.getCallHistory();
       expect(history).toEqual([]);
     });
 
     it("should clear history", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
       const count = manager.clearHistory();
       expect(count).toBe(0);
     });

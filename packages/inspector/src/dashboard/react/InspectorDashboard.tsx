@@ -334,8 +334,8 @@ export function InspectorDashboard({
   }, []);
 
   const handleCreateConnection = useCallback(
-    async (url: string): Promise<boolean> => {
-      const created = await createConnection(url);
+    async (params: import("@mcp-apps-kit/testing").ConnectionParams): Promise<boolean> => {
+      const created = await createConnection(params);
       if (created) {
         setIsConnectionFormOpen(false);
         return true;

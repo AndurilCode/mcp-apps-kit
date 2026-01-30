@@ -23,6 +23,8 @@ export type {
   ContentBlock,
   ToolResult,
   ToolCall,
+  // Connection params
+  ConnectionParams,
   // Test client types
   TestClient,
   TestClientOptions,

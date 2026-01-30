@@ -16,6 +16,7 @@ import type { IncomingMessage, ServerResponse } from "http";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { ConnectionParams } from "@mcp-apps-kit/testing";
 import type { ConnectionManager } from "../connection";
 import type { ConnectionRegistry } from "../connection-registry";
 import type { InspectorEvent, AgnosticInspectorEvent } from "../types";
@@ -145,6 +146,11 @@ export async function handleDashboardRequest(
 
   /**
    * POST /dashboard/connections — create new connection.
+   *
+   * Accepts ConnectionParams body:
+   *   - { transport: "http", url: string }
+   *   - { transport: "stdio", command: string, args?: string[], env?: Record<string,string>, cwd?: string }
+   *   - { url: string } (backward compat — defaults to transport: "http")
    */
   if (pathname === "/dashboard/connections" && req.method === "POST") {
     setCorsHeaders(res);
@@ -158,36 +164,69 @@ export async function handleDashboardRequest(
       for await (const chunk of req) {
         chunks.push(chunk as Buffer);
       }
-      const body = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as { url?: string };
-      if (!body.url) {
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Missing url" }));
-        return true;
-      }
-      try {
-        const parsedUrl = new URL(body.url);
-        const allowedProtocols = new Set(["http:", "https:", "ws:", "wss:"]);
-        if (!allowedProtocols.has(parsedUrl.protocol)) {
+      const body = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as Record<string, unknown>;
+
+      // Normalize to ConnectionParams (backward compat: { url } → { transport: "http", url })
+      let params: ConnectionParams;
+      const transport = (body.transport as string | undefined) ?? (body.url ? "http" : undefined);
+
+      if (transport === "stdio") {
+        // Validate stdio params
+        const command = body.command;
+        if (typeof command !== "string" || command.trim().length === 0) {
           res.writeHead(400, { "Content-Type": "application/json" });
-          res.end(
-            JSON.stringify({
-              error: "Unsupported URL protocol. Use http, https, ws, or wss.",
-            })
-          );
+          res.end(JSON.stringify({ error: "Missing or empty command for stdio transport" }));
           return true;
         }
-      } catch {
+        params = {
+          transport: "stdio",
+          command: command.trim(),
+          ...(Array.isArray(body.args) ? { args: body.args as string[] } : {}),
+          ...(body.env && typeof body.env === "object"
+            ? { env: body.env as Record<string, string> }
+            : {}),
+          ...(typeof body.cwd === "string" ? { cwd: body.cwd } : {}),
+        };
+      } else if (transport === "http") {
+        // Validate HTTP/WS URL
+        const urlStr = body.url;
+        if (typeof urlStr !== "string" || urlStr.trim().length === 0) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Missing url" }));
+          return true;
+        }
+        try {
+          const parsedUrl = new URL(urlStr);
+          const allowedProtocols = new Set(["http:", "https:", "ws:", "wss:"]);
+          if (!allowedProtocols.has(parsedUrl.protocol)) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                error: "Unsupported URL protocol. Use http, https, ws, or wss.",
+              })
+            );
+            return true;
+          }
+        } catch {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Invalid URL format" }));
+          return true;
+        }
+        params = { transport: "http", url: urlStr };
+      } else {
         res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Invalid URL format" }));
+        res.end(JSON.stringify({ error: "Missing transport type or url" }));
         return true;
       }
-      const { id, connectionManager: cm } = await registry.createConnection(body.url);
+
+      const { id, connectionManager: cm } = await registry.createConnection(params);
       const state = cm.getState();
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(
         JSON.stringify({
           id,
-          url: body.url,
+          url: state.serverUrl,
+          transport: params.transport,
           serverInfo: state.serverInfo,
         })
       );

@@ -5,7 +5,12 @@
  */
 
 import { EventEmitter } from "node:events";
-import { createTestClient, type TestClient, type ToolCall } from "@mcp-apps-kit/testing";
+import {
+  createTestClient,
+  type TestClient,
+  type ToolCall,
+  type ConnectionParams,
+} from "@mcp-apps-kit/testing";
 import type {
   ConnectionState,
   ConnectOptions,
@@ -105,6 +110,7 @@ function getDefaultEnvironmentState(): EnvironmentState {
  */
 export class ConnectionManager extends EventEmitter {
   private static idCounter = 0;
+  private static readonly MAX_RESTART_ATTEMPTS = 3;
 
   readonly id: string;
 
@@ -115,7 +121,11 @@ export class ConnectionManager extends EventEmitter {
     historyEnabled: true,
     callCount: 0,
     client: null,
+    connectionParams: null,
   };
+
+  private autoRestartAttempts = 0;
+  private autoRestartTimer: ReturnType<typeof setTimeout> | null = null;
 
   private environmentState: EnvironmentState;
   private readonly maxHistorySize: number;
@@ -159,7 +169,7 @@ export class ConnectionManager extends EventEmitter {
    * Connect to a target MCP server
    */
   async connect(
-    url: string,
+    params: ConnectionParams,
     options: ConnectOptions = {}
   ): Promise<{
     serverInfo: ServerInfo | null;
@@ -169,11 +179,25 @@ export class ConnectionManager extends EventEmitter {
   }> {
     const { trackHistory = true, timeout = this.defaultTimeout } = options;
 
-    // Validate URL
-    try {
-      new URL(url);
-    } catch {
-      throw new Error(`Invalid URL format: '${url}'. Expected format: http(s)://host:port/path`);
+    // Generate display label
+    const label =
+      params.transport === "http"
+        ? params.url
+        : `stdio: ${params.command}${params.args?.length ? " " + params.args.join(" ") : ""}`;
+
+    // Validate input at API boundary
+    if (params.transport === "http") {
+      try {
+        new URL(params.url);
+      } catch {
+        throw new Error(
+          `Invalid URL format: '${params.url}'. Expected format: http(s)://host:port/path`
+        );
+      }
+    } else {
+      if (!params.command?.trim()) {
+        throw new Error("stdio transport requires a non-empty command");
+      }
     }
 
     // Disconnect existing connection if any
@@ -185,13 +209,23 @@ export class ConnectionManager extends EventEmitter {
     }
 
     if (this.debug) {
-      console.log(`[inspector] Connecting to server: ${url}`);
+      console.log(`[inspector] Connecting to server: ${label}`);
     }
 
+    // Wire onTransportClose for stdio auto-restart
+    const onTransportClose =
+      params.transport === "stdio"
+        ? () => {
+            if (!this.state.connected) return; // intentional disconnect
+            this.handleStdioProcessExit(params, options);
+          }
+        : undefined;
+
     // Create test client using @mcp-apps-kit/testing
-    const client = await createTestClient(url, {
+    const client = await createTestClient(params, {
       trackHistory,
       timeout,
+      onTransportClose,
     });
 
     // Get server capabilities by listing tools, resources, prompts
@@ -251,15 +285,19 @@ export class ConnectionManager extends EventEmitter {
     // Update state
     this.state = {
       connected: true,
-      serverUrl: url,
+      serverUrl: label,
       serverInfo,
       historyEnabled: trackHistory,
       callCount: 0,
       client,
+      connectionParams: params,
     };
 
+    // Reset auto-restart attempts on successful connect
+    this.autoRestartAttempts = 0;
+
     if (this.debug) {
-      console.log(`[inspector] Connected to ${url}`);
+      console.log(`[inspector] Connected to ${label}`);
       console.log(
         `[inspector] Tools: ${tools.length}, Resources: ${resources.length}, Prompts: ${prompts.length}`
       );
@@ -339,6 +377,15 @@ export class ConnectionManager extends EventEmitter {
   async disconnect(): Promise<string | null> {
     const previousUrl = this.state.serverUrl;
 
+    // Mark as disconnected BEFORE clearing timer so onclose handler sees it
+    this.state.connected = false;
+
+    // Clear auto-restart timer
+    if (this.autoRestartTimer) {
+      clearTimeout(this.autoRestartTimer);
+      this.autoRestartTimer = null;
+    }
+
     // Close all widget sessions
     await this.widgetSessionManager.closeAllSessions();
 
@@ -363,6 +410,7 @@ export class ConnectionManager extends EventEmitter {
       historyEnabled: false,
       callCount: 0,
       client: null,
+      connectionParams: null,
     };
 
     // Clear cached schema
@@ -379,6 +427,40 @@ export class ConnectionManager extends EventEmitter {
     this.emit("disconnected", previousUrl);
 
     return previousUrl;
+  }
+
+  /**
+   * Handle unexpected stdio process exit with exponential backoff restart
+   */
+  private handleStdioProcessExit(params: ConnectionParams, options: ConnectOptions): void {
+    if (this.autoRestartAttempts >= ConnectionManager.MAX_RESTART_ATTEMPTS) {
+      if (this.debug) {
+        console.log(
+          `[inspector] Max auto-restart attempts (${ConnectionManager.MAX_RESTART_ATTEMPTS}) reached, disconnecting`
+        );
+      }
+      void this.disconnect();
+      return;
+    }
+
+    const delay = 1000 * Math.pow(2, this.autoRestartAttempts); // 1s, 2s, 4s
+    this.autoRestartAttempts++;
+
+    if (this.debug) {
+      console.log(
+        `[inspector] stdio process exited, restarting in ${delay}ms (attempt ${this.autoRestartAttempts}/${ConnectionManager.MAX_RESTART_ATTEMPTS})`
+      );
+    }
+
+    this.autoRestartTimer = setTimeout(() => {
+      this.autoRestartTimer = null;
+      this.connect(params, options).catch(() => {
+        if (this.debug) {
+          console.log(`[inspector] Auto-restart failed, disconnecting`);
+        }
+        void this.disconnect();
+      });
+    }, delay);
   }
 
   /**

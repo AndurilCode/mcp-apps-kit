@@ -52,7 +52,7 @@ describe("History Tools", () => {
 
   describe("get_call_history", () => {
     it("should return empty history when no calls made", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createGetCallHistoryTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
@@ -82,7 +82,7 @@ describe("History Tools", () => {
       ];
       mockGetCallHistory.mockReturnValue(mockHistory);
 
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createGetCallHistoryTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
@@ -112,7 +112,7 @@ describe("History Tools", () => {
       ];
       mockGetCallHistory.mockReturnValue(mockHistory);
 
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createGetCallHistoryTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
@@ -122,7 +122,10 @@ describe("History Tools", () => {
     });
 
     it("should return message when history disabled", async () => {
-      await manager.connect("http://localhost:3000/mcp", { trackHistory: false });
+      await manager.connect(
+        { transport: "http", url: "http://localhost:3000/mcp" },
+        { trackHistory: false }
+      );
 
       const tool = createGetCallHistoryTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
@@ -152,7 +155,7 @@ describe("History Tools", () => {
       ];
       mockGetCallHistory.mockReturnValue(mockHistory);
 
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createClearHistoryTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
@@ -162,7 +165,7 @@ describe("History Tools", () => {
     });
 
     it("should return 0 when history already empty", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createClearHistoryTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);

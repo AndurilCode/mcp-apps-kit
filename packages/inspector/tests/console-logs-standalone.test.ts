@@ -78,7 +78,7 @@ describe("get_console_logs Standalone Mode", () => {
       errors: [],
     });
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
   });
 
   afterEach(async () => {

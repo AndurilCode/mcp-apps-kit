@@ -2,6 +2,7 @@
  * Test helpers for inspector tools.
  */
 
+import type { ConnectionParams } from "@mcp-apps-kit/testing";
 import type { ConnectionManager } from "../src/connection";
 import type { ConnectionInfo, ConnectionRegistry } from "../src/connection-registry";
 import type { ConnectOptions } from "../src/types";
@@ -53,10 +54,10 @@ export function createMockRegistry(manager: ConnectionManager): ConnectionRegist
   };
 
   const createConnection = async (
-    url: string,
+    params: ConnectionParams,
     options?: ConnectOptions
   ): Promise<{ id: string; connectionManager: ConnectionManager }> => {
-    await manager.connect(url, options);
+    await manager.connect(params, options);
     activeId = manager.id;
     return { id: manager.id, connectionManager: manager };
   };

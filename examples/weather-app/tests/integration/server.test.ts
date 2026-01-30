@@ -17,10 +17,13 @@ describe("Weather App MCP Server", () => {
     const server = await startTestServer(app, { port: 0 });
     await new Promise((r) => setTimeout(r, 100));
 
-    const client = await createTestClient(server.mcpUrl, {
-      trackHistory: true,
-      timeout: 15000,
-    });
+    const client = await createTestClient(
+      { transport: "http", url: server.mcpUrl },
+      {
+        trackHistory: true,
+        timeout: 15000,
+      }
+    );
 
     env = {
       server,

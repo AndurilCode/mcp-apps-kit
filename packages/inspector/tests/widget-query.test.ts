@@ -110,7 +110,7 @@ describe("widget_query Tool", () => {
     mockListResources.mockResolvedValue([]);
     mockListPrompts.mockResolvedValue([]);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
   });
 
   afterEach(async () => {
@@ -278,7 +278,7 @@ describe("widget_query handler with mock session", () => {
     mockListResources.mockResolvedValue([]);
     mockListPrompts.mockResolvedValue([]);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
   });
 
   afterEach(async () => {
@@ -671,7 +671,7 @@ describe("widget_query handler - branch coverage", () => {
     mockListResources.mockResolvedValue([]);
     mockListPrompts.mockResolvedValue([]);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
   });
 
   afterEach(async () => {

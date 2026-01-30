@@ -13,12 +13,16 @@ describe("createTestClient", () => {
   describe("connection errors", () => {
     it("should throw ConnectionError when server is unreachable", async () => {
       // Try to connect to a non-existent server
-      await expect(createTestClient("http://localhost:59999/mcp")).rejects.toThrow(ConnectionError);
+      await expect(
+        createTestClient({ transport: "http", url: "http://localhost:59999/mcp" })
+      ).rejects.toThrow(ConnectionError);
     });
 
     it("should throw ConnectionError for invalid URL format", async () => {
       // Invalid URLs should throw connection errors
-      await expect(createTestClient("http://localhost:99999/mcp")).rejects.toThrow(ConnectionError);
+      await expect(
+        createTestClient({ transport: "http", url: "http://localhost:99999/mcp" })
+      ).rejects.toThrow(ConnectionError);
     });
   });
 

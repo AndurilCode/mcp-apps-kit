@@ -393,9 +393,12 @@ describe("Advanced Features", () => {
       const server = await startTestServer(app, { port: testPort });
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const client = await createTestClient(`http://localhost:${testPort}/v1/mcp`, {
-        trackHistory: true,
-      });
+      const client = await createTestClient(
+        { transport: "http", url: `http://localhost:${testPort}/v1/mcp` },
+        {
+          trackHistory: true,
+        }
+      );
 
       await client.callTool("greet", { name: "History1" });
       await client.callTool("greet", { name: "History2" });
@@ -418,7 +421,10 @@ describe("Advanced Features", () => {
       const testPort = 3014;
       const server = await startTestServer(app, { port: testPort });
       await new Promise((resolve) => setTimeout(resolve, 100));
-      const client = await createTestClient(`http://localhost:${testPort}/v1/mcp`);
+      const client = await createTestClient({
+        transport: "http",
+        url: `http://localhost:${testPort}/v1/mcp`,
+      });
 
       const tools = await client.listTools();
       expect(tools.some((t) => t.name === "greet")).toBe(true);
@@ -435,9 +441,12 @@ describe("Advanced Features", () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Client with short timeout
-      const client = await createTestClient(`http://localhost:${testPort}/v1/mcp`, {
-        timeout: 5000, // 5 second timeout
-      });
+      const client = await createTestClient(
+        { transport: "http", url: `http://localhost:${testPort}/v1/mcp` },
+        {
+          timeout: 5000, // 5 second timeout
+        }
+      );
 
       // Should complete within timeout
       const result = await client.callTool("greet", { name: "Timeout" });

@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import type { ConnectionParams } from "@mcp-apps-kit/testing";
 import { useServerHistory, type ServerHistoryEntry } from "./useServerHistory";
 
 /**
@@ -50,7 +51,7 @@ export interface UseConnectionsResult {
   isCreating: boolean;
   error: string | null;
   refresh: () => Promise<void>;
-  createConnection: (url: string) => Promise<DashboardConnection | null>;
+  createConnection: (params: ConnectionParams) => Promise<DashboardConnection | null>;
   closeConnection: (id: string) => Promise<boolean>;
   getMatchingEntries: (filter: string) => ServerHistoryEntry[];
 }
@@ -111,14 +112,14 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
   }, [refresh]);
 
   const createConnection = useCallback(
-    async (url: string): Promise<DashboardConnection | null> => {
+    async (params: ConnectionParams): Promise<DashboardConnection | null> => {
       setIsCreating(true);
       setError(null);
       try {
         const res = await fetch(`${baseUrl}/dashboard/connections`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url }),
+          body: JSON.stringify(params),
         });
         if (!res.ok) {
           const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -136,11 +137,22 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
           return [...filtered, newConn];
         });
         setActiveConnectionId(newConn.id);
-        addEntry({
-          url: data.url,
-          protocolType: "mcp",
-          name: data.serverInfo?.name,
-        });
+        if (params.transport === "stdio") {
+          addEntry({
+            url: data.url || `stdio:${params.command}`,
+            protocolType: "mcp",
+            name: data.serverInfo?.name,
+            transport: "stdio",
+            command: params.command,
+            args: params.args,
+          });
+        } else {
+          addEntry({
+            url: data.url,
+            protocolType: "mcp",
+            name: data.serverInfo?.name,
+          });
+        }
         return newConn;
       } catch (e) {
         setError(e instanceof Error ? e.message : "Connection failed");

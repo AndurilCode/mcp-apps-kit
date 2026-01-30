@@ -6,6 +6,7 @@
 
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
+import type { ConnectionParams } from "@mcp-apps-kit/testing";
 import { ConnectionManager } from "./connection";
 import type { ConnectOptions, ConnectionStatusOutput, InspectorServerOptions } from "./types";
 
@@ -61,12 +62,12 @@ export class ConnectionRegistry extends EventEmitter {
   /**
    * Create a new connection and connect to the target server.
    *
-   * @param url - MCP server URL to connect to.
+   * @param params - Connection parameters (transport type + config).
    * @param options - Connection options passed to the ConnectionManager.
    * @returns The new connection id and manager instance.
    */
   async createConnection(
-    url: string,
+    params: ConnectionParams,
     options?: ConnectOptions
   ): Promise<{ id: string; connectionManager: ConnectionManager }> {
     if (this.connections.size >= this.maxConnections) {
@@ -80,7 +81,7 @@ export class ConnectionRegistry extends EventEmitter {
     });
 
     try {
-      await connectionManager.connect(url, options);
+      await connectionManager.connect(params, options);
     } catch (error) {
       try {
         await connectionManager.disconnect();

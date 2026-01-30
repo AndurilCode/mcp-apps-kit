@@ -348,7 +348,10 @@ export function createStandaloneInspectorServer(
           }
 
           // Create a new connection via registry
-          const { id, connectionManager: cm } = await registry.createConnection(data.url);
+          const { id, connectionManager: cm } = await registry.createConnection({
+            transport: "http",
+            url: data.url,
+          });
           const schema = cm.getTargetSchema();
           const protocolType = schema ? inferProtocolType(schema.tools) : "mcp";
 
@@ -871,7 +874,7 @@ export function createStandaloneInspectorServer(
             // Auto-connect if targetUrl is provided
             if (targetUrl) {
               void registry
-                .createConnection(targetUrl, { trackHistory: true })
+                .createConnection({ transport: "http", url: targetUrl }, { trackHistory: true })
                 .then(() => {
                   // Mark server as ready now that auto-connect succeeded
                   isReady = true;

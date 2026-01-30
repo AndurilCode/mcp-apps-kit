@@ -143,7 +143,7 @@ describe("widget_click Tool", () => {
     mockListResources.mockResolvedValue([]);
     mockListPrompts.mockResolvedValue([]);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
   });
 
   afterEach(async () => {
@@ -232,7 +232,7 @@ describe("widget_fill Tool", () => {
     mockListResources.mockResolvedValue([]);
     mockListPrompts.mockResolvedValue([]);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
   });
 
   afterEach(async () => {
@@ -288,7 +288,7 @@ describe("widget_drag Tool", () => {
     mockListResources.mockResolvedValue([]);
     mockListPrompts.mockResolvedValue([]);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
   });
 
   afterEach(async () => {
@@ -347,7 +347,7 @@ describe("widget_evaluate Tool", () => {
     mockListResources.mockResolvedValue([]);
     mockListPrompts.mockResolvedValue([]);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
   });
 
   afterEach(async () => {
@@ -401,7 +401,7 @@ describe("widget_locator Tool", () => {
     mockListResources.mockResolvedValue([]);
     mockListPrompts.mockResolvedValue([]);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
   });
 
   afterEach(async () => {
@@ -456,7 +456,7 @@ describe("widget_refresh Tool", () => {
     mockListResources.mockResolvedValue([]);
     mockListPrompts.mockResolvedValue([]);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
   });
 
   afterEach(async () => {
@@ -512,7 +512,7 @@ describe("widget_wait_for_selector Tool", () => {
     mockListResources.mockResolvedValue([]);
     mockListPrompts.mockResolvedValue([]);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
   });
 
   afterEach(async () => {
@@ -571,7 +571,7 @@ describe("widget_click handler with mock session", () => {
     mockListResources.mockResolvedValue([]);
     mockListPrompts.mockResolvedValue([]);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
   });
 
   afterEach(async () => {
@@ -642,7 +642,7 @@ describe("widget_fill handler with mock session", () => {
     mockListResources.mockResolvedValue([]);
     mockListPrompts.mockResolvedValue([]);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
   });
 
   afterEach(async () => {
@@ -697,7 +697,7 @@ describe("widget_evaluate handler with mock session", () => {
     mockListResources.mockResolvedValue([]);
     mockListPrompts.mockResolvedValue([]);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
   });
 
   afterEach(async () => {
@@ -754,7 +754,7 @@ describe("widget_locator handler with mock session", () => {
     mockListResources.mockResolvedValue([]);
     mockListPrompts.mockResolvedValue([]);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
   });
 
   afterEach(async () => {
@@ -791,7 +791,7 @@ describe("widget_wait_for_selector handler with mock session", () => {
     mockListResources.mockResolvedValue([]);
     mockListPrompts.mockResolvedValue([]);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
   });
 
   afterEach(async () => {
@@ -1026,7 +1026,7 @@ describe("widget_click handler - error branches", () => {
     mockListResources.mockResolvedValue([]);
     mockListPrompts.mockResolvedValue([]);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
   });
 
   afterEach(async () => {
@@ -1177,7 +1177,7 @@ describe("widget_fill handler - element type branches", () => {
     mockListResources.mockResolvedValue([]);
     mockListPrompts.mockResolvedValue([]);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
   });
 
   afterEach(async () => {
@@ -1446,7 +1446,7 @@ describe("widget_evaluate handler - additional branches", () => {
     mockListResources.mockResolvedValue([]);
     mockListPrompts.mockResolvedValue([]);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
   });
 
   afterEach(async () => {
@@ -1504,7 +1504,7 @@ describe("widget_drag handler - position branches", () => {
     mockListResources.mockResolvedValue([]);
     mockListPrompts.mockResolvedValue([]);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
   });
 
   afterEach(async () => {
@@ -1651,7 +1651,7 @@ describe("widget_refresh handler - additional branches", () => {
     mockListResources.mockResolvedValue([]);
     mockListPrompts.mockResolvedValue([]);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
   });
 
   afterEach(async () => {

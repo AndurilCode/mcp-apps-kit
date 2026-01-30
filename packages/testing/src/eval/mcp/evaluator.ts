@@ -312,7 +312,7 @@ function estimateCost(
  *
  * @example
  * ```typescript
- * const client = await createTestClient("http://localhost:3000/v1/mcp");
+ * const client = await createTestClient({ transport: "http", url: "http://localhost:3000/v1/mcp" });
  * const eval = createMCPEval(client, { model: "gpt-4o-mini" });
  *
  * const result = await eval.run("Greet Alice politely");
@@ -830,9 +830,12 @@ export async function setupMCPEval(app: App, config: MCPEvalSetupConfig = {}): P
   const mcpUrl = config.version ? `${baseUrl}/${config.version}/mcp` : `${baseUrl}/mcp`;
 
   // Create client
-  const client: TestClient = await createTestClient(mcpUrl, {
-    trackHistory: true,
-  });
+  const client: TestClient = await createTestClient(
+    { transport: "http", url: mcpUrl },
+    {
+      trackHistory: true,
+    }
+  );
 
   // Create the evaluator (pass all config except port/version which were already used)
   const { port: _port, version: _version, ...evalConfig } = config;
