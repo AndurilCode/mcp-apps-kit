@@ -144,7 +144,8 @@ export async function handleDashboardRequest(
       );
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      res.writeHead(500, { "Content-Type": "application/json" });
+      const isBadInput = e instanceof SyntaxError || message.includes("Invalid URL");
+      res.writeHead(isBadInput ? 400 : 500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: message }));
     }
     return true;
