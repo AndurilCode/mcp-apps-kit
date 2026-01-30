@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import { createGetConsoleLogsTool } from "../src/tools/get-console-logs";
+import { createMockRegistry } from "./test-utils";
 
 // Mock modules
 const mockCallTool = vi.fn();
@@ -104,7 +105,7 @@ describe("get_console_logs Standalone Mode", () => {
         contents: [{ text: "<html><body>Widget</body></html>" }],
       });
 
-      const tool = createGetConsoleLogsTool(manager);
+      const tool = createGetConsoleLogsTool(createMockRegistry(manager));
       const result = await tool.handler(
         { tool: "greet", arguments: { name: "Alice" } },
         {} as never
@@ -128,7 +129,7 @@ describe("get_console_logs Standalone Mode", () => {
         contents: [{ text: "<div>Test</div>" }],
       });
 
-      const tool = createGetConsoleLogsTool(manager);
+      const tool = createGetConsoleLogsTool(createMockRegistry(manager));
       await tool.handler({ tool: "greet", arguments: {} }, {} as never);
 
       // Verify listeners were set up
@@ -152,7 +153,7 @@ describe("get_console_logs Standalone Mode", () => {
         contents: [{ text: "<div>Test</div>" }],
       });
 
-      const tool = createGetConsoleLogsTool(manager);
+      const tool = createGetConsoleLogsTool(createMockRegistry(manager));
       await tool.handler({ tool: "greet", arguments: {}, waitMs: 1000 }, {} as never);
 
       expect(mockPage.reload).toHaveBeenCalledWith({ waitUntil: "networkidle" });
@@ -172,7 +173,7 @@ describe("get_console_logs Standalone Mode", () => {
         contents: [{ text: "<div>Test</div>" }],
       });
 
-      const tool = createGetConsoleLogsTool(manager);
+      const tool = createGetConsoleLogsTool(createMockRegistry(manager));
       await tool.handler({ tool: "greet", arguments: {} }, {} as never);
 
       expect(mockPage.waitForTimeout).toHaveBeenCalledWith(500);
@@ -184,7 +185,7 @@ describe("get_console_logs Standalone Mode", () => {
       const client = manager.getClient();
       vi.mocked(client.raw.callTool).mockRejectedValue(new Error("Tool execution failed"));
 
-      const tool = createGetConsoleLogsTool(manager);
+      const tool = createGetConsoleLogsTool(createMockRegistry(manager));
       const result = await tool.handler(
         { tool: "greet", arguments: { name: "Alice" } },
         {} as never
@@ -201,7 +202,7 @@ describe("get_console_logs Standalone Mode", () => {
       });
       vi.mocked(client.raw.listResources).mockResolvedValue({ resources: [] });
 
-      const tool = createGetConsoleLogsTool(manager);
+      const tool = createGetConsoleLogsTool(createMockRegistry(manager));
       const result = await tool.handler(
         { tool: "greet", arguments: { name: "Alice" } },
         {} as never
@@ -223,7 +224,7 @@ describe("get_console_logs Standalone Mode", () => {
         contents: [{ text: "" }],
       });
 
-      const tool = createGetConsoleLogsTool(manager);
+      const tool = createGetConsoleLogsTool(createMockRegistry(manager));
       const result = await tool.handler(
         { tool: "greet", arguments: { name: "Alice" } },
         {} as never
@@ -243,7 +244,7 @@ describe("get_console_logs Standalone Mode", () => {
       });
       vi.mocked(client.raw.readResource).mockRejectedValue(new Error("Resource fetch failed"));
 
-      const tool = createGetConsoleLogsTool(manager);
+      const tool = createGetConsoleLogsTool(createMockRegistry(manager));
       const result = await tool.handler(
         { tool: "greet", arguments: { name: "Alice" } },
         {} as never
@@ -270,7 +271,7 @@ describe("get_console_logs Standalone Mode", () => {
       // Override mock to throw error
       mockRenderInBrowser.mockRejectedValue(new Error("Render failed"));
 
-      const tool = createGetConsoleLogsTool(manager);
+      const tool = createGetConsoleLogsTool(createMockRegistry(manager));
       const result = await tool.handler({ tool: "greet", arguments: {} }, {} as never);
 
       expect(result.hasUI).toBe(true);
@@ -315,7 +316,7 @@ describe("get_console_logs Standalone Mode", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (sessionManager as any).store.sessions.set("test-session-id", mockSession);
 
-      const tool = createGetConsoleLogsTool(manager);
+      const tool = createGetConsoleLogsTool(createMockRegistry(manager));
       const result = await tool.handler({ sessionId: "test-session-id" }, {} as never);
 
       expect(result.hasUI).toBe(true);

@@ -75,7 +75,7 @@ function setCorsHeaders(res: ServerResponse): void {
 export async function handleDashboardRequest(
   req: IncomingMessage,
   res: ServerResponse,
-  connectionManager: ConnectionManager,
+  connectionManager: ConnectionManager | null,
   registry?: ConnectionRegistry
 ): Promise<boolean> {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
@@ -184,6 +184,10 @@ export async function handleDashboardRequest(
 
   // GET /dashboard/sessions - List active sessions
   if (pathname === "/dashboard/sessions" && req.method === "GET") {
+    if (!connectionManager) {
+      serveEmptySessions(res);
+      return true;
+    }
     serveSessionList(res, connectionManager);
     return true;
   }
@@ -194,6 +198,10 @@ export async function handleDashboardRequest(
     if (!sessionId) {
       res.writeHead(400, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Missing sessionId parameter" }));
+      return true;
+    }
+    if (!connectionManager) {
+      writeNoSessionStream(res, "No active connection");
       return true;
     }
     await startScreencastStream(req, res, connectionManager, sessionId);
@@ -208,6 +216,10 @@ export async function handleDashboardRequest(
       res.end(JSON.stringify({ error: "Missing sessionId parameter" }));
       return true;
     }
+    if (!connectionManager) {
+      writeNoSessionStream(res, "No active connection");
+      return true;
+    }
     await startLogStream(req, res, connectionManager, sessionId);
     return true;
   }
@@ -220,18 +232,30 @@ export async function handleDashboardRequest(
       res.end(JSON.stringify({ error: "Missing sessionId parameter" }));
       return true;
     }
+    if (!connectionManager) {
+      writeNoSessionStream(res, "No active connection");
+      return true;
+    }
     startEventStream(req, res, connectionManager, sessionId);
     return true;
   }
 
   // GET /dashboard/globals - Get current environment state
   if (pathname === "/dashboard/globals" && req.method === "GET") {
+    if (!connectionManager) {
+      serveEmptyGlobals(res);
+      return true;
+    }
     serveGlobals(res, connectionManager);
     return true;
   }
 
   // GET /dashboard/agent-events - SSE agent event stream (session-agnostic)
   if (pathname === "/dashboard/agent-events" && req.method === "GET") {
+    if (!connectionManager) {
+      startEmptyAgentEventStream(res);
+      return true;
+    }
     startAgentEventStream(req, res, connectionManager);
     return true;
   }
@@ -298,6 +322,54 @@ function serveDashboardHtml(res: ServerResponse): void {
     "Cache-Control": "no-cache",
   });
   res.end(getDashboardHtml());
+}
+
+function serveEmptySessions(res: ServerResponse): void {
+  res.writeHead(200, {
+    "Content-Type": "application/json",
+    "Cache-Control": "no-cache",
+    "Access-Control-Allow-Origin": "*",
+  });
+  res.end(JSON.stringify({ sessions: [] }));
+}
+
+function serveEmptyGlobals(res: ServerResponse): void {
+  res.writeHead(200, {
+    "Content-Type": "application/json",
+    "Cache-Control": "no-cache",
+    "Access-Control-Allow-Origin": "*",
+  });
+  res.end(JSON.stringify({ globals: {} }));
+}
+
+function writeNoSessionStream(res: ServerResponse, message: string): void {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "Access-Control-Allow-Origin": "*",
+  });
+  res.write(`event: noSession\\ndata: ${JSON.stringify({ message })}\\n\\n`);
+  setTimeout(() => {
+    if (!res.writableEnded) {
+      res.end();
+    }
+  }, 100);
+}
+
+function startEmptyAgentEventStream(res: ServerResponse): void {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "Access-Control-Allow-Origin": "*",
+  });
+  res.write(`event: events\\ndata: ${JSON.stringify({ events: [] })}\\n\\n`);
+  setTimeout(() => {
+    if (!res.writableEnded) {
+      res.end();
+    }
+  }, 100);
 }
 
 /**
@@ -565,35 +637,37 @@ function startEventStream(
  */
 async function serveMcpPrimitives(
   res: ServerResponse,
-  connectionManager: ConnectionManager
+  connectionManager: ConnectionManager | null
 ): Promise<void> {
   let tools: unknown[] = [];
   let resources: unknown[] = [];
   let prompts: unknown[] = [];
 
-  try {
-    const client = connectionManager.getClient();
-
-    // Fetch each primitive type, handling individual failures gracefully
+  if (connectionManager) {
     try {
-      tools = await client.listTools();
-    } catch {
-      // Server doesn't support tools capability or error occurred
-    }
+      const client = connectionManager.getClient();
 
-    try {
-      resources = await client.listResources();
-    } catch {
-      // Server doesn't support resources capability or error occurred
-    }
+      // Fetch each primitive type, handling individual failures gracefully
+      try {
+        tools = await client.listTools();
+      } catch {
+        // Server doesn't support tools capability or error occurred
+      }
 
-    try {
-      prompts = await client.listPrompts();
+      try {
+        resources = await client.listResources();
+      } catch {
+        // Server doesn't support resources capability or error occurred
+      }
+
+      try {
+        prompts = await client.listPrompts();
+      } catch {
+        // Server doesn't support prompts capability or error occurred
+      }
     } catch {
-      // Server doesn't support prompts capability or error occurred
+      // Not connected - return empty arrays (already initialized)
     }
-  } catch {
-    // Not connected - return empty arrays (already initialized)
   }
 
   res.writeHead(200, {

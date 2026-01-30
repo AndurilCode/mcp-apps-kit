@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import { createCallToolTool } from "../src/tools/call-tool";
+import { createMockRegistry } from "./test-utils";
 
 // Mock testing module
 const mockCallTool = vi.fn();
@@ -56,7 +57,7 @@ describe("call_tool Error Handling", () => {
     it("should handle timeout error with lowercase message", async () => {
       mockCallTool.mockRejectedValue(new Error("Request timeout after 30000ms"));
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "slow_tool", arguments: {} }, {} as never);
 
       expect(result.isError).toBe(true);
@@ -67,7 +68,7 @@ describe("call_tool Error Handling", () => {
     it("should handle Timeout error with capitalized message", async () => {
       mockCallTool.mockRejectedValue(new Error("Timeout exceeded"));
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "slow_tool", arguments: {} }, {} as never);
 
       expect(result.isError).toBe(true);
@@ -79,7 +80,7 @@ describe("call_tool Error Handling", () => {
     it("should handle tool not found error", async () => {
       mockCallTool.mockRejectedValue(new Error("Tool not found: unknown_tool"));
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "unknown_tool", arguments: {} }, {} as never);
 
       expect(result.isError).toBe(true);
@@ -90,7 +91,7 @@ describe("call_tool Error Handling", () => {
     it("should handle Unknown tool error", async () => {
       mockCallTool.mockRejectedValue(new Error("Unknown tool: foobar"));
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "foobar", arguments: {} }, {} as never);
 
       expect(result.isError).toBe(true);
@@ -102,7 +103,7 @@ describe("call_tool Error Handling", () => {
     it("should handle validation error", async () => {
       mockCallTool.mockRejectedValue(new Error("validation failed: name is required"));
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "greet", arguments: {} }, {} as never);
 
       expect(result.isError).toBe(true);
@@ -113,7 +114,7 @@ describe("call_tool Error Handling", () => {
     it("should handle Validation error with capital letter", async () => {
       mockCallTool.mockRejectedValue(new Error("Validation error: invalid input"));
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "greet", arguments: {} }, {} as never);
 
       expect(result.isError).toBe(true);
@@ -123,7 +124,7 @@ describe("call_tool Error Handling", () => {
     it("should handle required field error", async () => {
       mockCallTool.mockRejectedValue(new Error("Field 'name' is required"));
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "greet", arguments: {} }, {} as never);
 
       expect(result.isError).toBe(true);
@@ -135,7 +136,7 @@ describe("call_tool Error Handling", () => {
     it("should handle generic errors", async () => {
       mockCallTool.mockRejectedValue(new Error("Something went wrong"));
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "greet", arguments: {} }, {} as never);
 
       expect(result.isError).toBe(true);
@@ -146,7 +147,7 @@ describe("call_tool Error Handling", () => {
     it("should handle non-Error thrown values", async () => {
       mockCallTool.mockRejectedValue("String error");
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "greet", arguments: {} }, {} as never);
 
       expect(result.isError).toBe(true);
@@ -162,7 +163,7 @@ describe("call_tool Error Handling", () => {
         isError: true,
       });
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "greet", arguments: {} }, {} as never);
 
       expect(result.isError).toBe(true);
@@ -176,7 +177,7 @@ describe("call_tool Error Handling", () => {
         isError: true,
       });
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "greet", arguments: {} }, {} as never);
 
       expect(result.isError).toBe(true);
@@ -193,7 +194,7 @@ describe("call_tool Error Handling", () => {
         structuredContent: { greeting: "Hello" },
       });
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler(
         { name: "greet", arguments: { name: "Alice" } },
         {} as never
@@ -209,7 +210,7 @@ describe("call_tool Error Handling", () => {
         isError: false,
       });
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "greet", arguments: {} }, {} as never);
 
       expect(result.duration).toBeGreaterThanOrEqual(0);
@@ -224,7 +225,7 @@ describe("call_tool Error Handling", () => {
         isError: false,
       });
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "greet", arguments: {} }, {} as never);
 
       expect(result.content).toHaveLength(2);

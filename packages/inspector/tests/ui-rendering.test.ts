@@ -13,6 +13,7 @@ import {
   createTestWidgetInteractionTool,
 } from "../src/tools";
 import { MCP_WIDGET_MIME_TYPE, OPENAI_WIDGET_MIME_TYPE } from "@mcp-apps-kit/core";
+import { createMockRegistry } from "./test-utils";
 
 // Mock resources
 const mockResources = [
@@ -294,7 +295,7 @@ describe("preview_ui tool", () => {
 
     await manager.connect("http://localhost:3000/mcp");
 
-    const tool = createPreviewUITool(manager);
+    const tool = createPreviewUITool(createMockRegistry(manager));
     const result = await tool.handler(
       { tool: "currentWeather", arguments: { city: "NYC" } },
       {} as never
@@ -329,7 +330,7 @@ describe("preview_ui tool", () => {
 
     await manager.connect("http://localhost:3000/mcp");
 
-    const tool = createPreviewUITool(manager);
+    const tool = createPreviewUITool(createMockRegistry(manager));
     const result = await tool.handler({ tool: "forecast", arguments: {} }, {} as never);
 
     expect(result.hasUI).toBe(true);
@@ -341,7 +342,7 @@ describe("preview_ui tool", () => {
 
     await manager.connect("http://localhost:3000/mcp");
 
-    const tool = createPreviewUITool(manager);
+    const tool = createPreviewUITool(createMockRegistry(manager));
     const result = await tool.handler({ tool: "currentWeather", arguments: {} }, {} as never);
 
     expect(result.hasUI).toBe(false);
@@ -365,7 +366,7 @@ describe("preview_ui tool", () => {
 
     await manager.connect("http://localhost:3000/mcp");
 
-    const tool = createPreviewUITool(manager);
+    const tool = createPreviewUITool(createMockRegistry(manager));
     const result = await tool.handler({ tool: "unknownTool", arguments: {} }, {} as never);
 
     expect(result.hasUI).toBe(false);
@@ -373,7 +374,7 @@ describe("preview_ui tool", () => {
   });
 
   it("should throw error when not connected", async () => {
-    const tool = createPreviewUITool(manager);
+    const tool = createPreviewUITool(createMockRegistry(manager));
     await expect(
       tool.handler({ tool: "currentWeather", arguments: {} }, {} as never)
     ).rejects.toThrow("No active connection");
@@ -400,7 +401,7 @@ describe("screenshot_widget tool", () => {
 
     await manager.connect("http://localhost:3000/mcp");
 
-    const tool = createScreenshotWidgetTool(manager);
+    const tool = createScreenshotWidgetTool(createMockRegistry(manager));
     const result = await tool.handler({ tool: "currentWeather", arguments: {} }, {} as never);
 
     expect(result.hasUI).toBe(false);
@@ -422,7 +423,7 @@ describe("screenshot_widget tool", () => {
 
     await manager.connect("http://localhost:3000/mcp");
 
-    const tool = createScreenshotWidgetTool(manager);
+    const tool = createScreenshotWidgetTool(createMockRegistry(manager));
     const result = await tool.handler({ tool: "unknownTool", arguments: {} }, {} as never);
 
     expect(result.hasUI).toBe(false);
@@ -430,7 +431,7 @@ describe("screenshot_widget tool", () => {
   });
 
   it("should throw error when not connected", async () => {
-    const tool = createScreenshotWidgetTool(manager);
+    const tool = createScreenshotWidgetTool(createMockRegistry(manager));
     await expect(
       tool.handler({ tool: "currentWeather", arguments: {} }, {} as never)
     ).rejects.toThrow("No active connection");
@@ -460,7 +461,7 @@ describe("test_widget_interaction tool", () => {
 
     await manager.connect("http://localhost:3000/mcp");
 
-    const tool = createTestWidgetInteractionTool(manager);
+    const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
     const result = await tool.handler(
       {
         tool: "currentWeather",
@@ -489,7 +490,7 @@ describe("test_widget_interaction tool", () => {
 
     await manager.connect("http://localhost:3000/mcp");
 
-    const tool = createTestWidgetInteractionTool(manager);
+    const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
     const result = await tool.handler(
       {
         tool: "unknownTool",
@@ -504,7 +505,7 @@ describe("test_widget_interaction tool", () => {
   });
 
   it("should throw error when not connected", async () => {
-    const tool = createTestWidgetInteractionTool(manager);
+    const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
     await expect(
       tool.handler(
         {
@@ -524,7 +525,7 @@ describe("test_widget_interaction tool", () => {
 describe("Input/Output schemas", () => {
   it("should validate preview_ui input", async () => {
     const manager = new ConnectionManager();
-    const tool = createPreviewUITool(manager);
+    const tool = createPreviewUITool(createMockRegistry(manager));
 
     // Input schema should exist
     expect(tool.input).toBeDefined();
@@ -532,7 +533,7 @@ describe("Input/Output schemas", () => {
 
   it("should validate screenshot_widget input", async () => {
     const manager = new ConnectionManager();
-    const tool = createScreenshotWidgetTool(manager);
+    const tool = createScreenshotWidgetTool(createMockRegistry(manager));
 
     // Input schema should exist
     expect(tool.input).toBeDefined();
@@ -540,7 +541,7 @@ describe("Input/Output schemas", () => {
 
   it("should validate test_widget_interaction input", async () => {
     const manager = new ConnectionManager();
-    const tool = createTestWidgetInteractionTool(manager);
+    const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
 
     // Input schema should exist and include interactions array
     expect(tool.input).toBeDefined();

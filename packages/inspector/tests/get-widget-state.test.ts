@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import { createGetWidgetStateTool } from "../src/tools/get-widget-state";
 import type { WidgetSession } from "../src/types";
+import { createMockRegistry } from "./test-utils";
 
 // Mock testing module
 const mockCallTool = vi.fn();
@@ -127,13 +128,13 @@ describe("get_widget_state Tool", () => {
 
   describe("tool metadata", () => {
     it("should have correct description", () => {
-      const tool = createGetWidgetStateTool(manager);
+      const tool = createGetWidgetStateTool(createMockRegistry(manager));
       expect(tool.description).toContain("comprehensive state");
       expect(tool.description).toContain("widget session");
     });
 
     it("should have input and output schemas defined", () => {
-      const tool = createGetWidgetStateTool(manager);
+      const tool = createGetWidgetStateTool(createMockRegistry(manager));
       expect(tool.input).toBeDefined();
       expect(tool.output).toBeDefined();
     });
@@ -141,7 +142,7 @@ describe("get_widget_state Tool", () => {
 
   describe("session validation", () => {
     it("should return error when session not found", async () => {
-      const tool = createGetWidgetStateTool(manager);
+      const tool = createGetWidgetStateTool(createMockRegistry(manager));
       const result = await tool.handler({ sessionId: "non-existent-id" }, {} as never);
 
       expect(result.success).toBe(false);
@@ -149,7 +150,7 @@ describe("get_widget_state Tool", () => {
     });
 
     it("should return error with valid session ID format but no session", async () => {
-      const tool = createGetWidgetStateTool(manager);
+      const tool = createGetWidgetStateTool(createMockRegistry(manager));
       const result = await tool.handler({ sessionId: "abc123-def456-ghi789" }, {} as never);
 
       expect(result.success).toBe(false);
@@ -160,7 +161,7 @@ describe("get_widget_state Tool", () => {
   describe("not connected", () => {
     it("should return error when not connected", async () => {
       const disconnectedManager = new ConnectionManager();
-      const tool = createGetWidgetStateTool(disconnectedManager);
+      const tool = createGetWidgetStateTool(createMockRegistry(disconnectedManager));
 
       // These tools check session first before checking connection
       const result = await tool.handler({ sessionId: "test-session" }, {} as never);
@@ -171,30 +172,30 @@ describe("get_widget_state Tool", () => {
 
   describe("input schema", () => {
     it("should have sessionId field", () => {
-      const tool = createGetWidgetStateTool(manager);
+      const tool = createGetWidgetStateTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("sessionId");
     });
 
     it("should have optional includeDOM field", () => {
-      const tool = createGetWidgetStateTool(manager);
+      const tool = createGetWidgetStateTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("includeDOM");
     });
   });
 
   describe("output schema", () => {
     it("should have success field", () => {
-      const tool = createGetWidgetStateTool(manager);
+      const tool = createGetWidgetStateTool(createMockRegistry(manager));
       expect(tool.output).toBeDefined();
       expect(tool.output!.shape).toHaveProperty("success");
     });
 
     it("should have state field", () => {
-      const tool = createGetWidgetStateTool(manager);
+      const tool = createGetWidgetStateTool(createMockRegistry(manager));
       expect(tool.output!.shape).toHaveProperty("state");
     });
 
     it("should have error field", () => {
-      const tool = createGetWidgetStateTool(manager);
+      const tool = createGetWidgetStateTool(createMockRegistry(manager));
       expect(tool.output!.shape).toHaveProperty("error");
     });
   });
@@ -228,7 +229,7 @@ describe("get_widget_state handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createGetWidgetStateTool(manager);
+    const tool = createGetWidgetStateTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-session-state" }, {} as never);
 
     expect(result.success).toBe(true);
@@ -245,7 +246,7 @@ describe("get_widget_state handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createGetWidgetStateTool(manager);
+    const tool = createGetWidgetStateTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-session-dom", includeDOM: true },
       {} as never
@@ -265,7 +266,7 @@ describe("get_widget_state handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createGetWidgetStateTool(manager);
+    const tool = createGetWidgetStateTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-session-logs" }, {} as never);
 
     expect(result.success).toBe(true);
@@ -282,7 +283,7 @@ describe("get_widget_state handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createGetWidgetStateTool(manager);
+    const tool = createGetWidgetStateTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-session-calls" }, {} as never);
 
     expect(result.success).toBe(true);
@@ -297,7 +298,7 @@ describe("get_widget_state handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createGetWidgetStateTool(manager);
+    const tool = createGetWidgetStateTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-session-closed" }, {} as never);
 
     expect(result.success).toBe(false);
@@ -311,7 +312,7 @@ describe("get_widget_state handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createGetWidgetStateTool(manager);
+    const tool = createGetWidgetStateTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-session-openai" }, {} as never);
 
     expect(result.success).toBe(true);
@@ -326,7 +327,7 @@ describe("get_widget_state handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createGetWidgetStateTool(manager);
+    const tool = createGetWidgetStateTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-session-mcp" }, {} as never);
 
     expect(result.success).toBe(true);
@@ -341,7 +342,7 @@ describe("get_widget_state handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createGetWidgetStateTool(manager);
+    const tool = createGetWidgetStateTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-session-noframe" }, {} as never);
 
     // Should still succeed but without DOM/runtime state

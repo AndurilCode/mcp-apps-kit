@@ -11,6 +11,7 @@ import {
   createCallToolTool,
   createGetConnectionStatusTool,
 } from "../src/tools";
+import { createMockRegistry } from "./test-utils";
 
 // Mock the @mcp-apps-kit/testing module
 const mockListTools = vi.fn();
@@ -61,7 +62,7 @@ describe("Inspector Tools", () => {
 
   describe("connect_to_server", () => {
     it("should connect to a server and return tool count", async () => {
-      const tool = createConnectTool(manager);
+      const tool = createConnectTool(createMockRegistry(manager));
       const result = await tool.handler({ url: "http://localhost:3000/mcp" }, {} as never);
 
       expect(result.connected).toBe(true);
@@ -72,7 +73,7 @@ describe("Inspector Tools", () => {
     });
 
     it("should handle invalid URL", async () => {
-      const tool = createConnectTool(manager);
+      const tool = createConnectTool(createMockRegistry(manager));
       await expect(tool.handler({ url: "not-a-url" }, {} as never)).rejects.toThrow(
         "Invalid URL format"
       );
@@ -82,26 +83,28 @@ describe("Inspector Tools", () => {
       // First connection
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createConnectTool(manager);
+      const tool = createConnectTool(createMockRegistry(manager));
       const result = await tool.handler({ url: "http://localhost:3000/mcp" }, {} as never);
 
       expect(result.connected).toBe(true);
       expect(result.serverUrl).toBe("http://localhost:3000/mcp");
     });
 
-    it("should throw when connected to different URL without force", async () => {
+    it("should allow connecting to different URL (multi-connection)", async () => {
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createConnectTool(manager);
-      await expect(tool.handler({ url: "http://localhost:4000/mcp" }, {} as never)).rejects.toThrow(
-        "Already connected"
-      );
+      const tool = createConnectTool(createMockRegistry(manager));
+      const result = await tool.handler({ url: "http://localhost:4000/mcp" }, {} as never);
+
+      // Multi-connection mode: new connections are always allowed
+      expect(result.connected).toBe(true);
+      expect(result.connectionId).toBeDefined();
     });
 
     it("should reconnect when force=true with different URL", async () => {
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createConnectTool(manager);
+      const tool = createConnectTool(createMockRegistry(manager));
       const result = await tool.handler(
         { url: "http://localhost:4000/mcp", force: true },
         {} as never
@@ -116,7 +119,7 @@ describe("Inspector Tools", () => {
     it("should disconnect from server", async () => {
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createDisconnectTool(manager);
+      const tool = createDisconnectTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.disconnected).toBe(true);
@@ -124,7 +127,7 @@ describe("Inspector Tools", () => {
     });
 
     it("should return null previousUrl when not connected", async () => {
-      const tool = createDisconnectTool(manager);
+      const tool = createDisconnectTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.disconnected).toBe(true);
@@ -136,7 +139,7 @@ describe("Inspector Tools", () => {
     it("should list tools from connected server", async () => {
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createListToolsTool(manager);
+      const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.tools).toHaveLength(1);
@@ -153,7 +156,7 @@ describe("Inspector Tools", () => {
     });
 
     it("should throw error when not connected", async () => {
-      const tool = createListToolsTool(manager);
+      const tool = createListToolsTool(createMockRegistry(manager));
       await expect(tool.handler({}, {} as never)).rejects.toThrow("No active connection");
     });
 
@@ -161,7 +164,7 @@ describe("Inspector Tools", () => {
       mockListTools.mockResolvedValue([]);
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createListToolsTool(manager);
+      const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.tools).toEqual([]);
@@ -172,7 +175,7 @@ describe("Inspector Tools", () => {
     it("should call tool and return result", async () => {
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler(
         { name: "greet", arguments: { name: "Alice" } },
         {} as never
@@ -191,7 +194,7 @@ describe("Inspector Tools", () => {
       });
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "greet", arguments: {} }, {} as never);
 
       expect(result.isError).toBe(true);
@@ -199,7 +202,7 @@ describe("Inspector Tools", () => {
     });
 
     it("should throw error when not connected", async () => {
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       await expect(tool.handler({ name: "greet", arguments: {} }, {} as never)).rejects.toThrow(
         "No active connection"
       );
@@ -222,7 +225,7 @@ describe("Inspector Tools", () => {
       ]);
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createListToolsTool(manager);
+      const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.tools[0].hasUI).toBe(true);
@@ -244,7 +247,7 @@ describe("Inspector Tools", () => {
       ]);
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createListToolsTool(manager);
+      const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.tools[0].hasUI).toBe(true);
@@ -264,7 +267,7 @@ describe("Inspector Tools", () => {
       ]);
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createListToolsTool(manager);
+      const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.tools[0].hasUI).toBe(true);
@@ -283,7 +286,7 @@ describe("Inspector Tools", () => {
       ]);
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createListToolsTool(manager);
+      const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.tools[0].hasUI).toBe(true);
@@ -304,7 +307,7 @@ describe("Inspector Tools", () => {
       ]);
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createListToolsTool(manager);
+      const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.tools[0].hasUI).toBe(true);
@@ -326,7 +329,7 @@ describe("Inspector Tools", () => {
       ]);
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createListToolsTool(manager);
+      const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.tools[0].hasUI).toBe(true);
@@ -347,7 +350,7 @@ describe("Inspector Tools", () => {
       ]);
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createListToolsTool(manager);
+      const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.tools[0].hasUI).toBe(true);
@@ -363,7 +366,7 @@ describe("Inspector Tools", () => {
       ]);
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createListToolsTool(manager);
+      const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.tools[0].hasUI).toBe(false);
@@ -382,7 +385,7 @@ describe("Inspector Tools", () => {
       ]);
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createListToolsTool(manager);
+      const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.tools[0].hasUI).toBe(false);
@@ -391,26 +394,28 @@ describe("Inspector Tools", () => {
 
   describe("get_connection_status", () => {
     it("should return status when not connected", async () => {
-      const tool = createGetConnectionStatusTool(manager);
+      const tool = createGetConnectionStatusTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
-      expect(result.connected).toBe(false);
-      expect(result.serverUrl).toBe(null);
-      expect(result.serverInfo).toBe(null);
-      expect(result.historyEnabled).toBe(true);
-      expect(result.callCount).toBe(0);
+      expect(result.connections).toHaveLength(1);
+      expect(result.connections[0].connected).toBe(false);
+      expect(result.connections[0].serverUrl).toBe(null);
+      expect(result.connections[0].serverInfo).toBe(null);
+      expect(result.connections[0].historyEnabled).toBe(true);
+      expect(result.connections[0].callCount).toBe(0);
     });
 
     it("should return status when connected", async () => {
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createGetConnectionStatusTool(manager);
+      const tool = createGetConnectionStatusTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
-      expect(result.connected).toBe(true);
-      expect(result.serverUrl).toBe("http://localhost:3000/mcp");
-      expect(result.historyEnabled).toBe(true);
-      expect(result.callCount).toBe(0);
+      expect(result.connections).toHaveLength(1);
+      expect(result.connections[0].connected).toBe(true);
+      expect(result.connections[0].serverUrl).toBe("http://localhost:3000/mcp");
+      expect(result.connections[0].historyEnabled).toBe(true);
+      expect(result.connections[0].callCount).toBe(0);
     });
   });
 });

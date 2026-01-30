@@ -467,8 +467,20 @@ export function createStandaloneInspectorServer(
         }
 
         try {
+          const connectionManager = getActiveConnectionManager();
+          if (!connectionManager) {
+            res.writeHead(503, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                error: "No active connection",
+                message: "Use connect_to_server tool first",
+              })
+            );
+            return;
+          }
+
           // Check if connected to a server
-          const state = getActiveConnectionManager()!.getState();
+          const state = connectionManager.getState();
           if (!state.connected) {
             res.writeHead(503, { "Content-Type": "application/json" });
             res.end(
@@ -481,7 +493,7 @@ export function createStandaloneInspectorServer(
           }
 
           // Execute the tool on the connected server
-          const client = getActiveConnectionManager()!.getClient();
+          const client = connectionManager.getClient();
           const result = await client.callTool(toolName, args);
 
           // Extract structured result for recording
@@ -503,7 +515,7 @@ export function createStandaloneInspectorServer(
 
           // Record the tool call with result in the session (if sessionId provided)
           if (sessionId) {
-            const sessionManager = getActiveConnectionManager()!.getWidgetSessionManager();
+            const sessionManager = connectionManager.getWidgetSessionManager();
             sessionManager.recordToolCall(
               sessionId,
               toolName,
@@ -585,7 +597,18 @@ export function createStandaloneInspectorServer(
             return;
           }
 
-          const sessionManager = getActiveConnectionManager()!.getWidgetSessionManager();
+          const connectionManager = getActiveConnectionManager();
+          if (!connectionManager) {
+            res.writeHead(503, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                error: "No active connection",
+                message: "Use connect_to_server tool first",
+              })
+            );
+            return;
+          }
+          const sessionManager = connectionManager.getWidgetSessionManager();
           sessionManager.recordEvent(sessionId, type, payload, source ?? "host", protocol);
 
           res.writeHead(200, { "Content-Type": "application/json" });
@@ -628,12 +651,24 @@ export function createStandaloneInspectorServer(
             globals: Record<string, unknown>;
           };
 
+          const connectionManager = getActiveConnectionManager();
+          if (!connectionManager) {
+            res.writeHead(503, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                error: "No active connection",
+                message: "Use connect_to_server tool first",
+              })
+            );
+            return;
+          }
+
           // Update the connection manager's environment state
-          getActiveConnectionManager()!.updateEnvironmentFromGlobals(data.globals);
+          connectionManager.updateEnvironmentFromGlobals(data.globals);
 
           // Resize the Playwright viewport for the specific session
-          const sessionManager = getActiveConnectionManager()!.getWidgetSessionManager();
-          const currentEnvState = getActiveConnectionManager()!.getEnvironmentState();
+          const sessionManager = connectionManager.getWidgetSessionManager();
+          const currentEnvState = connectionManager.getEnvironmentState();
 
           // Use the environment state which now includes the updated displayMode/viewport
           const updated = await sessionManager.updateSessionGlobals(
@@ -668,7 +703,7 @@ export function createStandaloneInspectorServer(
       const handled = await handleDashboardRequest(
         req,
         res,
-        getActiveConnectionManager()!,
+        getActiveConnectionManager(),
         registry
       );
       if (handled) return;
@@ -704,11 +739,14 @@ export function createStandaloneInspectorServer(
               startTime: Date.now(),
             };
             // Record inspector tool call event
-            getActiveConnectionManager()!.recordAgentEvent("agent-tool-call", {
-              name: inspectorToolCall.name,
-              arguments: inspectorToolCall.arguments,
-              source: "inspector",
-            });
+            const connectionManager = getActiveConnectionManager();
+            if (connectionManager) {
+              connectionManager.recordAgentEvent("agent-tool-call", {
+                name: inspectorToolCall.name,
+                arguments: inspectorToolCall.arguments,
+                source: "inspector",
+              });
+            }
           }
         } catch {
           // Not valid JSON or not a tool call, ignore
@@ -755,13 +793,16 @@ export function createStandaloneInspectorServer(
         } catch {
           // Ignore parse errors
         }
-        getActiveConnectionManager()!.recordAgentEvent("agent-tool-result", {
-          name: inspectorToolCall.name,
-          isError,
-          duration,
-          result,
-          source: "inspector",
-        });
+        const connectionManager = getActiveConnectionManager();
+        if (connectionManager) {
+          connectionManager.recordAgentEvent("agent-tool-result", {
+            name: inspectorToolCall.name,
+            isError,
+            duration,
+            result,
+            source: "inspector",
+          });
+        }
       }
 
       // Convert Web Response to Node response
@@ -776,7 +817,7 @@ export function createStandaloneInspectorServer(
       const handled = await handleDashboardRequest(
         req,
         res,
-        getActiveConnectionManager()!,
+        getActiveConnectionManager(),
         registry
       );
       if (handled) return;

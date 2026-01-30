@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import { createWidgetSnapshotTool } from "../src/tools/widget-snapshot";
 import type { WidgetSession } from "../src/types";
+import { createMockRegistry } from "./test-utils";
 
 // Mock testing module
 const mockCallTool = vi.fn();
@@ -107,13 +108,13 @@ describe("widget_snapshot Tool", () => {
 
   describe("tool metadata", () => {
     it("should have correct description", () => {
-      const tool = createWidgetSnapshotTool(manager);
+      const tool = createWidgetSnapshotTool(createMockRegistry(manager));
       expect(tool.description).toContain("accessibility tree snapshot");
       expect(tool.description).toContain("widget_snapshot_diff");
     });
 
     it("should have input and output schemas defined", () => {
-      const tool = createWidgetSnapshotTool(manager);
+      const tool = createWidgetSnapshotTool(createMockRegistry(manager));
       expect(tool.input).toBeDefined();
       expect(tool.output).toBeDefined();
     });
@@ -121,7 +122,7 @@ describe("widget_snapshot Tool", () => {
 
   describe("session validation", () => {
     it("should return error when session not found", async () => {
-      const tool = createWidgetSnapshotTool(manager);
+      const tool = createWidgetSnapshotTool(createMockRegistry(manager));
       const result = await tool.handler({ sessionId: "non-existent-id" }, {} as never);
 
       expect(result.success).toBe(false);
@@ -130,7 +131,7 @@ describe("widget_snapshot Tool", () => {
     });
 
     it("should return error with valid session ID format but no session", async () => {
-      const tool = createWidgetSnapshotTool(manager);
+      const tool = createWidgetSnapshotTool(createMockRegistry(manager));
       const result = await tool.handler({ sessionId: "abc123-def456-ghi789" }, {} as never);
 
       expect(result.success).toBe(false);
@@ -141,7 +142,7 @@ describe("widget_snapshot Tool", () => {
   describe("not connected", () => {
     it("should return error when not connected", async () => {
       const disconnectedManager = new ConnectionManager();
-      const tool = createWidgetSnapshotTool(disconnectedManager);
+      const tool = createWidgetSnapshotTool(createMockRegistry(disconnectedManager));
 
       // These tools check session first before checking connection
       const result = await tool.handler({ sessionId: "test-session" }, {} as never);
@@ -152,56 +153,56 @@ describe("widget_snapshot Tool", () => {
 
   describe("input validation", () => {
     it("should accept valid sessionId", () => {
-      const tool = createWidgetSnapshotTool(manager);
+      const tool = createWidgetSnapshotTool(createMockRegistry(manager));
       // Input schema should accept sessionId
       expect(tool.input.shape).toHaveProperty("sessionId");
     });
 
     it("should have optional includeDOM parameter", () => {
-      const tool = createWidgetSnapshotTool(manager);
+      const tool = createWidgetSnapshotTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("includeDOM");
     });
 
     it("should have optional compactDOM parameter", () => {
-      const tool = createWidgetSnapshotTool(manager);
+      const tool = createWidgetSnapshotTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("compactDOM");
     });
 
     it("should have optional filterRoles parameter", () => {
-      const tool = createWidgetSnapshotTool(manager);
+      const tool = createWidgetSnapshotTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("filterRoles");
     });
 
     it("should have optional maxDepth parameter", () => {
-      const tool = createWidgetSnapshotTool(manager);
+      const tool = createWidgetSnapshotTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("maxDepth");
     });
   });
 
   describe("output schema", () => {
     it("should have success field", () => {
-      const tool = createWidgetSnapshotTool(manager);
+      const tool = createWidgetSnapshotTool(createMockRegistry(manager));
       expect(tool.output).toBeDefined();
       expect(tool.output!.shape).toHaveProperty("success");
     });
 
     it("should have optional accessibilityTree field", () => {
-      const tool = createWidgetSnapshotTool(manager);
+      const tool = createWidgetSnapshotTool(createMockRegistry(manager));
       expect(tool.output!.shape).toHaveProperty("accessibilityTree");
     });
 
     it("should have optional interactiveElements field", () => {
-      const tool = createWidgetSnapshotTool(manager);
+      const tool = createWidgetSnapshotTool(createMockRegistry(manager));
       expect(tool.output!.shape).toHaveProperty("interactiveElements");
     });
 
     it("should have optional error field", () => {
-      const tool = createWidgetSnapshotTool(manager);
+      const tool = createWidgetSnapshotTool(createMockRegistry(manager));
       expect(tool.output!.shape).toHaveProperty("error");
     });
 
     it("should have optional hints field", () => {
-      const tool = createWidgetSnapshotTool(manager);
+      const tool = createWidgetSnapshotTool(createMockRegistry(manager));
       expect(tool.output!.shape).toHaveProperty("hints");
     });
   });
@@ -236,7 +237,7 @@ describe("widget_snapshot handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetSnapshotTool(manager);
+    const tool = createWidgetSnapshotTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-session-123" }, {} as never);
 
     expect(result.success).toBe(true);
@@ -257,7 +258,7 @@ describe("widget_snapshot handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetSnapshotTool(manager);
+    const tool = createWidgetSnapshotTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-session-dom", includeDOM: true },
       {} as never
@@ -277,7 +278,7 @@ describe("widget_snapshot handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetSnapshotTool(manager);
+    const tool = createWidgetSnapshotTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-session-empty" }, {} as never);
 
     expect(result.success).toBe(false);
@@ -291,7 +292,7 @@ describe("widget_snapshot handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetSnapshotTool(manager);
+    const tool = createWidgetSnapshotTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-session-filter", filterRoles: ["button"] },
       {} as never
@@ -314,7 +315,7 @@ describe("widget_snapshot handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetSnapshotTool(manager);
+    const tool = createWidgetSnapshotTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-session-closed" }, {} as never);
 
     expect(result.success).toBe(false);
@@ -329,7 +330,7 @@ describe("widget_snapshot handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetSnapshotTool(manager);
+    const tool = createWidgetSnapshotTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-session-noframe" }, {} as never);
 
     expect(result.success).toBe(false);
@@ -343,7 +344,7 @@ describe("widget_snapshot handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetSnapshotTool(manager);
+    const tool = createWidgetSnapshotTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-session-cache" }, {} as never);
 
     expect(result.success).toBe(true);

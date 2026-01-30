@@ -9,6 +9,7 @@ import {
   createGetGlobalsTool,
   createResetGlobalsTool,
 } from "../src/tools/set-globals";
+import { createMockRegistry } from "./test-utils";
 
 describe("set_globals tool integration", () => {
   let manager: ConnectionManager;
@@ -19,7 +20,7 @@ describe("set_globals tool integration", () => {
 
   describe("basic functionality", () => {
     it("should get default globals", async () => {
-      const tool = createGetGlobalsTool(manager);
+      const tool = createGetGlobalsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.currentState).toMatchObject({
@@ -37,20 +38,20 @@ describe("set_globals tool integration", () => {
     });
 
     it("should set theme", async () => {
-      const tool = createSetGlobalsTool(manager);
+      const tool = createSetGlobalsTool(createMockRegistry(manager));
       const result = await tool.handler({ theme: "dark" }, {} as never);
 
       expect(result.updated).toBe(true);
       expect(result.currentState.theme).toBe("dark");
 
       // Verify with get_globals
-      const getTool = createGetGlobalsTool(manager);
+      const getTool = createGetGlobalsTool(createMockRegistry(manager));
       const getResult = await getTool.handler({}, {} as never);
       expect(getResult.currentState.theme).toBe("dark");
     });
 
     it("should set locale and timezone", async () => {
-      const tool = createSetGlobalsTool(manager);
+      const tool = createSetGlobalsTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           locale: "ja-JP",
@@ -65,7 +66,7 @@ describe("set_globals tool integration", () => {
     });
 
     it("should set viewport for mobile", async () => {
-      const tool = createSetGlobalsTool(manager);
+      const tool = createSetGlobalsTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           viewport: { width: 390, height: 844 },
@@ -78,7 +79,7 @@ describe("set_globals tool integration", () => {
     });
 
     it("should set safe area insets", async () => {
-      const tool = createSetGlobalsTool(manager);
+      const tool = createSetGlobalsTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           safeAreaInsets: { top: 47, right: 0, bottom: 34, left: 0 },
@@ -96,7 +97,7 @@ describe("set_globals tool integration", () => {
     });
 
     it("should set user agent for mobile device", async () => {
-      const tool = createSetGlobalsTool(manager);
+      const tool = createSetGlobalsTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           userAgent: {
@@ -115,7 +116,7 @@ describe("set_globals tool integration", () => {
     });
 
     it("should set user location", async () => {
-      const tool = createSetGlobalsTool(manager);
+      const tool = createSetGlobalsTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           userLocation: {
@@ -138,7 +139,7 @@ describe("set_globals tool integration", () => {
     });
 
     it("should set maxHeight", async () => {
-      const tool = createSetGlobalsTool(manager);
+      const tool = createSetGlobalsTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           maxHeight: 1200,
@@ -151,7 +152,7 @@ describe("set_globals tool integration", () => {
     });
 
     it("should unset optional fields with null", async () => {
-      const setTool = createSetGlobalsTool(manager);
+      const setTool = createSetGlobalsTool(createMockRegistry(manager));
 
       // First set a value
       await setTool.handler(
@@ -177,7 +178,7 @@ describe("set_globals tool integration", () => {
     });
 
     it("should set multiple fields at once", async () => {
-      const tool = createSetGlobalsTool(manager);
+      const tool = createSetGlobalsTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           theme: "dark",
@@ -203,8 +204,8 @@ describe("set_globals tool integration", () => {
     });
 
     it("should reset to defaults", async () => {
-      const setTool = createSetGlobalsTool(manager);
-      const resetTool = createResetGlobalsTool(manager);
+      const setTool = createSetGlobalsTool(createMockRegistry(manager));
+      const resetTool = createResetGlobalsTool(createMockRegistry(manager));
 
       // First set custom values
       await setTool.handler(
@@ -228,8 +229,8 @@ describe("set_globals tool integration", () => {
     });
 
     it("should persist state across multiple calls", async () => {
-      const setTool = createSetGlobalsTool(manager);
-      const getTool = createGetGlobalsTool(manager);
+      const setTool = createSetGlobalsTool(createMockRegistry(manager));
+      const getTool = createGetGlobalsTool(createMockRegistry(manager));
 
       // Set theme
       await setTool.handler({ theme: "dark" }, {} as never);
@@ -244,7 +245,7 @@ describe("set_globals tool integration", () => {
     });
 
     it("should return message indicating no changes when empty input", async () => {
-      const tool = createSetGlobalsTool(manager);
+      const tool = createSetGlobalsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.updated).toBe(false);
@@ -254,7 +255,7 @@ describe("set_globals tool integration", () => {
 
   describe("common testing scenarios", () => {
     it("should configure iPhone 13 Pro simulation", async () => {
-      const tool = createSetGlobalsTool(manager);
+      const tool = createSetGlobalsTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           viewport: { width: 390, height: 844 },
@@ -276,7 +277,7 @@ describe("set_globals tool integration", () => {
     });
 
     it("should configure iPad landscape", async () => {
-      const tool = createSetGlobalsTool(manager);
+      const tool = createSetGlobalsTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           viewport: { width: 1024, height: 768 },
@@ -294,7 +295,7 @@ describe("set_globals tool integration", () => {
     });
 
     it("should configure desktop with 4K resolution", async () => {
-      const tool = createSetGlobalsTool(manager);
+      const tool = createSetGlobalsTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           viewport: { width: 3840, height: 2160 },
@@ -312,7 +313,7 @@ describe("set_globals tool integration", () => {
     });
 
     it("should configure European user with dark mode", async () => {
-      const tool = createSetGlobalsTool(manager);
+      const tool = createSetGlobalsTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           theme: "dark",
@@ -336,7 +337,7 @@ describe("set_globals tool integration", () => {
     });
 
     it("should configure Asian user with mobile device", async () => {
-      const tool = createSetGlobalsTool(manager);
+      const tool = createSetGlobalsTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           locale: "zh-CN",
@@ -364,14 +365,17 @@ describe("set_globals tool integration", () => {
 
   describe("dynamic propagation to active sessions", () => {
     it("should propagate theme changes to active widget sessions", async () => {
-      const setTool = createSetGlobalsTool(manager);
+      const setTool = createSetGlobalsTool(createMockRegistry(manager));
       const sessionManager = manager.getWidgetSessionManager();
 
       // Mock a widget session (we won't actually render, just verify the method is called)
       const updateAllSessionGlobalsSpy = vi.spyOn(sessionManager, "updateAllSessionGlobals");
 
       // Initial state is light theme
-      const initialState = await createGetGlobalsTool(manager).handler({}, {} as never);
+      const initialState = await createGetGlobalsTool(createMockRegistry(manager)).handler(
+        {},
+        {} as never
+      );
       expect(initialState.currentState.theme).toBe("light");
 
       // Change to dark theme
@@ -391,7 +395,7 @@ describe("set_globals tool integration", () => {
     });
 
     it("should report number of sessions updated in message", async () => {
-      const setTool = createSetGlobalsTool(manager);
+      const setTool = createSetGlobalsTool(createMockRegistry(manager));
       const sessionManager = manager.getWidgetSessionManager();
 
       // Mock updateAllSessionGlobals to return 2 sessions updated
@@ -409,7 +413,7 @@ describe("set_globals tool integration", () => {
     });
 
     it("should handle zero active sessions gracefully", async () => {
-      const setTool = createSetGlobalsTool(manager);
+      const setTool = createSetGlobalsTool(createMockRegistry(manager));
       const sessionManager = manager.getWidgetSessionManager();
 
       // Mock updateAllSessionGlobals to return 0 sessions updated

@@ -8,6 +8,7 @@ import { createListPromptsTool } from "../src/tools/list-prompts";
 import { createGetPromptTool } from "../src/tools/get-prompt";
 import { createListResourcesTool } from "../src/tools/list-resources";
 import { createReadResourceTool } from "../src/tools/read-resource";
+import { createMockRegistry } from "./test-utils";
 
 // Mock the testing module
 const mockListPrompts = vi.fn();
@@ -62,7 +63,7 @@ describe("Prompts and Resources Tools", () => {
         { name: "summary", description: "A summary prompt" },
       ]);
 
-      const tool = createListPromptsTool(manager);
+      const tool = createListPromptsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.prompts).toHaveLength(2);
@@ -79,7 +80,7 @@ describe("Prompts and Resources Tools", () => {
     it("should return empty array when no prompts", async () => {
       mockListPrompts.mockResolvedValue([]);
 
-      const tool = createListPromptsTool(manager);
+      const tool = createListPromptsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.prompts).toEqual([]);
@@ -87,13 +88,13 @@ describe("Prompts and Resources Tools", () => {
 
     it("should throw error when not connected", async () => {
       const disconnectedManager = new ConnectionManager();
-      const tool = createListPromptsTool(disconnectedManager);
+      const tool = createListPromptsTool(createMockRegistry(disconnectedManager));
 
       await expect(tool.handler({}, {} as never)).rejects.toThrow("No active connection");
     });
 
     it("should have correct metadata", () => {
-      const tool = createListPromptsTool(manager);
+      const tool = createListPromptsTool(createMockRegistry(manager));
       expect(tool.description).toBe("List all prompts available on the connected MCP server.");
     });
   });
@@ -110,7 +111,7 @@ describe("Prompts and Resources Tools", () => {
         ],
       });
 
-      const tool = createGetPromptTool(manager);
+      const tool = createGetPromptTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "greeting" }, {} as never);
 
       expect(result.description).toBe("A greeting prompt");
@@ -131,7 +132,7 @@ describe("Prompts and Resources Tools", () => {
         ],
       });
 
-      const tool = createGetPromptTool(manager);
+      const tool = createGetPromptTool(createMockRegistry(manager));
       const result = await tool.handler(
         { name: "greeting", arguments: { name: "Alice" } },
         {} as never
@@ -143,7 +144,7 @@ describe("Prompts and Resources Tools", () => {
     it("should throw error for not found prompt", async () => {
       mockGetPrompt.mockRejectedValue(new Error("Prompt not found"));
 
-      const tool = createGetPromptTool(manager);
+      const tool = createGetPromptTool(createMockRegistry(manager));
 
       await expect(tool.handler({ name: "unknown" }, {} as never)).rejects.toThrow(
         "Prompt not found: unknown"
@@ -153,7 +154,7 @@ describe("Prompts and Resources Tools", () => {
     it("should throw error for missing required argument", async () => {
       mockGetPrompt.mockRejectedValue(new Error("Missing required argument 'name'"));
 
-      const tool = createGetPromptTool(manager);
+      const tool = createGetPromptTool(createMockRegistry(manager));
 
       await expect(tool.handler({ name: "greeting" }, {} as never)).rejects.toThrow(
         "Missing required argument for prompt 'greeting'"
@@ -163,7 +164,7 @@ describe("Prompts and Resources Tools", () => {
     it("should throw generic error for other failures", async () => {
       mockGetPrompt.mockRejectedValue(new Error("Server error"));
 
-      const tool = createGetPromptTool(manager);
+      const tool = createGetPromptTool(createMockRegistry(manager));
 
       await expect(tool.handler({ name: "greeting" }, {} as never)).rejects.toThrow(
         "Failed to get prompt 'greeting': Server error"
@@ -172,7 +173,7 @@ describe("Prompts and Resources Tools", () => {
 
     it("should throw error when not connected", async () => {
       const disconnectedManager = new ConnectionManager();
-      const tool = createGetPromptTool(disconnectedManager);
+      const tool = createGetPromptTool(createMockRegistry(disconnectedManager));
 
       await expect(tool.handler({ name: "greeting" }, {} as never)).rejects.toThrow(
         "No active connection"
@@ -187,7 +188,7 @@ describe("Prompts and Resources Tools", () => {
         { uri: "file://config.json", name: "Config" },
       ]);
 
-      const tool = createListResourcesTool(manager);
+      const tool = createListResourcesTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.resources).toHaveLength(2);
@@ -206,7 +207,7 @@ describe("Prompts and Resources Tools", () => {
     it("should return empty array when no resources", async () => {
       mockListResources.mockResolvedValue([]);
 
-      const tool = createListResourcesTool(manager);
+      const tool = createListResourcesTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.resources).toEqual([]);
@@ -214,13 +215,13 @@ describe("Prompts and Resources Tools", () => {
 
     it("should throw error when not connected", async () => {
       const disconnectedManager = new ConnectionManager();
-      const tool = createListResourcesTool(disconnectedManager);
+      const tool = createListResourcesTool(createMockRegistry(disconnectedManager));
 
       await expect(tool.handler({}, {} as never)).rejects.toThrow("No active connection");
     });
 
     it("should have correct metadata", () => {
-      const tool = createListResourcesTool(manager);
+      const tool = createListResourcesTool(createMockRegistry(manager));
       expect(tool.description).toBe("List all resources available on the connected MCP server.");
     });
   });
@@ -231,7 +232,7 @@ describe("Prompts and Resources Tools", () => {
         contents: [{ text: "# README\n\nProject description", mimeType: "text/markdown" }],
       });
 
-      const tool = createReadResourceTool(manager);
+      const tool = createReadResourceTool(createMockRegistry(manager));
       const result = await tool.handler({ uri: "file://readme.md" }, {} as never);
 
       expect(result.contents).toHaveLength(1);
@@ -248,7 +249,7 @@ describe("Prompts and Resources Tools", () => {
         contents: [{ blob: "base64encodeddata", mimeType: "image/png" }],
       });
 
-      const tool = createReadResourceTool(manager);
+      const tool = createReadResourceTool(createMockRegistry(manager));
       const result = await tool.handler({ uri: "file://image.png" }, {} as never);
 
       expect(result.contents[0]?.uri).toBe("file://image.png");
@@ -259,7 +260,7 @@ describe("Prompts and Resources Tools", () => {
     it("should throw error for not found resource", async () => {
       mockReadResource.mockRejectedValue(new Error("Resource not found"));
 
-      const tool = createReadResourceTool(manager);
+      const tool = createReadResourceTool(createMockRegistry(manager));
 
       await expect(tool.handler({ uri: "file://unknown.txt" }, {} as never)).rejects.toThrow(
         "Resource not found: file://unknown.txt"
@@ -269,7 +270,7 @@ describe("Prompts and Resources Tools", () => {
     it("should throw error for Not found (capitalized)", async () => {
       mockReadResource.mockRejectedValue(new Error("Not found: file://unknown.txt"));
 
-      const tool = createReadResourceTool(manager);
+      const tool = createReadResourceTool(createMockRegistry(manager));
 
       await expect(tool.handler({ uri: "file://unknown.txt" }, {} as never)).rejects.toThrow(
         "Resource not found: file://unknown.txt"
@@ -279,7 +280,7 @@ describe("Prompts and Resources Tools", () => {
     it("should throw generic error for other failures", async () => {
       mockReadResource.mockRejectedValue(new Error("Server error"));
 
-      const tool = createReadResourceTool(manager);
+      const tool = createReadResourceTool(createMockRegistry(manager));
 
       await expect(tool.handler({ uri: "file://readme.md" }, {} as never)).rejects.toThrow(
         "Failed to read resource file://readme.md: Server error"
@@ -288,7 +289,7 @@ describe("Prompts and Resources Tools", () => {
 
     it("should throw error when not connected", async () => {
       const disconnectedManager = new ConnectionManager();
-      const tool = createReadResourceTool(disconnectedManager);
+      const tool = createReadResourceTool(createMockRegistry(disconnectedManager));
 
       await expect(tool.handler({ uri: "file://readme.md" }, {} as never)).rejects.toThrow(
         "No active connection"

@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import { createScreenshotWidgetTool } from "../src/tools/screenshot-widget";
+import { createMockRegistry } from "./test-utils";
 
 // Mock modules
 const mockCallTool = vi.fn();
@@ -119,7 +120,7 @@ describe("screenshot_widget Standalone Mode", () => {
         contents: [{ text: "<html><body>Widget</body></html>" }],
       });
 
-      const tool = createScreenshotWidgetTool(manager);
+      const tool = createScreenshotWidgetTool(createMockRegistry(manager));
       const result = await tool.handler(
         { tool: "greet", arguments: { name: "Alice" } },
         {} as never
@@ -143,7 +144,7 @@ describe("screenshot_widget Standalone Mode", () => {
         contents: [{ text: "<div>Test</div>" }],
       });
 
-      const tool = createScreenshotWidgetTool(manager);
+      const tool = createScreenshotWidgetTool(createMockRegistry(manager));
       await tool.handler({ tool: "greet", arguments: {} }, {} as never);
 
       expect(mockPage.close).toHaveBeenCalled();
@@ -161,7 +162,7 @@ describe("screenshot_widget Standalone Mode", () => {
         contents: [{ text: "<div>Test</div>" }],
       });
 
-      const tool = createScreenshotWidgetTool(manager);
+      const tool = createScreenshotWidgetTool(createMockRegistry(manager));
       const result = await tool.handler({ tool: "greet", arguments: {} }, {} as never);
 
       expect(result.dimensions).toEqual({ width: 800, height: 600 });
@@ -179,7 +180,7 @@ describe("screenshot_widget Standalone Mode", () => {
         contents: [{ text: "<div>Test</div>" }],
       });
 
-      const tool = createScreenshotWidgetTool(manager);
+      const tool = createScreenshotWidgetTool(createMockRegistry(manager));
       const result = await tool.handler(
         { tool: "greet", arguments: {}, viewport: { width: 1920, height: 1080 } },
         {} as never
@@ -200,7 +201,7 @@ describe("screenshot_widget Standalone Mode", () => {
         contents: [{ text: "<div>Test</div>" }],
       });
 
-      const tool = createScreenshotWidgetTool(manager);
+      const tool = createScreenshotWidgetTool(createMockRegistry(manager));
       const result = await tool.handler(
         { tool: "greet", arguments: {}, format: "jpeg" },
         {} as never
@@ -224,7 +225,7 @@ describe("screenshot_widget Standalone Mode", () => {
       // When fullPage is true, it should fall back to takeScreenshot
       mockPage.frame.mockReturnValue(null);
 
-      const tool = createScreenshotWidgetTool(manager);
+      const tool = createScreenshotWidgetTool(createMockRegistry(manager));
       await tool.handler({ tool: "greet", arguments: {}, fullPage: true }, {} as never);
 
       expect(mockTakeScreenshot).toHaveBeenCalled();
@@ -236,7 +237,7 @@ describe("screenshot_widget Standalone Mode", () => {
       const client = manager.getClient();
       vi.mocked(client.raw.callTool).mockRejectedValue(new Error("Tool execution failed"));
 
-      const tool = createScreenshotWidgetTool(manager);
+      const tool = createScreenshotWidgetTool(createMockRegistry(manager));
       const result = await tool.handler(
         { tool: "greet", arguments: { name: "Alice" } },
         {} as never
@@ -253,7 +254,7 @@ describe("screenshot_widget Standalone Mode", () => {
       });
       vi.mocked(client.raw.listResources).mockResolvedValue({ resources: [] });
 
-      const tool = createScreenshotWidgetTool(manager);
+      const tool = createScreenshotWidgetTool(createMockRegistry(manager));
       const result = await tool.handler(
         { tool: "greet", arguments: { name: "Alice" } },
         {} as never
@@ -275,7 +276,7 @@ describe("screenshot_widget Standalone Mode", () => {
         contents: [{ text: "" }],
       });
 
-      const tool = createScreenshotWidgetTool(manager);
+      const tool = createScreenshotWidgetTool(createMockRegistry(manager));
       const result = await tool.handler(
         { tool: "greet", arguments: { name: "Alice" } },
         {} as never
@@ -295,7 +296,7 @@ describe("screenshot_widget Standalone Mode", () => {
       });
       vi.mocked(client.raw.readResource).mockRejectedValue(new Error("Resource fetch failed"));
 
-      const tool = createScreenshotWidgetTool(manager);
+      const tool = createScreenshotWidgetTool(createMockRegistry(manager));
       const result = await tool.handler(
         { tool: "greet", arguments: { name: "Alice" } },
         {} as never
@@ -322,7 +323,7 @@ describe("screenshot_widget Standalone Mode", () => {
       // Override mock to throw error
       mockRenderInBrowser.mockRejectedValue(new Error("Render failed"));
 
-      const tool = createScreenshotWidgetTool(manager);
+      const tool = createScreenshotWidgetTool(createMockRegistry(manager));
       const result = await tool.handler({ tool: "greet", arguments: {} }, {} as never);
 
       expect(result.hasUI).toBe(true);
@@ -368,7 +369,7 @@ describe("screenshot_widget Standalone Mode", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (sessionManager as any).store.sessions.set("test-session-id", mockSession);
 
-      const tool = createScreenshotWidgetTool(manager);
+      const tool = createScreenshotWidgetTool(createMockRegistry(manager));
       const result = await tool.handler({ sessionId: "test-session-id" }, {} as never);
 
       expect(result.hasUI).toBe(true);
@@ -410,7 +411,7 @@ describe("screenshot_widget Standalone Mode", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (sessionManager as any).store.sessions.set("failing-session", mockSession);
 
-      const tool = createScreenshotWidgetTool(manager);
+      const tool = createScreenshotWidgetTool(createMockRegistry(manager));
       const result = await tool.handler({ sessionId: "failing-session" }, {} as never);
 
       expect(result.hasUI).toBe(true);

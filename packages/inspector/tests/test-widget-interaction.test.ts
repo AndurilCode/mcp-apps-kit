@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import { createTestWidgetInteractionTool } from "../src/tools/test-widget-interaction";
+import { createMockRegistry } from "./test-utils";
 
 // Mock testing module
 const mockCallTool = vi.fn();
@@ -55,7 +56,7 @@ describe("test_widget_interaction Tool", () => {
 
   describe("standalone mode validation", () => {
     it("should return error when neither sessionId nor tool/arguments provided", async () => {
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       const result = await tool.handler(
         { interactions: [{ action: "click", selector: "#btn" }] },
         {} as never
@@ -72,7 +73,7 @@ describe("test_widget_interaction Tool", () => {
     });
 
     it("should return error when only tool provided without arguments", async () => {
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       const result = await tool.handler(
         { tool: "greet", interactions: [{ action: "click", selector: "#btn" }] },
         {} as never
@@ -87,7 +88,7 @@ describe("test_widget_interaction Tool", () => {
 
   describe("session mode", () => {
     it("should return error when session not found", async () => {
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           sessionId: "non-existent-id",
@@ -107,7 +108,7 @@ describe("test_widget_interaction Tool", () => {
       const client = manager.getClient();
       vi.mocked(client.raw.callTool).mockRejectedValue(new Error("Tool execution failed"));
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           tool: "greet",
@@ -131,7 +132,7 @@ describe("test_widget_interaction Tool", () => {
       });
       vi.mocked(client.raw.listResources).mockResolvedValue({ resources: [] });
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           tool: "greet",
@@ -157,7 +158,7 @@ describe("test_widget_interaction Tool", () => {
         contents: [{ text: "" }],
       });
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           tool: "greet",
@@ -181,7 +182,7 @@ describe("test_widget_interaction Tool", () => {
       });
       vi.mocked(client.raw.readResource).mockRejectedValue(new Error("Resource read failed"));
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           tool: "greet",
@@ -201,7 +202,7 @@ describe("test_widget_interaction Tool", () => {
     // Helper to get action enum options from the Zod schema
     // Zod 4 API: tool.input.shape.interactions.element.shape.action.options
     const getActionOptions = () => {
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       const inputSchema = tool.input;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const interactionsSchema = (inputSchema as any).shape.interactions;
@@ -214,7 +215,7 @@ describe("test_widget_interaction Tool", () => {
     };
 
     it("should have inputSchema that accepts click action", () => {
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       expect(tool.input).toBeDefined();
       expect(getActionOptions()).toContain("click");
     });
@@ -242,7 +243,7 @@ describe("test_widget_interaction Tool", () => {
 
   describe("metadata", () => {
     it("should have correct tool metadata", () => {
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       expect(tool.description).toContain("interactions");
     });
   });
@@ -250,7 +251,7 @@ describe("test_widget_interaction Tool", () => {
   describe("not connected", () => {
     it("should throw error when not connected", async () => {
       const disconnectedManager = new ConnectionManager();
-      const tool = createTestWidgetInteractionTool(disconnectedManager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(disconnectedManager));
 
       await expect(
         tool.handler(

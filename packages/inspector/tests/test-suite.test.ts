@@ -33,6 +33,7 @@ vi.mock("@mcp-apps-kit/testing", () => {
 });
 
 import * as testingModule from "@mcp-apps-kit/testing";
+import { createMockRegistry } from "./test-utils";
 
 interface MocksType {
   listTools: ReturnType<typeof vi.fn>;
@@ -93,7 +94,7 @@ describe("run_test_suite Tool", () => {
       ],
     });
 
-    const tool = createRunTestSuiteTool(manager);
+    const tool = createRunTestSuiteTool(createMockRegistry(manager));
     const result = await tool.handler(
       {
         suite: {
@@ -148,7 +149,7 @@ describe("run_test_suite Tool", () => {
       ],
     });
 
-    const tool = createRunTestSuiteTool(manager);
+    const tool = createRunTestSuiteTool(createMockRegistry(manager));
     const result = await tool.handler(
       {
         suite: {
@@ -178,7 +179,7 @@ describe("run_test_suite Tool", () => {
       cases: [{ name: "case1", status: "passed", duration: 50 }],
     });
 
-    const tool = createRunTestSuiteTool(manager);
+    const tool = createRunTestSuiteTool(createMockRegistry(manager));
     await tool.handler(
       {
         suite: {
@@ -201,7 +202,7 @@ describe("run_test_suite Tool", () => {
 
   it("should throw error when not connected", async () => {
     const disconnectedManager = new ConnectionManager();
-    const tool = createRunTestSuiteTool(disconnectedManager);
+    const tool = createRunTestSuiteTool(createMockRegistry(disconnectedManager));
 
     await expect(
       tool.handler(
@@ -218,7 +219,7 @@ describe("run_test_suite Tool", () => {
   });
 
   it("should have correct metadata", () => {
-    const tool = createRunTestSuiteTool(manager);
+    const tool = createRunTestSuiteTool(createMockRegistry(manager));
     expect(tool.description).toContain("Run a test suite against a tool");
   });
 });
