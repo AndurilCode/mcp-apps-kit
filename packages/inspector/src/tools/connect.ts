@@ -1,12 +1,17 @@
 /**
  * connect_to_server tool
+ *
+ * Creates a new connection via the ConnectionRegistry.
  */
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type { ConnectOutput } from "../types";
 
+/**
+ * Zod schema for optional connection options.
+ */
 export const connectOptionsSchema = z
   .object({
     trackHistory: z.boolean().optional().describe("Track call history. Default: true"),
@@ -14,18 +19,21 @@ export const connectOptionsSchema = z
   })
   .optional();
 
+/**
+ * Zod schema for connect tool input.
+ */
 export const connectInputSchema = z.object({
   url: z
     .string()
     .describe("URL of the MCP server to connect to (e.g., http://localhost:3000/v1/mcp)"),
   options: connectOptionsSchema,
-  force: z
-    .boolean()
-    .optional()
-    .describe("Force reconnection if already connected to a different server"),
 });
 
+/**
+ * Zod schema for connect tool output.
+ */
 export const connectOutputSchema = z.object({
+  connectionId: z.string().describe("Unique ID for this connection"),
   connected: z.boolean(),
   serverUrl: z.string(),
   serverInfo: z
@@ -39,53 +47,43 @@ export const connectOutputSchema = z.object({
   promptCount: z.number(),
 });
 
-export function createConnectTool(connectionManager: ConnectionManager) {
+/**
+ * Connect tool output including the assigned connection id.
+ */
+export interface ConnectOutputWithId extends ConnectOutput {
+  connectionId: string;
+}
+
+/**
+ * Create the connect tool bound to a registry instance.
+ *
+ * @param registry - Connection registry to create connections with.
+ * @returns A configured MCP tool definition.
+ */
+export function createConnectTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
-      "Connect to a target MCP server. This establishes a connection that can be used to list and call tools, resources, and prompts on the target server.",
+      "Connect to a target MCP server. Creates a new connection and returns a connectionId that can be used with other tools. Multiple simultaneous connections are supported.",
     input: connectInputSchema,
     output: connectOutputSchema,
-    handler: async (input): Promise<ConnectOutput> => {
+    handler: async (input): Promise<ConnectOutputWithId> => {
       try {
-        // Check if already connected
-        const currentState = connectionManager.getState();
-        if (currentState.connected && currentState.serverUrl) {
-          // If already connected to the same URL, return success silently
-          if (currentState.serverUrl === input.url) {
-            const schema = connectionManager.getTargetSchema();
-            return {
-              connected: true,
-              serverUrl: input.url,
-              serverInfo: currentState.serverInfo,
-              toolCount: schema?.tools.length ?? 0,
-              resourceCount: schema?.resources.length ?? 0,
-              promptCount: schema?.prompts.length ?? 0,
-            };
-          }
+        const { id, connectionManager } = await registry.createConnection(input.url, input.options);
 
-          // If already connected to a different URL without force, throw error
-          if (!input.force) {
-            throw new Error(
-              `Already connected to ${currentState.serverUrl}. Use force=true to disconnect and connect to ${input.url}.`
-            );
-          }
-          // If force=true, disconnect first (handled by connectionManager.connect)
-        }
-
-        const result = await connectionManager.connect(input.url, input.options);
+        const schema = connectionManager.getTargetSchema();
 
         return {
+          connectionId: id,
           connected: true,
           serverUrl: input.url,
-          serverInfo: result.serverInfo,
-          toolCount: result.toolCount,
-          resourceCount: result.resourceCount,
-          promptCount: result.promptCount,
+          serverInfo: connectionManager.getState().serverInfo,
+          toolCount: schema?.tools.length ?? 0,
+          resourceCount: schema?.resources.length ?? 0,
+          promptCount: schema?.prompts.length ?? 0,
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
 
-        // Handle specific error types
         if (message.includes("ECONNREFUSED")) {
           throw new Error(`Connection refused: ECONNREFUSED ${input.url}`);
         }
@@ -94,6 +92,9 @@ export function createConnectTool(connectionManager: ConnectionManager) {
           throw new Error(`Connection timeout after ${timeout}ms to ${input.url}`);
         }
         if (message.includes("Invalid URL")) {
+          throw new Error(message);
+        }
+        if (message.includes("Max connections limit")) {
           throw new Error(message);
         }
 

@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import { createWidgetQueryTool } from "../src/tools/widget-query";
 import type { WidgetSession } from "../src/types";
+import { createMockRegistry } from "./test-utils";
 
 // Mock testing module
 const mockCallTool = vi.fn();
@@ -121,13 +122,13 @@ describe("widget_query Tool", () => {
 
   describe("tool metadata", () => {
     it("should have correct description", () => {
-      const tool = createWidgetQueryTool(manager);
+      const tool = createWidgetQueryTool(createMockRegistry(manager));
       expect(tool.description).toContain("Query elements");
       expect(tool.description).toContain("semantic locators");
     });
 
     it("should have input and output schemas defined", () => {
-      const tool = createWidgetQueryTool(manager);
+      const tool = createWidgetQueryTool(createMockRegistry(manager));
       expect(tool.input).toBeDefined();
       expect(tool.output).toBeDefined();
     });
@@ -135,7 +136,7 @@ describe("widget_query Tool", () => {
 
   describe("session validation", () => {
     it("should return error when session not found", async () => {
-      const tool = createWidgetQueryTool(manager);
+      const tool = createWidgetQueryTool(createMockRegistry(manager));
       const result = await tool.handler(
         { sessionId: "non-existent-id", text: "Click me" },
         {} as never
@@ -149,7 +150,7 @@ describe("widget_query Tool", () => {
 
   describe("locator validation", () => {
     it("should return error when no locator is provided", async () => {
-      const tool = createWidgetQueryTool(manager);
+      const tool = createWidgetQueryTool(createMockRegistry(manager));
       // First need a valid session - but since we can't create one easily,
       // we'll test the schema validation instead
       const result = await tool.handler({ sessionId: "test-session" }, {} as never);
@@ -163,7 +164,7 @@ describe("widget_query Tool", () => {
   describe("not connected", () => {
     it("should return error when not connected", async () => {
       const disconnectedManager = new ConnectionManager();
-      const tool = createWidgetQueryTool(disconnectedManager);
+      const tool = createWidgetQueryTool(createMockRegistry(disconnectedManager));
 
       // These tools check session first before checking connection
       const result = await tool.handler(
@@ -177,90 +178,90 @@ describe("widget_query Tool", () => {
 
   describe("input schema validation", () => {
     it("should accept text locator", () => {
-      const tool = createWidgetQueryTool(manager);
+      const tool = createWidgetQueryTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("text");
     });
 
     it("should accept selector locator", () => {
-      const tool = createWidgetQueryTool(manager);
+      const tool = createWidgetQueryTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("selector");
     });
 
     it("should accept role locator", () => {
-      const tool = createWidgetQueryTool(manager);
+      const tool = createWidgetQueryTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("role");
     });
 
     it("should accept name parameter for role locator", () => {
-      const tool = createWidgetQueryTool(manager);
+      const tool = createWidgetQueryTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("name");
     });
 
     it("should accept label locator", () => {
-      const tool = createWidgetQueryTool(manager);
+      const tool = createWidgetQueryTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("label");
     });
 
     it("should accept placeholder locator", () => {
-      const tool = createWidgetQueryTool(manager);
+      const tool = createWidgetQueryTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("placeholder");
     });
 
     it("should accept testId locator", () => {
-      const tool = createWidgetQueryTool(manager);
+      const tool = createWidgetQueryTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("testId");
     });
 
     it("should accept exact matching option", () => {
-      const tool = createWidgetQueryTool(manager);
+      const tool = createWidgetQueryTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("exact");
     });
 
     it("should accept nth option", () => {
-      const tool = createWidgetQueryTool(manager);
+      const tool = createWidgetQueryTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("nth");
     });
 
     it("should accept maxResults option", () => {
-      const tool = createWidgetQueryTool(manager);
+      const tool = createWidgetQueryTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("maxResults");
     });
 
     it("should accept timeout option", () => {
-      const tool = createWidgetQueryTool(manager);
+      const tool = createWidgetQueryTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("timeout");
     });
   });
 
   describe("output schema validation", () => {
     it("should have success field", () => {
-      const tool = createWidgetQueryTool(manager);
+      const tool = createWidgetQueryTool(createMockRegistry(manager));
       expect(tool.output).toBeDefined();
       expect(tool.output!.shape).toHaveProperty("success");
     });
 
     it("should have count field", () => {
-      const tool = createWidgetQueryTool(manager);
+      const tool = createWidgetQueryTool(createMockRegistry(manager));
       expect(tool.output!.shape).toHaveProperty("count");
     });
 
     it("should have elements field", () => {
-      const tool = createWidgetQueryTool(manager);
+      const tool = createWidgetQueryTool(createMockRegistry(manager));
       expect(tool.output!.shape).toHaveProperty("elements");
     });
 
     it("should have locatorStrategy field", () => {
-      const tool = createWidgetQueryTool(manager);
+      const tool = createWidgetQueryTool(createMockRegistry(manager));
       expect(tool.output!.shape).toHaveProperty("locatorStrategy");
     });
 
     it("should have error field", () => {
-      const tool = createWidgetQueryTool(manager);
+      const tool = createWidgetQueryTool(createMockRegistry(manager));
       expect(tool.output!.shape).toHaveProperty("error");
     });
 
     it("should have hints field", () => {
-      const tool = createWidgetQueryTool(manager);
+      const tool = createWidgetQueryTool(createMockRegistry(manager));
       expect(tool.output!.shape).toHaveProperty("hints");
     });
   });
@@ -294,7 +295,7 @@ describe("widget_query handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-session-text", text: "Click Me" },
       {} as never
@@ -313,7 +314,7 @@ describe("widget_query handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-session-role", role: "button" },
       {} as never
@@ -330,7 +331,7 @@ describe("widget_query handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-session-selector", selector: "#my-button" },
       {} as never
@@ -347,7 +348,7 @@ describe("widget_query handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-session-label", label: "Email" },
       {} as never
@@ -364,7 +365,7 @@ describe("widget_query handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-session-placeholder", placeholder: "Enter email" },
       {} as never
@@ -384,7 +385,7 @@ describe("widget_query handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-session-testid", testId: "submit-btn" },
       {} as never
@@ -401,7 +402,7 @@ describe("widget_query handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-session-no-loc" }, {} as never);
 
     expect(result.success).toBe(false);
@@ -416,7 +417,7 @@ describe("widget_query handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-session-closed", text: "test" },
       {} as never
@@ -434,7 +435,7 @@ describe("widget_query handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-session-multi", role: "button", maxResults: 3 },
       {} as never
@@ -452,7 +453,7 @@ describe("widget_query handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-session-limit", role: "button", maxResults: 5 },
       {} as never
@@ -688,7 +689,7 @@ describe("widget_query handler - branch coverage", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-role-name", role: "button", name: "Submit" },
       {} as never
@@ -706,7 +707,7 @@ describe("widget_query handler - branch coverage", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-role-exact", role: "button", name: "Submit", exact: true },
       {} as never
@@ -729,7 +730,7 @@ describe("widget_query handler - branch coverage", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-nth-valid", text: "Button", nth: 1 },
       {} as never
@@ -749,7 +750,7 @@ describe("widget_query handler - branch coverage", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-nth-invalid", text: "Button", nth: 5 },
       {} as never
@@ -768,7 +769,7 @@ describe("widget_query handler - branch coverage", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-nth-error", text: "Button", nth: 0 },
       {} as never
@@ -788,7 +789,7 @@ describe("widget_query handler - branch coverage", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-many-matches", role: "button" },
       {} as never
@@ -807,7 +808,7 @@ describe("widget_query handler - branch coverage", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-zero-matches", text: "NonExistent" },
       {} as never
@@ -828,7 +829,7 @@ describe("widget_query handler - branch coverage", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-single-match", text: "Submit" },
       {} as never
@@ -848,7 +849,7 @@ describe("widget_query handler - branch coverage", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-q-noframe", text: "Submit" }, {} as never);
 
     expect(result.success).toBe(false);
@@ -872,7 +873,7 @@ describe("widget_query handler - branch coverage", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-iter-error", role: "button" },
       {} as never
@@ -891,7 +892,7 @@ describe("widget_query handler - branch coverage", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-main-error", text: "Submit" },
       {} as never
@@ -912,7 +913,7 @@ describe("widget_query handler - branch coverage", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetQueryTool(manager);
+    const tool = createWidgetQueryTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-multi-hint", role: "button" },
       {} as never

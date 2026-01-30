@@ -39,7 +39,11 @@ function ensureLogId(log: Omit<LogEntry, "id"> & { id?: string }): LogEntry {
   };
 }
 
-export function useLogStream(baseUrl: string, sessionId: string | null): UseLogStreamResult {
+export function useLogStream(
+  baseUrl: string,
+  sessionId: string | null,
+  connectionId: string | null = null
+): UseLogStreamResult {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const eventSourceRef = useRef<EventSource | null>(null);
 
@@ -60,9 +64,11 @@ export function useLogStream(baseUrl: string, sessionId: string | null): UseLogS
       return;
     }
 
-    const eventSource = new EventSource(
-      `${baseUrl}/dashboard/logs?sessionId=${encodeURIComponent(sessionId)}`
-    );
+    const params = new URLSearchParams({ sessionId });
+    if (connectionId) {
+      params.set("connectionId", connectionId);
+    }
+    const eventSource = new EventSource(`${baseUrl}/dashboard/logs?${params.toString()}`);
     eventSourceRef.current = eventSource;
 
     // Handle initial batch of logs
@@ -120,7 +126,7 @@ export function useLogStream(baseUrl: string, sessionId: string | null): UseLogS
         eventSourceRef.current = null;
       }
     };
-  }, [baseUrl, sessionId]);
+  }, [baseUrl, sessionId, connectionId]);
 
   return { logs, clearLogs };
 }

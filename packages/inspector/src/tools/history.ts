@@ -4,14 +4,16 @@
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type { HistoryOutput, ClearHistoryOutput } from "../types";
 
 // =============================================================================
 // get_call_history
 // =============================================================================
 
-export const getCallHistoryInputSchema = z.object({}).describe("No input required");
+export const getCallHistoryInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
+});
 
 export const getCallHistoryOutputSchema = z.object({
   history: z.array(
@@ -39,13 +41,14 @@ export const getCallHistoryOutputSchema = z.object({
   message: z.string().optional(),
 });
 
-export function createGetCallHistoryTool(connectionManager: ConnectionManager) {
+export function createGetCallHistoryTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Get the history of tool calls made to the connected server. Returns call details including name, arguments, results, and timing.",
     input: getCallHistoryInputSchema,
     output: getCallHistoryOutputSchema,
-    handler: async (): Promise<HistoryOutput> => {
+    handler: async (input): Promise<HistoryOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       // Check if history tracking is enabled
       if (!connectionManager.isHistoryEnabled()) {
         return {
@@ -79,19 +82,22 @@ export function createGetCallHistoryTool(connectionManager: ConnectionManager) {
 // clear_history
 // =============================================================================
 
-export const clearHistoryInputSchema = z.object({}).describe("No input required");
+export const clearHistoryInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
+});
 
 export const clearHistoryOutputSchema = z.object({
   cleared: z.boolean(),
   previousCount: z.number(),
 });
 
-export function createClearHistoryTool(connectionManager: ConnectionManager) {
+export function createClearHistoryTool(registry: ConnectionRegistry) {
   return defineTool({
     description: "Clear the call history for the current connection.",
     input: clearHistoryInputSchema,
     output: clearHistoryOutputSchema,
-    handler: async (): Promise<ClearHistoryOutput> => {
+    handler: async (input): Promise<ClearHistoryOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const previousCount = connectionManager.clearHistory();
 
       return {

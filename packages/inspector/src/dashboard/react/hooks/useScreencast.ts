@@ -23,7 +23,11 @@ export interface UseScreencastResult {
   error: string | null;
 }
 
-export function useScreencast(baseUrl: string, sessionId: string | null): UseScreencastResult {
+export function useScreencast(
+  baseUrl: string,
+  sessionId: string | null,
+  connectionId: string | null = null
+): UseScreencastResult {
   const [imageData, setImageData] = useState<string | null>(null);
   const [status, setStatus] = useState<ScreencastStatus>("disconnected");
   const [error, setError] = useState<string | null>(null);
@@ -53,9 +57,11 @@ export function useScreencast(baseUrl: string, sessionId: string | null): UseScr
       setStatus("connecting");
       setError(null);
 
-      const eventSource = new EventSource(
-        `${baseUrl}/dashboard/stream?sessionId=${encodeURIComponent(sessionId)}`
-      );
+      const params = new URLSearchParams({ sessionId });
+      if (connectionId) {
+        params.set("connectionId", connectionId);
+      }
+      const eventSource = new EventSource(`${baseUrl}/dashboard/stream?${params.toString()}`);
       eventSourceRef.current = eventSource;
 
       eventSource.addEventListener("frame", (event: MessageEvent) => {
@@ -117,7 +123,7 @@ export function useScreencast(baseUrl: string, sessionId: string | null): UseScr
         reconnectTimeoutRef.current = null;
       }
     };
-  }, [baseUrl, sessionId]);
+  }, [baseUrl, sessionId, connectionId]);
 
   return { imageData, status, error };
 }

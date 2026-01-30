@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import { createPreviewUITool } from "../src/tools/preview-ui";
+import { createMockRegistry } from "./test-utils";
 
 // Mock testing module
 const mockCallTool = vi.fn();
@@ -62,7 +63,7 @@ describe("preview_ui Tool", () => {
 
   describe("standalone mode validation", () => {
     it("should return error when neither sessionId nor tool/arguments provided", async () => {
-      const tool = createPreviewUITool(manager);
+      const tool = createPreviewUITool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.hasUI).toBe(false);
@@ -73,7 +74,7 @@ describe("preview_ui Tool", () => {
     });
 
     it("should return error when only tool provided without arguments", async () => {
-      const tool = createPreviewUITool(manager);
+      const tool = createPreviewUITool(createMockRegistry(manager));
       const result = await tool.handler({ tool: "greet" }, {} as never);
 
       expect(result.hasUI).toBe(false);
@@ -83,7 +84,7 @@ describe("preview_ui Tool", () => {
     });
 
     it("should return error when only arguments provided without tool", async () => {
-      const tool = createPreviewUITool(manager);
+      const tool = createPreviewUITool(createMockRegistry(manager));
       const result = await tool.handler({ arguments: { name: "Alice" } }, {} as never);
 
       expect(result.hasUI).toBe(false);
@@ -95,7 +96,7 @@ describe("preview_ui Tool", () => {
 
   describe("session mode", () => {
     it("should return error when session not found", async () => {
-      const tool = createPreviewUITool(manager);
+      const tool = createPreviewUITool(createMockRegistry(manager));
       const result = await tool.handler({ sessionId: "non-existent-id" }, {} as never);
 
       expect(result.hasUI).toBe(false);
@@ -109,7 +110,7 @@ describe("preview_ui Tool", () => {
       const client = manager.getClient();
       vi.mocked(client.raw.callTool).mockRejectedValue(new Error("Tool execution failed"));
 
-      const tool = createPreviewUITool(manager);
+      const tool = createPreviewUITool(createMockRegistry(manager));
       const result = await tool.handler(
         { tool: "greet", arguments: { name: "Alice" } },
         {} as never
@@ -129,7 +130,7 @@ describe("preview_ui Tool", () => {
       });
       vi.mocked(client.raw.listResources).mockResolvedValue({ resources: [] });
 
-      const tool = createPreviewUITool(manager);
+      const tool = createPreviewUITool(createMockRegistry(manager));
       const result = await tool.handler(
         { tool: "greet", arguments: { name: "Alice" } },
         {} as never
@@ -151,7 +152,7 @@ describe("preview_ui Tool", () => {
         contents: [{ text: "" }],
       });
 
-      const tool = createPreviewUITool(manager);
+      const tool = createPreviewUITool(createMockRegistry(manager));
       const result = await tool.handler(
         { tool: "greet", arguments: { name: "Alice" } },
         {} as never
@@ -171,7 +172,7 @@ describe("preview_ui Tool", () => {
       });
       vi.mocked(client.raw.readResource).mockRejectedValue(new Error("Resource read failed"));
 
-      const tool = createPreviewUITool(manager);
+      const tool = createPreviewUITool(createMockRegistry(manager));
       const result = await tool.handler(
         { tool: "greet", arguments: { name: "Alice" } },
         {} as never
@@ -185,7 +186,7 @@ describe("preview_ui Tool", () => {
 
   describe("metadata", () => {
     it("should have correct tool metadata", () => {
-      const tool = createPreviewUITool(manager);
+      const tool = createPreviewUITool(createMockRegistry(manager));
       expect(tool.description).toContain("Preview a tool's UI widget");
     });
   });
@@ -193,7 +194,7 @@ describe("preview_ui Tool", () => {
   describe("not connected", () => {
     it("should throw error when not connected", async () => {
       const disconnectedManager = new ConnectionManager();
-      const tool = createPreviewUITool(disconnectedManager);
+      const tool = createPreviewUITool(createMockRegistry(disconnectedManager));
 
       await expect(tool.handler({ tool: "greet", arguments: {} }, {} as never)).rejects.toThrow(
         "No active connection"

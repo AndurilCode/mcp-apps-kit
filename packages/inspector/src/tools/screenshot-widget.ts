@@ -10,7 +10,7 @@ import { defineTool } from "@mcp-apps-kit/core";
 import { writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type { ScreenshotWidgetOutput } from "../types";
 import { UIHostManager, type DetectedProtocol } from "../ui-host";
 import {
@@ -21,6 +21,7 @@ import {
 } from "./helpers";
 
 export const screenshotWidgetInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   sessionId: z
     .string()
     .optional()
@@ -63,13 +64,14 @@ export const screenshotWidgetOutputSchema = z.object({
 // Create screenshots directory in temp
 const SCREENSHOTS_DIR = join(tmpdir(), "mcp-inspector-screenshots");
 
-export function createScreenshotWidgetTool(connectionManager: ConnectionManager) {
+export function createScreenshotWidgetTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Take a screenshot of a tool's UI widget. Can use an existing widget session (via sessionId) or call the tool and render a new widget. Saves the screenshot to a temp file and returns the file path.",
     input: screenshotWidgetInputSchema,
     output: screenshotWidgetOutputSchema,
     handler: async (input): Promise<ScreenshotWidgetOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const format = input.format ?? "png";
       const viewport = input.viewport ?? { width: 800, height: 600 };
 

@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import { createTestWidgetInteractionTool } from "../src/tools/test-widget-interaction";
+import { createMockRegistry } from "./test-utils";
 
 // Mock modules
 const mockCallTool = vi.fn();
@@ -128,7 +129,7 @@ describe("test_widget_interaction Standalone Mode", () => {
         contents: [{ text: "<html><body><button id='btn'>Click</button></body></html>" }],
       });
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           tool: "greet",
@@ -155,7 +156,7 @@ describe("test_widget_interaction Standalone Mode", () => {
         contents: [{ text: "<div><input type='text' id='input'/></div>" }],
       });
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       await tool.handler(
         {
           tool: "greet",
@@ -180,7 +181,7 @@ describe("test_widget_interaction Standalone Mode", () => {
         contents: [{ text: "<div id='hover-target'>Hover me</div>" }],
       });
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       await tool.handler(
         {
           tool: "greet",
@@ -205,7 +206,7 @@ describe("test_widget_interaction Standalone Mode", () => {
         contents: [{ text: "<div>Test</div>" }],
       });
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       await tool.handler(
         {
           tool: "greet",
@@ -230,7 +231,7 @@ describe("test_widget_interaction Standalone Mode", () => {
         contents: [{ text: "<div>Test</div>" }],
       });
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       await tool.handler(
         {
           tool: "greet",
@@ -255,7 +256,7 @@ describe("test_widget_interaction Standalone Mode", () => {
         contents: [{ text: "<div>Test</div>" }],
       });
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           tool: "greet",
@@ -282,7 +283,7 @@ describe("test_widget_interaction Standalone Mode", () => {
         contents: [{ text: "<div><input id='in'/><button id='btn'/></div>" }],
       });
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       await tool.handler(
         {
           tool: "greet",
@@ -312,7 +313,7 @@ describe("test_widget_interaction Standalone Mode", () => {
         contents: [{ text: "<div>Test</div>" }],
       });
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       await tool.handler(
         {
           tool: "greet",
@@ -337,7 +338,7 @@ describe("test_widget_interaction Standalone Mode", () => {
         contents: [{ text: "<div>Test</div>" }],
       });
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       await tool.handler(
         {
           tool: "greet",
@@ -367,7 +368,7 @@ describe("test_widget_interaction Standalone Mode", () => {
       // Make click fail
       mockFrame.click.mockRejectedValue(new Error("Element not found"));
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           tool: "greet",
@@ -386,7 +387,7 @@ describe("test_widget_interaction Standalone Mode", () => {
       const client = manager.getClient();
       vi.mocked(client.raw.callTool).mockRejectedValue(new Error("Tool execution failed"));
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           tool: "greet",
@@ -407,7 +408,7 @@ describe("test_widget_interaction Standalone Mode", () => {
       });
       vi.mocked(client.raw.listResources).mockResolvedValue({ resources: [] });
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           tool: "greet",
@@ -433,7 +434,7 @@ describe("test_widget_interaction Standalone Mode", () => {
         contents: [{ text: "" }],
       });
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           tool: "greet",
@@ -457,7 +458,7 @@ describe("test_widget_interaction Standalone Mode", () => {
       });
       vi.mocked(client.raw.readResource).mockRejectedValue(new Error("Resource fetch failed"));
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           tool: "greet",
@@ -488,7 +489,7 @@ describe("test_widget_interaction Standalone Mode", () => {
       // Override mock to throw error
       mockRenderInBrowser.mockRejectedValue(new Error("Render failed"));
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           tool: "greet",
@@ -517,7 +518,7 @@ describe("test_widget_interaction Standalone Mode", () => {
       // Return null for frame
       mockPage.frame.mockReturnValue(null);
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           tool: "greet",
@@ -571,7 +572,7 @@ describe("test_widget_interaction Standalone Mode", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (sessionManager as any).store.sessions.set("test-session-id", mockSession);
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           sessionId: "test-session-id",
@@ -609,7 +610,7 @@ describe("test_widget_interaction Standalone Mode", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (sessionManager as any).store.sessions.set("no-frame-session", mockSession);
 
-      const tool = createTestWidgetInteractionTool(manager);
+      const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           sessionId: "no-frame-session",

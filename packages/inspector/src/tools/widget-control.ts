@@ -11,7 +11,7 @@
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type {
   WidgetEvaluateOutput,
   WidgetClickOutput,
@@ -36,6 +36,7 @@ import {
 // =============================================================================
 
 export const widgetEvaluateInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   sessionId: z.string().describe("Session ID of the widget to evaluate in"),
   expression: z.string().describe("JavaScript code to evaluate in the widget iframe"),
 });
@@ -46,13 +47,14 @@ export const widgetEvaluateOutputSchema = z.object({
   error: z.string().optional(),
 });
 
-export function createWidgetEvaluateTool(connectionManager: ConnectionManager) {
+export function createWidgetEvaluateTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Execute JavaScript code in a widget iframe. The expression is evaluated in the context of the widget and the result is returned (must be JSON-serializable).",
     input: widgetEvaluateInputSchema,
     output: widgetEvaluateOutputSchema,
     handler: async (input): Promise<WidgetEvaluateOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const session = sessionManager.getSession(input.sessionId);
 
@@ -119,6 +121,7 @@ const stabilityOptionsSchema = z
   .optional();
 
 export const widgetClickInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   sessionId: z.string().describe("Session ID of the widget"),
   // Semantic locator options (use one)
   selector: z.string().optional().describe("CSS selector of the element to click"),
@@ -153,7 +156,7 @@ export const widgetClickOutputSchema = z.object({
   hints: toolHintsSchema.optional(),
 });
 
-export function createWidgetClickTool(connectionManager: ConnectionManager) {
+export function createWidgetClickTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Click an element in a widget iframe. Supports semantic locators: CSS selector, " +
@@ -162,6 +165,7 @@ export function createWidgetClickTool(connectionManager: ConnectionManager) {
     input: widgetClickInputSchema,
     output: widgetClickOutputSchema,
     handler: async (input): Promise<WidgetClickOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const validation = validateWidgetSession(sessionManager, input.sessionId);
       if (!validation.success) {
@@ -269,6 +273,7 @@ export function createWidgetClickTool(connectionManager: ConnectionManager) {
 // =============================================================================
 
 export const widgetFillInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   sessionId: z.string().describe("Session ID of the widget"),
   // Semantic locator options (use one)
   selector: z.string().optional().describe("CSS selector of the input element"),
@@ -301,7 +306,7 @@ export const widgetFillOutputSchema = z.object({
   hints: toolHintsSchema.optional(),
 });
 
-export function createWidgetFillTool(connectionManager: ConnectionManager) {
+export function createWidgetFillTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Fill an input, textarea, select, or contenteditable element in a widget iframe. " +
@@ -310,6 +315,7 @@ export function createWidgetFillTool(connectionManager: ConnectionManager) {
     input: widgetFillInputSchema,
     output: widgetFillOutputSchema,
     handler: async (input): Promise<WidgetFillOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const validation = validateWidgetSession(sessionManager, input.sessionId);
       if (!validation.success) {
@@ -481,6 +487,7 @@ export function createWidgetFillTool(connectionManager: ConnectionManager) {
 // =============================================================================
 
 export const widgetWaitForSelectorInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   sessionId: z.string().describe("Session ID of the widget"),
   selector: z.string().describe("CSS selector to wait for"),
   state: z
@@ -495,13 +502,14 @@ export const widgetWaitForSelectorOutputSchema = z.object({
   error: z.string().optional(),
 });
 
-export function createWidgetWaitForSelectorTool(connectionManager: ConnectionManager) {
+export function createWidgetWaitForSelectorTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Wait for an element matching a CSS selector to reach a specific state in a widget iframe.",
     input: widgetWaitForSelectorInputSchema,
     output: widgetWaitForSelectorOutputSchema,
     handler: async (input): Promise<WidgetWaitForSelectorOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const session = sessionManager.getSession(input.sessionId);
 
@@ -550,6 +558,7 @@ export function createWidgetWaitForSelectorTool(connectionManager: ConnectionMan
 // =============================================================================
 
 export const widgetLocatorInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   sessionId: z.string().describe("Session ID of the widget"),
   selector: z.string().describe("CSS selector to query"),
   timeout: z.number().optional().describe("Timeout in ms (default: 5000)"),
@@ -581,13 +590,14 @@ export const widgetLocatorOutputSchema = z.object({
   error: z.string().optional(),
 });
 
-export function createWidgetLocatorTool(connectionManager: ConnectionManager) {
+export function createWidgetLocatorTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Query elements in a widget iframe by CSS selector. Returns info about matching elements (up to 10).",
     input: widgetLocatorInputSchema,
     output: widgetLocatorOutputSchema,
     handler: async (input): Promise<WidgetLocatorOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const session = sessionManager.getSession(input.sessionId);
 
@@ -668,6 +678,7 @@ export function createWidgetLocatorTool(connectionManager: ConnectionManager) {
 // =============================================================================
 
 export const widgetDragInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   sessionId: z.string().describe("Session ID of the widget"),
   source: z
     .union([
@@ -706,13 +717,14 @@ export const widgetDragOutputSchema = z.object({
   hints: toolHintsSchema.optional(),
 });
 
-export function createWidgetDragTool(connectionManager: ConnectionManager) {
+export function createWidgetDragTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Drag an element from source to target in a widget iframe. Supports both CSS selectors and pixel positions. Useful for drag-and-drop interactions like moving tasks between columns.",
     input: widgetDragInputSchema,
     output: widgetDragOutputSchema,
     handler: async (input): Promise<WidgetDragOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const session = sessionManager.getSession(input.sessionId);
 
@@ -850,6 +862,7 @@ export function createWidgetDragTool(connectionManager: ConnectionManager) {
 // =============================================================================
 
 export const widgetRefreshInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   sessionId: z.string().describe("Session ID of the widget to refresh"),
   tool: z
     .string()
@@ -872,13 +885,14 @@ export const widgetRefreshOutputSchema = z.object({
     .describe("Error message if widget update failed but tool call succeeded"),
 });
 
-export function createWidgetRefreshTool(connectionManager: ConnectionManager) {
+export function createWidgetRefreshTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Refresh a widget session with fresh data by re-calling the tool and pushing the new result to the widget. This syncs the widget UI with the current server state after mutations.",
     input: widgetRefreshInputSchema,
     output: widgetRefreshOutputSchema,
     handler: async (input): Promise<WidgetRefreshOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const session = sessionManager.getSession(input.sessionId);
 

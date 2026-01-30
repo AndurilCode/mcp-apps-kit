@@ -108,6 +108,7 @@ export {
   type StandaloneInspectorServerOptions,
 } from "./standalone-server";
 export { ConnectionManager } from "./connection";
+export { ConnectionRegistry } from "./connection-registry";
 export { WidgetServer, type WidgetSession, type CreateSessionResult } from "./widget-server";
 
 // =============================================================================
@@ -143,6 +144,7 @@ export {
   createClearHistoryTool,
   createRunTestSuiteTool,
   createGetConnectionStatusTool,
+  createListConnectionsTool,
   // UI Inspection tools
   createListUIWidgetsTool,
   createGetUIWidgetTool,

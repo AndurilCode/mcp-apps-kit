@@ -14,6 +14,7 @@ import {
   createWidgetWaitForSelectorTool,
 } from "../src/tools/widget-control";
 import type { WidgetSession } from "../src/types";
+import { createMockRegistry } from "./test-utils";
 
 // Mock testing module
 const mockCallTool = vi.fn();
@@ -154,12 +155,12 @@ describe("widget_click Tool", () => {
 
   describe("tool metadata", () => {
     it("should have correct description", () => {
-      const tool = createWidgetClickTool(manager);
+      const tool = createWidgetClickTool(createMockRegistry(manager));
       expect(tool.description).toContain("click");
     });
 
     it("should have input and output schemas", () => {
-      const tool = createWidgetClickTool(manager);
+      const tool = createWidgetClickTool(createMockRegistry(manager));
       expect(tool.input).toBeDefined();
       expect(tool.output).toBeDefined();
     });
@@ -167,7 +168,7 @@ describe("widget_click Tool", () => {
 
   describe("session validation", () => {
     it("should return error when session not found", async () => {
-      const tool = createWidgetClickTool(manager);
+      const tool = createWidgetClickTool(createMockRegistry(manager));
       const result = await tool.handler(
         { sessionId: "non-existent-id", text: "Click me" },
         {} as never
@@ -181,7 +182,7 @@ describe("widget_click Tool", () => {
   describe("not connected", () => {
     it("should return error when not connected", async () => {
       const disconnectedManager = new ConnectionManager();
-      const tool = createWidgetClickTool(disconnectedManager);
+      const tool = createWidgetClickTool(createMockRegistry(disconnectedManager));
 
       // These tools check session first before checking connection
       const result = await tool.handler({ sessionId: "test", text: "Click" }, {} as never);
@@ -192,12 +193,12 @@ describe("widget_click Tool", () => {
 
   describe("input schema", () => {
     it("should have sessionId field", () => {
-      const tool = createWidgetClickTool(manager);
+      const tool = createWidgetClickTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("sessionId");
     });
 
     it("should have locator fields", () => {
-      const tool = createWidgetClickTool(manager);
+      const tool = createWidgetClickTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("selector");
       expect(tool.input.shape).toHaveProperty("text");
       expect(tool.input.shape).toHaveProperty("role");
@@ -208,13 +209,13 @@ describe("widget_click Tool", () => {
     });
 
     it("should have stability options", () => {
-      const tool = createWidgetClickTool(manager);
+      const tool = createWidgetClickTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("waitForStability");
       expect(tool.input.shape).toHaveProperty("stabilityOptions");
     });
 
     it("should have timeout option", () => {
-      const tool = createWidgetClickTool(manager);
+      const tool = createWidgetClickTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("timeout");
     });
   });
@@ -243,14 +244,14 @@ describe("widget_fill Tool", () => {
 
   describe("tool metadata", () => {
     it("should have correct description", () => {
-      const tool = createWidgetFillTool(manager);
+      const tool = createWidgetFillTool(createMockRegistry(manager));
       expect(tool.description).toContain("fill");
     });
   });
 
   describe("session validation", () => {
     it("should return error when session not found", async () => {
-      const tool = createWidgetFillTool(manager);
+      const tool = createWidgetFillTool(createMockRegistry(manager));
       const result = await tool.handler(
         { sessionId: "non-existent-id", selector: "#input", value: "test" },
         {} as never
@@ -263,12 +264,12 @@ describe("widget_fill Tool", () => {
 
   describe("input schema", () => {
     it("should have value field", () => {
-      const tool = createWidgetFillTool(manager);
+      const tool = createWidgetFillTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("value");
     });
 
     it("should have locator fields", () => {
-      const tool = createWidgetFillTool(manager);
+      const tool = createWidgetFillTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("selector");
       expect(tool.input.shape).toHaveProperty("label");
       expect(tool.input.shape).toHaveProperty("placeholder");
@@ -299,14 +300,14 @@ describe("widget_drag Tool", () => {
 
   describe("tool metadata", () => {
     it("should have correct description", () => {
-      const tool = createWidgetDragTool(manager);
+      const tool = createWidgetDragTool(createMockRegistry(manager));
       expect(tool.description).toContain("drag");
     });
   });
 
   describe("session validation", () => {
     it("should return error when session not found", async () => {
-      const tool = createWidgetDragTool(manager);
+      const tool = createWidgetDragTool(createMockRegistry(manager));
       const result = await tool.handler(
         {
           sessionId: "non-existent-id",
@@ -323,13 +324,13 @@ describe("widget_drag Tool", () => {
 
   describe("input schema", () => {
     it("should have source and target fields", () => {
-      const tool = createWidgetDragTool(manager);
+      const tool = createWidgetDragTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("source");
       expect(tool.input.shape).toHaveProperty("target");
     });
 
     it("should have steps field", () => {
-      const tool = createWidgetDragTool(manager);
+      const tool = createWidgetDragTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("steps");
     });
   });
@@ -358,14 +359,14 @@ describe("widget_evaluate Tool", () => {
 
   describe("tool metadata", () => {
     it("should have correct description", () => {
-      const tool = createWidgetEvaluateTool(manager);
+      const tool = createWidgetEvaluateTool(createMockRegistry(manager));
       expect(tool.description).toContain("JavaScript");
     });
   });
 
   describe("session validation", () => {
     it("should return error when session not found", async () => {
-      const tool = createWidgetEvaluateTool(manager);
+      const tool = createWidgetEvaluateTool(createMockRegistry(manager));
       const result = await tool.handler(
         { sessionId: "non-existent-id", expression: "document.title" },
         {} as never
@@ -378,12 +379,12 @@ describe("widget_evaluate Tool", () => {
 
   describe("input schema", () => {
     it("should have expression field", () => {
-      const tool = createWidgetEvaluateTool(manager);
+      const tool = createWidgetEvaluateTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("expression");
     });
 
     it("should have sessionId field", () => {
-      const tool = createWidgetEvaluateTool(manager);
+      const tool = createWidgetEvaluateTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("sessionId");
     });
   });
@@ -412,7 +413,7 @@ describe("widget_locator Tool", () => {
 
   describe("tool metadata", () => {
     it("should have correct description", () => {
-      const tool = createWidgetLocatorTool(manager);
+      const tool = createWidgetLocatorTool(createMockRegistry(manager));
       // Description says "query elements... by css selector"
       expect(tool.description.toLowerCase()).toContain("selector");
     });
@@ -420,7 +421,7 @@ describe("widget_locator Tool", () => {
 
   describe("session validation", () => {
     it("should return error when session not found", async () => {
-      const tool = createWidgetLocatorTool(manager);
+      const tool = createWidgetLocatorTool(createMockRegistry(manager));
       const result = await tool.handler(
         { sessionId: "non-existent-id", selector: "#test" },
         {} as never
@@ -433,12 +434,12 @@ describe("widget_locator Tool", () => {
 
   describe("input schema", () => {
     it("should have selector field", () => {
-      const tool = createWidgetLocatorTool(manager);
+      const tool = createWidgetLocatorTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("selector");
     });
 
     it("should have timeout field", () => {
-      const tool = createWidgetLocatorTool(manager);
+      const tool = createWidgetLocatorTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("timeout");
     });
   });
@@ -467,14 +468,14 @@ describe("widget_refresh Tool", () => {
 
   describe("tool metadata", () => {
     it("should have correct description", () => {
-      const tool = createWidgetRefreshTool(manager);
+      const tool = createWidgetRefreshTool(createMockRegistry(manager));
       expect(tool.description.toLowerCase()).toContain("refresh");
     });
   });
 
   describe("session validation", () => {
     it("should return error when session not found", async () => {
-      const tool = createWidgetRefreshTool(manager);
+      const tool = createWidgetRefreshTool(createMockRegistry(manager));
       const result = await tool.handler({ sessionId: "non-existent-id" }, {} as never);
 
       expect(result.success).toBe(false);
@@ -484,17 +485,17 @@ describe("widget_refresh Tool", () => {
 
   describe("input schema", () => {
     it("should have sessionId field", () => {
-      const tool = createWidgetRefreshTool(manager);
+      const tool = createWidgetRefreshTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("sessionId");
     });
 
     it("should have tool field", () => {
-      const tool = createWidgetRefreshTool(manager);
+      const tool = createWidgetRefreshTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("tool");
     });
 
     it("should have arguments field", () => {
-      const tool = createWidgetRefreshTool(manager);
+      const tool = createWidgetRefreshTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("arguments");
     });
   });
@@ -523,14 +524,14 @@ describe("widget_wait_for_selector Tool", () => {
 
   describe("tool metadata", () => {
     it("should have correct description", () => {
-      const tool = createWidgetWaitForSelectorTool(manager);
+      const tool = createWidgetWaitForSelectorTool(createMockRegistry(manager));
       expect(tool.description.toLowerCase()).toContain("wait");
     });
   });
 
   describe("session validation", () => {
     it("should return error when session not found", async () => {
-      const tool = createWidgetWaitForSelectorTool(manager);
+      const tool = createWidgetWaitForSelectorTool(createMockRegistry(manager));
       const result = await tool.handler(
         { sessionId: "non-existent-id", selector: "#test" },
         {} as never
@@ -543,17 +544,17 @@ describe("widget_wait_for_selector Tool", () => {
 
   describe("input schema", () => {
     it("should have selector field", () => {
-      const tool = createWidgetWaitForSelectorTool(manager);
+      const tool = createWidgetWaitForSelectorTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("selector");
     });
 
     it("should have state field", () => {
-      const tool = createWidgetWaitForSelectorTool(manager);
+      const tool = createWidgetWaitForSelectorTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("state");
     });
 
     it("should have timeout field", () => {
-      const tool = createWidgetWaitForSelectorTool(manager);
+      const tool = createWidgetWaitForSelectorTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("timeout");
     });
   });
@@ -587,7 +588,7 @@ describe("widget_click handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetClickTool(manager);
+    const tool = createWidgetClickTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-click-text", text: "Click Me" },
       {} as never
@@ -605,7 +606,7 @@ describe("widget_click handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetClickTool(manager);
+    const tool = createWidgetClickTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-click-selector", selector: "#my-button" },
       {} as never
@@ -622,7 +623,7 @@ describe("widget_click handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetClickTool(manager);
+    const tool = createWidgetClickTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-click-noloc" }, {} as never);
 
     expect(result.success).toBe(false);
@@ -659,7 +660,7 @@ describe("widget_fill handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetFillTool(manager);
+    const tool = createWidgetFillTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-fill", selector: "#email", value: "test@example.com" },
       {} as never
@@ -677,7 +678,7 @@ describe("widget_fill handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetFillTool(manager);
+    const tool = createWidgetFillTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-fill-noloc", value: "test" }, {} as never);
 
     expect(result.success).toBe(false);
@@ -713,7 +714,7 @@ describe("widget_evaluate handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetEvaluateTool(manager);
+    const tool = createWidgetEvaluateTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-eval", expression: "document.title" },
       {} as never
@@ -731,7 +732,7 @@ describe("widget_evaluate handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetEvaluateTool(manager);
+    const tool = createWidgetEvaluateTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-eval-closed", expression: "1+1" },
       {} as never
@@ -771,7 +772,7 @@ describe("widget_locator handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetLocatorTool(manager);
+    const tool = createWidgetLocatorTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-locator", selector: ".btn" }, {} as never);
 
     expect(result.success).toBe(true);
@@ -807,7 +808,7 @@ describe("widget_wait_for_selector handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetWaitForSelectorTool(manager);
+    const tool = createWidgetWaitForSelectorTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-wait", selector: "#loading", state: "hidden" },
       {} as never
@@ -1046,7 +1047,7 @@ describe("widget_click handler - error branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetClickTool(manager);
+    const tool = createWidgetClickTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-click-blocked", text: "Submit" },
       {} as never
@@ -1067,7 +1068,7 @@ describe("widget_click handler - error branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetClickTool(manager);
+    const tool = createWidgetClickTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-click-notfound", text: "Submit" },
       {} as never
@@ -1087,7 +1088,7 @@ describe("widget_click handler - error branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetClickTool(manager);
+    const tool = createWidgetClickTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-click-timeout", text: "Submit" },
       {} as never
@@ -1106,7 +1107,7 @@ describe("widget_click handler - error branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetClickTool(manager);
+    const tool = createWidgetClickTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-click-generic", text: "Submit" },
       {} as never
@@ -1123,7 +1124,7 @@ describe("widget_click handler - error branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetClickTool(manager);
+    const tool = createWidgetClickTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-no-wait", text: "Submit", waitForStability: false },
       {} as never
@@ -1142,7 +1143,7 @@ describe("widget_click handler - error branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetClickTool(manager);
+    const tool = createWidgetClickTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-no-frame", text: "Submit" }, {} as never);
 
     expect(result.success).toBe(false);
@@ -1157,7 +1158,7 @@ describe("widget_click handler - error branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetClickTool(manager);
+    const tool = createWidgetClickTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-closed", text: "Submit" }, {} as never);
 
     expect(result.success).toBe(false);
@@ -1200,7 +1201,7 @@ describe("widget_fill handler - element type branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetFillTool(manager);
+    const tool = createWidgetFillTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-fill-select", selector: "select#country", value: "US" },
       {} as never
@@ -1226,7 +1227,7 @@ describe("widget_fill handler - element type branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetFillTool(manager);
+    const tool = createWidgetFillTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-fill-ce", selector: "div.editable", value: "Hello world" },
       {} as never
@@ -1255,7 +1256,7 @@ describe("widget_fill handler - element type branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetFillTool(manager);
+    const tool = createWidgetFillTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-fill-ce-fallback", selector: "div.editable", value: "New content" },
       {} as never
@@ -1280,7 +1281,7 @@ describe("widget_fill handler - element type branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetFillTool(manager);
+    const tool = createWidgetFillTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-fill-textarea", selector: "textarea", value: "Long text" },
       {} as never
@@ -1307,7 +1308,7 @@ describe("widget_fill handler - element type branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetFillTool(manager);
+    const tool = createWidgetFillTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-fill-ta-fallback", selector: "textarea", value: "Text" },
       {} as never
@@ -1330,7 +1331,7 @@ describe("widget_fill handler - element type branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetFillTool(manager);
+    const tool = createWidgetFillTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-fill-input-type", selector: "input[type=email]", value: "a@b.com" },
       {} as never
@@ -1356,7 +1357,7 @@ describe("widget_fill handler - element type branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetFillTool(manager);
+    const tool = createWidgetFillTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-fill-unknown", selector: "span.editable", value: "val" },
       {} as never
@@ -1379,7 +1380,7 @@ describe("widget_fill handler - element type branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetFillTool(manager);
+    const tool = createWidgetFillTool(createMockRegistry(manager));
     const result = await tool.handler(
       {
         sessionId: "test-fill-no-wait",
@@ -1403,7 +1404,7 @@ describe("widget_fill handler - element type branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetFillTool(manager);
+    const tool = createWidgetFillTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-fill-notfound", selector: "#input", value: "test" },
       {} as never
@@ -1423,7 +1424,7 @@ describe("widget_fill handler - element type branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetFillTool(manager);
+    const tool = createWidgetFillTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-fill-generic-err", selector: "#input", value: "test" },
       {} as never
@@ -1463,7 +1464,7 @@ describe("widget_evaluate handler - additional branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetEvaluateTool(manager);
+    const tool = createWidgetEvaluateTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-eval-noframe", expression: "1+1" },
       {} as never
@@ -1481,7 +1482,7 @@ describe("widget_evaluate handler - additional branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetEvaluateTool(manager);
+    const tool = createWidgetEvaluateTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-eval-error", expression: "invalid{{{" },
       {} as never
@@ -1526,7 +1527,7 @@ describe("widget_drag handler - position branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetDragTool(manager);
+    const tool = createWidgetDragTool(createMockRegistry(manager));
     const result = await tool.handler(
       {
         sessionId: "test-drag-pos",
@@ -1556,7 +1557,7 @@ describe("widget_drag handler - position branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetDragTool(manager);
+    const tool = createWidgetDragTool(createMockRegistry(manager));
     const result = await tool.handler(
       {
         sessionId: "test-drag-sel",
@@ -1580,7 +1581,7 @@ describe("widget_drag handler - position branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetDragTool(manager);
+    const tool = createWidgetDragTool(createMockRegistry(manager));
     const result = await tool.handler(
       {
         sessionId: "test-drag-nosource",
@@ -1602,7 +1603,7 @@ describe("widget_drag handler - position branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetDragTool(manager);
+    const tool = createWidgetDragTool(createMockRegistry(manager));
     const result = await tool.handler(
       {
         sessionId: "test-drag-closed",
@@ -1624,7 +1625,7 @@ describe("widget_drag handler - position branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetDragTool(manager);
+    const tool = createWidgetDragTool(createMockRegistry(manager));
     const result = await tool.handler(
       {
         sessionId: "test-drag-noframe",
@@ -1668,7 +1669,7 @@ describe("widget_refresh handler - additional branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetRefreshTool(manager);
+    const tool = createWidgetRefreshTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-refresh-closed" }, {} as never);
 
     expect(result.success).toBe(false);
@@ -1684,7 +1685,7 @@ describe("widget_refresh handler - additional branches", () => {
     const sessionManager = disconnectedManager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetRefreshTool(disconnectedManager);
+    const tool = createWidgetRefreshTool(createMockRegistry(disconnectedManager));
     const result = await tool.handler({ sessionId: "test-refresh-disconn" }, {} as never);
 
     expect(result.success).toBe(false);
@@ -1699,7 +1700,7 @@ describe("widget_refresh handler - additional branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetWaitForSelectorTool(manager);
+    const tool = createWidgetWaitForSelectorTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-wait-noframe", selector: "#test" },
       {} as never
@@ -1717,7 +1718,7 @@ describe("widget_refresh handler - additional branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetWaitForSelectorTool(manager);
+    const tool = createWidgetWaitForSelectorTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-wait-closed", selector: "#test" },
       {} as never
@@ -1735,7 +1736,7 @@ describe("widget_refresh handler - additional branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetWaitForSelectorTool(manager);
+    const tool = createWidgetWaitForSelectorTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-wait-timeout", selector: "#test" },
       {} as never
@@ -1753,7 +1754,7 @@ describe("widget_refresh handler - additional branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetLocatorTool(manager);
+    const tool = createWidgetLocatorTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-loc-closed", selector: "#test" },
       {} as never
@@ -1771,7 +1772,7 @@ describe("widget_refresh handler - additional branches", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetLocatorTool(manager);
+    const tool = createWidgetLocatorTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-loc-noframe", selector: "#test" },
       {} as never

@@ -4,7 +4,7 @@
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type { UIWidgetInfo, ListUIWidgetsOutput, UIProtocol } from "../types";
 
 // MCP Apps MIME type
@@ -29,7 +29,9 @@ function isUIWidget(mimeType: string | undefined): boolean {
   return mimeType === MCP_APP_MIME_TYPE || mimeType === OPENAI_MIME_TYPE;
 }
 
-export const listUIWidgetsInputSchema = z.object({}).describe("No input required");
+export const listUIWidgetsInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
+});
 
 export const listUIWidgetsOutputSchema = z.object({
   widgets: z.array(
@@ -44,13 +46,14 @@ export const listUIWidgetsOutputSchema = z.object({
   count: z.number(),
 });
 
-export function createListUIWidgetsTool(connectionManager: ConnectionManager) {
+export function createListUIWidgetsTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "List all UI widgets available on the connected MCP server. UI widgets are resources with specific MIME types (text/html;profile=mcp-app for MCP Apps or text/html+skybridge for OpenAI).",
     input: listUIWidgetsInputSchema,
     output: listUIWidgetsOutputSchema,
-    handler: async (): Promise<ListUIWidgetsOutput> => {
+    handler: async (input): Promise<ListUIWidgetsOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const client = connectionManager.getClient();
 
       // Use raw client to get full resource info including mimeType

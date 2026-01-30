@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import { createWidgetSnapshotDiffTool } from "../src/tools/widget-snapshot-diff";
 import type { WidgetSession, AccessibilityNode } from "../src/types";
+import { createMockRegistry } from "./test-utils";
 
 // Mock testing module
 const mockCallTool = vi.fn();
@@ -112,13 +113,13 @@ describe("widget_snapshot_diff Tool", () => {
 
   describe("tool metadata", () => {
     it("should have correct description", () => {
-      const tool = createWidgetSnapshotDiffTool(manager);
+      const tool = createWidgetSnapshotDiffTool(createMockRegistry(manager));
       expect(tool.description).toContain("Compare");
       expect(tool.description).toContain("snapshot");
     });
 
     it("should have input and output schemas defined", () => {
-      const tool = createWidgetSnapshotDiffTool(manager);
+      const tool = createWidgetSnapshotDiffTool(createMockRegistry(manager));
       expect(tool.input).toBeDefined();
       expect(tool.output).toBeDefined();
     });
@@ -126,7 +127,7 @@ describe("widget_snapshot_diff Tool", () => {
 
   describe("session validation", () => {
     it("should return error when session not found", async () => {
-      const tool = createWidgetSnapshotDiffTool(manager);
+      const tool = createWidgetSnapshotDiffTool(createMockRegistry(manager));
       const result = await tool.handler({ sessionId: "non-existent-id" }, {} as never);
 
       expect(result.success).toBe(false);
@@ -138,7 +139,7 @@ describe("widget_snapshot_diff Tool", () => {
   describe("not connected", () => {
     it("should return error when not connected", async () => {
       const disconnectedManager = new ConnectionManager();
-      const tool = createWidgetSnapshotDiffTool(disconnectedManager);
+      const tool = createWidgetSnapshotDiffTool(createMockRegistry(disconnectedManager));
 
       // These tools check session first before checking connection
       const result = await tool.handler({ sessionId: "test-session" }, {} as never);
@@ -149,60 +150,60 @@ describe("widget_snapshot_diff Tool", () => {
 
   describe("input schema", () => {
     it("should have sessionId field", () => {
-      const tool = createWidgetSnapshotDiffTool(manager);
+      const tool = createWidgetSnapshotDiffTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("sessionId");
     });
 
     it("should have previousSnapshot field", () => {
-      const tool = createWidgetSnapshotDiffTool(manager);
+      const tool = createWidgetSnapshotDiffTool(createMockRegistry(manager));
       expect(tool.input.shape).toHaveProperty("previousSnapshot");
     });
   });
 
   describe("output schema", () => {
     it("should have success field", () => {
-      const tool = createWidgetSnapshotDiffTool(manager);
+      const tool = createWidgetSnapshotDiffTool(createMockRegistry(manager));
       expect(tool.output).toBeDefined();
       expect(tool.output!.shape).toHaveProperty("success");
     });
 
     it("should have changes field", () => {
-      const tool = createWidgetSnapshotDiffTool(manager);
+      const tool = createWidgetSnapshotDiffTool(createMockRegistry(manager));
       expect(tool.output!.shape).toHaveProperty("changes");
     });
 
     it("should have unchanged field", () => {
-      const tool = createWidgetSnapshotDiffTool(manager);
+      const tool = createWidgetSnapshotDiffTool(createMockRegistry(manager));
       expect(tool.output!.shape).toHaveProperty("unchanged");
     });
 
     it("should have summary field", () => {
-      const tool = createWidgetSnapshotDiffTool(manager);
+      const tool = createWidgetSnapshotDiffTool(createMockRegistry(manager));
       expect(tool.output!.shape).toHaveProperty("summary");
     });
 
     it("should have currentSnapshot field", () => {
-      const tool = createWidgetSnapshotDiffTool(manager);
+      const tool = createWidgetSnapshotDiffTool(createMockRegistry(manager));
       expect(tool.output!.shape).toHaveProperty("currentSnapshot");
     });
 
     it("should have usedCachedSnapshot field", () => {
-      const tool = createWidgetSnapshotDiffTool(manager);
+      const tool = createWidgetSnapshotDiffTool(createMockRegistry(manager));
       expect(tool.output!.shape).toHaveProperty("usedCachedSnapshot");
     });
 
     it("should have cachedSnapshotAge field", () => {
-      const tool = createWidgetSnapshotDiffTool(manager);
+      const tool = createWidgetSnapshotDiffTool(createMockRegistry(manager));
       expect(tool.output!.shape).toHaveProperty("cachedSnapshotAge");
     });
 
     it("should have error field", () => {
-      const tool = createWidgetSnapshotDiffTool(manager);
+      const tool = createWidgetSnapshotDiffTool(createMockRegistry(manager));
       expect(tool.output!.shape).toHaveProperty("error");
     });
 
     it("should have hints field", () => {
-      const tool = createWidgetSnapshotDiffTool(manager);
+      const tool = createWidgetSnapshotDiffTool(createMockRegistry(manager));
       expect(tool.output!.shape).toHaveProperty("hints");
     });
   });
@@ -249,7 +250,7 @@ describe("widget_snapshot_diff handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetSnapshotDiffTool(manager);
+    const tool = createWidgetSnapshotDiffTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-diff-same" }, {} as never);
 
     expect(result.success).toBe(true);
@@ -271,7 +272,7 @@ describe("widget_snapshot_diff handler with mock session", () => {
       ],
     };
 
-    const tool = createWidgetSnapshotDiffTool(manager);
+    const tool = createWidgetSnapshotDiffTool(createMockRegistry(manager));
     const session = createMockSession("test-diff-added", mockPageObj.page);
 
     const sessionManager = manager.getWidgetSessionManager();
@@ -306,7 +307,7 @@ describe("widget_snapshot_diff handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetSnapshotDiffTool(manager);
+    const tool = createWidgetSnapshotDiffTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-diff-removed", previousSnapshot },
       {} as never
@@ -323,7 +324,7 @@ describe("widget_snapshot_diff handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetSnapshotDiffTool(manager);
+    const tool = createWidgetSnapshotDiffTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-diff-closed" }, {} as never);
 
     expect(result.success).toBe(false);
@@ -338,7 +339,7 @@ describe("widget_snapshot_diff handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetSnapshotDiffTool(manager);
+    const tool = createWidgetSnapshotDiffTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-diff-noframe" }, {} as never);
 
     expect(result.success).toBe(false);
@@ -353,7 +354,7 @@ describe("widget_snapshot_diff handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetSnapshotDiffTool(manager);
+    const tool = createWidgetSnapshotDiffTool(createMockRegistry(manager));
     const result = await tool.handler({ sessionId: "test-diff-nocached" }, {} as never);
 
     expect(result.success).toBe(false);
@@ -372,7 +373,7 @@ describe("widget_snapshot_diff handler with mock session", () => {
     const sessionManager = manager.getWidgetSessionManager();
     vi.spyOn(sessionManager, "getSession").mockReturnValue(session);
 
-    const tool = createWidgetSnapshotDiffTool(manager);
+    const tool = createWidgetSnapshotDiffTool(createMockRegistry(manager));
     const result = await tool.handler(
       { sessionId: "test-diff-empty", previousSnapshot },
       {} as never

@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import { createPreviewUITool } from "../src/tools/preview-ui";
+import { createMockRegistry } from "./test-utils";
 
 // Mock modules
 const mockCallTool = vi.fn();
@@ -87,7 +88,7 @@ describe("preview_ui Standalone Mode", () => {
         contents: [{ text: "<html><body>Widget</body></html>" }],
       });
 
-      const tool = createPreviewUITool(manager);
+      const tool = createPreviewUITool(createMockRegistry(manager));
       const result = await tool.handler(
         { tool: "greet", arguments: { name: "Alice" } },
         {} as never
@@ -111,7 +112,7 @@ describe("preview_ui Standalone Mode", () => {
         contents: [{ text: "<div>Test</div>" }],
       });
 
-      const tool = createPreviewUITool(manager);
+      const tool = createPreviewUITool(createMockRegistry(manager));
       const result = await tool.handler({ tool: "greet", arguments: {} }, {} as never);
 
       expect(result.renderDuration).toBeDefined();
@@ -138,7 +139,7 @@ describe("preview_ui Standalone Mode", () => {
         errors: [],
       });
 
-      const tool = createPreviewUITool(manager);
+      const tool = createPreviewUITool(createMockRegistry(manager));
       const result = await tool.handler({ tool: "greet", arguments: {} }, {} as never);
 
       expect(result.hasUI).toBe(true);
@@ -162,7 +163,7 @@ describe("preview_ui Standalone Mode", () => {
       // Override mock to throw error
       mockRenderHeadless.mockRejectedValue(new Error("Render failed"));
 
-      const tool = createPreviewUITool(manager);
+      const tool = createPreviewUITool(createMockRegistry(manager));
       const result = await tool.handler({ tool: "greet", arguments: {} }, {} as never);
 
       expect(result.hasUI).toBe(true);
@@ -183,7 +184,7 @@ describe("preview_ui Standalone Mode", () => {
         contents: [{ text: "<div>OpenAI Widget</div>" }],
       });
 
-      const tool = createPreviewUITool(manager);
+      const tool = createPreviewUITool(createMockRegistry(manager));
       // Just verify tool accepts protocol parameter
       expect(tool).toBeDefined();
     });

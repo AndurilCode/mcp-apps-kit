@@ -11,6 +11,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createStandaloneInspectorServer } from "../src/standalone-server";
+import type { ConnectionManager } from "../src/connection";
 import type { InspectorEvent } from "../src/types";
 import type { Page } from "playwright";
 
@@ -32,12 +33,17 @@ describe("DOM Event Full Flow", () => {
   const port = 16274; // Use a different port to avoid conflicts
   let server: ReturnType<typeof createStandaloneInspectorServer>;
   let serverUrl: string;
+  let connectionManager: ConnectionManager;
 
   beforeAll(async () => {
     server = createStandaloneInspectorServer({ debug: true });
     await server.start(port);
     // Server uses 127.0.0.1 instead of localhost to match widget server origin (avoids CORS)
     serverUrl = `http://127.0.0.1:${port}`;
+    // Create a connection through the registry so getConnectionManager works
+    const registry = server.getRegistry();
+    const { connectionManager: cm } = await registry.createConnection(`${serverUrl}/mcp`);
+    connectionManager = cm;
   });
 
   afterAll(async () => {
@@ -45,14 +51,12 @@ describe("DOM Event Full Flow", () => {
   });
 
   it("should have inspectorUrl set on ConnectionManager", () => {
-    const connectionManager = server.getConnectionManager();
     const inspectorUrl = connectionManager.getInspectorUrl();
 
     expect(inspectorUrl).toBe(serverUrl);
   });
 
   it("should record events via /record-event endpoint", async () => {
-    const connectionManager = server.getConnectionManager();
     const sessionManager = connectionManager.getWidgetSessionManager();
 
     // Create a mock session first (we need a session to record events against)
@@ -163,7 +167,6 @@ describe("DOM Event Full Flow", () => {
   });
 
   it("should stream events via SSE /dashboard/events endpoint", async () => {
-    const connectionManager = server.getConnectionManager();
     const sessionManager = connectionManager.getWidgetSessionManager();
 
     // Create a mock session

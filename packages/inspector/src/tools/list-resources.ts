@@ -4,10 +4,12 @@
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type { ResourceInfo } from "../types";
 
-export const listResourcesInputSchema = z.object({}).describe("No input required");
+export const listResourcesInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
+});
 
 export const listResourcesOutputSchema = z.object({
   resources: z.array(
@@ -19,12 +21,13 @@ export const listResourcesOutputSchema = z.object({
   ),
 });
 
-export function createListResourcesTool(connectionManager: ConnectionManager) {
+export function createListResourcesTool(registry: ConnectionRegistry) {
   return defineTool({
     description: "List all resources available on the connected MCP server.",
     input: listResourcesInputSchema,
     output: listResourcesOutputSchema,
-    handler: async (): Promise<{ resources: ResourceInfo[] }> => {
+    handler: async (input): Promise<{ resources: ResourceInfo[] }> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const client = connectionManager.getClient();
       const resources = await client.listResources();
 

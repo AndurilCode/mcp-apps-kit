@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type {
   WidgetSnapshotOutput,
   AccessibilityNode,
@@ -22,6 +22,7 @@ import { validateWidgetSession } from "./helpers";
 // =============================================================================
 
 export const widgetSnapshotInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   sessionId: z.string().describe("Session ID of the widget"),
   includeDOM: z.boolean().optional().describe("Include full DOM HTML as well (default: false)"),
   compactDOM: z
@@ -222,7 +223,7 @@ const INTERACTIVE_ROLES = new Set([
 // TOOL IMPLEMENTATION
 // =============================================================================
 
-export function createWidgetSnapshotTool(connectionManager: ConnectionManager) {
+export function createWidgetSnapshotTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Capture a compact accessibility tree snapshot of a widget. Returns structured " +
@@ -232,6 +233,7 @@ export function createWidgetSnapshotTool(connectionManager: ConnectionManager) {
     input: widgetSnapshotInputSchema,
     output: widgetSnapshotOutputSchema,
     handler: async (input): Promise<WidgetSnapshotOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const validation = validateWidgetSession(sessionManager, input.sessionId);
       if (!validation.success) {

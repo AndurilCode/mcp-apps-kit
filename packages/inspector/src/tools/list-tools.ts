@@ -4,7 +4,7 @@
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type { ToolInfo, ToolHints } from "../types";
 
 // =============================================================================
@@ -73,7 +73,9 @@ function extractUIBinding(meta: Record<string, unknown> | undefined): UIBinding 
 // SCHEMAS
 // =============================================================================
 
-export const listToolsInputSchema = z.object({}).describe("No input required");
+export const listToolsInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
+});
 
 const toolHintsSchema = z.object({
   next: z.string().optional(),
@@ -112,12 +114,13 @@ interface ListToolsOutput {
 // TOOL IMPLEMENTATION
 // =============================================================================
 
-export function createListToolsTool(connectionManager: ConnectionManager) {
+export function createListToolsTool(registry: ConnectionRegistry) {
   return defineTool({
     description: "List all tools available on the connected MCP server.",
     input: listToolsInputSchema,
     output: listToolsOutputSchema,
-    handler: async (): Promise<ListToolsOutput> => {
+    handler: async (input): Promise<ListToolsOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const client = connectionManager.getClient();
       const tools = await client.listTools();
 

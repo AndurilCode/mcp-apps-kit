@@ -28,6 +28,7 @@ export interface UseMcpPrimitivesResult {
 export function useMcpPrimitives(
   baseUrl: string,
   isConnected: boolean,
+  connectionId: string | null = null,
   pollInterval = 30000
 ): UseMcpPrimitivesResult {
   const [primitives, setPrimitives] = useState<McpPrimitives | null>(null);
@@ -37,7 +38,8 @@ export function useMcpPrimitives(
 
   const fetchPrimitives = useCallback(async () => {
     try {
-      const res = await fetch(`${baseUrl}/mcp/primitives`);
+      const params = connectionId ? `?connectionId=${encodeURIComponent(connectionId)}` : "";
+      const res = await fetch(`${baseUrl}/mcp/primitives${params}`);
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
       }
@@ -53,7 +55,19 @@ export function useMcpPrimitives(
     } finally {
       setIsLoading(false);
     }
-  }, [baseUrl]);
+  }, [baseUrl, connectionId]);
+
+  // Clear primitives when connection changes
+  useEffect(() => {
+    setPrimitives(null);
+    if (isConnected && connectionId) {
+      setIsLoading(true);
+      void fetchPrimitives();
+    } else {
+      // No connection - show empty state, not loading
+      setIsLoading(false);
+    }
+  }, [connectionId, isConnected, fetchPrimitives]);
 
   // Refresh immediately when connection is established
   useEffect(() => {

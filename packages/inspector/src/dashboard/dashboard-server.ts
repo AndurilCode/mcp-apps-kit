@@ -4,12 +4,12 @@
  * HTTP route handlers for the real-time browser dashboard.
  * Routes:
  * - GET /dashboard - Serve dashboard HTML
- * - GET /dashboard/stream?sessionId={id} - SSE screencast stream
- * - GET /dashboard/logs?sessionId={id} - SSE log stream
- * - GET /dashboard/events?sessionId={id} - SSE event stream
- * - GET /dashboard/sessions - List active sessions (JSON)
- * - GET /dashboard/globals - Get current environment state (JSON)
- * - GET /mcp/primitives - Get MCP server primitives (tools, resources, prompts)
+ * - GET /dashboard/stream?sessionId={id}&connectionId={id} - SSE screencast stream
+ * - GET /dashboard/logs?sessionId={id}&connectionId={id} - SSE log stream
+ * - GET /dashboard/events?sessionId={id}&connectionId={id} - SSE event stream
+ * - GET /dashboard/sessions?connectionId={id} - List active sessions (JSON)
+ * - GET /dashboard/globals?connectionId={id} - Get current environment state (JSON)
+ * - GET /mcp/primitives?connectionId={id} - Get MCP server primitives (tools, resources, prompts)
  */
 
 import type { IncomingMessage, ServerResponse } from "http";
@@ -17,12 +17,52 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type { InspectorEvent, AgnosticInspectorEvent } from "../types";
 import { CDPStreamer } from "./cdp-streamer";
 
-// Dashboard HTML file path (built by Vite)
+/**
+ * Resolve a ConnectionManager from an optional connection ID.
+ * Falls back to the provided default connectionManager if no ID given.
+ */
+function resolveConnectionManager(
+  connectionId: string | null,
+  defaultConnectionManager: ConnectionManager | null,
+  registry?: ConnectionRegistry
+): ConnectionManager | null {
+  if (connectionId && registry) {
+    try {
+      return registry.getConnection(connectionId);
+    } catch {
+      // Connection not found, fall through to default
+    }
+  }
+  return defaultConnectionManager;
+}
+
+// Dashboard HTML file path (built by Vite into dist/dashboard/index.html)
+// When bundled by tsup, __dirname can be either:
+// - dist/ (when imported as library from dist/index.js)
+// - dist/bin/ (when running CLI from dist/bin/mcp-inspector.js)
+// We try both possible paths to handle either case.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DASHBOARD_HTML_PATH = path.join(__dirname, "../dashboard/index.html");
+
+function findDashboardHtml(): string {
+  // Try relative paths for different bundle locations
+  const candidates = [
+    path.join(__dirname, "./dashboard/index.html"), // from dist/
+    path.join(__dirname, "../dashboard/index.html"), // from dist/bin/
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  // Return first candidate as fallback (will trigger "not built" message)
+  return candidates[0] ?? "";
+}
+
+const DASHBOARD_HTML_PATH = findDashboardHtml();
 
 // Cached dashboard HTML content
 let cachedDashboardHtml: string | null = null;
@@ -60,13 +100,138 @@ export async function cleanupCDPStreamer(): Promise<void> {
  * @param connectionManager - Connection manager for accessing sessions
  * @returns true if the request was handled, false otherwise
  */
+/**
+ * Apply CORS headers for dashboard connection endpoints.
+ *
+ * @param res - Server response to mutate.
+ */
+function setCorsHeaders(res: ServerResponse): void {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
 export async function handleDashboardRequest(
   req: IncomingMessage,
   res: ServerResponse,
-  connectionManager: ConnectionManager
+  connectionManager: ConnectionManager | null,
+  registry?: ConnectionRegistry
 ): Promise<boolean> {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
   const pathname = url.pathname;
+
+  // ===== Connection management endpoints =====
+
+  /**
+   * GET /dashboard/connections — list all connections.
+   */
+  if (pathname === "/dashboard/connections" && req.method === "GET") {
+    setCorsHeaders(res);
+    if (!registry) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ connections: [] }));
+      return true;
+    }
+    const connections = registry.listConnections().map((c) => ({
+      id: c.id,
+      connected: c.connected,
+      serverUrl: c.serverUrl,
+      serverInfo: c.serverInfo,
+    }));
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ connections }));
+    return true;
+  }
+
+  /**
+   * POST /dashboard/connections — create new connection.
+   */
+  if (pathname === "/dashboard/connections" && req.method === "POST") {
+    setCorsHeaders(res);
+    if (!registry) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Registry not available" }));
+      return true;
+    }
+    try {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(chunk as Buffer);
+      }
+      const body = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as { url?: string };
+      if (!body.url) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Missing url" }));
+        return true;
+      }
+      try {
+        const parsedUrl = new URL(body.url);
+        const allowedProtocols = new Set(["http:", "https:", "ws:", "wss:"]);
+        if (!allowedProtocols.has(parsedUrl.protocol)) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              error: "Unsupported URL protocol. Use http, https, ws, or wss.",
+            })
+          );
+          return true;
+        }
+      } catch {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Invalid URL format" }));
+        return true;
+      }
+      const { id, connectionManager: cm } = await registry.createConnection(body.url);
+      const state = cm.getState();
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          id,
+          url: body.url,
+          serverInfo: state.serverInfo,
+        })
+      );
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      const isBadInput = e instanceof SyntaxError || message.includes("Invalid URL");
+      res.writeHead(isBadInput ? 400 : 500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: message }));
+    }
+    return true;
+  }
+
+  /**
+   * DELETE /dashboard/connections/:id — close connection.
+   */
+  if (pathname.startsWith("/dashboard/connections/") && req.method === "DELETE") {
+    setCorsHeaders(res);
+    if (!registry) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Registry not available" }));
+      return true;
+    }
+    const connId = pathname.replace("/dashboard/connections/", "");
+    try {
+      await registry.closeConnection(connId);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: true }));
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: message }));
+    }
+    return true;
+  }
+
+  /**
+   * OPTIONS /dashboard/connections — CORS preflight for connection endpoints.
+   */
+  if (pathname.startsWith("/dashboard/connections") && req.method === "OPTIONS") {
+    setCorsHeaders(res);
+    res.writeHead(204);
+    res.end();
+    return true;
+  }
 
   // GET /dashboard - Serve HTML
   if (pathname === "/dashboard" && req.method === "GET") {
@@ -74,13 +239,19 @@ export async function handleDashboardRequest(
     return true;
   }
 
-  // GET /dashboard/sessions - List active sessions
+  // GET /dashboard/sessions?connectionId={id} - List active sessions
   if (pathname === "/dashboard/sessions" && req.method === "GET") {
-    serveSessionList(res, connectionManager);
+    const connId = url.searchParams.get("connectionId");
+    const cm = resolveConnectionManager(connId, connectionManager, registry);
+    if (!cm) {
+      serveEmptySessions(res);
+      return true;
+    }
+    serveSessionList(res, cm);
     return true;
   }
 
-  // GET /dashboard/stream?sessionId={id} - SSE screencast stream
+  // GET /dashboard/stream?sessionId={id}&connectionId={id} - SSE screencast stream
   if (pathname === "/dashboard/stream" && req.method === "GET") {
     const sessionId = url.searchParams.get("sessionId");
     if (!sessionId) {
@@ -88,11 +259,17 @@ export async function handleDashboardRequest(
       res.end(JSON.stringify({ error: "Missing sessionId parameter" }));
       return true;
     }
-    await startScreencastStream(req, res, connectionManager, sessionId);
+    const connId = url.searchParams.get("connectionId");
+    const cm = resolveConnectionManager(connId, connectionManager, registry);
+    if (!cm) {
+      writeNoSessionStream(res, "No active connection");
+      return true;
+    }
+    await startScreencastStream(req, res, cm, sessionId);
     return true;
   }
 
-  // GET /dashboard/logs?sessionId={id} - SSE log stream
+  // GET /dashboard/logs?sessionId={id}&connectionId={id} - SSE log stream
   if (pathname === "/dashboard/logs" && req.method === "GET") {
     const sessionId = url.searchParams.get("sessionId");
     if (!sessionId) {
@@ -100,11 +277,17 @@ export async function handleDashboardRequest(
       res.end(JSON.stringify({ error: "Missing sessionId parameter" }));
       return true;
     }
-    await startLogStream(req, res, connectionManager, sessionId);
+    const connId = url.searchParams.get("connectionId");
+    const cm = resolveConnectionManager(connId, connectionManager, registry);
+    if (!cm) {
+      writeNoSessionStream(res, "No active connection");
+      return true;
+    }
+    await startLogStream(req, res, cm, sessionId);
     return true;
   }
 
-  // GET /dashboard/events?sessionId={id} - SSE event stream
+  // GET /dashboard/events?sessionId={id}&connectionId={id} - SSE event stream
   if (pathname === "/dashboard/events" && req.method === "GET") {
     const sessionId = url.searchParams.get("sessionId");
     if (!sessionId) {
@@ -112,25 +295,45 @@ export async function handleDashboardRequest(
       res.end(JSON.stringify({ error: "Missing sessionId parameter" }));
       return true;
     }
-    startEventStream(req, res, connectionManager, sessionId);
+    const connId = url.searchParams.get("connectionId");
+    const cm = resolveConnectionManager(connId, connectionManager, registry);
+    if (!cm) {
+      writeNoSessionStream(res, "No active connection");
+      return true;
+    }
+    startEventStream(req, res, cm, sessionId);
     return true;
   }
 
-  // GET /dashboard/globals - Get current environment state
+  // GET /dashboard/globals?connectionId={id} - Get current environment state
   if (pathname === "/dashboard/globals" && req.method === "GET") {
-    serveGlobals(res, connectionManager);
+    const connId = url.searchParams.get("connectionId");
+    const cm = resolveConnectionManager(connId, connectionManager, registry);
+    if (!cm) {
+      serveEmptyGlobals(res);
+      return true;
+    }
+    serveGlobals(res, cm);
     return true;
   }
 
-  // GET /dashboard/agent-events - SSE agent event stream (session-agnostic)
+  // GET /dashboard/agent-events?connectionId={id} - SSE agent event stream (session-agnostic)
   if (pathname === "/dashboard/agent-events" && req.method === "GET") {
-    startAgentEventStream(req, res, connectionManager);
+    const connId = url.searchParams.get("connectionId");
+    const cm = resolveConnectionManager(connId, connectionManager, registry);
+    if (!cm) {
+      startEmptyAgentEventStream(res);
+      return true;
+    }
+    startAgentEventStream(req, res, cm);
     return true;
   }
 
-  // GET /mcp/primitives - Get MCP server primitives (tools, resources, prompts)
+  // GET /mcp/primitives?connectionId={id} - Get MCP server primitives (tools, resources, prompts)
   if (pathname === "/mcp/primitives" && req.method === "GET") {
-    await serveMcpPrimitives(res, connectionManager);
+    const connId = url.searchParams.get("connectionId");
+    const cm = resolveConnectionManager(connId, connectionManager, registry);
+    await serveMcpPrimitives(res, cm);
     return true;
   }
 
@@ -190,6 +393,54 @@ function serveDashboardHtml(res: ServerResponse): void {
     "Cache-Control": "no-cache",
   });
   res.end(getDashboardHtml());
+}
+
+function serveEmptySessions(res: ServerResponse): void {
+  res.writeHead(200, {
+    "Content-Type": "application/json",
+    "Cache-Control": "no-cache",
+    "Access-Control-Allow-Origin": "*",
+  });
+  res.end(JSON.stringify({ sessions: [] }));
+}
+
+function serveEmptyGlobals(res: ServerResponse): void {
+  res.writeHead(200, {
+    "Content-Type": "application/json",
+    "Cache-Control": "no-cache",
+    "Access-Control-Allow-Origin": "*",
+  });
+  res.end(JSON.stringify({ globals: {} }));
+}
+
+function writeNoSessionStream(res: ServerResponse, message: string): void {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "Access-Control-Allow-Origin": "*",
+  });
+  res.write(`event: noSession\\ndata: ${JSON.stringify({ message })}\\n\\n`);
+  setTimeout(() => {
+    if (!res.writableEnded) {
+      res.end();
+    }
+  }, 100);
+}
+
+function startEmptyAgentEventStream(res: ServerResponse): void {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "Access-Control-Allow-Origin": "*",
+  });
+  res.write(`event: events\\ndata: ${JSON.stringify({ events: [] })}\\n\\n`);
+  setTimeout(() => {
+    if (!res.writableEnded) {
+      res.end();
+    }
+  }, 100);
 }
 
 /**
@@ -457,35 +708,37 @@ function startEventStream(
  */
 async function serveMcpPrimitives(
   res: ServerResponse,
-  connectionManager: ConnectionManager
+  connectionManager: ConnectionManager | null
 ): Promise<void> {
   let tools: unknown[] = [];
   let resources: unknown[] = [];
   let prompts: unknown[] = [];
 
-  try {
-    const client = connectionManager.getClient();
-
-    // Fetch each primitive type, handling individual failures gracefully
+  if (connectionManager) {
     try {
-      tools = await client.listTools();
-    } catch {
-      // Server doesn't support tools capability or error occurred
-    }
+      const client = connectionManager.getClient();
 
-    try {
-      resources = await client.listResources();
-    } catch {
-      // Server doesn't support resources capability or error occurred
-    }
+      // Fetch each primitive type, handling individual failures gracefully
+      try {
+        tools = await client.listTools();
+      } catch {
+        // Server doesn't support tools capability or error occurred
+      }
 
-    try {
-      prompts = await client.listPrompts();
+      try {
+        resources = await client.listResources();
+      } catch {
+        // Server doesn't support resources capability or error occurred
+      }
+
+      try {
+        prompts = await client.listPrompts();
+      } catch {
+        // Server doesn't support prompts capability or error occurred
+      }
     } catch {
-      // Server doesn't support prompts capability or error occurred
+      // Not connected - return empty arrays (already initialized)
     }
-  } catch {
-    // Not connected - return empty arrays (already initialized)
   }
 
   res.writeHead(200, {

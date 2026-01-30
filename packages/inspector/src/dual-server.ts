@@ -17,6 +17,7 @@ import { createApp, type App, type ToolDefs } from "@mcp-apps-kit/core";
 import type { Server } from "http";
 import http from "http";
 import { ConnectionManager, inferProtocolType, type ProtocolType } from "./connection";
+import { ConnectionRegistry } from "./connection-registry";
 import type {
   InspectorServerOptions,
   TargetServerSchema,
@@ -33,6 +34,7 @@ import {
   createListResourcesTool,
   createListPromptsTool,
   createGetConnectionStatusTool,
+  createListConnectionsTool,
   createGetCallHistoryTool,
   createListSessionsTool,
   createGetConsoleLogsTool,
@@ -48,6 +50,8 @@ import {
 export interface DualInspectorServerOptions extends InspectorServerOptions {
   /** Port to run on. Default: 6274 */
   port?: number;
+  /** Maximum number of concurrent connections. Default: 20 */
+  maxConnections?: number;
 }
 
 /**
@@ -58,8 +62,10 @@ export interface DualInspectorServer {
   start: (port?: number) => Promise<void>;
   /** Stop the server */
   stop: () => Promise<void>;
-  /** Get the connection manager */
+  /** Get the connection manager (active connection) */
   getConnectionManager: () => ConnectionManager;
+  /** Get the connection registry */
+  getRegistry: () => ConnectionRegistry;
   /** Get the agent app (/agent/mcp) */
   getAgentApp: () => App;
   /** Get the apps app (/apps/mcp) - null until connected to target */
@@ -97,31 +103,32 @@ export interface DualInspectorServer {
  * - test_widget_interaction
  * - preview_ui
  */
-function createAgentTools(connectionManager: ConnectionManager): ToolDefs {
+function createAgentTools(registry: ConnectionRegistry): ToolDefs {
   return {
     // Connection management
-    connect_to_server: createConnectTool(connectionManager),
-    disconnect: createDisconnectTool(connectionManager),
+    connect_to_server: createConnectTool(registry),
+    disconnect: createDisconnectTool(registry),
+    list_connections: createListConnectionsTool(registry),
 
     // Read-only inspection tools
-    list_tools: createListToolsTool(connectionManager),
-    list_resources: createListResourcesTool(connectionManager),
-    list_prompts: createListPromptsTool(connectionManager),
-    get_connection_status: createGetConnectionStatusTool(connectionManager),
+    list_tools: createListToolsTool(registry),
+    list_resources: createListResourcesTool(registry),
+    list_prompts: createListPromptsTool(registry),
+    get_connection_status: createGetConnectionStatusTool(registry),
 
     // History observation (read-only)
-    get_call_history: createGetCallHistoryTool(connectionManager),
+    get_call_history: createGetCallHistoryTool(registry),
 
     // Session observation (read-only)
-    list_sessions: createListSessionsTool(connectionManager),
-    get_console_logs: createGetConsoleLogsTool(connectionManager),
-    screenshot_widget: createScreenshotWidgetTool(connectionManager),
+    list_sessions: createListSessionsTool(registry),
+    get_console_logs: createGetConsoleLogsTool(registry),
+    screenshot_widget: createScreenshotWidgetTool(registry),
 
     // Environment reading (no mutation)
-    get_globals: createGetGlobalsTool(connectionManager),
+    get_globals: createGetGlobalsTool(registry),
 
     // Widget state observation (read-only) - can observe but not interact
-    get_widget_state: createGetWidgetStateTool(connectionManager),
+    get_widget_state: createGetWidgetStateTool(registry),
   };
 }
 
@@ -145,11 +152,27 @@ function createAgentTools(connectionManager: ConnectionManager): ToolDefs {
 export function createDualInspectorServer(
   options: DualInspectorServerOptions = {}
 ): DualInspectorServer {
-  const connectionManager = new ConnectionManager(options);
+  const registry = new ConnectionRegistry({
+    connectionManagerOptions: options,
+    maxConnections: options.maxConnections ?? 20,
+  });
+  let connectionManager: ConnectionManager | null = null;
+  registry.on("created", (_id: string, cm: ConnectionManager) => {
+    connectionManager = cm;
+  });
+
+  const getActiveConnectionManager = (): ConnectionManager | null => {
+    try {
+      return registry.getActiveConnection();
+    } catch {
+      return connectionManager;
+    }
+  };
+
   const defaultPort = options.port ?? 6274;
 
   // Create agent app with observation-only tools (always available)
-  const agentTools = createAgentTools(connectionManager);
+  const agentTools = createAgentTools(registry);
   const agentApp = createApp({
     name: "mcp-inspector-agent",
     version: "1.0.0",
@@ -165,48 +188,47 @@ export function createDualInspectorServer(
   let appsApp: App | null = null;
 
   // Create apps app when target schema is available
-  connectionManager.on("schemaUpdated", (schema: TargetServerSchema) => {
-    // Only create once per lifecycle
-    if (appsApp !== null) {
+  // When any connection updates its schema, create the apps proxy
+  registry.on("created", (_regId: string, newCm: ConnectionManager) => {
+    newCm.on("schemaUpdated", (schema: TargetServerSchema) => {
+      // Only create once per lifecycle
+      if (appsApp !== null) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[dual-inspector] Target already connected. Restart inspector to connect to a different target.`
+        );
+        return;
+      }
+
+      // Create the apps app with NO tools initially
+      // We register proxy tools directly with the MCP server to preserve input schemas
+      appsApp = createApp({
+        name: "mcp-inspector-apps",
+        version: "1.0.0",
+        tools: {}, // Empty - tools registered directly below
+        config: {
+          cors: { origin: true },
+          serverRoute: "/apps/mcp",
+        },
+      });
+
+      // Get MCP server for direct tool/resource registration
+      // Cast through unknown as McpServer is an opaque type in core
+      const mcpServer = appsApp.getServer() as unknown as McpServerLike;
+
+      // Register proxy tools directly with the MCP server
+      // This bypasses the core's extractZodShape which strips unknown properties
+      registerProxyToolsDirectly(mcpServer, newCm, schema.tools);
+
+      // Register proxy resources on the MCP server
+      const registeredResources = registerProxyResources(mcpServer, newCm, schema.resources);
+
       // eslint-disable-next-line no-console
-      console.warn(
-        `[dual-inspector] Target already connected. Restart inspector to connect to a different target.`
+      console.log(
+        `[dual-inspector] /apps/mcp ready with ${schema.tools.length} proxy tools and ${registeredResources.length} proxy resources`
       );
-      return;
-    }
-
-    // Create the apps app with NO tools initially
-    // We register proxy tools directly with the MCP server to preserve input schemas
-    appsApp = createApp({
-      name: "mcp-inspector-apps",
-      version: "1.0.0",
-      tools: {}, // Empty - tools registered directly below
-      config: {
-        cors: { origin: true },
-        serverRoute: "/apps/mcp",
-      },
-    });
-
-    // Get MCP server for direct tool/resource registration
-    // Cast through unknown as McpServer is an opaque type in core
-    const mcpServer = appsApp.getServer() as unknown as McpServerLike;
-
-    // Register proxy tools directly with the MCP server
-    // This bypasses the core's extractZodShape which strips unknown properties
-    registerProxyToolsDirectly(mcpServer, connectionManager, schema.tools);
-
-    // Register proxy resources on the MCP server
-    const registeredResources = registerProxyResources(
-      mcpServer,
-      connectionManager,
-      schema.resources
-    );
-
-    // eslint-disable-next-line no-console
-    console.log(
-      `[dual-inspector] /apps/mcp ready with ${schema.tools.length} proxy tools and ${registeredResources.length} proxy resources`
-    );
-  });
+    }); // end schemaUpdated
+  }); // end registry.on("created")
 
   // HTTP server (created on start)
   let httpServer: Server | null = null;
@@ -226,8 +248,9 @@ export function createDualInspectorServer(
 
     // Health check
     if (url === "/health") {
-      const state = connectionManager.getState();
-      const schema = connectionManager.getTargetSchema();
+      const cm = getActiveConnectionManager();
+      const state = cm?.getState() ?? { connected: false, serverUrl: null, serverInfo: null };
+      const schema = cm?.getTargetSchema() ?? null;
       const protocolType: ProtocolType | null =
         state.connected && schema ? inferProtocolType(schema.tools) : null;
       const body = JSON.stringify({
@@ -317,11 +340,16 @@ export function createDualInspectorServer(
           const validatedUrl = trimmedUrl;
 
           // Check if already connected
-          const currentState = connectionManager.getState();
+          const currentCm = getActiveConnectionManager();
+          const currentState = currentCm?.getState() ?? {
+            connected: false,
+            serverUrl: null,
+            serverInfo: null,
+          };
           if (currentState.connected && currentState.serverUrl) {
             // If same URL, return success
             if (currentState.serverUrl === validatedUrl) {
-              const schema = connectionManager.getTargetSchema();
+              const schema = currentCm?.getTargetSchema() ?? null;
               const protocolType = schema ? inferProtocolType(schema.tools) : "mcp";
               res.writeHead(200, { "Content-Type": "application/json" });
               res.end(
@@ -353,20 +381,22 @@ export function createDualInspectorServer(
           }
 
           // Connect (will disconnect first if force=true and already connected)
-          const result = await connectionManager.connect(validatedUrl);
-          const schema = connectionManager.getTargetSchema();
-          const protocolType = schema ? inferProtocolType(schema.tools) : "mcp";
+          const { id: newConnId, connectionManager: newCm } =
+            await registry.createConnection(validatedUrl);
+          const connSchema = newCm.getTargetSchema();
+          const protocolType = connSchema ? inferProtocolType(connSchema.tools) : "mcp";
 
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(
             JSON.stringify({
               success: true,
+              connectionId: newConnId,
               connected: true,
               serverUrl: validatedUrl,
-              serverInfo: result.serverInfo,
-              toolCount: result.toolCount,
-              resourceCount: result.resourceCount,
-              promptCount: result.promptCount,
+              serverInfo: newCm.getState().serverInfo,
+              toolCount: connSchema?.tools.length ?? 0,
+              resourceCount: connSchema?.resources.length ?? 0,
+              promptCount: connSchema?.prompts.length ?? 0,
               protocolType,
             })
           );
@@ -397,7 +427,14 @@ export function createDualInspectorServer(
 
       if (req.method === "POST") {
         try {
-          const previousUrl = await connectionManager.disconnect();
+          const activeCm = getActiveConnectionManager();
+          if (!activeCm) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "No active connection" }));
+            return;
+          }
+          const previousUrl = activeCm.getState().serverUrl;
+          await registry.closeConnection(activeCm.id);
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(
             JSON.stringify({
@@ -445,12 +482,15 @@ export function createDualInspectorServer(
           const payload = JSON.parse(bodyData.toString("utf-8")) as SyncEventPayload;
 
           // For globals/host-context-changed events, also update the environment state
-          if (payload.type === "globals" || payload.type === "host-context-changed") {
-            connectionManager.updateEnvironmentFromGlobals(payload.data as Record<string, unknown>);
-          }
+          const syncCm = getActiveConnectionManager();
+          if (syncCm) {
+            if (payload.type === "globals" || payload.type === "host-context-changed") {
+              syncCm.updateEnvironmentFromGlobals(payload.data as Record<string, unknown>);
+            }
 
-          // Route to widget session manager for delivery to Playwright widgets
-          await connectionManager.getWidgetSessionManager().syncEvent(payload);
+            // Route to widget session manager for delivery to Playwright widgets
+            await syncCm.getWidgetSessionManager().syncEvent(payload);
+          }
 
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true, type: payload.type }));
@@ -499,6 +539,12 @@ export function createDualInspectorServer(
           };
 
           // Update the connection manager's environment state
+          const connectionManager = getActiveConnectionManager();
+          if (!connectionManager) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "No active connection" }));
+            return;
+          }
           connectionManager.updateEnvironmentFromGlobals(data.globals);
 
           // Resize the Playwright viewport for the specific session
@@ -566,8 +612,11 @@ export function createDualInspectorServer(
               protocol: "openai", // Legacy endpoint assumed OpenAI protocol
               timestamp: new Date().toISOString(),
             };
-            connectionManager.updateEnvironmentFromGlobals(data.globals);
-            await connectionManager.getWidgetSessionManager().syncEvent(payload);
+            const legacyCm = getActiveConnectionManager();
+            if (legacyCm) {
+              legacyCm.updateEnvironmentFromGlobals(data.globals);
+              await legacyCm.getWidgetSessionManager().syncEvent(payload);
+            }
           }
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: true }));
@@ -583,9 +632,14 @@ export function createDualInspectorServer(
       return;
     }
 
-    // Dashboard routes (including /mcp/primitives)
-    if (url.startsWith("/dashboard") || url === "/mcp/primitives") {
-      const handled = await handleDashboardRequest(req, res, connectionManager);
+    // Dashboard routes (including /mcp/primitives with optional ?connectionId=...)
+    if (url.startsWith("/dashboard") || url.startsWith("/mcp/primitives")) {
+      const handled = await handleDashboardRequest(
+        req,
+        res,
+        getActiveConnectionManager(),
+        registry
+      );
       if (handled) return;
     }
 
@@ -656,7 +710,7 @@ export function createDualInspectorServer(
           httpServer.listen(port, () => {
             // Set inspector URL for sync script injection
             // Use 127.0.0.1 instead of localhost to match widget server origin (avoids CORS issues)
-            connectionManager.setInspectorUrl(`http://127.0.0.1:${port}`);
+            getActiveConnectionManager()?.setInspectorUrl(`http://127.0.0.1:${port}`);
 
             // eslint-disable-next-line no-console
             console.log(`[dual-inspector] Started on port ${port}`);
@@ -676,13 +730,8 @@ export function createDualInspectorServer(
     },
 
     stop: async () => {
-      // Close all widget sessions
-      await connectionManager.getWidgetSessionManager().dispose();
-
-      // Disconnect from target if connected
-      if (connectionManager.getState().connected) {
-        await connectionManager.disconnect();
-      }
+      // Close all connections (including their widget sessions)
+      await registry.closeAll();
 
       // Close HTTP server
       return new Promise<void>((resolve, reject) => {
@@ -703,7 +752,13 @@ export function createDualInspectorServer(
       });
     },
 
-    getConnectionManager: () => connectionManager,
+    getConnectionManager: () => {
+      if (!connectionManager) {
+        throw new Error("No active connection. Call connect_to_server first.");
+      }
+      return connectionManager;
+    },
+    getRegistry: () => registry,
     getAgentApp: () => agentApp,
     getAppsApp: () => appsApp,
     getHttpServer: () => httpServer,

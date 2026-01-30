@@ -104,6 +104,10 @@ function getDefaultEnvironmentState(): EnvironmentState {
  * @emits disconnected - When disconnected from target server
  */
 export class ConnectionManager extends EventEmitter {
+  private static idCounter = 0;
+
+  readonly id: string;
+
   private state: ConnectionState = {
     connected: false,
     serverUrl: null,
@@ -138,8 +142,9 @@ export class ConnectionManager extends EventEmitter {
   /** Counter for generating unique agent event IDs */
   private agentEventIdCounter = 0;
 
-  constructor(options: InspectorServerOptions = {}) {
+  constructor(options: InspectorServerOptions & { id?: string } = {}) {
     super();
+    this.id = options.id ?? `conn-${++ConnectionManager.idCounter}`;
     this.maxHistorySize = options.maxHistorySize ?? 1000;
     this.defaultTimeout = options.defaultTimeout ?? 30000;
     this.debug = options.debug ?? false;

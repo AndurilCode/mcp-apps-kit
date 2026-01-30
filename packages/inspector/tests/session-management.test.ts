@@ -9,6 +9,7 @@ import {
   createCloseSessionTool,
   createCloseAllSessionsTool,
 } from "../src/tools/session-management";
+import { createMockRegistry } from "./test-utils";
 
 // Mock testing module
 vi.mock("@mcp-apps-kit/testing", () => {
@@ -43,7 +44,7 @@ describe("Session Management Tools", () => {
 
   describe("list_sessions", () => {
     it("should return empty sessions when no active sessions", async () => {
-      const tool = createListSessionsTool(manager);
+      const tool = createListSessionsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.sessions).toEqual([]);
@@ -51,7 +52,7 @@ describe("Session Management Tools", () => {
     });
 
     it("should have correct tool metadata", () => {
-      const tool = createListSessionsTool(manager);
+      const tool = createListSessionsTool(createMockRegistry(manager));
 
       expect(tool.description).toBe("List all active widget rendering sessions");
     });
@@ -59,7 +60,7 @@ describe("Session Management Tools", () => {
 
   describe("close_session", () => {
     it("should return closed=false and message when session not found", async () => {
-      const tool = createCloseSessionTool(manager);
+      const tool = createCloseSessionTool(createMockRegistry(manager));
       const result = await tool.handler({ sessionId: "non-existent-id" }, {} as never);
 
       expect(result.closed).toBe(false);
@@ -67,7 +68,7 @@ describe("Session Management Tools", () => {
     });
 
     it("should have correct tool metadata", () => {
-      const tool = createCloseSessionTool(manager);
+      const tool = createCloseSessionTool(createMockRegistry(manager));
 
       expect(tool.description).toBe(
         "Close a specific widget rendering session and clean up resources"
@@ -77,7 +78,7 @@ describe("Session Management Tools", () => {
 
   describe("close_all_sessions", () => {
     it("should return closed=0 with message when no sessions", async () => {
-      const tool = createCloseAllSessionsTool(manager);
+      const tool = createCloseAllSessionsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.closed).toBe(0);
@@ -85,7 +86,7 @@ describe("Session Management Tools", () => {
     });
 
     it("should have correct tool metadata", () => {
-      const tool = createCloseAllSessionsTool(manager);
+      const tool = createCloseAllSessionsTool(createMockRegistry(manager));
 
       expect(tool.description).toBe(
         "Close all active widget rendering sessions and clean up resources"

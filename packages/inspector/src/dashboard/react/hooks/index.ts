@@ -37,3 +37,9 @@ export {
   type UseServerHistoryResult,
 } from "./useServerHistory";
 export { useConnection, type ConnectionStatus, type UseConnectionResult } from "./useConnection";
+export {
+  useConnections,
+  type DashboardConnection,
+  type DashboardConnectionStatus,
+  type UseConnectionsResult,
+} from "./useConnections";

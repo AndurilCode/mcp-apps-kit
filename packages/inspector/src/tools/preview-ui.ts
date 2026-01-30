@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type { PreviewUIOutput } from "../types";
 import { UIHostManager, type DetectedProtocol } from "../ui-host";
 import {
@@ -18,6 +18,7 @@ import {
 } from "./helpers";
 
 export const previewUIInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   sessionId: z
     .string()
     .optional()
@@ -65,13 +66,14 @@ export const previewUIOutputSchema = z.object({
   hints: toolHintsSchema.optional(),
 });
 
-export function createPreviewUITool(connectionManager: ConnectionManager) {
+export function createPreviewUITool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Preview a tool's UI widget by calling the tool and rendering its result in the associated UI widget. Can use an existing session. Returns a DOM snapshot with extracted elements and text content.",
     input: previewUIInputSchema,
     output: previewUIOutputSchema,
     handler: async (input): Promise<PreviewUIOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const startTime = Date.now();
 
       // Check if using existing session

@@ -171,7 +171,14 @@ async function main(): Promise<void> {
     | undefined;
 
   // Handle graceful shutdown
+  let isShuttingDown = false;
   const shutdown = async (signal: string) => {
+    if (isShuttingDown) {
+      // Force exit on second signal
+      console.log(`\nForce exit.`);
+      process.exit(1);
+    }
+    isShuttingDown = true;
     console.log(`\n${signal} received. Shutting down...`);
     try {
       await server?.stop();

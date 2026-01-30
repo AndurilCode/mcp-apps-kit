@@ -6,7 +6,7 @@
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import { UIHostManager, type DetectedProtocol } from "../ui-host";
 import {
   extractToolResult,
@@ -65,6 +65,7 @@ export interface GetConsoleLogsOutput {
 }
 
 export const getConsoleLogsInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   sessionId: z
     .string()
     .optional()
@@ -117,13 +118,14 @@ export const getConsoleLogsOutputSchema = z.object({
   errors: z.array(z.string()),
 });
 
-export function createGetConsoleLogsTool(connectionManager: ConnectionManager) {
+export function createGetConsoleLogsTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Render a tool's UI widget in a browser and capture all console logs (log, info, warn, error, debug). Can use an existing session to get accumulated logs. Returns structured log entries with timestamps and sources.",
     input: getConsoleLogsInputSchema,
     output: getConsoleLogsOutputSchema,
     handler: async (input): Promise<GetConsoleLogsOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       // Check if using existing session
       if (input.sessionId) {
         const sessionManager = connectionManager.getWidgetSessionManager();

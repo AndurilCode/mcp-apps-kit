@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
-import type { ConnectionManager } from "../connection";
+import type { ConnectionRegistry } from "../connection-registry";
 import type { WidgetQueryOutput, QueryElementInfo, ToolHints } from "../types";
 import { hasLocatorOptions, describeLocatorStrategy, validateWidgetSession } from "./helpers";
 
@@ -16,6 +16,7 @@ import { hasLocatorOptions, describeLocatorStrategy, validateWidgetSession } fro
 // =============================================================================
 
 export const widgetQueryInputSchema = z.object({
+  connectionId: z.string().optional().describe("Connection ID. Defaults to active connection."),
   sessionId: z.string().describe("Session ID of the widget"),
   // Semantic locator options (use one)
   selector: z.string().optional().describe("CSS selector to query"),
@@ -78,7 +79,7 @@ export const widgetQueryOutputSchema = z.object({
 // TOOL IMPLEMENTATION
 // =============================================================================
 
-export function createWidgetQueryTool(connectionManager: ConnectionManager) {
+export function createWidgetQueryTool(registry: ConnectionRegistry) {
   return defineTool({
     description:
       "Query elements in a widget using semantic locators (text, role, label, placeholder, " +
@@ -87,6 +88,7 @@ export function createWidgetQueryTool(connectionManager: ConnectionManager) {
     input: widgetQueryInputSchema,
     output: widgetQueryOutputSchema,
     handler: async (input): Promise<WidgetQueryOutput> => {
+      const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const validation = validateWidgetSession(sessionManager, input.sessionId);
       if (!validation.success) {

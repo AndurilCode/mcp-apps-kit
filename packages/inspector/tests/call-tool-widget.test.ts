@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ConnectionManager } from "../src/connection";
 import { createCallToolTool } from "../src/tools/call-tool";
+import { createMockRegistry } from "./test-utils";
 
 // Mock testing module
 const mockCallTool = vi.fn();
@@ -61,7 +62,7 @@ describe("call_tool Widget Rendering", () => {
 
   describe("without renderWidget", () => {
     it("should return result without sessionId when renderWidget is false", async () => {
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler(
         { name: "greet", arguments: { name: "Alice" }, renderWidget: false },
         {} as never
@@ -72,7 +73,7 @@ describe("call_tool Widget Rendering", () => {
     });
 
     it("should return result without sessionId when renderWidget is not specified", async () => {
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler(
         { name: "greet", arguments: { name: "Alice" } },
         {} as never
@@ -88,7 +89,7 @@ describe("call_tool Widget Rendering", () => {
       const client = manager.getClient();
       vi.mocked(client.raw.listResources).mockResolvedValue({ resources: [] });
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler(
         { name: "greet", arguments: { name: "Alice" }, renderWidget: true },
         {} as never
@@ -107,7 +108,7 @@ describe("call_tool Widget Rendering", () => {
         structuredContent: { greeting: "Hello", target: "World" },
       });
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "greet", arguments: {} }, {} as never);
 
       expect(result.structuredContent).toEqual({ greeting: "Hello", target: "World" });
@@ -121,7 +122,7 @@ describe("call_tool Widget Rendering", () => {
         isError: false,
       });
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "greet", arguments: {} }, {} as never);
 
       expect(result.content).toHaveLength(1);
@@ -135,7 +136,7 @@ describe("call_tool Widget Rendering", () => {
         isError: false,
       });
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "greet", arguments: {} }, {} as never);
 
       expect(result.content).toHaveLength(1);
@@ -154,7 +155,7 @@ describe("call_tool Widget Rendering", () => {
         isError: false,
       });
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "greet", arguments: {} }, {} as never);
 
       expect(result.content).toHaveLength(3);
@@ -168,7 +169,7 @@ describe("call_tool Widget Rendering", () => {
         isError: true,
       });
 
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "greet", arguments: {} }, {} as never);
 
       expect(result.isError).toBe(true);
@@ -179,7 +180,7 @@ describe("call_tool Widget Rendering", () => {
 
   describe("metadata", () => {
     it("should include duration in response", async () => {
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "greet", arguments: {} }, {} as never);
 
       expect(result.duration).toBeDefined();
@@ -188,7 +189,7 @@ describe("call_tool Widget Rendering", () => {
     });
 
     it("should have correct tool description", () => {
-      const tool = createCallToolTool(manager);
+      const tool = createCallToolTool(createMockRegistry(manager));
       expect(tool.description).toContain("Call a tool");
     });
   });

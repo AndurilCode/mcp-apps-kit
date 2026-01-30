@@ -10,6 +10,7 @@ import {
   createInspectToolUITool,
   createGetUIMetadataTool,
 } from "../src/tools";
+import { createMockRegistry } from "./test-utils";
 
 // MCP Apps MIME type
 const MCP_APP_MIME_TYPE = "text/html;profile=mcp-app";
@@ -137,7 +138,7 @@ describe("UI Inspection Tools", () => {
     it("should list UI widgets from server", async () => {
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createListUIWidgetsTool(manager);
+      const tool = createListUIWidgetsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.count).toBe(2);
@@ -165,7 +166,7 @@ describe("UI Inspection Tools", () => {
         resources: [mockResources[2]], // Only the non-UI resource
       });
 
-      const tool = createListUIWidgetsTool(manager);
+      const tool = createListUIWidgetsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
 
       expect(result.widgets).toEqual([]);
@@ -173,7 +174,7 @@ describe("UI Inspection Tools", () => {
     });
 
     it("should throw error when not connected", async () => {
-      const tool = createListUIWidgetsTool(manager);
+      const tool = createListUIWidgetsTool(createMockRegistry(manager));
       await expect(tool.handler({}, {} as never)).rejects.toThrow("No active connection");
     });
   });
@@ -182,7 +183,7 @@ describe("UI Inspection Tools", () => {
     it("should get UI widget content and metadata", async () => {
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createGetUIWidgetTool(manager);
+      const tool = createGetUIWidgetTool(createMockRegistry(manager));
       const result = await tool.handler(
         { uri: "ui://weather-app/currentWeather?v=a1b2c3d4" },
         {} as never
@@ -200,7 +201,7 @@ describe("UI Inspection Tools", () => {
     it("should throw error for non-existent widget", async () => {
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createGetUIWidgetTool(manager);
+      const tool = createGetUIWidgetTool(createMockRegistry(manager));
       await expect(
         tool.handler({ uri: "ui://weather-app/nonexistent" }, {} as never)
       ).rejects.toThrow("UI widget not found: ui://weather-app/nonexistent");
@@ -209,7 +210,7 @@ describe("UI Inspection Tools", () => {
     it("should throw error for non-UI resource", async () => {
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createGetUIWidgetTool(manager);
+      const tool = createGetUIWidgetTool(createMockRegistry(manager));
       await expect(tool.handler({ uri: "file:///config.json" }, {} as never)).rejects.toThrow(
         "Resource is not a UI widget: file:///config.json (mimeType: application/json)"
       );
@@ -218,7 +219,7 @@ describe("UI Inspection Tools", () => {
     it("should throw error for invalid URI format", async () => {
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createGetUIWidgetTool(manager);
+      const tool = createGetUIWidgetTool(createMockRegistry(manager));
       await expect(tool.handler({ uri: "not-a-uri" }, {} as never)).rejects.toThrow(
         "Invalid URI format: 'not-a-uri'"
       );
@@ -229,7 +230,7 @@ describe("UI Inspection Tools", () => {
     it("should inspect tool with MCP UI binding", async () => {
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createInspectToolUITool(manager);
+      const tool = createInspectToolUITool(createMockRegistry(manager));
       const result = await tool.handler({ toolName: "get_current_weather" }, {} as never);
 
       expect(result.toolName).toBe("get_current_weather");
@@ -244,7 +245,7 @@ describe("UI Inspection Tools", () => {
     it("should inspect tool with OpenAI UI binding", async () => {
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createInspectToolUITool(manager);
+      const tool = createInspectToolUITool(createMockRegistry(manager));
       const result = await tool.handler({ toolName: "get_forecast" }, {} as never);
 
       expect(result.toolName).toBe("get_forecast");
@@ -259,7 +260,7 @@ describe("UI Inspection Tools", () => {
     it("should return hasUI: false for tool without UI", async () => {
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createInspectToolUITool(manager);
+      const tool = createInspectToolUITool(createMockRegistry(manager));
       const result = await tool.handler({ toolName: "calculate_sum" }, {} as never);
 
       expect(result.toolName).toBe("calculate_sum");
@@ -272,7 +273,7 @@ describe("UI Inspection Tools", () => {
     it("should throw error for non-existent tool", async () => {
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createInspectToolUITool(manager);
+      const tool = createInspectToolUITool(createMockRegistry(manager));
       await expect(tool.handler({ toolName: "unknown_tool" }, {} as never)).rejects.toThrow(
         "Tool not found: unknown_tool"
       );
@@ -283,7 +284,7 @@ describe("UI Inspection Tools", () => {
     it("should get metadata for MCP App widget", async () => {
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createGetUIMetadataTool(manager);
+      const tool = createGetUIMetadataTool(createMockRegistry(manager));
       const result = await tool.handler(
         { uri: "ui://weather-app/currentWeather?v=a1b2c3d4" },
         {} as never
@@ -310,7 +311,7 @@ describe("UI Inspection Tools", () => {
     it("should get metadata for OpenAI widget", async () => {
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createGetUIMetadataTool(manager);
+      const tool = createGetUIMetadataTool(createMockRegistry(manager));
       const result = await tool.handler(
         { uri: "ui://weather-app/forecast?v=e5f6g7h8" },
         {} as never
@@ -337,7 +338,7 @@ describe("UI Inspection Tools", () => {
     it("should throw error for non-existent URI", async () => {
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createGetUIMetadataTool(manager);
+      const tool = createGetUIMetadataTool(createMockRegistry(manager));
       await expect(
         tool.handler({ uri: "ui://weather-app/nonexistent" }, {} as never)
       ).rejects.toThrow("UI widget not found: ui://weather-app/nonexistent");
@@ -346,7 +347,7 @@ describe("UI Inspection Tools", () => {
     it("should throw error for non-UI resource", async () => {
       await manager.connect("http://localhost:3000/mcp");
 
-      const tool = createGetUIMetadataTool(manager);
+      const tool = createGetUIMetadataTool(createMockRegistry(manager));
       await expect(tool.handler({ uri: "file:///config.json" }, {} as never)).rejects.toThrow(
         "Resource is not a UI widget: file:///config.json (mimeType: application/json)"
       );

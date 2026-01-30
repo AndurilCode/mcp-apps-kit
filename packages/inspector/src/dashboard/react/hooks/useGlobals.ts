@@ -75,7 +75,11 @@ const defaultGlobals: GlobalsState = {
   },
 };
 
-export function useGlobals(baseUrl: string, pollInterval = 2000): UseGlobalsResult {
+export function useGlobals(
+  baseUrl: string,
+  connectionId: string | null = null,
+  pollInterval = 2000
+): UseGlobalsResult {
   const [globals, setGlobals] = useState<GlobalsState | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -91,14 +95,25 @@ export function useGlobals(baseUrl: string, pollInterval = 2000): UseGlobalsResu
     abortControllerRef.current = controller;
 
     try {
-      const res = await fetch(`${baseUrl}/dashboard/globals`, {
+      const params = connectionId ? `?connectionId=${encodeURIComponent(connectionId)}` : "";
+      const res = await fetch(`${baseUrl}/dashboard/globals${params}`, {
         signal: controller.signal,
       });
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
       }
       const data = (await res.json()) as GlobalsResponse;
-      setGlobals(data.globals ?? defaultGlobals);
+      // Merge with defaults to ensure all required fields are present
+      // (backend may return empty or partial globals object)
+      const merged: GlobalsState = {
+        ...defaultGlobals,
+        ...data.globals,
+        // Ensure nested objects are also merged with defaults
+        viewport: { ...defaultGlobals.viewport, ...data.globals?.viewport },
+        safeAreaInsets: { ...defaultGlobals.safeAreaInsets, ...data.globals?.safeAreaInsets },
+        userAgent: { ...defaultGlobals.userAgent, ...data.globals?.userAgent },
+      };
+      setGlobals(merged);
       setError(null);
     } catch (e) {
       // Skip state updates for aborted requests
@@ -112,7 +127,7 @@ export function useGlobals(baseUrl: string, pollInterval = 2000): UseGlobalsResu
         setIsLoading(false);
       }
     }
-  }, [baseUrl]);
+  }, [baseUrl, connectionId]);
 
   useEffect(() => {
     void fetchGlobals();
