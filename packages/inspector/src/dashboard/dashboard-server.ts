@@ -4,12 +4,12 @@
  * HTTP route handlers for the real-time browser dashboard.
  * Routes:
  * - GET /dashboard - Serve dashboard HTML
- * - GET /dashboard/stream?sessionId={id} - SSE screencast stream
- * - GET /dashboard/logs?sessionId={id} - SSE log stream
- * - GET /dashboard/events?sessionId={id} - SSE event stream
- * - GET /dashboard/sessions - List active sessions (JSON)
- * - GET /dashboard/globals - Get current environment state (JSON)
- * - GET /mcp/primitives - Get MCP server primitives (tools, resources, prompts)
+ * - GET /dashboard/stream?sessionId={id}&connectionId={id} - SSE screencast stream
+ * - GET /dashboard/logs?sessionId={id}&connectionId={id} - SSE log stream
+ * - GET /dashboard/events?sessionId={id}&connectionId={id} - SSE event stream
+ * - GET /dashboard/sessions?connectionId={id} - List active sessions (JSON)
+ * - GET /dashboard/globals?connectionId={id} - Get current environment state (JSON)
+ * - GET /mcp/primitives?connectionId={id} - Get MCP server primitives (tools, resources, prompts)
  */
 
 import type { IncomingMessage, ServerResponse } from "http";
@@ -229,17 +229,19 @@ export async function handleDashboardRequest(
     return true;
   }
 
-  // GET /dashboard/sessions - List active sessions
+  // GET /dashboard/sessions?connectionId={id} - List active sessions
   if (pathname === "/dashboard/sessions" && req.method === "GET") {
-    if (!connectionManager) {
+    const connId = url.searchParams.get("connectionId");
+    const cm = resolveConnectionManager(connId, connectionManager, registry);
+    if (!cm) {
       serveEmptySessions(res);
       return true;
     }
-    serveSessionList(res, connectionManager);
+    serveSessionList(res, cm);
     return true;
   }
 
-  // GET /dashboard/stream?sessionId={id} - SSE screencast stream
+  // GET /dashboard/stream?sessionId={id}&connectionId={id} - SSE screencast stream
   if (pathname === "/dashboard/stream" && req.method === "GET") {
     const sessionId = url.searchParams.get("sessionId");
     if (!sessionId) {
@@ -247,15 +249,17 @@ export async function handleDashboardRequest(
       res.end(JSON.stringify({ error: "Missing sessionId parameter" }));
       return true;
     }
-    if (!connectionManager) {
+    const connId = url.searchParams.get("connectionId");
+    const cm = resolveConnectionManager(connId, connectionManager, registry);
+    if (!cm) {
       writeNoSessionStream(res, "No active connection");
       return true;
     }
-    await startScreencastStream(req, res, connectionManager, sessionId);
+    await startScreencastStream(req, res, cm, sessionId);
     return true;
   }
 
-  // GET /dashboard/logs?sessionId={id} - SSE log stream
+  // GET /dashboard/logs?sessionId={id}&connectionId={id} - SSE log stream
   if (pathname === "/dashboard/logs" && req.method === "GET") {
     const sessionId = url.searchParams.get("sessionId");
     if (!sessionId) {
@@ -263,15 +267,17 @@ export async function handleDashboardRequest(
       res.end(JSON.stringify({ error: "Missing sessionId parameter" }));
       return true;
     }
-    if (!connectionManager) {
+    const connId = url.searchParams.get("connectionId");
+    const cm = resolveConnectionManager(connId, connectionManager, registry);
+    if (!cm) {
       writeNoSessionStream(res, "No active connection");
       return true;
     }
-    await startLogStream(req, res, connectionManager, sessionId);
+    await startLogStream(req, res, cm, sessionId);
     return true;
   }
 
-  // GET /dashboard/events?sessionId={id} - SSE event stream
+  // GET /dashboard/events?sessionId={id}&connectionId={id} - SSE event stream
   if (pathname === "/dashboard/events" && req.method === "GET") {
     const sessionId = url.searchParams.get("sessionId");
     if (!sessionId) {
@@ -279,11 +285,13 @@ export async function handleDashboardRequest(
       res.end(JSON.stringify({ error: "Missing sessionId parameter" }));
       return true;
     }
-    if (!connectionManager) {
+    const connId = url.searchParams.get("connectionId");
+    const cm = resolveConnectionManager(connId, connectionManager, registry);
+    if (!cm) {
       writeNoSessionStream(res, "No active connection");
       return true;
     }
-    startEventStream(req, res, connectionManager, sessionId);
+    startEventStream(req, res, cm, sessionId);
     return true;
   }
 

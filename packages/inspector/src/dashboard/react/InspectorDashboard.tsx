@@ -5,17 +5,18 @@
  * Connects to the inspector backend via SSE for screencast, log, and event streaming.
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useSessions } from "./hooks/useSessions";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useSessions, type SessionInfo } from "./hooks/useSessions";
 import { useScreencast } from "./hooks/useScreencast";
-import { useLogStream } from "./hooks/useLogStream";
+import { useLogStream, type LogEntry } from "./hooks/useLogStream";
 import { useEventStream } from "./hooks/useEventStream";
 import { useAgentEventStream } from "./hooks/useAgentEventStream";
+import type { InspectorEvent, AgnosticInspectorEvent } from "../../types";
 import { useResizablePanel } from "./hooks/useResizablePanel";
 import { useResizablePanelWidth } from "./hooks/useResizablePanelWidth";
-import { useGlobals } from "./hooks/useGlobals";
+import { useGlobals, type GlobalsState } from "./hooks/useGlobals";
 import { useConnections } from "./hooks/useConnections";
-import { useMcpPrimitives } from "./hooks/useMcpPrimitives";
+import { useMcpPrimitives, type McpPrimitives } from "./hooks/useMcpPrimitives";
 import { Toolbar } from "./components/Toolbar";
 import { ConnectionBar } from "./components/ConnectionBar";
 import { TabBar } from "./components/TabBar";
@@ -42,18 +43,21 @@ const DEFAULT_PANEL_VISIBILITY: PanelVisibility = {
 
 const PANEL_VISIBILITY_STORAGE_KEY = "mcp-dashboard-panel-visibility";
 
+interface CachedConnectionState {
+  sessions: SessionInfo[];
+  events: InspectorEvent[];
+  logs: LogEntry[];
+  agentEvents: AgnosticInspectorEvent[];
+  screencastImage: string | null;
+  globals: GlobalsState | null;
+  primitives: McpPrimitives | null;
+}
+
 export function InspectorDashboard({
   baseUrl = "",
   initialPanelHeight = 200,
   minPanelHeight = 100,
 }: InspectorDashboardProps): React.ReactElement {
-  // Session state
-  const [selectedSessionByConnection, setSelectedSessionByConnection] = useState<
-    Record<string, string | null>
-  >({});
-  const [isConnectionFormOpen, setIsConnectionFormOpen] = useState(false);
-  const { sessions, isLoading: sessionsLoading } = useSessions(baseUrl);
-
   // Connection state (includes actions and history)
   const {
     connections,
@@ -66,23 +70,43 @@ export function InspectorDashboard({
     getMatchingEntries,
   } = useConnections(baseUrl);
 
+  // Per-connection state cache for instant tab switching
+  const connectionCacheRef = useRef<Map<string, CachedConnectionState>>(new Map());
+  const prevConnectionIdRef = useRef<string | null>(null);
+
+  // Session state
+  const [selectedSessionByConnection, setSelectedSessionByConnection] = useState<
+    Record<string, string | null>
+  >({});
+  const [isConnectionFormOpen, setIsConnectionFormOpen] = useState(false);
+  const { sessions, isLoading: sessionsLoading } = useSessions(baseUrl, activeConnectionId);
+
   const activeConnection = useMemo(
     () => connections.find((connection) => connection.id === activeConnectionId) ?? null,
     [connections, activeConnectionId]
   );
+
+  // Retrieve cached state for the active connection (used as fallback while hooks refetch)
+  const cachedState = activeConnectionId
+    ? (connectionCacheRef.current.get(activeConnectionId) ?? null)
+    : null;
 
   const selectedSessionId = activeConnectionId
     ? (selectedSessionByConnection[activeConnectionId] ?? null)
     : null;
 
   // Screencast state
-  const { imageData, status, error } = useScreencast(baseUrl, selectedSessionId);
+  const { imageData, status, error } = useScreencast(
+    baseUrl,
+    selectedSessionId,
+    activeConnectionId
+  );
 
   // Log stream state
-  const { logs, clearLogs } = useLogStream(baseUrl, selectedSessionId);
+  const { logs, clearLogs } = useLogStream(baseUrl, selectedSessionId, activeConnectionId);
 
   // Event stream state
-  const { events, clearEvents } = useEventStream(baseUrl, selectedSessionId);
+  const { events, clearEvents } = useEventStream(baseUrl, selectedSessionId, activeConnectionId);
 
   // Agent event stream state (connection-scoped)
   const { events: agentEvents, clearEvents: clearAgentEvents } = useAgentEventStream(
@@ -100,6 +124,19 @@ export function InspectorDashboard({
     prompts,
     isLoading: primitivesLoading,
   } = useMcpPrimitives(baseUrl, activeConnection?.status === "connected", activeConnectionId);
+
+  // Use live data with cache fallback for instant tab switching
+  const displaySessions = sessions.length > 0 ? sessions : (cachedState?.sessions ?? []);
+  const displayEvents = events.length > 0 ? events : (cachedState?.events ?? []);
+  const displayLogs = logs.length > 0 ? logs : (cachedState?.logs ?? []);
+  const displayAgentEvents =
+    agentEvents.length > 0 ? agentEvents : (cachedState?.agentEvents ?? []);
+  const displayImageData = imageData ?? cachedState?.screencastImage ?? null;
+  const displayGlobals = globals ?? cachedState?.globals ?? null;
+  const displayTools = tools.length > 0 ? tools : (cachedState?.primitives?.tools ?? []);
+  const displayResources =
+    resources.length > 0 ? resources : (cachedState?.primitives?.resources ?? []);
+  const displayPrompts = prompts.length > 0 ? prompts : (cachedState?.primitives?.prompts ?? []);
 
   // Left panel state (for MCP primitives when session is active)
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
@@ -172,7 +209,7 @@ export function InspectorDashboard({
 
   // Auto-select first session when available
   useEffect(() => {
-    const firstSession = sessions[0];
+    const firstSession = displaySessions[0];
     if (!activeConnectionId) {
       return;
     }
@@ -186,7 +223,7 @@ export function InspectorDashboard({
       clearEvents();
       return;
     }
-    if (sessions.length === 0 && currentSelected) {
+    if (displaySessions.length === 0 && currentSelected) {
       setSelectedSessionByConnection((prev) => ({
         ...prev,
         [activeConnectionId]: null,
@@ -195,7 +232,7 @@ export function InspectorDashboard({
       clearEvents();
       return;
     }
-    if (currentSelected && !sessions.some((session) => session.id === currentSelected)) {
+    if (currentSelected && !displaySessions.some((session) => session.id === currentSelected)) {
       setSelectedSessionByConnection((prev) => ({
         ...prev,
         [activeConnectionId]: firstSession?.id ?? null,
@@ -203,7 +240,7 @@ export function InspectorDashboard({
       clearLogs();
       clearEvents();
     }
-  }, [sessions, activeConnectionId, selectedSessionByConnection, clearLogs, clearEvents]);
+  }, [displaySessions, activeConnectionId, selectedSessionByConnection, clearLogs, clearEvents]);
 
   // Save collapsed state
   useEffect(() => {
@@ -249,10 +286,33 @@ export function InspectorDashboard({
     [activeConnectionId, clearLogs, clearEvents]
   );
 
+  // Save state when switching away from a connection, restore when switching to one
   useEffect(() => {
+    const prevId = prevConnectionIdRef.current;
+
+    // Save previous connection's state to cache
+    if (prevId) {
+      connectionCacheRef.current.set(prevId, {
+        sessions,
+        events,
+        logs,
+        agentEvents,
+        screencastImage: imageData,
+        globals,
+        primitives:
+          tools.length > 0 || resources.length > 0 || prompts.length > 0
+            ? { tools, resources, prompts }
+            : null,
+      });
+    }
+
+    // Clear when switching (hooks will refetch or restore from cache)
     clearLogs();
     clearEvents();
-  }, [activeConnectionId, clearLogs, clearEvents]);
+    clearAgentEvents();
+
+    prevConnectionIdRef.current = activeConnectionId;
+  }, [activeConnectionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const togglePanel = useCallback(() => {
     setIsPanelCollapsed((prev) => !prev);
@@ -291,6 +351,8 @@ export function InspectorDashboard({
       if (!closed) {
         return;
       }
+      // Clear cached state for this connection
+      connectionCacheRef.current.delete(id);
       setSelectedSessionByConnection((prev) => {
         if (!(id in prev)) {
           return prev;
@@ -326,7 +388,7 @@ export function InspectorDashboard({
     : "Disconnected";
 
   // Determine if UI session is active (has screencast)
-  const hasActiveSession = !!selectedSessionId && !!imageData;
+  const hasActiveSession = !!selectedSessionId && !!displayImageData;
 
   // Inject keyframe animation for streaming border
   const keyframeStyles = useMemo(
@@ -380,18 +442,18 @@ export function InspectorDashboard({
 
         <div style={styles.headerRight}>
           <div style={styles.controls}>
-            {sessions.length > 0 && (
+            {displaySessions.length > 0 && (
               <select
                 id="session-select"
                 style={{
                   ...styles.select,
-                  ...(sessions.length === 1 ? styles.selectSingleSession : {}),
+                  ...(displaySessions.length === 1 ? styles.selectSingleSession : {}),
                 }}
                 value={selectedSessionId || ""}
                 onChange={handleSessionChange}
-                disabled={sessionsLoading || sessions.length <= 1}
+                disabled={sessionsLoading || displaySessions.length <= 1}
               >
-                {sessions.map((session) => (
+                {displaySessions.map((session) => (
                   <option key={session.id} value={session.id}>
                     {session.toolName} ({session.id.slice(0, 8)}...)
                   </option>
@@ -447,9 +509,9 @@ export function InspectorDashboard({
         {/* Left Panel - MCP Primitives when session active */}
         {hasActiveSession && (
           <McpPrimitivesPanel
-            tools={tools}
-            resources={resources}
-            prompts={prompts}
+            tools={displayTools}
+            resources={displayResources}
+            prompts={displayPrompts}
             isLoading={primitivesLoading}
             isVisible={true}
             isCollapsed={isLeftPanelCollapsed}
@@ -473,14 +535,18 @@ export function InspectorDashboard({
                   ...(isStreaming ? styles.displayContainerStreaming : {}),
                 }}
               >
-                <img src={imageData} alt="Live browser view" style={styles.streamImage} />
+                <img
+                  src={displayImageData ?? ""}
+                  alt="Live browser view"
+                  style={styles.streamImage}
+                />
               </div>
             ) : (
               /* MCP Primitives in center when no session */
               <McpPrimitivesPanel
-                tools={tools}
-                resources={resources}
-                prompts={prompts}
+                tools={displayTools}
+                resources={displayResources}
+                prompts={displayPrompts}
                 isLoading={primitivesLoading}
                 isVisible={true}
                 position="center"
@@ -507,9 +573,9 @@ export function InspectorDashboard({
             }}
           >
             <BottomPanel
-              logs={logs}
-              events={events}
-              agentEvents={agentEvents}
+              logs={displayLogs}
+              events={displayEvents}
+              agentEvents={displayAgentEvents}
               onClearLogs={clearLogs}
               onClearEvents={clearEvents}
               onClearAgentEvents={clearAgentEvents}
@@ -523,7 +589,7 @@ export function InspectorDashboard({
         </div>
 
         {/* Globals Panel - full height on the right */}
-        <GlobalsPanel globals={globals} isVisible={isGlobalsPanelVisible} />
+        <GlobalsPanel globals={displayGlobals} isVisible={isGlobalsPanelVisible} />
       </div>
     </div>
   );

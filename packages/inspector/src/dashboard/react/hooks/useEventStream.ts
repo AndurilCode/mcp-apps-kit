@@ -17,7 +17,11 @@ export interface UseEventStreamResult {
   clearEvents: () => void;
 }
 
-export function useEventStream(baseUrl: string, sessionId: string | null): UseEventStreamResult {
+export function useEventStream(
+  baseUrl: string,
+  sessionId: string | null,
+  connectionId: string | null = null
+): UseEventStreamResult {
   const [events, setEvents] = useState<InspectorEvent[]>([]);
   const eventSourceRef = useRef<EventSource | null>(null);
 
@@ -38,9 +42,11 @@ export function useEventStream(baseUrl: string, sessionId: string | null): UseEv
       return;
     }
 
-    const eventSource = new EventSource(
-      `${baseUrl}/dashboard/events?sessionId=${encodeURIComponent(sessionId)}`
-    );
+    const params = new URLSearchParams({ sessionId });
+    if (connectionId) {
+      params.set("connectionId", connectionId);
+    }
+    const eventSource = new EventSource(`${baseUrl}/dashboard/events?${params.toString()}`);
     eventSourceRef.current = eventSource;
 
     // Handle initial batch of events
@@ -92,7 +98,7 @@ export function useEventStream(baseUrl: string, sessionId: string | null): UseEv
         eventSourceRef.current = null;
       }
     };
-  }, [baseUrl, sessionId]);
+  }, [baseUrl, sessionId, connectionId]);
 
   return { events, clearEvents };
 }
