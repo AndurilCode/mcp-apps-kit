@@ -248,8 +248,9 @@ export function createDualInspectorServer(
 
     // Health check
     if (url === "/health") {
-      const state = getActiveConnectionManager()!.getState();
-      const schema = getActiveConnectionManager()!.getTargetSchema();
+      const cm = getActiveConnectionManager();
+      const state = cm?.getState() ?? { connected: false, serverUrl: null, serverInfo: null };
+      const schema = cm?.getTargetSchema() ?? null;
       const protocolType: ProtocolType | null =
         state.connected && schema ? inferProtocolType(schema.tools) : null;
       const body = JSON.stringify({
@@ -339,11 +340,16 @@ export function createDualInspectorServer(
           const validatedUrl = trimmedUrl;
 
           // Check if already connected
-          const currentState = getActiveConnectionManager()!.getState();
+          const currentCm = getActiveConnectionManager();
+          const currentState = currentCm?.getState() ?? {
+            connected: false,
+            serverUrl: null,
+            serverInfo: null,
+          };
           if (currentState.connected && currentState.serverUrl) {
             // If same URL, return success
             if (currentState.serverUrl === validatedUrl) {
-              const schema = getActiveConnectionManager()!.getTargetSchema();
+              const schema = currentCm?.getTargetSchema() ?? null;
               const protocolType = schema ? inferProtocolType(schema.tools) : "mcp";
               res.writeHead(200, { "Content-Type": "application/json" });
               res.end(
@@ -421,7 +427,12 @@ export function createDualInspectorServer(
 
       if (req.method === "POST") {
         try {
-          const activeCm = getActiveConnectionManager()!;
+          const activeCm = getActiveConnectionManager();
+          if (!activeCm) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "No active connection" }));
+            return;
+          }
           const previousUrl = activeCm.getState().serverUrl;
           await registry.closeConnection(activeCm.id);
           res.writeHead(200, { "Content-Type": "application/json" });
@@ -471,14 +482,15 @@ export function createDualInspectorServer(
           const payload = JSON.parse(bodyData.toString("utf-8")) as SyncEventPayload;
 
           // For globals/host-context-changed events, also update the environment state
-          if (payload.type === "globals" || payload.type === "host-context-changed") {
-            getActiveConnectionManager()!.updateEnvironmentFromGlobals(
-              payload.data as Record<string, unknown>
-            );
-          }
+          const syncCm = getActiveConnectionManager();
+          if (syncCm) {
+            if (payload.type === "globals" || payload.type === "host-context-changed") {
+              syncCm.updateEnvironmentFromGlobals(payload.data as Record<string, unknown>);
+            }
 
-          // Route to widget session manager for delivery to Playwright widgets
-          await getActiveConnectionManager()!.getWidgetSessionManager().syncEvent(payload);
+            // Route to widget session manager for delivery to Playwright widgets
+            await syncCm.getWidgetSessionManager().syncEvent(payload);
+          }
 
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true, type: payload.type }));
@@ -527,11 +539,17 @@ export function createDualInspectorServer(
           };
 
           // Update the connection manager's environment state
-          getActiveConnectionManager()!.updateEnvironmentFromGlobals(data.globals);
+          const connectionManager = getActiveConnectionManager();
+          if (!connectionManager) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "No active connection" }));
+            return;
+          }
+          connectionManager.updateEnvironmentFromGlobals(data.globals);
 
           // Resize the Playwright viewport for the specific session
-          const sessionManager = getActiveConnectionManager()!.getWidgetSessionManager();
-          const currentEnvState = getActiveConnectionManager()!.getEnvironmentState();
+          const sessionManager = connectionManager.getWidgetSessionManager();
+          const currentEnvState = connectionManager.getEnvironmentState();
 
           // Use the environment state which now includes the updated displayMode/viewport
           const updated = await sessionManager.updateSessionGlobals(
@@ -594,8 +612,11 @@ export function createDualInspectorServer(
               protocol: "openai", // Legacy endpoint assumed OpenAI protocol
               timestamp: new Date().toISOString(),
             };
-            getActiveConnectionManager()!.updateEnvironmentFromGlobals(data.globals);
-            await getActiveConnectionManager()!.getWidgetSessionManager().syncEvent(payload);
+            const legacyCm = getActiveConnectionManager();
+            if (legacyCm) {
+              legacyCm.updateEnvironmentFromGlobals(data.globals);
+              await legacyCm.getWidgetSessionManager().syncEvent(payload);
+            }
           }
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: true }));
@@ -616,7 +637,7 @@ export function createDualInspectorServer(
       const handled = await handleDashboardRequest(
         req,
         res,
-        getActiveConnectionManager()!,
+        getActiveConnectionManager(),
         registry
       );
       if (handled) return;
@@ -689,7 +710,7 @@ export function createDualInspectorServer(
           httpServer.listen(port, () => {
             // Set inspector URL for sync script injection
             // Use 127.0.0.1 instead of localhost to match widget server origin (avoids CORS issues)
-            getActiveConnectionManager()!.setInspectorUrl(`http://127.0.0.1:${port}`);
+            getActiveConnectionManager()?.setInspectorUrl(`http://127.0.0.1:${port}`);
 
             // eslint-disable-next-line no-console
             console.log(`[dual-inspector] Started on port ${port}`);
