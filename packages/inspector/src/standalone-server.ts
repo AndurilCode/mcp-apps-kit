@@ -674,13 +674,17 @@ export function createStandaloneInspectorServer(
           // Fullscreen mode has maxHeight=null so no clamping occurs
           if (
             currentEnvState.displayMode !== "fullscreen" &&
-            currentEnvState.maxHeight != null &&
+            currentEnvState.maxHeight !== null &&
+            currentEnvState.maxHeight !== undefined &&
             currentEnvState.viewport
           ) {
-            currentEnvState.viewport = {
+            const clampedViewport = {
               ...currentEnvState.viewport,
               height: Math.min(currentEnvState.viewport.height, currentEnvState.maxHeight),
             };
+            currentEnvState.viewport = clampedViewport;
+            // Persist clamped viewport back to shared environment state
+            connectionManager.updateEnvironmentFromGlobals({ viewport: clampedViewport });
           }
 
           // Use the environment state which now includes the updated displayMode/viewport

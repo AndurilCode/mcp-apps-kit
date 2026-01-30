@@ -359,7 +359,8 @@ export class WidgetSessionManager extends EventEmitter {
         // Inline/PiP: fixed width, dynamic height clamped to maxHeight
         const envHeight = environmentState.viewport?.height ?? modeSizing.height;
         const maxH = environmentState.maxHeight ?? modeSizing.maxHeight;
-        const clampedHeight = maxH != null ? Math.min(envHeight, maxH) : envHeight;
+        const clampedHeight =
+          maxH !== null && maxH !== undefined ? Math.min(envHeight, maxH) : envHeight;
         viewport = { width: modeSizing.width, height: clampedHeight };
       }
 

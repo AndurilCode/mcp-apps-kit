@@ -546,7 +546,7 @@ ${generateDomEventListenersScript()}
               window.__mcpLastSentHeight = scHeight;
               clearTimeout(window.__mcpSizeTimer);
               window.__mcpSizeTimer = setTimeout(function() {
-                var resolvedWidth = (scWidth != null ? scWidth : 800);
+                var resolvedWidth = (scWidth !== null && scWidth !== undefined ? scWidth : 800);
                 fetch(inspectorUrl + '/update-environment', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
