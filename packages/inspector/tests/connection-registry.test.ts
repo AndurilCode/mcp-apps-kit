@@ -73,7 +73,7 @@ describe("ConnectionRegistry", () => {
   it("closes connections and cleans up state", async () => {
     const registry = new ConnectionRegistry();
 
-    const first = await registry.createConnection("http://localhost:3000/mcp");
+    await registry.createConnection("http://localhost:3000/mcp");
     const second = await registry.createConnection("http://localhost:3001/mcp");
 
     await registry.closeConnection(second.id);
