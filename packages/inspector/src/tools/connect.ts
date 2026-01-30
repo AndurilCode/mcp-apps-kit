@@ -107,7 +107,7 @@ function buildConnectionParams(input: z.infer<typeof connectInputSchema>): Conne
       command: input.command,
     };
     if (input.args) params.args = input.args;
-    if (input.env) params.env = input.env as Record<string, string>;
+    if (input.env) params.env = input.env;
     if (input.cwd) params.cwd = input.cwd;
     return params;
   }
