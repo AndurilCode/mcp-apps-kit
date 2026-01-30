@@ -9,6 +9,8 @@ import { ConnectionRegistry } from "../src/connection-registry";
 import { ConnectionManager } from "../src/connection";
 import { handleDashboardRequest } from "../src/dashboard/dashboard-server";
 
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 interface MockClient {
   listTools: ReturnType<typeof vi.fn>;
   listResources: ReturnType<typeof vi.fn>;
@@ -153,7 +155,7 @@ describe("Dashboard connections endpoints", () => {
       url: string;
       serverInfo: { name: string; version: string } | null;
     };
-    expect(payload.id).toBe("conn-1");
+    expect(payload.id).toMatch(uuidRegex);
     expect(payload.url).toBe("http://localhost:3000/mcp");
     expect(payload.serverInfo?.name).toBe("server-alpha");
   });

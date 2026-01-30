@@ -15,6 +15,8 @@ import {
   createCallToolTool,
 } from "../src/tools";
 
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 interface MockClient {
   listTools: ReturnType<typeof vi.fn>;
   listResources: ReturnType<typeof vi.fn>;
@@ -85,7 +87,7 @@ describe("Multi-connection tools", () => {
     const result = await tool.handler({ url: "http://localhost:3000/mcp" }, {} as never);
 
     expect(result.connected).toBe(true);
-    expect(result.connectionId).toBe("conn-1");
+    expect(result.connectionId).toMatch(uuidRegex);
     expect(registry.listConnections()).toHaveLength(1);
   });
 

@@ -165,7 +165,17 @@ export async function handleDashboardRequest(
         return true;
       }
       try {
-        new URL(body.url);
+        const parsedUrl = new URL(body.url);
+        const allowedProtocols = new Set(["http:", "https:", "ws:", "wss:"]);
+        if (!allowedProtocols.has(parsedUrl.protocol)) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              error: "Unsupported URL protocol. Use http, https, ws, or wss.",
+            })
+          );
+          return true;
+        }
       } catch {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Invalid URL format" }));

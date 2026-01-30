@@ -4,6 +4,7 @@
  * Manages multiple ConnectionManager instances and tracks active connection.
  */
 
+import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { ConnectionManager } from "./connection";
 import type { ConnectOptions, ConnectionStatusOutput, InspectorServerOptions } from "./types";
@@ -45,7 +46,6 @@ export class ConnectionRegistry extends EventEmitter {
   private activeConnectionId: string | null = null;
   private readonly maxConnections: number;
   private readonly connectionManagerOptions: InspectorServerOptions;
-  private nextId = 1;
 
   /**
    * Create a ConnectionRegistry instance.
@@ -154,13 +154,21 @@ export class ConnectionRegistry extends EventEmitter {
    * @param id - Connection id to close.
    */
   async closeConnection(id: string): Promise<void> {
+    const connectionIds = Array.from(this.connections.keys());
+    const closingIndex = connectionIds.indexOf(id);
     const connection = this.getConnection(id);
     await connection.disconnect();
     this.connections.delete(id);
 
     if (this.activeConnectionId === id) {
       const remaining = Array.from(this.connections.keys());
-      this.activeConnectionId = remaining[0] ?? null;
+      if (remaining.length === 0) {
+        this.activeConnectionId = null;
+      } else if (closingIndex >= 0 && closingIndex < connectionIds.length - 1) {
+        this.activeConnectionId = connectionIds[closingIndex + 1] ?? remaining[0] ?? null;
+      } else {
+        this.activeConnectionId = connectionIds[closingIndex - 1] ?? remaining[0] ?? null;
+      }
     }
 
     this.emit("closed", id);
@@ -216,6 +224,6 @@ export class ConnectionRegistry extends EventEmitter {
   }
 
   private generateConnectionId(): string {
-    return `conn-${this.nextId++}`;
+    return randomUUID();
   }
 }

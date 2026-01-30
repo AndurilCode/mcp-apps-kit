@@ -23,6 +23,8 @@ vi.mock("@mcp-apps-kit/testing", () => {
   };
 });
 
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 describe("ConnectionRegistry", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -34,12 +36,15 @@ describe("ConnectionRegistry", () => {
     const first = await registry.createConnection("http://localhost:3000/mcp");
     const second = await registry.createConnection("http://localhost:3001/mcp");
 
-    expect(first.id).toBe("conn-1");
-    expect(second.id).toBe("conn-2");
+    expect(first.id).toMatch(uuidRegex);
+    expect(second.id).toMatch(uuidRegex);
+    expect(first.id).not.toBe(second.id);
 
     const list = registry.listConnections();
     expect(list).toHaveLength(2);
-    expect(list.map((item) => item.id)).toEqual(["conn-1", "conn-2"]);
+    for (const item of list) {
+      expect(item.id).toMatch(uuidRegex);
+    }
   });
 
   it("resolves connections by explicit ID, then active, then throws", async () => {
