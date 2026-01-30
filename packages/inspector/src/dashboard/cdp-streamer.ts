@@ -59,9 +59,9 @@ export interface ScreencastOptions {
  * Note: maxWidth/maxHeight are the MAXIMUM capture dimensions.
  * The actual capture size matches the page viewport (up to these limits).
  * We set these high enough to accommodate all display mode presets:
- * - inline: 400x300 (desktop), 375x400 (mobile)
- * - fullscreen: 1024x768 (desktop), 375x812 (mobile)
- * - pip: 320x240 (desktop), 280x200 (mobile)
+ * - inline: 800x600 (desktop), 375x400 (mobile)
+ * - fullscreen: 1280x800 (desktop), 375x667 (mobile)
+ * - pip: 320x240 (desktop), 280x210 (mobile)
  */
 const DEFAULT_SCREENCAST_OPTIONS: Required<ScreencastOptions> = {
   maxWidth: 2048,

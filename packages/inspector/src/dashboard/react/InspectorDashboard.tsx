@@ -376,6 +376,17 @@ export function InspectorDashboard({
     [connections]
   );
 
+  // Compute screencast container aspect ratio from globals viewport
+  const screencastAspectStyle = useMemo((): React.CSSProperties => {
+    const viewport = displayGlobals?.viewport;
+    if (!viewport || !viewport.width || !viewport.height) {
+      return {};
+    }
+    return {
+      aspectRatio: `${viewport.width} / ${viewport.height}`,
+    };
+  }, [displayGlobals?.viewport]);
+
   const isStreaming = status === "streaming";
   const connectionStatusLabel = activeConnection
     ? activeConnection.status === "connected"
@@ -533,6 +544,7 @@ export function InspectorDashboard({
                 style={{
                   ...styles.displayContainer,
                   ...(isStreaming ? styles.displayContainerStreaming : {}),
+                  ...(isStreaming ? screencastAspectStyle : {}),
                 }}
               >
                 <img

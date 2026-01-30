@@ -32,14 +32,14 @@ export interface DisplayModeSizing {
  */
 export const DISPLAY_MODE_SIZES = {
   desktop: {
-    inline: { width: 400, height: 300, maxHeight: 400 },
-    fullscreen: { width: 1024, height: 768, maxHeight: null },
+    inline: { width: 800, height: 600, maxHeight: 600 },
+    fullscreen: { width: 1280, height: 800, maxHeight: null },
     pip: { width: 320, height: 240, maxHeight: 320 },
   },
   mobile: {
-    inline: { width: 375, height: 400, maxHeight: 500 },
-    fullscreen: { width: 375, height: 812, maxHeight: null }, // iPhone X dimensions
-    pip: { width: 280, height: 200, maxHeight: 280 },
+    inline: { width: 375, height: 400, maxHeight: 400 },
+    fullscreen: { width: 375, height: 667, maxHeight: null },
+    pip: { width: 280, height: 210, maxHeight: 280 },
   },
 } as const;
 

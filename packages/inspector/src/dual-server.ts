@@ -551,6 +551,23 @@ export function createDualInspectorServer(
           const sessionManager = connectionManager.getWidgetSessionManager();
           const currentEnvState = connectionManager.getEnvironmentState();
 
+          // Clamp viewport height to maxHeight for inline mode
+          // Fullscreen mode has maxHeight=null so no clamping occurs
+          if (
+            currentEnvState.displayMode !== "fullscreen" &&
+            currentEnvState.maxHeight !== null &&
+            currentEnvState.maxHeight !== undefined &&
+            currentEnvState.viewport
+          ) {
+            const clampedViewport = {
+              ...currentEnvState.viewport,
+              height: Math.min(currentEnvState.viewport.height, currentEnvState.maxHeight),
+            };
+            currentEnvState.viewport = clampedViewport;
+            // Persist clamped viewport back to shared environment state
+            connectionManager.updateEnvironmentFromGlobals({ viewport: clampedViewport });
+          }
+
           // Use the environment state which now includes the updated displayMode/viewport
           const updated = await sessionManager.updateSessionGlobals(
             data.sessionId,

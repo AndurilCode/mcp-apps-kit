@@ -256,14 +256,13 @@ export const styles: Record<string, CSSProperties> = {
   },
 
   displayContainerStreaming: {
-    height: "100%",
+    width: "100%",
   },
 
   streamImage: {
     display: "block",
-    width: "auto",
+    width: "100%",
     height: "100%",
-    maxWidth: "100%",
     objectFit: "contain",
   },
 
