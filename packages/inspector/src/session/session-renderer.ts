@@ -127,15 +127,23 @@ export async function updateSessionGlobals(options: UpdateGlobalsOptions): Promi
     // Determine platform for sizing calculations
     const platform = getPlatformFromDeviceType(environmentState.userAgent?.device?.type);
 
-    // Get sizing based on display mode (use viewport from state, or derive from display mode)
+    // Get sizing based on display mode
     const displayMode: DisplayMode = environmentState.displayMode ?? "inline";
     const modeSizing = getDisplayModeSizing(displayMode, platform);
-    const viewport = environmentState.viewport ?? {
-      width: modeSizing.width,
-      height: modeSizing.height,
-    };
 
-    // Resize the Playwright page viewport to match the new display mode sizing
+    let viewport: { width: number; height: number };
+    if (displayMode === "fullscreen") {
+      // Fullscreen: both dimensions fixed from presets
+      viewport = { width: modeSizing.width, height: modeSizing.height };
+    } else {
+      // Inline/PiP: fixed width, dynamic height clamped to maxHeight
+      const envHeight = environmentState.viewport?.height ?? modeSizing.height;
+      const maxH = environmentState.maxHeight ?? modeSizing.maxHeight;
+      const clampedHeight = maxH != null ? Math.min(envHeight, maxH) : envHeight;
+      viewport = { width: modeSizing.width, height: clampedHeight };
+    }
+
+    // Resize the Playwright page viewport to match the computed sizing
     await page.setViewportSize(viewport);
 
     if (debug) {

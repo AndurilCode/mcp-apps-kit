@@ -503,6 +503,39 @@ ${generateDomEventListenersScript()}
         if (message.method === 'logging/sendMessage') {
           console.log('[MCP Widget Log]', message.params.level, message.params.data);
         }
+
+        // Handle ui/notifications/size-changed
+        if (message.method === 'ui/notifications/size-changed' && message.params) {
+          var scWidth = message.params.width;
+          var scHeight = message.params.height;
+          console.log('[MCP Host] Size changed:', scWidth, 'x', scHeight);
+
+          // Resize iframe CSS
+          var scIframe = document.getElementById('widget-frame');
+          if (scIframe && scHeight) {
+            scIframe.style.height = scHeight + 'px';
+          }
+
+          // Forward to /update-environment (debounced, dedup)
+          if (inspectorUrl && scHeight !== window.__mcpLastSentHeight) {
+            window.__mcpLastSentHeight = scHeight;
+            clearTimeout(window.__mcpSizeTimer);
+            window.__mcpSizeTimer = setTimeout(function() {
+              fetch(inspectorUrl + '/update-environment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  sessionId: sessionId,
+                  globals: { viewport: { width: scWidth || 800, height: scHeight } }
+                })
+              }).then(function(res) {
+                console.log('[MCP Host] Size change forwarded, status:', res.status);
+              }).catch(function(err) {
+                console.warn('[MCP Host] Failed to forward size change:', err);
+              });
+            }, 100);
+          }
+        }
       });
 
       console.log('[MCP Host] Ready, waiting for widget to initialize...');
@@ -662,11 +695,38 @@ ${generateDomEventListenersScript()}
 
       // Handle resize
       if (message && message.type === 'openai:resize') {
-        console.log('[OpenAI Host] Widget height:', message.height);
+        var newHeight = message.height;
+        console.log('[OpenAI Host] Widget height:', newHeight);
         // Track height changes for test assertions
         window.__hostState = window.__hostState || {};
         window.__hostState.heights = window.__hostState.heights || [];
-        window.__hostState.heights.push({ height: message.height, timestamp: Date.now() });
+        window.__hostState.heights.push({ height: newHeight, timestamp: Date.now() });
+
+        // Resize iframe CSS
+        var iframeEl = document.getElementById('widget-frame');
+        if (iframeEl) {
+          iframeEl.style.height = newHeight + 'px';
+        }
+
+        // Forward to /update-environment (debounced, dedup)
+        if (inspectorUrl && newHeight !== window.__lastSentHeight) {
+          window.__lastSentHeight = newHeight;
+          clearTimeout(window.__resizeTimer);
+          window.__resizeTimer = setTimeout(function() {
+            fetch(inspectorUrl + '/update-environment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sessionId: sessionId,
+                globals: { viewport: { width: 800, height: newHeight } }
+              })
+            }).then(function(res) {
+              console.log('[OpenAI Host] Resize forwarded, status:', res.status);
+            }).catch(function(err) {
+              console.warn('[OpenAI Host] Failed to forward resize:', err);
+            });
+          }, 100);
+        }
       }
 
       // Handle navigation
