@@ -144,6 +144,7 @@ export {
   createClearHistoryTool,
   createRunTestSuiteTool,
   createGetConnectionStatusTool,
+  createListConnectionsTool,
   // UI Inspection tools
   createListUIWidgetsTool,
   createGetUIWidgetTool,
