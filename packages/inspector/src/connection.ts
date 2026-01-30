@@ -477,13 +477,18 @@ export class ConnectionManager extends EventEmitter {
               console.log(`[inspector] Auto-restart aborted: disconnect called during reconnect`);
             }
             void this.disconnect();
+            return;
           }
+          // Reset attempt counter on successful reconnect
+          this.autoRestartAttempts = 0;
         })
         .catch(() => {
           if (this.debug) {
             console.log(`[inspector] Auto-restart failed, disconnecting`);
           }
-          void this.disconnect();
+          void this.disconnect().catch(() => {
+            /* cleanup best-effort */
+          });
         });
     }, delay);
   }

@@ -113,7 +113,10 @@ function buildConnectionParams(input: z.infer<typeof connectInputSchema>): Conne
   }
 
   // HTTP transport (explicit or legacy)
-  const url = "url" in input ? input.url : "";
+  const url = "url" in input ? input.url : undefined;
+  if (!url) {
+    throw new Error("HTTP transport requires a url");
+  }
   return { transport: "http", url };
 }
 
@@ -122,7 +125,7 @@ function buildConnectionParams(input: z.infer<typeof connectInputSchema>): Conne
  */
 function connectionDisplayLabel(params: ConnectionParams): string {
   if (params.transport === "stdio") {
-    return `stdio:${params.command}${params.args?.length ? " " + params.args.join(" ") : ""}`;
+    return `stdio: ${params.command}${params.args?.length ? " " + params.args.join(" ") : ""}`;
   }
   return params.url;
 }

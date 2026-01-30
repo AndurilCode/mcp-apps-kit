@@ -93,6 +93,12 @@ export function useServerHistory(): UseServerHistoryResult {
   const addEntry = useCallback((entry: Omit<ServerHistoryEntry, "lastConnected">) => {
     setHistory((prev) => {
       // Remove existing entry matching the same connection target
+      const argsEqual = (a?: string[], b?: string[]): boolean => {
+        if (!a?.length && !b?.length) return true;
+        if (!a?.length || !b?.length || a.length !== b.length) return false;
+        return a.every((v, i) => v === b[i]);
+      };
+
       const filtered =
         entry.transport === "stdio"
           ? prev.filter(
@@ -100,7 +106,7 @@ export function useServerHistory(): UseServerHistoryResult {
                 !(
                   e.transport === "stdio" &&
                   e.command === entry.command &&
-                  (e.args?.join(" ") ?? "") === (entry.args?.join(" ") ?? "")
+                  argsEqual(e.args, entry.args)
                 )
             )
           : prev.filter((e) => e.url !== entry.url);
