@@ -19,7 +19,7 @@ import { clientLogger } from "../debug";
 /** Human-readable label for connection params (used in logs and errors) */
 function connectionLabel(params: ConnectionParams): string {
   return params.transport === "stdio"
-    ? `stdio:${params.command}${params.args?.length ? " " + params.args.join(" ") : ""}`
+    ? `stdio: ${params.command}${params.args?.length ? " " + params.args.join(" ") : ""}`
     : params.url;
 }
 

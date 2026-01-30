@@ -126,6 +126,7 @@ export class ConnectionManager extends EventEmitter {
 
   private autoRestartAttempts = 0;
   private autoRestartTimer: ReturnType<typeof setTimeout> | null = null;
+  private connectionGeneration = 0;
 
   private environmentState: EnvironmentState;
   private readonly maxHistorySize: number;
@@ -377,6 +378,9 @@ export class ConnectionManager extends EventEmitter {
   async disconnect(): Promise<string | null> {
     const previousUrl = this.state.serverUrl;
 
+    // Bump generation so any in-flight restart aborts
+    this.connectionGeneration++;
+
     // Mark as disconnected BEFORE clearing timer so onclose handler sees it
     this.state.connected = false;
 
@@ -452,14 +456,35 @@ export class ConnectionManager extends EventEmitter {
       );
     }
 
+    const generationAtStart = this.connectionGeneration;
+
     this.autoRestartTimer = setTimeout(() => {
       this.autoRestartTimer = null;
-      this.connect(params, options).catch(() => {
+
+      // Abort if disconnect() was called while we were waiting
+      if (this.connectionGeneration !== generationAtStart) {
         if (this.debug) {
-          console.log(`[inspector] Auto-restart failed, disconnecting`);
+          console.log(`[inspector] Auto-restart aborted: disconnect called during backoff`);
         }
-        void this.disconnect();
-      });
+        return;
+      }
+
+      this.connect(params, options)
+        .then(() => {
+          // Abort if disconnect() was called while connect() was in-flight
+          if (this.connectionGeneration !== generationAtStart) {
+            if (this.debug) {
+              console.log(`[inspector] Auto-restart aborted: disconnect called during reconnect`);
+            }
+            void this.disconnect();
+          }
+        })
+        .catch(() => {
+          if (this.debug) {
+            console.log(`[inspector] Auto-restart failed, disconnecting`);
+          }
+          void this.disconnect();
+        });
     }, delay);
   }
 
