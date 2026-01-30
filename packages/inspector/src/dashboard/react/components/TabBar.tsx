@@ -91,7 +91,7 @@ const tabBarStyles: Record<string, React.CSSProperties> = {
     backgroundColor: "#1a1a1a",
     border: "1px solid #2d2f2f",
     color: "#e0e0e0",
-    borderRadius: "8px",
+    borderRadius: "6px",
     width: "28px",
     height: "28px",
     cursor: "pointer",
@@ -100,7 +100,7 @@ const tabBarStyles: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     flexShrink: 0,
     fontSize: "16px",
-    marginBottom: "2px",
+    alignSelf: "center",
   },
 };
 
@@ -117,10 +117,6 @@ export function TabBar({
   onClose,
   onAdd,
 }: TabBarProps): React.ReactElement {
-  if (tabs.length === 0) {
-    return <></>;
-  }
-
   return (
     <div style={tabBarStyles.container}>
       <div style={tabBarStyles.tabs}>

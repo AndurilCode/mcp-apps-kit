@@ -17,7 +17,10 @@ export interface UseAgentEventStreamResult {
   clearEvents: () => void;
 }
 
-export function useAgentEventStream(baseUrl: string): UseAgentEventStreamResult {
+export function useAgentEventStream(
+  baseUrl: string,
+  connectionId: string | null = null
+): UseAgentEventStreamResult {
   const [events, setEvents] = useState<AgnosticInspectorEvent[]>([]);
   const eventSourceRef = useRef<EventSource | null>(null);
 
@@ -32,7 +35,16 @@ export function useAgentEventStream(baseUrl: string): UseAgentEventStreamResult 
       eventSourceRef.current = null;
     }
 
-    const eventSource = new EventSource(`${baseUrl}/dashboard/agent-events`);
+    // Clear events when connection changes
+    setEvents([]);
+
+    // Don't connect when there's no active connection
+    if (!connectionId) {
+      return;
+    }
+
+    const params = `?connectionId=${encodeURIComponent(connectionId)}`;
+    const eventSource = new EventSource(`${baseUrl}/dashboard/agent-events${params}`);
     eventSourceRef.current = eventSource;
 
     // Handle initial batch of events
@@ -68,7 +80,7 @@ export function useAgentEventStream(baseUrl: string): UseAgentEventStreamResult 
         eventSourceRef.current = null;
       }
     };
-  }, [baseUrl]);
+  }, [baseUrl, connectionId]);
 
   return { events, clearEvents };
 }

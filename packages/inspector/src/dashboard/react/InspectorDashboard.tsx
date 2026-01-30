@@ -84,19 +84,22 @@ export function InspectorDashboard({
   // Event stream state
   const { events, clearEvents } = useEventStream(baseUrl, selectedSessionId);
 
-  // Agent event stream state (session-agnostic)
-  const { events: agentEvents, clearEvents: clearAgentEvents } = useAgentEventStream(baseUrl);
+  // Agent event stream state (connection-scoped)
+  const { events: agentEvents, clearEvents: clearAgentEvents } = useAgentEventStream(
+    baseUrl,
+    activeConnectionId
+  );
 
-  // Globals state
-  const { globals } = useGlobals(baseUrl);
+  // Globals state (connection-scoped)
+  const { globals } = useGlobals(baseUrl, activeConnectionId);
 
-  // MCP Primitives state (refreshes on connection)
+  // MCP Primitives state (connection-scoped, refreshes on connection)
   const {
     tools,
     resources,
     prompts,
     isLoading: primitivesLoading,
-  } = useMcpPrimitives(baseUrl, activeConnection?.status === "connected");
+  } = useMcpPrimitives(baseUrl, activeConnection?.status === "connected", activeConnectionId);
 
   // Left panel state (for MCP primitives when session is active)
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);

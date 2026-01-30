@@ -21,9 +21,48 @@ import type { ConnectionRegistry } from "../connection-registry";
 import type { InspectorEvent, AgnosticInspectorEvent } from "../types";
 import { CDPStreamer } from "./cdp-streamer";
 
-// Dashboard HTML file path (built by Vite)
+/**
+ * Resolve a ConnectionManager from an optional connection ID.
+ * Falls back to the provided default connectionManager if no ID given.
+ */
+function resolveConnectionManager(
+  connectionId: string | null,
+  defaultConnectionManager: ConnectionManager | null,
+  registry?: ConnectionRegistry
+): ConnectionManager | null {
+  if (connectionId && registry) {
+    try {
+      return registry.getConnection(connectionId);
+    } catch {
+      // Connection not found, fall through to default
+    }
+  }
+  return defaultConnectionManager;
+}
+
+// Dashboard HTML file path (built by Vite into dist/dashboard/index.html)
+// When bundled by tsup, __dirname can be either:
+// - dist/ (when imported as library from dist/index.js)
+// - dist/bin/ (when running CLI from dist/bin/mcp-inspector.js)
+// We try both possible paths to handle either case.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DASHBOARD_HTML_PATH = path.join(__dirname, "../dashboard/index.html");
+
+function findDashboardHtml(): string {
+  // Try relative paths for different bundle locations
+  const candidates = [
+    path.join(__dirname, "./dashboard/index.html"), // from dist/
+    path.join(__dirname, "../dashboard/index.html"), // from dist/bin/
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  // Return first candidate as fallback (will trigger "not built" message)
+  return candidates[0] ?? "";
+}
+
+const DASHBOARD_HTML_PATH = findDashboardHtml();
 
 // Cached dashboard HTML content
 let cachedDashboardHtml: string | null = null;
@@ -248,29 +287,35 @@ export async function handleDashboardRequest(
     return true;
   }
 
-  // GET /dashboard/globals - Get current environment state
+  // GET /dashboard/globals?connectionId={id} - Get current environment state
   if (pathname === "/dashboard/globals" && req.method === "GET") {
-    if (!connectionManager) {
+    const connId = url.searchParams.get("connectionId");
+    const cm = resolveConnectionManager(connId, connectionManager, registry);
+    if (!cm) {
       serveEmptyGlobals(res);
       return true;
     }
-    serveGlobals(res, connectionManager);
+    serveGlobals(res, cm);
     return true;
   }
 
-  // GET /dashboard/agent-events - SSE agent event stream (session-agnostic)
+  // GET /dashboard/agent-events?connectionId={id} - SSE agent event stream (session-agnostic)
   if (pathname === "/dashboard/agent-events" && req.method === "GET") {
-    if (!connectionManager) {
+    const connId = url.searchParams.get("connectionId");
+    const cm = resolveConnectionManager(connId, connectionManager, registry);
+    if (!cm) {
       startEmptyAgentEventStream(res);
       return true;
     }
-    startAgentEventStream(req, res, connectionManager);
+    startAgentEventStream(req, res, cm);
     return true;
   }
 
-  // GET /mcp/primitives - Get MCP server primitives (tools, resources, prompts)
+  // GET /mcp/primitives?connectionId={id} - Get MCP server primitives (tools, resources, prompts)
   if (pathname === "/mcp/primitives" && req.method === "GET") {
-    await serveMcpPrimitives(res, connectionManager);
+    const connId = url.searchParams.get("connectionId");
+    const cm = resolveConnectionManager(connId, connectionManager, registry);
+    await serveMcpPrimitives(res, cm);
     return true;
   }
 

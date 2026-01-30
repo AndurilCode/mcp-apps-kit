@@ -632,8 +632,8 @@ export function createDualInspectorServer(
       return;
     }
 
-    // Dashboard routes (including /mcp/primitives)
-    if (url.startsWith("/dashboard") || url === "/mcp/primitives") {
+    // Dashboard routes (including /mcp/primitives with optional ?connectionId=...)
+    if (url.startsWith("/dashboard") || url.startsWith("/mcp/primitives")) {
       const handled = await handleDashboardRequest(
         req,
         res,
