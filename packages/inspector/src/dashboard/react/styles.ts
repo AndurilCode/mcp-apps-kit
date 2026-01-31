@@ -1020,7 +1020,7 @@ export const styles: Record<string, CSSProperties> = {
   },
 
   noWidgetStar: {
-    filter: "drop-shadow(0 0 20px rgba(32, 178, 170, 0.2))",
+    filter: "drop-shadow(0 0 24px rgba(122, 171, 207, 0.25))",
   },
 
   noWidgetStarFloat: {
