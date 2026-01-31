@@ -329,7 +329,7 @@ describe("Human Mode — Takeover Request Flow", () => {
     await callEndpoint("POST", "/dashboard/takeover-request", {});
 
     const { status, json } = await callEndpoint("PUT", "/dashboard/takeover-response", {
-      requestId: "non-existent-id",
+      requestId: "00000000-0000-0000-0000-000000000000",
       allow: true,
     });
     expect(status).toBe(404);

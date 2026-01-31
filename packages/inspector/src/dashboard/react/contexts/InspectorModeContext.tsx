@@ -5,7 +5,7 @@
  * Syncs with the backend `GET/PUT /dashboard/mode` endpoints on mount and on change.
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { useTakeoverStream } from "../hooks/useTakeoverStream";
 
 // =============================================================================
@@ -52,7 +52,8 @@ export function InspectorModeProvider({
   baseUrl,
   children,
 }: InspectorModeProviderProps): React.ReactElement {
-  const [mode, setModeLocal] = useState<DashboardMode>("agent");
+  const [mode, setModeState] = useState<DashboardMode>("agent");
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Subscribe to takeover SSE stream
   const { pendingRequest } = useTakeoverStream(baseUrl);
@@ -67,7 +68,7 @@ export function InspectorModeProvider({
         });
         if (res.ok) {
           const data = (await res.json()) as { mode: DashboardMode };
-          setModeLocal(data.mode);
+          setModeState(data.mode);
         }
       } catch {
         // Ignore fetch errors on mount (e.g. abort, network)
@@ -77,23 +78,35 @@ export function InspectorModeProvider({
   }, [baseUrl]);
 
   // Set mode: sync with backend, then update local state
+  // Uses AbortController to deduplicate rapid toggles
   const setMode = useCallback(
-    (newMode: DashboardMode) => {
-      void (async () => {
-        try {
-          const res = await fetch(`${baseUrl}/dashboard/mode`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ mode: newMode }),
-          });
+    async (newMode: DashboardMode) => {
+      // Abort any in-flight mode change
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      try {
+        const res = await fetch(`${baseUrl}/dashboard/mode`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode: newMode }),
+          signal: controller.signal,
+        });
+        if (!controller.signal.aborted) {
           if (res.ok) {
-            const data = (await res.json()) as { mode: DashboardMode };
-            setModeLocal(data.mode);
+            setModeState(newMode);
           }
-        } catch {
-          // Ignore fetch errors — mode stays unchanged
         }
-      })();
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          // Intentionally aborted, ignore
+        } else {
+          console.error("Failed to set mode:", err);
+        }
+      }
     },
     [baseUrl]
   );
@@ -111,7 +124,7 @@ export function InspectorModeProvider({
           });
           if (res.ok) {
             const data = (await res.json()) as { mode: DashboardMode };
-            setModeLocal(data.mode);
+            setModeState(data.mode);
           }
         } catch {
           // Ignore fetch errors

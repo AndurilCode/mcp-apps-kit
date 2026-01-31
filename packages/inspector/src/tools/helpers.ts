@@ -9,15 +9,26 @@ import { MCP_WIDGET_MIME_TYPE, OPENAI_WIDGET_MIME_TYPE } from "@mcp-apps-kit/cor
 import { getDashboardMode } from "../dashboard/dashboard-server";
 
 /**
+ * Minimal result shape returned when a tool call is blocked in human mode.
+ *
+ * Compatible with the common `content / isError / error / duration` fields
+ * present across all tool output interfaces. Handlers whose concrete output
+ * type differs should cast: `return modeCheck.result as SomeOutput;`
+ */
+export interface HumanModeBlockedResult {
+  content: Array<{ type: "text"; text: string }>;
+  isError: true;
+  error: { code: string; message: string };
+  duration: 0;
+}
+
+/**
  * Assert that the dashboard is in agent mode.
  * Returns a blocked result with an error message if in human mode.
- *
- * The result shape includes content/isError/error/duration fields that are
- * serialized as a standard MCP error response. The return type uses `any`
- * so the guard can be used in handlers with different output type signatures.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function assertAgentMode(): { blocked: true; result: any } | { blocked: false } {
+export function assertAgentMode():
+  | { blocked: true; result: HumanModeBlockedResult }
+  | { blocked: false } {
   if (getDashboardMode() === "human") {
     const message =
       "Inspector is in Human mode. Tool calls are unavailable until the user switches to Agent mode.";

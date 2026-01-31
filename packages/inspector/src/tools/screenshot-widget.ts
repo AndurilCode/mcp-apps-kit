@@ -73,7 +73,7 @@ export function createScreenshotWidgetTool(registry: ConnectionRegistry) {
     output: screenshotWidgetOutputSchema,
     handler: async (input): Promise<ScreenshotWidgetOutput> => {
       const modeCheck = assertAgentMode();
-      if (modeCheck.blocked) return modeCheck.result;
+      if (modeCheck.blocked) return modeCheck.result as unknown as ScreenshotWidgetOutput;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const format = input.format ?? "png";
       const viewport = input.viewport ?? { width: 800, height: 600 };

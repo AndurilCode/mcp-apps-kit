@@ -113,7 +113,7 @@ export function createTestWidgetInteractionTool(registry: ConnectionRegistry) {
     output: testWidgetInteractionOutputSchema,
     handler: async (input): Promise<TestWidgetInteractionOutput> => {
       const modeCheck = assertAgentMode();
-      if (modeCheck.blocked) return modeCheck.result;
+      if (modeCheck.blocked) return modeCheck.result as unknown as TestWidgetInteractionOutput;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const snapshots: Array<{ afterAction: number; dom: string; textContent: string }> = [];
       const toolCalls: Array<{ name: string; args: unknown }> = [];

@@ -234,7 +234,7 @@ export function createWidgetSnapshotTool(registry: ConnectionRegistry) {
     output: widgetSnapshotOutputSchema,
     handler: async (input): Promise<WidgetSnapshotOutput> => {
       const modeCheck = assertAgentMode();
-      if (modeCheck.blocked) return modeCheck.result;
+      if (modeCheck.blocked) return modeCheck.result as unknown as WidgetSnapshotOutput;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const validation = validateWidgetSession(sessionManager, input.sessionId);

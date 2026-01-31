@@ -94,7 +94,7 @@ export function createWidgetQueryTool(registry: ConnectionRegistry) {
     output: widgetQueryOutputSchema,
     handler: async (input): Promise<WidgetQueryOutput> => {
       const modeCheck = assertAgentMode();
-      if (modeCheck.blocked) return modeCheck.result;
+      if (modeCheck.blocked) return modeCheck.result as unknown as WidgetQueryOutput;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const validation = validateWidgetSession(sessionManager, input.sessionId);

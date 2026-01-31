@@ -18,6 +18,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { z } from "zod";
 import type { ConnectionParams } from "@mcp-apps-kit/testing";
 import type { ConnectionManager } from "../connection";
 import type { ConnectionRegistry } from "../connection-registry";
@@ -30,6 +31,39 @@ import {
   extractToolResult,
   type MCPCallToolResponse,
 } from "../tools/helpers";
+
+// ===== Request Schemas =====
+
+const modeSchema = z.object({
+  mode: z.enum(["human", "agent"]),
+});
+
+const executeToolSchema = z.object({
+  connectionId: z.string().optional(),
+  toolName: z.string().min(1),
+  arguments: z.record(z.string(), z.unknown()).default({}),
+});
+
+const readResourceSchema = z.object({
+  connectionId: z.string().optional(),
+  uri: z.string().min(1),
+});
+
+const getPromptSchema = z.object({
+  connectionId: z.string().optional(),
+  promptName: z.string().min(1),
+  arguments: z.record(z.string(), z.string()).optional(),
+});
+
+const takeoverRequestSchema = z.object({
+  agentId: z.string().optional(),
+  reason: z.string().optional(),
+});
+
+const takeoverResponseSchema = z.object({
+  requestId: z.string().uuid(),
+  allow: z.boolean(),
+});
 
 // ===== Dashboard Mode State =====
 
@@ -396,14 +430,17 @@ export async function handleDashboardRequest(
       for await (const chunk of req) {
         chunks.push(chunk as Buffer);
       }
-      const body = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as Record<string, unknown>;
-      const newMode = body.mode;
-      if (newMode !== "human" && newMode !== "agent") {
+      const bodyStr = Buffer.concat(chunks).toString("utf-8");
+      const parseResult = modeSchema.safeParse(JSON.parse(bodyStr));
+      if (!parseResult.success) {
         res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: 'Invalid mode. Expected "human" or "agent".' }));
+        res.end(
+          JSON.stringify({ error: "Invalid request body", details: parseResult.error.format() })
+        );
         return true;
       }
-      dashboardMode = newMode;
+      const body = parseResult.data;
+      dashboardMode = body.mode;
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ mode: dashboardMode }));
     } catch (e) {
@@ -500,11 +537,17 @@ export async function handleDashboardRequest(
       for await (const chunk of req) {
         chunks.push(chunk as Buffer);
       }
-      const body = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as Record<string, unknown>;
-      const result = requestTakeover(
-        body.agentId as string | undefined,
-        body.reason as string | undefined
-      );
+      const bodyStr = Buffer.concat(chunks).toString("utf-8");
+      const parseResult = takeoverRequestSchema.safeParse(JSON.parse(bodyStr));
+      if (!parseResult.success) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({ error: "Invalid request body", details: parseResult.error.format() })
+        );
+        return true;
+      }
+      const body = parseResult.data;
+      const result = requestTakeover(body.agentId, body.reason);
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(result));
     } catch (e) {
@@ -525,36 +568,44 @@ export async function handleDashboardRequest(
       for await (const chunk of req) {
         chunks.push(chunk as Buffer);
       }
-      const body = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as Record<string, unknown>;
-      const requestId = body.requestId as string | undefined;
-      const allow = body.allow as boolean | undefined;
-
-      if (!requestId || typeof allow !== "boolean") {
+      const bodyStr = Buffer.concat(chunks).toString("utf-8");
+      const parseResult = takeoverResponseSchema.safeParse(JSON.parse(bodyStr));
+      if (!parseResult.success) {
         res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Missing requestId or allow" }));
+        res.end(
+          JSON.stringify({ error: "Invalid request body", details: parseResult.error.format() })
+        );
         return true;
       }
-      if (!pendingTakeover || pendingTakeover.id !== requestId) {
+      const body = parseResult.data;
+
+      if (!pendingTakeover || pendingTakeover.id !== body.requestId) {
         res.writeHead(404, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "No matching pending takeover request" }));
         return true;
       }
 
       // Resolve the takeover
-      lastTakeoverResult = { requestId, allowed: allow, resolvedAt: Date.now() };
-      if (allow) {
+      lastTakeoverResult = {
+        requestId: body.requestId,
+        allowed: body.allow,
+        resolvedAt: Date.now(),
+      };
+      if (body.allow) {
         dashboardMode = "agent";
       }
       pendingTakeover = null;
 
       emitTakeoverEvent("takeover-response", {
-        requestId,
-        allowed: allow,
+        requestId: body.requestId,
+        allowed: body.allow,
         mode: dashboardMode,
       });
 
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ mode: dashboardMode, requestId, allowed: allow }));
+      res.end(
+        JSON.stringify({ mode: dashboardMode, requestId: body.requestId, allowed: body.allow })
+      );
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       res.writeHead(500, { "Content-Type": "application/json" });
@@ -603,6 +654,7 @@ export async function handleDashboardRequest(
 
     req.on("close", cleanup);
     req.on("error", cleanup);
+    res.on("finish", cleanup);
     return true;
   }
 
@@ -744,33 +796,32 @@ export async function handleDashboardRequest(
       for await (const chunk of req) {
         chunks.push(chunk as Buffer);
       }
-      const body = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as Record<string, unknown>;
-      const toolName = body.toolName as string | undefined;
-      if (!toolName) {
+      const bodyStr = Buffer.concat(chunks).toString("utf-8");
+      const parseResult = executeToolSchema.safeParse(JSON.parse(bodyStr));
+      if (!parseResult.success) {
         res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Missing toolName" }));
+        res.end(
+          JSON.stringify({ error: "Invalid request body", details: parseResult.error.format() })
+        );
         return true;
       }
-      const cm = resolveConnectionManager(
-        (body.connectionId as string | undefined) ?? null,
-        connectionManager,
-        registry
-      );
+      const body = parseResult.data;
+      const cm = resolveConnectionManager(body.connectionId ?? null, connectionManager, registry);
       if (!cm) {
         res.writeHead(404, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "No active connection" }));
         return true;
       }
-      const toolArgs = (body.arguments ?? {}) as Record<string, unknown>;
+      const toolArgs = body.arguments;
       const start = Date.now();
-      const result = await cm.getClient().callTool(toolName, toolArgs);
+      const result = await cm.getClient().callTool(body.toolName, toolArgs);
       const duration = Date.now() - start;
 
       // Try to render widget session if tool has a UI resource
       let sessionId: string | undefined;
       try {
         const rawClient = cm.getClient().raw;
-        const uiResource = await findUIResourceForTool(rawClient, toolName);
+        const uiResource = await findUIResourceForTool(rawClient, body.toolName);
         if (uiResource) {
           const html = await fetchWidgetHTML(rawClient, uiResource.uri);
           if (html) {
@@ -786,7 +837,7 @@ export async function handleDashboardRequest(
               html,
               uiResource.protocol,
               toolResult,
-              toolName,
+              body.toolName,
               toolArgs,
               environmentState,
               viewport,
@@ -802,7 +853,7 @@ export async function handleDashboardRequest(
               const widgetServerTouch = uiHostManager.createSessionTouchCallback(widgetSessionId);
               const sessionManager = cm.getWidgetSessionManager();
               const session = await sessionManager.createSession(
-                toolName,
+                body.toolName,
                 toolArgs,
                 toolResult,
                 renderResult.page,
@@ -865,24 +916,23 @@ export async function handleDashboardRequest(
       for await (const chunk of req) {
         chunks.push(chunk as Buffer);
       }
-      const body = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as Record<string, unknown>;
-      const uri = body.uri as string | undefined;
-      if (!uri) {
+      const bodyStr = Buffer.concat(chunks).toString("utf-8");
+      const parseResult = readResourceSchema.safeParse(JSON.parse(bodyStr));
+      if (!parseResult.success) {
         res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Missing uri" }));
+        res.end(
+          JSON.stringify({ error: "Invalid request body", details: parseResult.error.format() })
+        );
         return true;
       }
-      const cm = resolveConnectionManager(
-        (body.connectionId as string | undefined) ?? null,
-        connectionManager,
-        registry
-      );
+      const body = parseResult.data;
+      const cm = resolveConnectionManager(body.connectionId ?? null, connectionManager, registry);
       if (!cm) {
         res.writeHead(404, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "No active connection" }));
         return true;
       }
-      const result = await cm.getClient().readResource(uri);
+      const result = await cm.getClient().readResource(body.uri);
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ contents: result.contents }));
     } catch (e) {
@@ -920,25 +970,24 @@ export async function handleDashboardRequest(
       for await (const chunk of req) {
         chunks.push(chunk as Buffer);
       }
-      const body = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as Record<string, unknown>;
-      const promptName = body.promptName as string | undefined;
-      if (!promptName) {
+      const bodyStr = Buffer.concat(chunks).toString("utf-8");
+      const parseResult = getPromptSchema.safeParse(JSON.parse(bodyStr));
+      if (!parseResult.success) {
         res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Missing promptName" }));
+        res.end(
+          JSON.stringify({ error: "Invalid request body", details: parseResult.error.format() })
+        );
         return true;
       }
-      const cm = resolveConnectionManager(
-        (body.connectionId as string | undefined) ?? null,
-        connectionManager,
-        registry
-      );
+      const body = parseResult.data;
+      const cm = resolveConnectionManager(body.connectionId ?? null, connectionManager, registry);
       if (!cm) {
         res.writeHead(404, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "No active connection" }));
         return true;
       }
-      const promptArgs = (body.arguments ?? {}) as Record<string, string>;
-      const result = await cm.getClient().getPrompt(promptName, promptArgs);
+      const promptArgs = body.arguments ?? {};
+      const result = await cm.getClient().getPrompt(body.promptName, promptArgs);
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ messages: result.messages, description: result.description }));
     } catch (e) {
@@ -1151,6 +1200,7 @@ async function startScreencastStream(
 
   req.on("close", cleanup);
   req.on("error", cleanup);
+  res.on("finish", cleanup);
 
   try {
     // Start screencast

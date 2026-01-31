@@ -291,7 +291,7 @@ export function createWidgetSnapshotDiffTool(registry: ConnectionRegistry) {
     output: widgetSnapshotDiffOutputSchema,
     handler: async (input): Promise<WidgetSnapshotDiffOutput> => {
       const modeCheck = assertAgentMode();
-      if (modeCheck.blocked) return modeCheck.result;
+      if (modeCheck.blocked) return modeCheck.result as unknown as WidgetSnapshotDiffOutput;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const validation = validateWidgetSession(sessionManager, input.sessionId);

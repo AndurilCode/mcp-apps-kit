@@ -56,7 +56,7 @@ export function createWidgetEvaluateTool(registry: ConnectionRegistry) {
     output: widgetEvaluateOutputSchema,
     handler: async (input): Promise<WidgetEvaluateOutput> => {
       const modeCheck = assertAgentMode();
-      if (modeCheck.blocked) return modeCheck.result;
+      if (modeCheck.blocked) return modeCheck.result as unknown as WidgetEvaluateOutput;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const session = sessionManager.getSession(input.sessionId);
@@ -169,7 +169,7 @@ export function createWidgetClickTool(registry: ConnectionRegistry) {
     output: widgetClickOutputSchema,
     handler: async (input): Promise<WidgetClickOutput> => {
       const modeCheck = assertAgentMode();
-      if (modeCheck.blocked) return modeCheck.result;
+      if (modeCheck.blocked) return modeCheck.result as unknown as WidgetClickOutput;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const validation = validateWidgetSession(sessionManager, input.sessionId);
@@ -321,7 +321,7 @@ export function createWidgetFillTool(registry: ConnectionRegistry) {
     output: widgetFillOutputSchema,
     handler: async (input): Promise<WidgetFillOutput> => {
       const modeCheck = assertAgentMode();
-      if (modeCheck.blocked) return modeCheck.result;
+      if (modeCheck.blocked) return modeCheck.result as unknown as WidgetFillOutput;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const validation = validateWidgetSession(sessionManager, input.sessionId);
@@ -517,7 +517,7 @@ export function createWidgetWaitForSelectorTool(registry: ConnectionRegistry) {
     output: widgetWaitForSelectorOutputSchema,
     handler: async (input): Promise<WidgetWaitForSelectorOutput> => {
       const modeCheck = assertAgentMode();
-      if (modeCheck.blocked) return modeCheck.result;
+      if (modeCheck.blocked) return modeCheck.result as unknown as WidgetWaitForSelectorOutput;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const session = sessionManager.getSession(input.sessionId);
@@ -607,7 +607,7 @@ export function createWidgetLocatorTool(registry: ConnectionRegistry) {
     output: widgetLocatorOutputSchema,
     handler: async (input): Promise<WidgetLocatorOutput> => {
       const modeCheck = assertAgentMode();
-      if (modeCheck.blocked) return modeCheck.result;
+      if (modeCheck.blocked) return modeCheck.result as unknown as WidgetLocatorOutput;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const session = sessionManager.getSession(input.sessionId);
@@ -736,7 +736,7 @@ export function createWidgetDragTool(registry: ConnectionRegistry) {
     output: widgetDragOutputSchema,
     handler: async (input): Promise<WidgetDragOutput> => {
       const modeCheck = assertAgentMode();
-      if (modeCheck.blocked) return modeCheck.result;
+      if (modeCheck.blocked) return modeCheck.result as unknown as WidgetDragOutput;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const session = sessionManager.getSession(input.sessionId);
@@ -906,7 +906,7 @@ export function createWidgetRefreshTool(registry: ConnectionRegistry) {
     output: widgetRefreshOutputSchema,
     handler: async (input): Promise<WidgetRefreshOutput> => {
       const modeCheck = assertAgentMode();
-      if (modeCheck.blocked) return modeCheck.result;
+      if (modeCheck.blocked) return modeCheck.result as unknown as WidgetRefreshOutput;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const session = sessionManager.getSession(input.sessionId);
