@@ -14,6 +14,7 @@ export interface UseResizablePanelWidthOptions {
   maxWidth?: number;
   storageKey?: string;
   disabled?: boolean;
+  resizeDirection?: "left" | "right";
 }
 
 export interface UseResizablePanelWidthResult {
@@ -31,6 +32,7 @@ export function useResizablePanelWidth({
   maxWidth = 600,
   storageKey,
   disabled = false,
+  resizeDirection = "left",
 }: UseResizablePanelWidthOptions): UseResizablePanelWidthResult {
   const [panelWidth, setPanelWidth] = useState(() => {
     if (typeof window !== "undefined" && storageKey) {
@@ -108,6 +110,7 @@ export function useResizablePanelWidth({
 
       const startX = e.clientX;
       const startWidth = widthRef.current;
+      const directionMultiplier = resizeDirection === "right" ? -1 : 1;
 
       setIsResizing(true);
       document.body.style.cursor = "ew-resize";
@@ -118,7 +121,10 @@ export function useResizablePanelWidth({
         const deltaX = moveEvent.clientX - startX;
         const reservedWidth = 400;
         const effectiveMaxWidth = Math.min(maxWidth, window.innerWidth - reservedWidth);
-        const newWidth = Math.min(effectiveMaxWidth, Math.max(minWidth, startWidth + deltaX));
+        const newWidth = Math.min(
+          effectiveMaxWidth,
+          Math.max(minWidth, startWidth + directionMultiplier * deltaX)
+        );
 
         setPanelWidth(newWidth);
       };
@@ -145,7 +151,7 @@ export function useResizablePanelWidth({
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
-    [disabled, minWidth, maxWidth]
+    [disabled, minWidth, maxWidth, resizeDirection]
   );
 
   return {

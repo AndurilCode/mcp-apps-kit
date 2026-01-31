@@ -22,6 +22,10 @@ export interface EventsPanelProps {
   onClearEvents: () => void;
   /** Whether to show the header (default: true) */
   showHeader?: boolean;
+  /** Whether to show the title in the header (default: true) */
+  showTitle?: boolean;
+  /** Whether to show the clear button in the header (default: true) */
+  showClearButton?: boolean;
 }
 
 const ALL_CATEGORIES: EventCategory[] = [
@@ -38,6 +42,8 @@ export function EventsPanel({
   events,
   onClearEvents,
   showHeader = true,
+  showTitle = true,
+  showClearButton = true,
 }: EventsPanelProps): React.ReactElement {
   const [categoryFilter, setCategoryFilter] = useState<EventCategory | "all">("all");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -65,7 +71,7 @@ export function EventsPanel({
     <div style={styles.eventsPanel as React.CSSProperties}>
       {showHeader && (
         <div style={styles.eventsPanelHeader as React.CSSProperties}>
-          <span style={styles.eventsPanelTitle as React.CSSProperties}>Events</span>
+          {showTitle && <span style={styles.eventsPanelTitle as React.CSSProperties}>Events</span>}
           <div style={styles.eventsPanelControls as React.CSSProperties}>
             <select
               style={styles.filterSelect as React.CSSProperties}
@@ -83,9 +89,11 @@ export function EventsPanel({
                 );
               })}
             </select>
-            <button style={styles.clearLogsBtn as React.CSSProperties} onClick={onClearEvents}>
-              Clear
-            </button>
+            {showClearButton && (
+              <button style={styles.clearLogsBtn as React.CSSProperties} onClick={onClearEvents}>
+                Clear
+              </button>
+            )}
           </div>
         </div>
       )}

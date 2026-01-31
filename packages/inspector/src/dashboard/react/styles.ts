@@ -888,4 +888,220 @@ export const styles: Record<string, CSSProperties> = {
     color: "#6b7280",
     fontStyle: "italic",
   },
+
+  // =========================================================================
+  // Right Panel (Agent / Events / Logs)
+  // =========================================================================
+
+  rightPanel: {
+    backgroundColor: "#0d0e0e",
+    display: "flex",
+    flexDirection: "column" as const,
+    overflow: "hidden",
+    transition: "width 0.25s ease, opacity 0.3s ease",
+    height: "100%",
+    flexShrink: 0,
+    borderLeft: "1px solid #2d2f2f",
+  },
+
+  rightPanelCollapsed: {
+    width: 0,
+    borderLeft: "none",
+    opacity: 0,
+  },
+
+  rightPanelResizeHandle: {
+    width: "4px",
+    cursor: "col-resize",
+    backgroundColor: "transparent",
+    transition: "background-color 0.15s ease",
+    flexShrink: 0,
+    zIndex: 10,
+  },
+
+  rightPanelResizeHandleActive: {
+    backgroundColor: "#20b2aa",
+  },
+
+  rightPanelHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "0.5rem 0.75rem",
+    backgroundColor: "#0a0a0a",
+    borderBottom: "1px solid #1a1a1a",
+    flexShrink: 0,
+  },
+
+  rightPanelTabs: {
+    display: "flex",
+    gap: "0.25rem",
+  },
+
+  rightPanelTab: {
+    fontFamily: "inherit",
+    backgroundColor: "transparent",
+    border: "1px solid #3d4040",
+    color: "#9ca3af",
+    padding: "0.3rem 0.6rem",
+    borderRadius: "4px",
+    fontSize: "0.6875rem",
+    cursor: "pointer",
+    transition: "all 0.15s ease",
+    display: "flex",
+    alignItems: "center",
+    gap: "0.375rem",
+  },
+
+  rightPanelTabActive: {
+    backgroundColor: "rgba(32, 178, 170, 0.15)",
+    borderColor: "#20b2aa",
+    color: "#20b2aa",
+  },
+
+  rightPanelTabCount: {
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    padding: "0.1rem 0.35rem",
+    borderRadius: "3px",
+    fontSize: "0.5625rem",
+  },
+
+  rightPanelTabCountActive: {
+    backgroundColor: "rgba(32, 178, 170, 0.2)",
+  },
+
+  rightPanelActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.375rem",
+  },
+
+  rightPanelClearBtn: {
+    fontFamily: "inherit",
+    backgroundColor: "transparent",
+    border: "1px solid #3d4040",
+    color: "#9ca3af",
+    padding: "0.25rem 0.5rem",
+    borderRadius: "4px",
+    fontSize: "0.625rem",
+    cursor: "pointer",
+    transition: "all 0.15s ease",
+  },
+
+  rightPanelCollapseBtn: {
+    fontFamily: "inherit",
+    background: "transparent",
+    border: "1px solid #3d4040",
+    borderRadius: "4px",
+    padding: "0.25rem 0.375rem",
+    cursor: "pointer",
+    color: "#9ca3af",
+    fontSize: "0.625rem",
+    transition: "all 0.15s ease",
+  },
+
+  rightPanelContent: {
+    flex: 1,
+    overflow: "auto",
+  },
+
+  // =========================================================================
+  // No Widget Placeholder (Tamagotchi Star)
+  // =========================================================================
+
+  noWidgetWrapper: {
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "center",
+    justifyContent: "center",
+    height: "100%",
+    width: "100%",
+    gap: "1.5rem",
+  },
+
+  noWidgetStar: {
+    filter: "drop-shadow(0 0 12px rgba(32, 178, 170, 0.3))",
+  },
+
+  noWidgetStarFloat: {
+    animation: "starFloat 3s ease-in-out infinite",
+  },
+
+  noWidgetEye: {
+    animation: "starBlink 4s ease-in-out infinite",
+  },
+
+  noWidgetMessage: {
+    color: "#6b7280",
+    fontSize: "0.875rem",
+    fontFamily: FONT_SANS,
+    textAlign: "center" as const,
+    margin: 0,
+    letterSpacing: "0.01em",
+  },
+
+  // =========================================================================
+  // Globals Bar (Horizontal, below screencast)
+  // =========================================================================
+
+  globalsBar: {
+    backgroundColor: "#0a0a0a",
+    borderTop: "1px solid #2d2f2f",
+    transition: "all 0.2s ease",
+    flexShrink: 0,
+  },
+
+  globalsBarCollapsed: {
+    borderTop: "1px solid #1a1a1a",
+  },
+
+  globalsBarContent: {
+    display: "flex",
+    flexWrap: "wrap" as const,
+    gap: "0.75rem",
+    padding: "0.5rem 1rem",
+    alignItems: "center",
+  },
+
+  globalsBarCollapsedContent: {
+    display: "flex",
+    justifyContent: "center",
+    padding: "0.2rem 0.5rem",
+  },
+
+  globalsBarExpandBtn: {
+    fontFamily: "inherit",
+    background: "transparent",
+    border: "none",
+    color: "#6b7280",
+    fontSize: "0.625rem",
+    cursor: "pointer",
+    padding: "0.15rem 0.5rem",
+    transition: "color 0.15s ease",
+  },
+
+  globalsBarItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.35rem",
+  },
+
+  globalsBarItemLabel: {
+    color: "#6b7280",
+    fontSize: "0.625rem",
+    fontWeight: 500,
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.04em",
+  },
+
+  globalsBarItemValue: {
+    color: "#d4d4d4",
+    fontSize: "0.6875rem",
+  },
+
+  globalsBarLoading: {
+    color: "#6b7280",
+    fontSize: "0.6875rem",
+    fontStyle: "italic",
+  },
 };

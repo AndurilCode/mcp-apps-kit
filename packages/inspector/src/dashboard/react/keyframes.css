@@ -13,3 +13,21 @@
     background-position: 200% 50%;
   }
 }
+
+@keyframes starFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes starBlink {
+  0%, 42%, 44%, 100% {
+    r: 4;
+  }
+  43% {
+    r: 0.5;
+  }
+}

@@ -108,6 +108,7 @@ const localStyles: Record<string, React.CSSProperties> = {
   },
   tabs: {
     display: "flex",
+    alignItems: "center",
     gap: "0.25rem",
     padding: "0.5rem 0.75rem",
     backgroundColor: "#0a0a0a",
@@ -767,19 +768,6 @@ export function McpPrimitivesPanel({
       <>
         <div style={panelStyle}>
           <KeyframeStyles />
-          <div style={localStyles.header}>
-            <span style={localStyles.title}>MCP Primitives</span>
-            {onToggleCollapse && (
-              <button
-                style={localStyles.collapseBtn}
-                onClick={onToggleCollapse}
-                title="Collapse panel"
-              >
-                ◀
-              </button>
-            )}
-          </div>
-
           <div style={localStyles.tabs}>
             {tabs.map((tab) => (
               <button
@@ -801,6 +789,15 @@ export function McpPrimitivesPanel({
                 </span>
               </button>
             ))}
+            {onToggleCollapse && (
+              <button
+                style={{ ...localStyles.collapseBtn, marginLeft: "auto" }}
+                onClick={onToggleCollapse}
+                title="Collapse panel"
+              >
+                ◀
+              </button>
+            )}
           </div>
 
           <div style={localStyles.content}>{renderContent()}</div>
@@ -819,15 +816,11 @@ export function McpPrimitivesPanel({
   return (
     <div style={panelStyle}>
       <KeyframeStyles />
-      <div style={localStyles.header}>
-        <span style={localStyles.title}>MCP Primitives</span>
-        {position === "left" && onToggleCollapse && (
-          <button style={localStyles.collapseBtn} onClick={onToggleCollapse} title="Collapse panel">
-            ◀
-          </button>
-        )}
-      </div>
-
+      {position === "center" && (
+        <div style={localStyles.header}>
+          <span style={localStyles.title}>MCP Primitives</span>
+        </div>
+      )}
       <div style={localStyles.tabs}>
         {tabs.map((tab) => (
           <button
@@ -849,6 +842,15 @@ export function McpPrimitivesPanel({
             </span>
           </button>
         ))}
+        {position === "left" && onToggleCollapse && (
+          <button
+            style={{ ...localStyles.collapseBtn, marginLeft: "auto" }}
+            onClick={onToggleCollapse}
+            title="Collapse panel"
+          >
+            ◀
+          </button>
+        )}
       </div>
 
       <div style={localStyles.content}>{renderContent()}</div>
