@@ -408,7 +408,7 @@ export const styles: Record<string, CSSProperties> = {
     alignItems: "center",
     justifyContent: "center",
     flex: 1,
-    color: "#6b7280",
+    color: "#4b5563",
     fontSize: "0.75rem",
     fontFamily: FONT_SANS,
   },
@@ -685,7 +685,7 @@ export const styles: Record<string, CSSProperties> = {
     alignItems: "center",
     justifyContent: "center",
     flex: 1,
-    color: "#6b7280",
+    color: "#4b5563",
     fontSize: "0.75rem",
     fontFamily: FONT_SANS,
   },
@@ -917,12 +917,11 @@ export const styles: Record<string, CSSProperties> = {
   },
 
   rightPanelResizeHandle: {
-    width: "4px",
-    cursor: "col-resize",
-    backgroundColor: "transparent",
+    width: "6px",
+    cursor: "ew-resize",
+    backgroundColor: "#2d2f2f",
     transition: "background-color 0.15s ease",
     flexShrink: 0,
-    zIndex: 10,
   },
 
   rightPanelResizeHandleActive: {

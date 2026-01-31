@@ -4,7 +4,7 @@
  * Tabbed sidebar for Agent, Events, and Logs.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { LogEntry } from "../hooks/useLogStream";
 import type { InspectorEvent, AgnosticInspectorEvent } from "../../../types";
 import { styles } from "../styles";
@@ -59,18 +59,6 @@ export function RightPanel({
     }
   }, [activeTab]);
 
-  const handleClear = useCallback(() => {
-    if (activeTab === "logs") {
-      onClearLogs();
-      return;
-    }
-    if (activeTab === "events") {
-      onClearEvents();
-      return;
-    }
-    onClearAgentEvents();
-  }, [activeTab, onClearAgentEvents, onClearEvents, onClearLogs]);
-
   const tabs = useMemo(
     () => [
       { id: "agent" as const, label: "Agent", count: agentEvents.length },
@@ -102,6 +90,14 @@ export function RightPanel({
       />
       <div style={panelStyle}>
         <div style={styles.rightPanelHeader}>
+          <button
+            style={styles.rightPanelCollapseBtn}
+            onClick={onToggleCollapse}
+            title="Collapse panel"
+            aria-label="Collapse panel"
+          >
+            ▶
+          </button>
           <div style={styles.rightPanelTabs}>
             {tabs.map((tab) => (
               <button
@@ -124,19 +120,6 @@ export function RightPanel({
                 </span>
               </button>
             ))}
-          </div>
-          <div style={styles.rightPanelActions}>
-            <button style={styles.rightPanelClearBtn} onClick={handleClear}>
-              Clear
-            </button>
-            <button
-              style={styles.rightPanelCollapseBtn}
-              onClick={onToggleCollapse}
-              title="Collapse panel"
-              aria-label="Collapse panel"
-            >
-              ▶
-            </button>
           </div>
         </div>
         <div style={styles.rightPanelContent}>
