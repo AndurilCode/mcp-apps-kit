@@ -583,6 +583,13 @@ export type ConnectionParams =
       transport: "stdio";
       command: string;
       args?: string[];
+      /**
+       * Environment variables for the child process.
+       * When provided, these are merged with process.env. This means all parent
+       * environment variables (including sensitive ones) are passed to the child.
+       * For production deployments, consider providing a complete env object
+       * instead of relying on merge behavior.
+       */
       env?: Record<string, string>;
       cwd?: string;
     };

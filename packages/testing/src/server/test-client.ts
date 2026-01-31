@@ -19,7 +19,7 @@ import { clientLogger } from "../debug";
 /** Human-readable label for connection params (used in logs and errors) */
 function connectionLabel(params: ConnectionParams): string {
   return params.transport === "stdio"
-    ? `stdio: ${params.command}${params.args?.length ? " " + params.args.join(" ") : ""}`
+    ? `stdio:${params.command}${params.args?.length ? " " + params.args.join(" ") : ""}`
     : params.url;
 }
 
@@ -42,6 +42,9 @@ export async function createTestClient(
 
   try {
     if (params.transport === "stdio") {
+      // SECURITY NOTE: When env is provided, it's merged with process.env.
+      // This passes all parent environment variables to the child process.
+      // For isolated environments, pass a complete env object without relying on merge.
       // Merge process.env with user-provided env, filtering out undefined values
       const mergedEnv = params.env
         ? Object.fromEntries(

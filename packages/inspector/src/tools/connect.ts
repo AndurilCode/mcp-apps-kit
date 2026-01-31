@@ -125,7 +125,7 @@ function buildConnectionParams(input: z.infer<typeof connectInputSchema>): Conne
  */
 function connectionDisplayLabel(params: ConnectionParams): string {
   if (params.transport === "stdio") {
-    return `stdio: ${params.command}${params.args?.length ? " " + params.args.join(" ") : ""}`;
+    return `stdio:${params.command}${params.args?.length ? " " + params.args.join(" ") : ""}`;
   }
   return params.url;
 }

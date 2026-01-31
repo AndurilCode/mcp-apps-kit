@@ -184,7 +184,7 @@ export class ConnectionManager extends EventEmitter {
     const label =
       params.transport === "http"
         ? params.url
-        : `stdio: ${params.command}${params.args?.length ? " " + params.args.join(" ") : ""}`;
+        : `stdio:${params.command}${params.args?.length ? " " + params.args.join(" ") : ""}`;
 
     // Validate input at API boundary
     if (params.transport === "http") {

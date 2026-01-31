@@ -218,7 +218,7 @@ describe("createTestClient", () => {
         expect.unreachable("Should have thrown");
       } catch (e) {
         expect(e).toBeInstanceOf(ConnectionError);
-        expect((e as ConnectionError).url).toBe("stdio: node server.js");
+        expect((e as ConnectionError).url).toBe("stdio:node server.js");
       }
     });
 

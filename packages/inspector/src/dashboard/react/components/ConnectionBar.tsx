@@ -463,6 +463,7 @@ export function ConnectionBar({
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter" && showDropdown && hoveredIndex >= 0) {
+        if (isCreating) return;
         e.preventDefault();
         const entry = filteredHistory[hoveredIndex];
         if (entry) {
@@ -490,16 +491,18 @@ export function ConnectionBar({
       filteredHistory,
       onCreateConnection,
       applyHistoryEntry,
+      isCreating,
     ]
   );
 
   const handleSelectHistory = useCallback(
     (entry: ServerHistoryEntry) => {
+      if (isCreating) return;
       const params = applyHistoryEntry(entry);
       setShowDropdown(false);
       void onCreateConnection(params);
     },
-    [onCreateConnection, applyHistoryEntry]
+    [onCreateConnection, applyHistoryEntry, isCreating]
   );
 
   if (!isOpen) {

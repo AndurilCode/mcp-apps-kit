@@ -223,7 +223,7 @@ describe("Criteria 3-4: ConnectionManager.connect serverUrl label", () => {
     }
   });
 
-  it('C3: stdio connect sets serverUrl to "stdio: command args"', async () => {
+  it('C3: stdio connect sets serverUrl to "stdio:command args"', async () => {
     await manager.connect({
       transport: "stdio",
       command: "node",
@@ -232,7 +232,7 @@ describe("Criteria 3-4: ConnectionManager.connect serverUrl label", () => {
 
     const state = manager.getState();
     expect(state.connected).toBe(true);
-    expect(state.serverUrl).toBe("stdio: node server.js");
+    expect(state.serverUrl).toBe("stdio:node server.js");
   });
 
   it("C3b: stdio connect with no args sets serverUrl to 'stdio: command'", async () => {
@@ -242,7 +242,7 @@ describe("Criteria 3-4: ConnectionManager.connect serverUrl label", () => {
     });
 
     const state = manager.getState();
-    expect(state.serverUrl).toBe("stdio: python3");
+    expect(state.serverUrl).toBe("stdio:python3");
   });
 
   it("C4: http connect sets serverUrl to the URL", async () => {
