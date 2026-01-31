@@ -68,7 +68,7 @@ describe("ConnectionManager Target Schema", () => {
 
   describe("target schema capture", () => {
     it("should capture target schema on connect", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const schema = manager.getTargetSchema();
       expect(schema).not.toBeNull();
@@ -78,7 +78,7 @@ describe("ConnectionManager Target Schema", () => {
     });
 
     it("should store server info in target schema when available", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const schema = manager.getTargetSchema();
       // serverInfo is extracted via getServerVersion() which may not be available in mock
@@ -88,7 +88,7 @@ describe("ConnectionManager Target Schema", () => {
 
     it("should set capturedAt timestamp", async () => {
       const before = Date.now();
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
       const after = Date.now();
 
       const schema = manager.getTargetSchema();
@@ -97,7 +97,7 @@ describe("ConnectionManager Target Schema", () => {
     });
 
     it("should clear target schema on disconnect", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
       expect(manager.getTargetSchema()).not.toBeNull();
 
       await manager.disconnect();
@@ -117,7 +117,7 @@ describe("ConnectionManager Target Schema", () => {
         },
       ]);
 
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const schema = manager.getTargetSchema();
       const tool = schema?.tools[0];
@@ -140,7 +140,7 @@ describe("ConnectionManager Target Schema", () => {
         },
       ]);
 
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const schema = manager.getTargetSchema();
       const resource = schema?.resources[0];
@@ -165,7 +165,7 @@ describe("ConnectionManager Target Schema", () => {
         },
       ]);
 
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const schema = manager.getTargetSchema();
       const prompt = schema?.prompts[0];
@@ -182,7 +182,7 @@ describe("ConnectionManager Target Schema", () => {
         contents: [{ text: "# README content", mimeType: "text/markdown" }],
       });
 
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const result = await manager.readTargetResource("file://readme.md");
       // readTargetResource returns the text content as a string
@@ -213,7 +213,7 @@ describe("ConnectionManager Connection Events", () => {
     const schemaHandler = vi.fn();
     manager.on("schemaUpdated", schemaHandler);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
     expect(schemaHandler).toHaveBeenCalledTimes(1);
   });
@@ -222,7 +222,7 @@ describe("ConnectionManager Connection Events", () => {
     const disconnectedHandler = vi.fn();
     manager.on("disconnected", disconnectedHandler);
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
     await manager.disconnect();
 
     expect(disconnectedHandler).toHaveBeenCalledTimes(1);

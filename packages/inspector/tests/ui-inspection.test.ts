@@ -136,7 +136,7 @@ describe("UI Inspection Tools", () => {
 
   describe("list_ui_widgets", () => {
     it("should list UI widgets from server", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createListUIWidgetsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
@@ -160,7 +160,7 @@ describe("UI Inspection Tools", () => {
     });
 
     it("should return empty array when no UI widgets", async () => {
-      const client = await manager.connect("http://localhost:3000/mcp");
+      const client = await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
       // Override raw client to return no UI widgets
       (manager.getClient().raw.listResources as ReturnType<typeof vi.fn>).mockResolvedValue({
         resources: [mockResources[2]], // Only the non-UI resource
@@ -181,7 +181,7 @@ describe("UI Inspection Tools", () => {
 
   describe("get_ui_widget", () => {
     it("should get UI widget content and metadata", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createGetUIWidgetTool(createMockRegistry(manager));
       const result = await tool.handler(
@@ -199,7 +199,7 @@ describe("UI Inspection Tools", () => {
     });
 
     it("should throw error for non-existent widget", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createGetUIWidgetTool(createMockRegistry(manager));
       await expect(
@@ -208,7 +208,7 @@ describe("UI Inspection Tools", () => {
     });
 
     it("should throw error for non-UI resource", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createGetUIWidgetTool(createMockRegistry(manager));
       await expect(tool.handler({ uri: "file:///config.json" }, {} as never)).rejects.toThrow(
@@ -217,7 +217,7 @@ describe("UI Inspection Tools", () => {
     });
 
     it("should throw error for invalid URI format", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createGetUIWidgetTool(createMockRegistry(manager));
       await expect(tool.handler({ uri: "not-a-uri" }, {} as never)).rejects.toThrow(
@@ -228,7 +228,7 @@ describe("UI Inspection Tools", () => {
 
   describe("inspect_tool_ui", () => {
     it("should inspect tool with MCP UI binding", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createInspectToolUITool(createMockRegistry(manager));
       const result = await tool.handler({ toolName: "get_current_weather" }, {} as never);
@@ -243,7 +243,7 @@ describe("UI Inspection Tools", () => {
     });
 
     it("should inspect tool with OpenAI UI binding", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createInspectToolUITool(createMockRegistry(manager));
       const result = await tool.handler({ toolName: "get_forecast" }, {} as never);
@@ -258,7 +258,7 @@ describe("UI Inspection Tools", () => {
     });
 
     it("should return hasUI: false for tool without UI", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createInspectToolUITool(createMockRegistry(manager));
       const result = await tool.handler({ toolName: "calculate_sum" }, {} as never);
@@ -271,7 +271,7 @@ describe("UI Inspection Tools", () => {
     });
 
     it("should throw error for non-existent tool", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createInspectToolUITool(createMockRegistry(manager));
       await expect(tool.handler({ toolName: "unknown_tool" }, {} as never)).rejects.toThrow(
@@ -282,7 +282,7 @@ describe("UI Inspection Tools", () => {
 
   describe("get_ui_metadata", () => {
     it("should get metadata for MCP App widget", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createGetUIMetadataTool(createMockRegistry(manager));
       const result = await tool.handler(
@@ -309,7 +309,7 @@ describe("UI Inspection Tools", () => {
     });
 
     it("should get metadata for OpenAI widget", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createGetUIMetadataTool(createMockRegistry(manager));
       const result = await tool.handler(
@@ -336,7 +336,7 @@ describe("UI Inspection Tools", () => {
     });
 
     it("should throw error for non-existent URI", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createGetUIMetadataTool(createMockRegistry(manager));
       await expect(
@@ -345,7 +345,7 @@ describe("UI Inspection Tools", () => {
     });
 
     it("should throw error for non-UI resource", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createGetUIMetadataTool(createMockRegistry(manager));
       await expect(tool.handler({ uri: "file:///config.json" }, {} as never)).rejects.toThrow(

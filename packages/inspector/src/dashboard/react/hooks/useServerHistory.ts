@@ -17,6 +17,12 @@ export interface ServerHistoryEntry {
   protocolType: ProtocolType;
   lastConnected: number;
   name?: string;
+  /** Transport type — defaults to HTTP when absent (backward compat). */
+  transport?: "http" | "stdio";
+  /** stdio command (only when transport === "stdio"). */
+  command?: string;
+  /** stdio args (only when transport === "stdio"). */
+  args?: string[];
 }
 
 export interface UseServerHistoryResult {
@@ -26,6 +32,12 @@ export interface UseServerHistoryResult {
   clearHistory: () => void;
   getMatchingEntries: (filter: string) => ServerHistoryEntry[];
 }
+
+const argsEqual = (left?: string[], right?: string[]): boolean => {
+  if (!left && !right) return true;
+  if (!left || !right) return false;
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+};
 
 /**
  * Load history from localStorage
@@ -86,10 +98,19 @@ export function useServerHistory(): UseServerHistoryResult {
 
   const addEntry = useCallback((entry: Omit<ServerHistoryEntry, "lastConnected">) => {
     setHistory((prev) => {
-      // Remove existing entry with same URL
-      const filtered = prev.filter((e) => e.url !== entry.url);
+      // Remove existing entry matching the same connection target
+      const filtered =
+        entry.transport === "stdio"
+          ? prev.filter(
+              (e) =>
+                !(
+                  e.transport === "stdio" &&
+                  e.command === entry.command &&
+                  argsEqual(e.args, entry.args)
+                )
+            )
+          : prev.filter((e) => e.url !== entry.url);
 
-      // Add new entry at the beginning
       const newEntry: ServerHistoryEntry = {
         ...entry,
         lastConnected: Date.now(),
@@ -111,11 +132,17 @@ export function useServerHistory(): UseServerHistoryResult {
     (filter: string): ServerHistoryEntry[] => {
       if (!filter) return history;
       const lowerFilter = filter.toLowerCase();
-      return history.filter(
-        (entry) =>
-          entry.url.toLowerCase().includes(lowerFilter) ||
-          entry.name?.toLowerCase().includes(lowerFilter)
-      );
+      return history.filter((entry) => {
+        if (entry.url.toLowerCase().includes(lowerFilter)) return true;
+        if (entry.name?.toLowerCase().includes(lowerFilter)) return true;
+        if (entry.command?.toLowerCase().includes(lowerFilter)) return true;
+        if (
+          entry.args?.some((a) => typeof a === "string" && a.toLowerCase().includes(lowerFilter))
+        ) {
+          return true;
+        }
+        return false;
+      });
     },
     [history]
   );

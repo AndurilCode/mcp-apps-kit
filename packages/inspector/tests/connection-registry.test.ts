@@ -33,8 +33,14 @@ describe("ConnectionRegistry", () => {
   it("creates multiple connections with unique IDs", async () => {
     const registry = new ConnectionRegistry();
 
-    const first = await registry.createConnection("http://localhost:3000/mcp");
-    const second = await registry.createConnection("http://localhost:3001/mcp");
+    const first = await registry.createConnection({
+      transport: "http",
+      url: "http://localhost:3000/mcp",
+    });
+    const second = await registry.createConnection({
+      transport: "http",
+      url: "http://localhost:3001/mcp",
+    });
 
     expect(first.id).toMatch(uuidRegex);
     expect(second.id).toMatch(uuidRegex);
@@ -50,8 +56,14 @@ describe("ConnectionRegistry", () => {
   it("resolves connections by explicit ID, then active, then throws", async () => {
     const registry = new ConnectionRegistry();
 
-    const first = await registry.createConnection("http://localhost:3000/mcp");
-    const second = await registry.createConnection("http://localhost:3001/mcp");
+    const first = await registry.createConnection({
+      transport: "http",
+      url: "http://localhost:3000/mcp",
+    });
+    const second = await registry.createConnection({
+      transport: "http",
+      url: "http://localhost:3001/mcp",
+    });
 
     const explicit = registry.resolveConnection(first.id);
     expect(explicit.id).toBe(first.id);
@@ -68,18 +80,21 @@ describe("ConnectionRegistry", () => {
   it("enforces max connections limit", async () => {
     const registry = new ConnectionRegistry({ maxConnections: 1 });
 
-    await registry.createConnection("http://localhost:3000/mcp");
+    await registry.createConnection({ transport: "http", url: "http://localhost:3000/mcp" });
 
-    await expect(registry.createConnection("http://localhost:3001/mcp")).rejects.toThrow(
-      "Max connections limit"
-    );
+    await expect(
+      registry.createConnection({ transport: "http", url: "http://localhost:3001/mcp" })
+    ).rejects.toThrow("Max connections limit");
   });
 
   it("closes connections and cleans up state", async () => {
     const registry = new ConnectionRegistry();
 
-    await registry.createConnection("http://localhost:3000/mcp");
-    const second = await registry.createConnection("http://localhost:3001/mcp");
+    await registry.createConnection({ transport: "http", url: "http://localhost:3000/mcp" });
+    const second = await registry.createConnection({
+      transport: "http",
+      url: "http://localhost:3001/mcp",
+    });
 
     await registry.closeConnection(second.id);
     expect(registry.listConnections()).toHaveLength(1);

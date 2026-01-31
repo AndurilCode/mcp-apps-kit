@@ -69,6 +69,8 @@ export interface TestClientOptions {
   timeout?: number;
   /** Number of retries on failure (default: 0) */
   retries?: number;
+  /** Called when the underlying transport closes (e.g., stdio process exits) */
+  onTransportClose?: () => void;
 }
 
 /**
@@ -564,3 +566,37 @@ export interface PromptResultAssertion {
   /** Assert prompt has description */
   toHaveDescription(description?: string): void;
 }
+
+// =============================================================================
+// CONNECTION PARAMS
+// =============================================================================
+
+/**
+ * Discriminated union for MCP transport connection parameters.
+ *
+ * - `"http"`: Connect to an MCP server over Streamable HTTP.
+ * - `"stdio"`: Spawn a child process and communicate over stdin/stdout.
+ */
+export type ConnectionParams =
+  | { transport: "http"; url: string }
+  | {
+      transport: "stdio";
+      command: string;
+      args?: string[];
+      /**
+       * Environment variables for the child process.
+       * When provided, user-supplied vars are merged with a safe subset of
+       * parent process env (PATH, HOME, LANG, etc.). Sensitive variables
+       * (API keys, credentials, tokens) are never inherited automatically.
+       */
+      env?: Record<string, string>;
+      /**
+       * When `false`, only the safe allowlisted parent env vars are passed
+       * (PATH, HOME, etc.) plus any explicit `env` overrides.
+       * When `true` or omitted with no `env`, the child inherits the default
+       * Node.js behavior (full process.env).
+       * Default: `true` when `env` is not provided, `false` otherwise.
+       */
+      inheritEnv?: boolean;
+      cwd?: string;
+    };

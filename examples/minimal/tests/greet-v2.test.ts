@@ -16,9 +16,12 @@ describe("Greet Tool V2", () => {
     const server = await startTestServer(app, { port: testPort });
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    const client = await createTestClient(`http://localhost:${testPort}/v2/mcp`, {
-      trackHistory: true,
-    });
+    const client = await createTestClient(
+      { transport: "http", url: `http://localhost:${testPort}/v2/mcp` },
+      {
+        trackHistory: true,
+      }
+    );
 
     env = {
       server,

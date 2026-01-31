@@ -81,7 +81,7 @@ describe("Inspector Tools", () => {
 
     it("should return existing connection when already connected to same URL", async () => {
       // First connection
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createConnectTool(createMockRegistry(manager));
       const result = await tool.handler({ url: "http://localhost:3000/mcp" }, {} as never);
@@ -91,7 +91,7 @@ describe("Inspector Tools", () => {
     });
 
     it("should allow connecting to different URL (multi-connection)", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createConnectTool(createMockRegistry(manager));
       const result = await tool.handler({ url: "http://localhost:4000/mcp" }, {} as never);
@@ -102,7 +102,7 @@ describe("Inspector Tools", () => {
     });
 
     it("should reconnect when force=true with different URL", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createConnectTool(createMockRegistry(manager));
       const result = await tool.handler(
@@ -117,7 +117,7 @@ describe("Inspector Tools", () => {
 
   describe("disconnect", () => {
     it("should disconnect from server", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createDisconnectTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
@@ -137,7 +137,7 @@ describe("Inspector Tools", () => {
 
   describe("list_tools", () => {
     it("should list tools from connected server", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
@@ -162,7 +162,7 @@ describe("Inspector Tools", () => {
 
     it("should return empty array when server has no tools", async () => {
       mockListTools.mockResolvedValue([]);
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
@@ -173,7 +173,7 @@ describe("Inspector Tools", () => {
 
   describe("call_tool", () => {
     it("should call tool and return result", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler(
@@ -192,7 +192,7 @@ describe("Inspector Tools", () => {
         content: [{ type: "text", text: "Error: name is required" }],
         isError: true,
       });
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createCallToolTool(createMockRegistry(manager));
       const result = await tool.handler({ name: "greet", arguments: {} }, {} as never);
@@ -223,7 +223,7 @@ describe("Inspector Tools", () => {
           },
         },
       ]);
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
@@ -245,7 +245,7 @@ describe("Inspector Tools", () => {
           },
         },
       ]);
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
@@ -265,7 +265,7 @@ describe("Inspector Tools", () => {
           },
         },
       ]);
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
@@ -284,7 +284,7 @@ describe("Inspector Tools", () => {
           },
         },
       ]);
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
@@ -305,7 +305,7 @@ describe("Inspector Tools", () => {
           },
         },
       ]);
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
@@ -327,7 +327,7 @@ describe("Inspector Tools", () => {
           },
         },
       ]);
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
@@ -348,7 +348,7 @@ describe("Inspector Tools", () => {
           },
         },
       ]);
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
@@ -364,7 +364,7 @@ describe("Inspector Tools", () => {
           description: "No UI",
         },
       ]);
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
@@ -383,7 +383,7 @@ describe("Inspector Tools", () => {
           },
         },
       ]);
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createListToolsTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);
@@ -406,7 +406,7 @@ describe("Inspector Tools", () => {
     });
 
     it("should return status when connected", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const tool = createGetConnectionStatusTool(createMockRegistry(manager));
       const result = await tool.handler({}, {} as never);

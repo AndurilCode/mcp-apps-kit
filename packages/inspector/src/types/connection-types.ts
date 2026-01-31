@@ -4,7 +4,7 @@
  * Types for connection state, options, and related tool inputs/outputs.
  */
 
-import type { TestClient } from "@mcp-apps-kit/testing";
+import type { TestClient, ConnectionParams } from "@mcp-apps-kit/testing";
 import type { ServerInfo } from "./server-types";
 
 // =============================================================================
@@ -43,6 +43,9 @@ export interface ConnectionState {
 
   /** The test client (if connected) */
   client: TestClient | null;
+
+  /** Connection parameters used to establish the connection */
+  connectionParams: ConnectionParams | null;
 }
 
 /**

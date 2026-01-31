@@ -137,7 +137,7 @@ describe("UIHostManager", () => {
 
   describe("findUIResourceForTool", () => {
     it("should find UI resource by tool name", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
       const client = manager.getClient();
       const uiHostManager = new UIHostManager(client);
 
@@ -149,7 +149,7 @@ describe("UIHostManager", () => {
     });
 
     it("should return null when no matching resource", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
       const client = manager.getClient();
       const uiHostManager = new UIHostManager(client);
 
@@ -161,7 +161,7 @@ describe("UIHostManager", () => {
 
   describe("fetchWidgetHTML", () => {
     it("should fetch HTML content from resource", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
       const client = manager.getClient();
       const uiHostManager = new UIHostManager(client);
 
@@ -174,7 +174,7 @@ describe("UIHostManager", () => {
     it("should throw error for empty content", async () => {
       mockReadResource.mockResolvedValue({ contents: [] });
 
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
       const client = manager.getClient();
       const uiHostManager = new UIHostManager(client);
 
@@ -186,7 +186,7 @@ describe("UIHostManager", () => {
 
   describe("renderHeadless", () => {
     it("should render widget with MCP protocol", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
       const client = manager.getClient();
       const uiHostManager = new UIHostManager(client);
 
@@ -206,7 +206,7 @@ describe("UIHostManager", () => {
     });
 
     it("should render widget with OpenAI protocol", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
       const client = manager.getClient();
       const uiHostManager = new UIHostManager(client);
 
@@ -225,7 +225,7 @@ describe("UIHostManager", () => {
     });
 
     it("should extract elements from DOM", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
       const client = manager.getClient();
       const uiHostManager = new UIHostManager(client);
 
@@ -262,7 +262,7 @@ describe("UIHostManager", () => {
         </body></html>
       `;
 
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
       const client = manager.getClient();
       const uiHostManager = new UIHostManager(client);
 
@@ -293,7 +293,7 @@ describe("preview_ui tool", () => {
       contents: [{ text: mockMCPWidgetHTML }],
     });
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
     const tool = createPreviewUITool(createMockRegistry(manager));
     const result = await tool.handler(
@@ -328,7 +328,7 @@ describe("preview_ui tool", () => {
       },
     });
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
     const tool = createPreviewUITool(createMockRegistry(manager));
     const result = await tool.handler({ tool: "forecast", arguments: {} }, {} as never);
@@ -340,7 +340,7 @@ describe("preview_ui tool", () => {
   it("should return hasUI: false when tool call fails", async () => {
     mockCallTool.mockRejectedValue(new Error("Tool execution failed"));
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
     const tool = createPreviewUITool(createMockRegistry(manager));
     const result = await tool.handler({ tool: "currentWeather", arguments: {} }, {} as never);
@@ -364,7 +364,7 @@ describe("preview_ui tool", () => {
       },
     });
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
     const tool = createPreviewUITool(createMockRegistry(manager));
     const result = await tool.handler({ tool: "unknownTool", arguments: {} }, {} as never);
@@ -399,7 +399,7 @@ describe("screenshot_widget tool", () => {
   it("should return hasUI: false when tool call fails", async () => {
     mockCallTool.mockRejectedValue(new Error("Screenshot tool failed"));
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
     const tool = createScreenshotWidgetTool(createMockRegistry(manager));
     const result = await tool.handler({ tool: "currentWeather", arguments: {} }, {} as never);
@@ -421,7 +421,7 @@ describe("screenshot_widget tool", () => {
       },
     });
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
     const tool = createScreenshotWidgetTool(createMockRegistry(manager));
     const result = await tool.handler({ tool: "unknownTool", arguments: {} }, {} as never);
@@ -459,7 +459,7 @@ describe("test_widget_interaction tool", () => {
   it("should return hasUI: false when tool call fails", async () => {
     mockCallTool.mockRejectedValue(new Error("Interaction tool failed"));
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
     const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
     const result = await tool.handler(
@@ -488,7 +488,7 @@ describe("test_widget_interaction tool", () => {
       },
     });
 
-    await manager.connect("http://localhost:3000/mcp");
+    await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
     const tool = createTestWidgetInteractionTool(createMockRegistry(manager));
     const result = await tool.handler(

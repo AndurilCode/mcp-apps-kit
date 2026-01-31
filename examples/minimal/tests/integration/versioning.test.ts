@@ -17,13 +17,19 @@ describe("Versioning", () => {
     mainServer = await startTestServer(app as unknown, { port: testPort });
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    const v1Client = await createTestClient(`http://localhost:${testPort}/v1/mcp`, {
-      trackHistory: true,
-    });
+    const v1Client = await createTestClient(
+      { transport: "http", url: `http://localhost:${testPort}/v1/mcp` },
+      {
+        trackHistory: true,
+      }
+    );
 
-    const v2Client = await createTestClient(`http://localhost:${testPort}/v2/mcp`, {
-      trackHistory: true,
-    });
+    const v2Client = await createTestClient(
+      { transport: "http", url: `http://localhost:${testPort}/v2/mcp` },
+      {
+        trackHistory: true,
+      }
+    );
 
     v1Env = {
       server: mainServer,

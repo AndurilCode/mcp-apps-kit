@@ -113,8 +113,8 @@ describe("Dashboard connections endpoints", () => {
     const clientA = mockState.buildClient("alpha");
     const clientB = mockState.buildClient("bravo");
     mockState.clients.push(clientA, clientB);
-    await registry.createConnection("http://localhost:3000/mcp");
-    await registry.createConnection("http://localhost:3001/mcp");
+    await registry.createConnection({ transport: "http", url: "http://localhost:3000/mcp" });
+    await registry.createConnection({ transport: "http", url: "http://localhost:3001/mcp" });
 
     const req = createRequest("GET", "/dashboard/connections");
     const res = new MockResponse();
@@ -164,7 +164,10 @@ describe("Dashboard connections endpoints", () => {
     const registry = new ConnectionRegistry();
     const clientA = mockState.buildClient("alpha");
     mockState.clients.push(clientA);
-    const connection = await registry.createConnection("http://localhost:3000/mcp");
+    const connection = await registry.createConnection({
+      transport: "http",
+      url: "http://localhost:3000/mcp",
+    });
 
     const req = createRequest("DELETE", `/dashboard/connections/${connection.id}`);
     const res = new MockResponse();
@@ -186,7 +189,7 @@ describe("Dashboard connections endpoints", () => {
   it("DELETE /dashboard/connections/:id returns 404 for invalid id", async () => {
     const registry = new ConnectionRegistry();
     mockState.clients.push(mockState.buildClient("alpha"));
-    await registry.createConnection("http://localhost:3000/mcp");
+    await registry.createConnection({ transport: "http", url: "http://localhost:3000/mcp" });
 
     const req = createRequest("DELETE", "/dashboard/connections/does-not-exist");
     const res = new MockResponse();

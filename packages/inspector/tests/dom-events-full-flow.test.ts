@@ -42,7 +42,10 @@ describe("DOM Event Full Flow", () => {
     serverUrl = `http://127.0.0.1:${port}`;
     // Create a connection through the registry so getConnectionManager works
     const registry = server.getRegistry();
-    const { connectionManager: cm } = await registry.createConnection(`${serverUrl}/mcp`);
+    const { connectionManager: cm } = await registry.createConnection({
+      transport: "http",
+      url: `${serverUrl}/mcp`,
+    });
     connectionManager = cm;
   });
 

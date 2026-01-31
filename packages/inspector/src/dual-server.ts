@@ -381,8 +381,10 @@ export function createDualInspectorServer(
           }
 
           // Connect (will disconnect first if force=true and already connected)
-          const { id: newConnId, connectionManager: newCm } =
-            await registry.createConnection(validatedUrl);
+          const { id: newConnId, connectionManager: newCm } = await registry.createConnection({
+            transport: "http",
+            url: validatedUrl,
+          });
           const connSchema = newCm.getTargetSchema();
           const protocolType = connSchema ? inferProtocolType(connSchema.tools) : "mcp";
 

@@ -85,7 +85,7 @@ describe("ConnectionManager Extended", () => {
     });
 
     it("should return connected state after connection", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
       const state = manager.getState();
 
       expect(state.connected).toBe(true);
@@ -99,7 +99,7 @@ describe("ConnectionManager Extended", () => {
     });
 
     it("should return client after connection", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
       const client = manager.getClient();
       expect(client).toBeDefined();
     });
@@ -207,14 +207,14 @@ describe("ConnectionManager Extended", () => {
           timestamp: new Date(),
         },
       ]);
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
 
       const history = manager.getCallHistory();
       expect(history).toHaveLength(1);
     });
 
     it("should clear history", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
       manager.clearHistory();
 
       expect(mockClearHistory).toHaveBeenCalled();
@@ -228,7 +228,7 @@ describe("ConnectionManager Extended", () => {
     });
 
     it("should increment call count", async () => {
-      await manager.connect("http://localhost:3000/mcp");
+      await manager.connect({ transport: "http", url: "http://localhost:3000/mcp" });
       manager.incrementCallCount();
       manager.incrementCallCount();
       manager.incrementCallCount();

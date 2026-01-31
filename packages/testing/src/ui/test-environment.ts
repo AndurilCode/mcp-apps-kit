@@ -71,7 +71,7 @@ export async function createTestEnvironment(
   }
 
   // Create test client
-  client = await createTestClient(mcpUrl, options.clientOptions);
+  client = await createTestClient({ transport: "http", url: mcpUrl }, options.clientOptions);
 
   return {
     server,
