@@ -378,7 +378,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
       <header style={styles.header}>
         <div style={styles.headerLeft}>
           <img src={logoUrl} alt="MCP Agent Inspector" style={styles.logo} />
-          <h1 style={styles.title}>MCP Agent Inspector</h1>
+          <h1 style={styles.title}>sirius-mcp inspector</h1>
         </div>
 
         {/* Connection Bar */}
