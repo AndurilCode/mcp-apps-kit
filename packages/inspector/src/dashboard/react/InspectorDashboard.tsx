@@ -29,10 +29,6 @@ import logoUrl from "../assets/logo.png";
 export interface InspectorDashboardProps {
   /** Base URL for the inspector API (default: current origin) */
   baseUrl?: string;
-  /** Initial panel height in pixels (default: 200) */
-  initialPanelHeight?: number;
-  /** Minimum panel height in pixels (default: 100) */
-  minPanelHeight?: number;
 }
 
 interface CachedConnectionState {
@@ -486,6 +482,16 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
                   alt="Live browser view"
                   style={styles.streamImage}
                 />
+                {isGlobalsBarCollapsed && (
+                  <button
+                    style={styles.globalsCollapsedToggle}
+                    onClick={toggleGlobalsBar}
+                    aria-label="Show Globals"
+                    title="Show Globals"
+                  >
+                    Show Globals
+                  </button>
+                )}
               </div>
             ) : (
               /* Tamagotchi placeholder when no widget */
@@ -511,7 +517,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           agentEvents={displayAgentEvents}
           onClearLogs={clearLogs}
           onClearEvents={clearEvents}
-          onClearAgentEvents={clearAgentEvents}
+          onClearAgent={clearAgentEvents}
           isCollapsed={isRightPanelCollapsed}
           onToggleCollapse={toggleRightPanel}
           panelWidth={rightPanelWidth}

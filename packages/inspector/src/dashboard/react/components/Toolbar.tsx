@@ -64,7 +64,7 @@ export function Toolbar({
 }: ToolbarProps): React.ReactElement {
   return (
     <div style={styles.toolbar}>
-      {/* Primitives panel toggle - only shown when session is active */}
+      {/* Primitives panel toggle */}
       <button
         style={{
           ...styles.toolbarBtn,

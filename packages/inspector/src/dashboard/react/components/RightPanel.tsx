@@ -20,9 +20,9 @@ export interface RightPanelProps {
   logs: LogEntry[];
   events: InspectorEvent[];
   agentEvents: AgnosticInspectorEvent[];
-  onClearLogs: () => void;
-  onClearEvents: () => void;
-  onClearAgentEvents: () => void;
+  onClearLogs?: () => void;
+  onClearEvents?: () => void;
+  onClearAgent?: () => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   panelWidth: number;
@@ -36,13 +36,14 @@ export function RightPanel({
   agentEvents,
   onClearLogs,
   onClearEvents,
-  onClearAgentEvents,
+  onClearAgent,
   isCollapsed,
   onToggleCollapse,
   panelWidth,
   resizeHandleProps,
   isResizing,
 }: RightPanelProps): React.ReactElement {
+  const noop = (): void => undefined;
   const [activeTab, setActiveTab] = useState<RightPanelTab>(() => {
     if (typeof window !== "undefined") {
       const stored = window.localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
@@ -78,6 +79,21 @@ export function RightPanel({
     return <div style={panelStyle} />;
   }
 
+  const handleClear = (() => {
+    if (activeTab === "agent") {
+      return onClearAgent ?? noop;
+    }
+    if (activeTab === "events") {
+      return onClearEvents ?? noop;
+    }
+    return onClearLogs ?? noop;
+  })();
+
+  const isClearDisabled =
+    (activeTab === "agent" && !onClearAgent) ||
+    (activeTab === "events" && !onClearEvents) ||
+    (activeTab === "logs" && !onClearLogs);
+
   return (
     <>
       <div
@@ -110,26 +126,37 @@ export function RightPanel({
                 aria-pressed={activeTab === tab.id}
               >
                 {tab.label}
-                <span
-                  style={{
-                    ...styles.rightPanelTabCount,
-                    ...(activeTab === tab.id ? styles.rightPanelTabCountActive : {}),
-                  }}
-                >
-                  {tab.count}
-                </span>
+                {tab.count > 0 && (
+                  <span
+                    style={{
+                      ...styles.rightPanelTabCount,
+                      ...(activeTab === tab.id ? styles.rightPanelTabCountActive : {}),
+                    }}
+                  >
+                    {tab.count}
+                  </span>
+                )}
               </button>
             ))}
+          </div>
+          <div style={styles.rightPanelActions}>
+            <button
+              style={styles.rightPanelClearBtn}
+              onClick={handleClear}
+              disabled={isClearDisabled}
+            >
+              Clear
+            </button>
           </div>
         </div>
         <div style={styles.rightPanelContent}>
           {activeTab === "logs" && (
-            <LogsPanel logs={logs} onClearLogs={onClearLogs} showHeader={false} />
+            <LogsPanel logs={logs} onClearLogs={onClearLogs ?? noop} showHeader={false} />
           )}
           {activeTab === "events" && (
             <EventsPanel
               events={events}
-              onClearEvents={onClearEvents}
+              onClearEvents={onClearEvents ?? noop}
               showHeader={true}
               showTitle={false}
               showClearButton={false}
@@ -138,7 +165,7 @@ export function RightPanel({
           {activeTab === "agent" && (
             <AgentPanel
               events={agentEvents}
-              onClearEvents={onClearAgentEvents}
+              onClearEvents={onClearAgent ?? noop}
               showHeader={true}
               showTitle={false}
               showClearButton={false}

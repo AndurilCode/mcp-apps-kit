@@ -268,6 +268,23 @@ export const styles: Record<string, CSSProperties> = {
     objectFit: "contain",
   },
 
+  globalsCollapsedToggle: {
+    position: "absolute",
+    bottom: "0.5rem",
+    left: "50%",
+    transform: "translateX(-50%)",
+    fontFamily: "inherit",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    border: "1px solid #20b2aa",
+    color: "#20b2aa",
+    padding: "0.2rem 0.6rem",
+    borderRadius: "999px",
+    fontSize: "0.625rem",
+    cursor: "pointer",
+    letterSpacing: "0.02em",
+    transition: "all 0.15s ease",
+  },
+
   // Placeholder
   placeholder: {
     display: "flex",
