@@ -334,9 +334,6 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           : "Disconnected"
     : "Disconnected";
 
-  // Determine if UI session is active (has screencast)
-  const hasActiveSession = !!selectedSessionId && !!displayImageData;
-
   // Inject keyframe animation for streaming border
   const keyframeStyles = useMemo(
     () => `
