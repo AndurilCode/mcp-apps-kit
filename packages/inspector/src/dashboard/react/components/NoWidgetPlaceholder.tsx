@@ -92,60 +92,60 @@ export function NoWidgetPlaceholder(): React.ReactElement {
           {/* Halo */}
           <circle cx="100" cy="100" r="85" fill="url(#siriusHalo)" />
 
-          {/* Cardinal points — wider/larger edges */}
+          {/* Cardinal points — broad compass-style */}
           <polygon
-            points="100,12 109,78 100,90 91,78"
+            points="100,12 118,74 100,90 82,74"
             fill="url(#siriusFacetA)"
             stroke="#a8c8e8"
             strokeWidth="0.5"
             strokeOpacity="0.5"
           />
           <polygon
-            points="188,100 122,109 110,100 122,91"
+            points="188,100 126,118 110,100 126,82"
             fill="url(#siriusFacetA)"
             stroke="#a8c8e8"
             strokeWidth="0.5"
             strokeOpacity="0.5"
           />
           <polygon
-            points="100,188 91,122 100,110 109,122"
+            points="100,188 82,126 100,110 118,126"
             fill="url(#siriusFacetA)"
             stroke="#a8c8e8"
             strokeWidth="0.5"
             strokeOpacity="0.5"
           />
           <polygon
-            points="12,100 78,91 90,100 78,109"
+            points="12,100 74,82 90,100 74,118"
             fill="url(#siriusFacetA)"
             stroke="#a8c8e8"
             strokeWidth="0.5"
             strokeOpacity="0.5"
           />
 
-          {/* Diagonal points — wider edges, slightly shorter */}
+          {/* Diagonal points — broad, slightly shorter */}
           <polygon
-            points="162,38 116,84 108,90 114,80"
+            points="162,38 118,82 100,92 112,72"
             fill="url(#siriusFacetB)"
             stroke="#8bb0d4"
             strokeWidth="0.4"
             strokeOpacity="0.35"
           />
           <polygon
-            points="162,162 116,116 114,106 120,114"
+            points="162,162 118,118 108,100 128,112"
             fill="url(#siriusFacetB)"
             stroke="#8bb0d4"
             strokeWidth="0.4"
             strokeOpacity="0.35"
           />
           <polygon
-            points="38,162 84,116 90,108 80,114"
+            points="38,162 82,118 92,100 72,128"
             fill="url(#siriusFacetB)"
             stroke="#8bb0d4"
             strokeWidth="0.4"
             strokeOpacity="0.35"
           />
           <polygon
-            points="38,38 84,84 90,92 80,86"
+            points="38,38 82,82 92,100 72,88"
             fill="url(#siriusFacetB)"
             stroke="#8bb0d4"
             strokeWidth="0.4"
@@ -154,7 +154,7 @@ export function NoWidgetPlaceholder(): React.ReactElement {
 
           {/* Inner crystalline facets */}
           <polygon
-            points="100,68 110,90 100,96 90,90"
+            points="100,64 114,88 100,98 86,88"
             fill="#b8d0e8"
             fillOpacity="0.2"
             stroke="#a8c8e8"
@@ -162,7 +162,7 @@ export function NoWidgetPlaceholder(): React.ReactElement {
             strokeOpacity="0.35"
           />
           <polygon
-            points="132,100 110,110 104,100 110,90"
+            points="136,100 112,114 102,100 112,86"
             fill="#b8d0e8"
             fillOpacity="0.16"
             stroke="#a8c8e8"
@@ -170,7 +170,7 @@ export function NoWidgetPlaceholder(): React.ReactElement {
             strokeOpacity="0.3"
           />
           <polygon
-            points="100,132 90,110 96,104 110,110"
+            points="100,136 86,112 98,102 114,112"
             fill="#b8d0e8"
             fillOpacity="0.13"
             stroke="#a8c8e8"
@@ -178,7 +178,7 @@ export function NoWidgetPlaceholder(): React.ReactElement {
             strokeOpacity="0.25"
           />
           <polygon
-            points="68,100 90,90 96,96 90,110"
+            points="64,100 88,86 98,98 88,114"
             fill="#b8d0e8"
             fillOpacity="0.1"
             stroke="#a8c8e8"
