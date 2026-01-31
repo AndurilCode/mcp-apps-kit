@@ -16,6 +16,10 @@ export interface LogsPanelProps {
   onClearLogs: () => void;
   /** Whether to show the header (default: true) */
   showHeader?: boolean;
+  /** Whether to show the title in the header (default: true) */
+  showTitle?: boolean;
+  /** Whether to show the clear button in the header (default: true) */
+  showClearButton?: boolean;
 }
 
 /**
@@ -63,6 +67,8 @@ export function LogsPanel({
   logs,
   onClearLogs,
   showHeader = true,
+  showTitle = true,
+  showClearButton = true,
 }: LogsPanelProps): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -77,12 +83,14 @@ export function LogsPanel({
     <div style={styles.eventsPanel as React.CSSProperties}>
       {showHeader && (
         <div style={styles.eventsPanelHeader as React.CSSProperties}>
-          <span style={styles.eventsPanelTitle as React.CSSProperties}>Logs</span>
+          {showTitle && <span style={styles.eventsPanelTitle as React.CSSProperties}>Logs</span>}
           <div style={styles.eventsPanelControls as React.CSSProperties}>
             <span style={styles.logCount}>{logs.length} logs</span>
-            <button style={styles.clearLogsBtn as React.CSSProperties} onClick={onClearLogs}>
-              Clear
-            </button>
+            {showClearButton && (
+              <button style={styles.clearLogsBtn as React.CSSProperties} onClick={onClearLogs}>
+                Clear
+              </button>
+            )}
           </div>
         </div>
       )}
