@@ -11,13 +11,7 @@ import starUrl from "../../assets/sirius-star.png";
 export function NoWidgetPlaceholder(): React.ReactElement {
   return (
     <div style={styles.noWidgetWrapper}>
-      <img
-        src={starUrl}
-        alt="Sirius the star"
-        width={180}
-        height={180}
-        style={styles.noWidgetStar}
-      />
+      <img src={starUrl} alt="Sirius the star" width={90} height={90} style={styles.noWidgetStar} />
       <p style={styles.noWidgetMessage}>No active widget yet — ask your agent to test</p>
     </div>
   );

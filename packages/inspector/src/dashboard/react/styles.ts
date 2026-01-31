@@ -44,8 +44,8 @@ export const styles: Record<string, CSSProperties> = {
   },
 
   logo: {
-    width: "36px",
-    height: "36px",
+    width: "20px",
+    height: "20px",
     objectFit: "contain",
   },
 
