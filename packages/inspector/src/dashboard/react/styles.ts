@@ -1020,15 +1020,34 @@ export const styles: Record<string, CSSProperties> = {
   },
 
   noWidgetStar: {
-    filter: "drop-shadow(0 0 12px rgba(32, 178, 170, 0.3))",
+    filter: "drop-shadow(0 0 20px rgba(32, 178, 170, 0.2))",
   },
 
   noWidgetStarFloat: {
-    animation: "starFloat 3s ease-in-out infinite",
+    animation: "starFloat 4s ease-in-out infinite",
+    transformOrigin: "100px 100px",
   },
 
-  noWidgetEye: {
-    animation: "starBlink 4s ease-in-out infinite",
+  noWidgetCorePulse: {
+    animation: "corePulse 3s ease-in-out infinite",
+  },
+
+  noWidgetOrbitRing: {
+    animation: "orbitSpin 40s linear infinite",
+    transformOrigin: "100px 100px",
+  },
+
+  noWidgetOrbitRingReverse: {
+    animation: "orbitSpin 30s linear infinite reverse",
+    transformOrigin: "100px 100px",
+  },
+
+  noWidgetSparkle: {
+    animation: "sparkle 3s ease-in-out infinite",
+  },
+
+  noWidgetSparkle2: {
+    animation: "sparkle 3s ease-in-out infinite 1.5s",
   },
 
   noWidgetMessage: {

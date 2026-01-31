@@ -14,20 +14,44 @@
   }
 }
 
+/* Sirius star — gentle floating */
 @keyframes starFloat {
   0%, 100% {
     transform: translateY(0);
   }
   50% {
-    transform: translateY(-8px);
+    transform: translateY(-6px);
   }
 }
 
-@keyframes starBlink {
-  0%, 42%, 44%, 100% {
-    r: 4;
+/* Core glow pulse */
+@keyframes corePulse {
+  0%, 100% {
+    opacity: 0.8;
+    r: 16;
   }
-  43% {
-    r: 0.5;
+  50% {
+    opacity: 1;
+    r: 18;
+  }
+}
+
+/* Orbital ring rotation */
+@keyframes orbitSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Ambient sparkle */
+@keyframes sparkle {
+  0%, 100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.8;
   }
 }
