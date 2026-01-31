@@ -216,22 +216,24 @@ const connectionBarStyles: Record<string, React.CSSProperties> = {
     backgroundPosition: "right 0.25rem center",
     paddingRight: "1rem",
   } as React.CSSProperties,
-  advancedToggle: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.25rem",
-    background: "transparent",
-    border: "none",
-    color: "#6b7280",
-    fontSize: "0.6875rem",
-    cursor: "pointer",
-    padding: "0.25rem 0",
-    marginTop: "0.375rem",
+  settingsButtonActive: {
+    color: "#20b2aa",
+    backgroundColor: "rgba(32, 178, 170, 0.1)",
   },
-  advancedRow: {
+  popover: {
+    position: "absolute",
+    backgroundColor: "#1e1e1e",
+    border: "1px solid #444",
+    borderRadius: "8px",
+    boxShadow: "0 10px 28px rgba(0, 0, 0, 0.5)",
+    padding: "16px",
+    zIndex: 1000,
+    minWidth: "400px",
+  },
+  popoverContent: {
     display: "flex",
-    gap: "0.5rem",
-    marginTop: "0.375rem",
+    flexDirection: "column" as const,
+    gap: "0.75rem",
   },
   advancedInput: {
     flex: 1,
@@ -273,6 +275,79 @@ const connectionBarStyles: Record<string, React.CSSProperties> = {
   },
 };
 
+interface PopoverProps {
+  isOpen: boolean;
+  anchorRef: React.RefObject<HTMLElement>;
+  containerRef: React.RefObject<HTMLElement>;
+  onClose: () => void;
+  children: React.ReactNode;
+  panelStyle?: React.CSSProperties;
+}
+
+function Popover({
+  isOpen,
+  anchorRef,
+  containerRef,
+  onClose,
+  children,
+  panelStyle,
+}: PopoverProps): React.ReactElement | null {
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<React.CSSProperties>({});
+
+  const updatePosition = useCallback(() => {
+    const anchor = anchorRef.current;
+    const container = containerRef.current;
+    if (!anchor || !container) return;
+    const anchorRect = anchor.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const top = anchorRect.bottom - containerRect.top + 8;
+    const right = Math.max(containerRect.right - anchorRect.right, 0);
+    setPosition({ top: `${top}px`, right: `${right}px` });
+  }, [anchorRef, containerRef]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    updatePosition();
+    const handleResize = () => updatePosition();
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("scroll", handleResize, true);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("scroll", handleResize, true);
+    };
+  }, [isOpen, updatePosition]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (popoverRef.current?.contains(target)) return;
+      if (anchorRef.current?.contains(target)) return;
+      onClose();
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onClose, anchorRef]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div ref={popoverRef} style={{ ...connectionBarStyles.popover, ...panelStyle, ...position }}>
+      {children}
+    </div>
+  );
+}
+
 /**
  * ConnectionBar Component
  */
@@ -296,6 +371,7 @@ export function ConnectionBar({
   const [hoveredIndex, setHoveredIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
 
   // Determine if the current form is submittable
   const canSubmit = transport === "http" ? !!inputValue.trim() : !!command.trim();
@@ -323,6 +399,12 @@ export function ConnectionBar({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (transport !== "stdio") {
+      setShowAdvanced(false);
+    }
+  }, [transport]);
 
   const buildParams = useCallback((): ConnectionParams | null => {
     if (transport === "http") {
@@ -519,6 +601,34 @@ export function ConnectionBar({
             )}
           </button>
 
+          {transport === "stdio" && (
+            <button
+              ref={settingsButtonRef}
+              type="button"
+              style={{
+                ...connectionBarStyles.actionButton,
+                ...(showAdvanced ? connectionBarStyles.settingsButtonActive : {}),
+              }}
+              onClick={() => setShowAdvanced((prev) => !prev)}
+              title="Advanced Settings"
+              aria-expanded={showAdvanced}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+              </svg>
+            </button>
+          )}
+
           <button
             type="button"
             style={{
@@ -534,58 +644,39 @@ export function ConnectionBar({
             </svg>
           </button>
         </div>
-
-        {/* Advanced Settings (stdio only) */}
-        {transport === "stdio" && (
-          <>
-            <button
-              type="button"
-              style={connectionBarStyles.advancedToggle}
-              onClick={() => setShowAdvanced((prev) => !prev)}
-            >
-              <svg
-                width="8"
-                height="8"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                style={{
-                  transform: showAdvanced ? "rotate(90deg)" : "rotate(0deg)",
-                  transition: "transform 0.15s ease",
-                }}
-              >
-                <polyline points="9 6 15 12 9 18" />
-              </svg>
-              Advanced Settings
-            </button>
-            {showAdvanced && (
-              <div style={connectionBarStyles.advancedRow}>
-                <div style={connectionBarStyles.advancedField}>
-                  <label style={connectionBarStyles.advancedLabel}>Environment Variables</label>
-                  <textarea
-                    style={connectionBarStyles.advancedTextarea}
-                    value={envVars}
-                    onChange={(e) => setEnvVars(e.target.value)}
-                    placeholder="KEY=value, KEY2=value2"
-                    rows={2}
-                  />
-                </div>
-                <div style={connectionBarStyles.advancedField}>
-                  <label style={connectionBarStyles.advancedLabel}>Working Directory</label>
-                  <input
-                    type="text"
-                    style={connectionBarStyles.advancedInput}
-                    value={cwd}
-                    onChange={(e) => setCwd(e.target.value)}
-                    placeholder="/path/to/project"
-                  />
-                </div>
-              </div>
-            )}
-          </>
-        )}
       </div>
+
+      {transport === "stdio" && (
+        <Popover
+          isOpen={showAdvanced}
+          anchorRef={settingsButtonRef}
+          containerRef={containerRef}
+          onClose={() => setShowAdvanced(false)}
+        >
+          <div style={connectionBarStyles.popoverContent}>
+            <div style={connectionBarStyles.advancedField}>
+              <label style={connectionBarStyles.advancedLabel}>Environment Variables</label>
+              <textarea
+                style={connectionBarStyles.advancedTextarea}
+                value={envVars}
+                onChange={(e) => setEnvVars(e.target.value)}
+                placeholder="KEY=value, KEY2=value2"
+                rows={2}
+              />
+            </div>
+            <div style={connectionBarStyles.advancedField}>
+              <label style={connectionBarStyles.advancedLabel}>Working Directory</label>
+              <input
+                type="text"
+                style={connectionBarStyles.advancedInput}
+                value={cwd}
+                onChange={(e) => setCwd(e.target.value)}
+                placeholder="/path/to/project"
+              />
+            </div>
+          </div>
+        </Popover>
+      )}
 
       {/* History Dropdown */}
       {showDropdown && (
