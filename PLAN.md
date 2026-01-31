@@ -237,6 +237,7 @@ _Depends on Phase 1. Most complex phase._
   - **Agent mode:** Renders `<img>` with screencast data (existing behavior) + animated glow border
   - **Human mode:** Renders `<iframe>` pointing to widget URL (interactive)
 - **Structure:**
+
   ```tsx
   function WidgetDisplay({ sessionId, connectionId, baseUrl, screencastAspectStyle }) {
     const { mode } = useInspectorMode();
@@ -268,6 +269,7 @@ _Depends on Phase 1. Most complex phase._
     );
   }
   ```
+
 - **Glow border:** CSS animation using `box-shadow` or `outline` with pulsing keyframes. Define in `keyframes.css` (already exists) or inject via `<style>`.
 - **Critical:** The iframe must NOT unmount when switching modes (would kill session). Use CSS `pointerEvents: "none"` + overlay to "disable" it visually in agent mode.
 
