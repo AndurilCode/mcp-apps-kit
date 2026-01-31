@@ -485,6 +485,11 @@ export async function handleDashboardRequest(
       res.end(JSON.stringify({ error: "No active connection" }));
       return true;
     }
+    if (!cm.hasWidgetServer()) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "No widget server available" }));
+      return true;
+    }
     const sessionMgr = cm.getWidgetSessionManager();
     const session = sessionMgr.getSession(sessionId);
     if (!session) {
@@ -813,74 +818,75 @@ export async function handleDashboardRequest(
         return true;
       }
       const toolArgs = body.arguments;
+      const toolName = body.toolName;
       const start = Date.now();
-      const result = await cm.getClient().callTool(body.toolName, toolArgs);
+      const result = await cm.getClient().callTool(toolName, toolArgs);
       const duration = Date.now() - start;
 
-      // Try to render widget session if tool has a UI resource
-      let sessionId: string | undefined;
-      try {
-        const rawClient = cm.getClient().raw;
-        const uiResource = await findUIResourceForTool(rawClient, body.toolName);
-        if (uiResource) {
-          const html = await fetchWidgetHTML(rawClient, uiResource.uri);
-          if (html) {
-            const sharedWidgetServer = await cm.getWidgetServer();
-            const uiHostManager = new UIHostManager(cm.getClient(), { sharedWidgetServer });
-            const environmentState = cm.getEnvironmentState();
-            const viewport = environmentState.viewport;
-            const inspectorUrl = cm.getInspectorUrl();
-
-            const toolResult = extractToolResult(result as MCPCallToolResponse);
-
-            const renderResult = await uiHostManager.renderInBrowser(
-              html,
-              uiResource.protocol,
-              toolResult,
-              body.toolName,
-              toolArgs,
-              environmentState,
-              viewport,
-              undefined,
-              inspectorUrl ?? undefined
-            );
-
-            const pageUrl = renderResult.page.url();
-            const urlMatch = pageUrl.match(/\/host\/([a-f0-9-]+)/);
-            const widgetSessionId = urlMatch?.[1];
-
-            if (widgetSessionId) {
-              const widgetServerTouch = uiHostManager.createSessionTouchCallback(widgetSessionId);
-              const sessionManager = cm.getWidgetSessionManager();
-              const session = await sessionManager.createSession(
-                body.toolName,
-                toolArgs,
-                toolResult,
-                renderResult.page,
-                widgetSessionId,
-                uiResource.protocol,
-                "agent",
-                undefined,
-                widgetServerTouch
-              );
-              sessionId = session.id;
-            }
-          }
-        }
-      } catch (widgetError) {
-        // Widget rendering failed, but tool call succeeded — continue without session
-        console.warn("[dashboard/execute-tool] Widget rendering failed:", widgetError);
-      }
-
+      // Return tool result immediately — widget rendering happens in background
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(
         JSON.stringify({
           content: result.content,
           isError: !!result.isError,
+          structuredContent: result.structuredContent,
           duration,
-          sessionId,
         })
       );
+
+      // Fire-and-forget: render widget session in background if tool has a UI resource
+      void (async () => {
+        try {
+          const rawClient = cm.getClient().raw;
+          const uiResource = await findUIResourceForTool(rawClient, toolName);
+          if (uiResource) {
+            const html = await fetchWidgetHTML(rawClient, uiResource.uri);
+            if (html) {
+              const sharedWidgetServer = await cm.getWidgetServer();
+              const uiHostManager = new UIHostManager(cm.getClient(), { sharedWidgetServer });
+              const environmentState = cm.getEnvironmentState();
+              const viewport = environmentState.viewport;
+              const inspectorUrl = cm.getInspectorUrl();
+
+              const toolResult = extractToolResult(result as MCPCallToolResponse);
+
+              const renderResult = await uiHostManager.renderInBrowser(
+                html,
+                uiResource.protocol,
+                toolResult,
+                toolName,
+                toolArgs,
+                environmentState,
+                viewport,
+                undefined,
+                inspectorUrl ?? undefined
+              );
+
+              const pageUrl = renderResult.page.url();
+              const urlMatch = pageUrl.match(/\/host\/([a-f0-9-]+)/);
+              const widgetSessionId = urlMatch?.[1];
+
+              if (widgetSessionId) {
+                const widgetServerTouch = uiHostManager.createSessionTouchCallback(widgetSessionId);
+                const sessionManager = cm.getWidgetSessionManager();
+                await sessionManager.createSession(
+                  toolName,
+                  toolArgs,
+                  toolResult,
+                  renderResult.page,
+                  widgetSessionId,
+                  uiResource.protocol,
+                  "agent",
+                  undefined,
+                  widgetServerTouch
+                );
+              }
+            }
+          }
+        } catch (widgetError) {
+          console.warn("[dashboard/execute-tool] Background widget rendering failed:", widgetError);
+        }
+      })();
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       res.writeHead(500, { "Content-Type": "application/json" });

@@ -6,7 +6,7 @@
  * with full interactive capabilities — distinct from the read-only McpPrimitivesPanel.
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import type { McpTool, McpResource, McpPrompt } from "../types/mcp-primitives";
 import { ToolExecutor } from "./ToolExecutor";
 import { ResourceBrowser } from "./ResourceBrowser";
@@ -246,6 +246,11 @@ function ListItem({
   onClick: () => void;
 }): React.ReactElement {
   const [isHovered, setIsHovered] = useState(false);
+
+  // Reset hover state when active state changes to avoid stale visual artifacts
+  useEffect(() => {
+    setIsHovered(false);
+  }, [isActive]);
 
   return (
     <div

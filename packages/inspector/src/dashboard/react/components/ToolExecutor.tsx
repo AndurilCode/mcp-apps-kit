@@ -370,11 +370,17 @@ export function ToolExecutor({
   baseUrl,
   connectionId,
 }: ToolExecutorProps): React.ReactElement {
-  const { execute, isExecuting, lastResult, error } = useToolExecutor(baseUrl, connectionId);
+  const { execute, isExecuting, lastResult, error, clearResult } = useToolExecutor(
+    baseUrl,
+    connectionId
+  );
   const [formValues, setFormValues] = useState<Record<string, unknown>>({});
+  const [showStructured, setShowStructured] = useState(false);
 
-  // Reset form when tool changes
+  // Reset form and result when tool changes
   useEffect(() => {
+    clearResult();
+    setShowStructured(false);
     const defaults: Record<string, unknown> = {};
     const properties = tool.inputSchema?.properties ?? {};
     for (const [name, prop] of Object.entries(properties)) {
@@ -497,11 +503,46 @@ export function ToolExecutor({
                     ...(lastResult.isError ? localStyles.resultErrorText : {}),
                   }}
                 >
-                  {block.text ?? JSON.stringify(block, null, 2)}
+                  {(() => {
+                    const text = block.text ?? JSON.stringify(block, null, 2);
+                    try {
+                      const parsed = JSON.parse(text);
+                      return JSON.stringify(parsed, null, 2);
+                    } catch {
+                      return text;
+                    }
+                  })()}
                 </pre>
               </div>
             );
           })}
+
+          {/* Structured Content (collapsible) */}
+          {lastResult.structuredContent != null && (
+            <div>
+              <button
+                style={{
+                  ...localStyles.executeBtn,
+                  backgroundColor: "transparent",
+                  color: "#9ca3af",
+                  border: "1px solid #2d2f2f",
+                  padding: "0.375rem 0.75rem",
+                  fontSize: "0.625rem",
+                  fontWeight: 500,
+                }}
+                onClick={() => setShowStructured((v) => !v)}
+              >
+                {showStructured ? "▾" : "▸"} Structured Content
+              </button>
+              {showStructured && (
+                <div style={{ ...localStyles.resultBlock, marginTop: "0.25rem" }}>
+                  <pre style={localStyles.resultText}>
+                    {JSON.stringify(lastResult.structuredContent, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

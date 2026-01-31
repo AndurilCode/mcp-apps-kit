@@ -20,6 +20,7 @@ export interface ToolExecutionResult {
   }>;
   isError: boolean;
   duration: number;
+  structuredContent?: unknown;
 }
 
 export interface UseToolExecutorResult {
@@ -27,6 +28,7 @@ export interface UseToolExecutorResult {
   isExecuting: boolean;
   lastResult: ToolExecutionResult | null;
   error: string | null;
+  clearResult: () => void;
 }
 
 // =============================================================================
@@ -40,6 +42,11 @@ export function useToolExecutor(
   const [isExecuting, setIsExecuting] = useState(false);
   const [lastResult, setLastResult] = useState<ToolExecutionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const clearResult = useCallback(() => {
+    setLastResult(null);
+    setError(null);
+  }, []);
 
   const execute = useCallback(
     async (toolName: string, args: Record<string, unknown>): Promise<void> => {
@@ -74,5 +81,5 @@ export function useToolExecutor(
     [baseUrl, connectionId]
   );
 
-  return { execute, isExecuting, lastResult, error };
+  return { execute, isExecuting, lastResult, error, clearResult };
 }
