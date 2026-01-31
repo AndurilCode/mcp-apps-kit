@@ -15,6 +15,7 @@ import {
   findUIResourceForTool,
   fetchWidgetHTML,
   resolveProtocol,
+  assertAgentMode,
 } from "./helpers";
 
 const interactionActionSchema = z.object({
@@ -111,6 +112,8 @@ export function createTestWidgetInteractionTool(registry: ConnectionRegistry) {
     input: testWidgetInteractionInputSchema,
     output: testWidgetInteractionOutputSchema,
     handler: async (input): Promise<TestWidgetInteractionOutput> => {
+      const modeCheck = assertAgentMode();
+      if (modeCheck.blocked) return modeCheck.result;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const snapshots: Array<{ afterAction: number; dom: string; textContent: string }> = [];
       const toolCalls: Array<{ name: string; args: unknown }> = [];

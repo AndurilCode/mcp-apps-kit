@@ -6,6 +6,33 @@
  */
 
 import { MCP_WIDGET_MIME_TYPE, OPENAI_WIDGET_MIME_TYPE } from "@mcp-apps-kit/core";
+import { getDashboardMode } from "../dashboard/dashboard-server";
+
+/**
+ * Assert that the dashboard is in agent mode.
+ * Returns a blocked result with an error message if in human mode.
+ *
+ * The result shape includes content/isError/error/duration fields that are
+ * serialized as a standard MCP error response. The return type uses `any`
+ * so the guard can be used in handlers with different output type signatures.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function assertAgentMode(): { blocked: true; result: any } | { blocked: false } {
+  if (getDashboardMode() === "human") {
+    const message =
+      "Inspector is in Human mode. Tool calls are unavailable until the user switches to Agent mode.";
+    return {
+      blocked: true,
+      result: {
+        content: [{ type: "text" as const, text: message }],
+        isError: true as const,
+        error: { code: "HUMAN_MODE", message },
+        duration: 0 as const,
+      },
+    };
+  }
+  return { blocked: false };
+}
 import type { Frame, Locator } from "playwright";
 import type { SemanticLocatorOptions, WaitForStabilityOptions, ToolHints } from "../types";
 import type { ActiveWidgetSession, WidgetSessionManager } from "../widget-session-manager";

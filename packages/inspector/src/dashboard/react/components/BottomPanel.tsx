@@ -13,6 +13,7 @@
 import React, { useCallback, useMemo } from "react";
 import type { LogEntry } from "../hooks/useLogStream";
 import type { InspectorEvent, AgnosticInspectorEvent } from "../../../types";
+import { useInspectorMode } from "../contexts";
 import { styles } from "../styles";
 import { LogsPanel } from "./LogsPanel";
 import { EventsPanel } from "./EventsPanel";
@@ -50,6 +51,8 @@ export interface BottomPanelProps {
   panelVisibility: PanelVisibility;
   /** Callback to toggle a panel's visibility */
   onTogglePanel: (panel: keyof PanelVisibility) => void;
+  /** Whether a widget session is active (controls logs panel availability) */
+  hasActiveSession: boolean;
 }
 
 export function BottomPanel({
@@ -64,7 +67,10 @@ export function BottomPanel({
   onToggleCollapse,
   panelVisibility,
   onTogglePanel,
+  hasActiveSession,
 }: BottomPanelProps): React.ReactElement {
+  const { mode } = useInspectorMode();
+
   const handleClearAll = useCallback(() => {
     onClearLogs();
     onClearEvents();
@@ -76,20 +82,30 @@ export function BottomPanel({
     ...(isActive ? (styles.viewModeBtnActive as React.CSSProperties) : {}),
   });
 
-  // Count visible panels
+  // Compute effective visibility: respects stored prefs but gates on mode/session
+  const effectiveVisibility = useMemo(
+    () => ({
+      logs: panelVisibility.logs && hasActiveSession,
+      events: panelVisibility.events,
+      agent: panelVisibility.agent && mode === "agent",
+    }),
+    [panelVisibility, hasActiveSession, mode]
+  );
+
+  // Count visible panels using effective visibility
   const visiblePanelCount = useMemo(() => {
     let count = 0;
-    if (panelVisibility.logs) count++;
-    if (panelVisibility.events) count++;
-    if (panelVisibility.agent) count++;
+    if (effectiveVisibility.logs) count++;
+    if (effectiveVisibility.events) count++;
+    if (effectiveVisibility.agent) count++;
     return count;
-  }, [panelVisibility]);
+  }, [effectiveVisibility]);
 
-  // Render visible panels
+  // Render visible panels (uses effectiveVisibility)
   const renderPanels = useCallback(() => {
     const panels: React.ReactNode[] = [];
 
-    if (panelVisibility.logs) {
+    if (effectiveVisibility.logs) {
       panels.push(
         <div key="logs" style={styles.splitPane as React.CSSProperties}>
           <LogsPanel logs={logs} onClearLogs={onClearLogs} showHeader={visiblePanelCount > 1} />
@@ -97,7 +113,7 @@ export function BottomPanel({
       );
     }
 
-    if (panelVisibility.events) {
+    if (effectiveVisibility.events) {
       if (panels.length > 0) {
         panels.push(<div key="divider1" style={styles.splitDivider as React.CSSProperties} />);
       }
@@ -112,7 +128,7 @@ export function BottomPanel({
       );
     }
 
-    if (panelVisibility.agent) {
+    if (effectiveVisibility.agent) {
       if (panels.length > 0) {
         panels.push(<div key="divider2" style={styles.splitDivider as React.CSSProperties} />);
       }
@@ -129,7 +145,7 @@ export function BottomPanel({
 
     return panels;
   }, [
-    panelVisibility,
+    effectiveVisibility,
     logs,
     events,
     agentEvents,
@@ -144,13 +160,15 @@ export function BottomPanel({
       {/* Header - always visible */}
       <div style={styles.logsHeader}>
         <div style={styles.viewModeSelector as React.CSSProperties}>
-          <button
-            style={getToggleBtnStyle(panelVisibility.logs)}
-            onClick={() => onTogglePanel("logs")}
-            title={panelVisibility.logs ? "Hide logs panel" : "Show logs panel"}
-          >
-            Logs ({logs.length})
-          </button>
+          {hasActiveSession && (
+            <button
+              style={getToggleBtnStyle(panelVisibility.logs)}
+              onClick={() => onTogglePanel("logs")}
+              title={panelVisibility.logs ? "Hide logs panel" : "Show logs panel"}
+            >
+              Logs ({logs.length})
+            </button>
+          )}
           <button
             style={getToggleBtnStyle(panelVisibility.events)}
             onClick={() => onTogglePanel("events")}
@@ -158,13 +176,15 @@ export function BottomPanel({
           >
             Events ({events.length})
           </button>
-          <button
-            style={getToggleBtnStyle(panelVisibility.agent)}
-            onClick={() => onTogglePanel("agent")}
-            title={panelVisibility.agent ? "Hide agent panel" : "Show agent panel"}
-          >
-            Agent ({agentEvents.length})
-          </button>
+          {mode === "agent" && (
+            <button
+              style={getToggleBtnStyle(panelVisibility.agent)}
+              onClick={() => onTogglePanel("agent")}
+              title={panelVisibility.agent ? "Hide agent panel" : "Show agent panel"}
+            >
+              Agent ({agentEvents.length})
+            </button>
+          )}
         </div>
         <div style={styles.logsControls}>
           <button style={styles.clearLogsBtn} onClick={handleClearAll}>

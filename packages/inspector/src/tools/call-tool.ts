@@ -11,6 +11,7 @@ import {
   findUIResourceForTool,
   fetchWidgetHTML,
   extractToolResult,
+  assertAgentMode,
   type MCPCallToolResponse,
 } from "./helpers";
 
@@ -62,6 +63,8 @@ export function createCallToolTool(registry: ConnectionRegistry) {
     input: callToolInputSchema,
     output: callToolOutputSchema,
     handler: async (input): Promise<CallToolOutput> => {
+      const modeCheck = assertAgentMode();
+      if (modeCheck.blocked) return modeCheck.result;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const client = connectionManager.getClient();
       const startTime = Date.now();

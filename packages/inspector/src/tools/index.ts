@@ -64,6 +64,9 @@ export { createWidgetQueryTool } from "./widget-query";
 // Widget snapshot diff tool (compare accessibility snapshots)
 export { createWidgetSnapshotDiffTool } from "./widget-snapshot-diff";
 
+// Agent takeover tool (request control from human mode)
+export { createRequestTakeoverTool } from "./request-takeover";
+
 // Helper exports (for advanced usage)
 export {
   resolveLocator,

@@ -15,7 +15,7 @@ import type {
   WidgetDOMSnapshot,
   ToolHints,
 } from "../types";
-import { validateWidgetSession } from "./helpers";
+import { validateWidgetSession, assertAgentMode } from "./helpers";
 
 // =============================================================================
 // SCHEMAS
@@ -233,6 +233,8 @@ export function createWidgetSnapshotTool(registry: ConnectionRegistry) {
     input: widgetSnapshotInputSchema,
     output: widgetSnapshotOutputSchema,
     handler: async (input): Promise<WidgetSnapshotOutput> => {
+      const modeCheck = assertAgentMode();
+      if (modeCheck.blocked) return modeCheck.result;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const validation = validateWidgetSession(sessionManager, input.sessionId);

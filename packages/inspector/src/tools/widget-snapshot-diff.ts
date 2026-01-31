@@ -16,7 +16,7 @@ import type {
   SnapshotDiffSummary,
   WidgetSnapshotDiffOutput,
 } from "../types";
-import { validateWidgetSession } from "./helpers";
+import { validateWidgetSession, assertAgentMode } from "./helpers";
 
 // =============================================================================
 // SCHEMAS
@@ -290,6 +290,8 @@ export function createWidgetSnapshotDiffTool(registry: ConnectionRegistry) {
     input: widgetSnapshotDiffInputSchema,
     output: widgetSnapshotDiffOutputSchema,
     handler: async (input): Promise<WidgetSnapshotDiffOutput> => {
+      const modeCheck = assertAgentMode();
+      if (modeCheck.blocked) return modeCheck.result;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const validation = validateWidgetSession(sessionManager, input.sessionId);

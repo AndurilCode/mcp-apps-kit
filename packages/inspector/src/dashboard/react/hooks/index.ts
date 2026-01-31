@@ -43,3 +43,22 @@ export {
   type DashboardConnectionStatus,
   type UseConnectionsResult,
 } from "./useConnections";
+export { useWidgetUrl, type UseWidgetUrlResult } from "./useWidgetUrl";
+export {
+  useToolExecutor,
+  type ToolExecutionResult,
+  type UseToolExecutorResult,
+} from "./useToolExecutor";
+export {
+  useResourceReader,
+  type ResourceContent,
+  type ResourceReadResult,
+  type UseResourceReaderResult,
+} from "./useResourceReader";
+export {
+  usePromptRunner,
+  type PromptMessage,
+  type PromptRunResult,
+  type UsePromptRunnerResult,
+} from "./usePromptRunner";
+export { useTakeoverStream, type UseTakeoverStreamResult } from "./useTakeoverStream";

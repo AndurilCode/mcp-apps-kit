@@ -18,6 +18,7 @@ import {
   findUIResourceForTool,
   fetchWidgetHTML,
   resolveProtocol,
+  assertAgentMode,
 } from "./helpers";
 
 export const screenshotWidgetInputSchema = z.object({
@@ -71,6 +72,8 @@ export function createScreenshotWidgetTool(registry: ConnectionRegistry) {
     input: screenshotWidgetInputSchema,
     output: screenshotWidgetOutputSchema,
     handler: async (input): Promise<ScreenshotWidgetOutput> => {
+      const modeCheck = assertAgentMode();
+      if (modeCheck.blocked) return modeCheck.result;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const format = input.format ?? "png";
       const viewport = input.viewport ?? { width: 800, height: 600 };

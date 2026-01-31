@@ -22,7 +22,12 @@ import { ConnectionBar } from "./components/ConnectionBar";
 import { TabBar } from "./components/TabBar";
 import { GlobalsPanel } from "./components/GlobalsPanel";
 import { McpPrimitivesPanel } from "./components/McpPrimitivesPanel";
+import { HumanPanel } from "./components/HumanPanel";
 import { BottomPanel, type PanelVisibility } from "./components/BottomPanel";
+import { ModeToggle } from "./components/ModeToggle";
+import { WidgetDisplay } from "./components/WidgetDisplay";
+import { AgentTakeoverDialog } from "./components/AgentTakeoverDialog";
+import { InspectorModeProvider, useInspectorMode } from "./contexts";
 import { styles } from "./styles";
 import logoUrl from "../assets/logo.png";
 
@@ -52,6 +57,146 @@ interface CachedConnectionState {
   globals: GlobalsState | null;
   primitives: McpPrimitives | null;
 }
+
+// =============================================================================
+// Mode-aware sub-components (must be rendered inside InspectorModeProvider)
+// =============================================================================
+
+/**
+ * Left panel that switches between McpPrimitivesPanel (agent) and HumanPanel (human).
+ */
+function ModeAwareLeftPanel({
+  hasActiveSession,
+  tools,
+  resources,
+  prompts,
+  primitivesLoading,
+  isLeftPanelCollapsed,
+  onToggleCollapse,
+  leftPanelWidth,
+  leftResizeHandleProps,
+  isLeftResizing,
+  baseUrl,
+  connectionId,
+}: {
+  hasActiveSession: boolean;
+  tools: import("./hooks/useMcpPrimitives").McpTool[];
+  resources: import("./hooks/useMcpPrimitives").McpResource[];
+  prompts: import("./hooks/useMcpPrimitives").McpPrompt[];
+  primitivesLoading: boolean;
+  isLeftPanelCollapsed: boolean;
+  onToggleCollapse: () => void;
+  leftPanelWidth: number;
+  leftResizeHandleProps: React.HTMLAttributes<HTMLDivElement>;
+  isLeftResizing: boolean;
+  baseUrl: string;
+  connectionId: string | null;
+}): React.ReactElement | null {
+  const { mode } = useInspectorMode();
+
+  if (!hasActiveSession) return null;
+
+  if (mode === "human") {
+    return (
+      <HumanPanel
+        tools={tools}
+        resources={resources}
+        prompts={prompts}
+        isLoading={primitivesLoading}
+        baseUrl={baseUrl}
+        connectionId={connectionId}
+      />
+    );
+  }
+
+  return (
+    <McpPrimitivesPanel
+      tools={tools}
+      resources={resources}
+      prompts={prompts}
+      isLoading={primitivesLoading}
+      isVisible={true}
+      isCollapsed={isLeftPanelCollapsed}
+      onToggleCollapse={onToggleCollapse}
+      position="left"
+      panelWidth={leftPanelWidth}
+      resizeHandleProps={leftResizeHandleProps}
+      isResizing={isLeftResizing}
+    />
+  );
+}
+
+/**
+ * Main content area that switches between WidgetDisplay, HumanPanel, or McpPrimitivesPanel.
+ */
+function ModeAwareMainContent({
+  hasActiveSession,
+  selectedSessionId,
+  baseUrl,
+  connectionId,
+  isStreaming,
+  screencastAspectStyle,
+  tools,
+  resources,
+  prompts,
+  primitivesLoading,
+}: {
+  hasActiveSession: boolean;
+  selectedSessionId: string | null;
+  baseUrl: string;
+  connectionId: string | null;
+  isStreaming: boolean;
+  screencastAspectStyle: React.CSSProperties;
+  tools: import("./hooks/useMcpPrimitives").McpTool[];
+  resources: import("./hooks/useMcpPrimitives").McpResource[];
+  prompts: import("./hooks/useMcpPrimitives").McpPrompt[];
+  primitivesLoading: boolean;
+}): React.ReactElement {
+  const { mode } = useInspectorMode();
+
+  if (hasActiveSession) {
+    return (
+      <WidgetDisplay
+        baseUrl={baseUrl}
+        sessionId={selectedSessionId!}
+        connectionId={connectionId}
+        screencastAspectStyle={{
+          ...styles.displayContainer,
+          ...(isStreaming ? styles.displayContainerStreaming : {}),
+          ...(isStreaming ? screencastAspectStyle : {}),
+        }}
+      />
+    );
+  }
+
+  if (mode === "human") {
+    return (
+      <HumanPanel
+        tools={tools}
+        resources={resources}
+        prompts={prompts}
+        isLoading={primitivesLoading}
+        baseUrl={baseUrl}
+        connectionId={connectionId}
+      />
+    );
+  }
+
+  return (
+    <McpPrimitivesPanel
+      tools={tools}
+      resources={resources}
+      prompts={prompts}
+      isLoading={primitivesLoading}
+      isVisible={true}
+      position="center"
+    />
+  );
+}
+
+// =============================================================================
+// Main Dashboard Component
+// =============================================================================
 
 export function InspectorDashboard({
   baseUrl = "",
@@ -131,7 +276,6 @@ export function InspectorDashboard({
   const displayLogs = logs.length > 0 ? logs : (cachedState?.logs ?? []);
   const displayAgentEvents =
     agentEvents.length > 0 ? agentEvents : (cachedState?.agentEvents ?? []);
-  const displayImageData = imageData ?? cachedState?.screencastImage ?? null;
   const displayGlobals = globals ?? cachedState?.globals ?? null;
   const displayTools = tools.length > 0 ? tools : (cachedState?.primitives?.tools ?? []);
   const displayResources =
@@ -398,8 +542,9 @@ export function InspectorDashboard({
           : "Disconnected"
     : "Disconnected";
 
-  // Determine if UI session is active (has screencast)
-  const hasActiveSession = !!selectedSessionId && !!displayImageData;
+  // Determine if UI session is active (selected session exists — in human mode
+  // there may be no screencast data, so we don't require displayImageData)
+  const hasActiveSession = !!selectedSessionId;
 
   // Inject keyframe animation for streaming border
   const keyframeStyles = useMemo(
@@ -433,177 +578,167 @@ export function InspectorDashboard({
   }, [keyframeStyles]);
 
   return (
-    <div style={styles.root}>
-      {/* Header */}
-      <header style={styles.header}>
-        <div style={styles.headerLeft}>
-          <img src={logoUrl} alt="MCP Agent Inspector" style={styles.logo} />
-          <h1 style={styles.title}>MCP Agent Inspector</h1>
-        </div>
+    <InspectorModeProvider baseUrl={baseUrl}>
+      <div style={styles.root}>
+        {/* Header */}
+        <header style={styles.header}>
+          <div style={styles.headerLeft}>
+            <img src={logoUrl} alt="MCP Agent Inspector" style={styles.logo} />
+            <h1 style={styles.title}>MCP Agent Inspector</h1>
+          </div>
 
-        {/* Connection Bar */}
-        <ConnectionBar
-          isOpen={isConnectionFormOpen}
-          isCreating={isCreating}
-          error={connectionError}
-          onCreateConnection={handleCreateConnection}
-          onClose={() => setIsConnectionFormOpen(false)}
-          getMatchingEntries={getMatchingEntries}
-        />
+          {/* Connection Bar */}
+          <ConnectionBar
+            isOpen={isConnectionFormOpen}
+            isCreating={isCreating}
+            error={connectionError}
+            onCreateConnection={handleCreateConnection}
+            onClose={() => setIsConnectionFormOpen(false)}
+            getMatchingEntries={getMatchingEntries}
+          />
 
-        <div style={styles.headerRight}>
-          <div style={styles.controls}>
-            {displaySessions.length > 0 && (
-              <select
-                id="session-select"
-                style={{
-                  ...styles.select,
-                  ...(displaySessions.length === 1 ? styles.selectSingleSession : {}),
-                }}
-                value={selectedSessionId || ""}
-                onChange={handleSessionChange}
-                disabled={sessionsLoading || displaySessions.length <= 1}
-              >
-                {displaySessions.map((session) => (
-                  <option key={session.id} value={session.id}>
-                    {session.toolName} ({session.id.slice(0, 8)}...)
-                  </option>
-                ))}
-              </select>
-            )}
-            <div
-              style={{
-                ...styles.statusWrapper,
-                ...(isStreaming ? styles.statusWrapperStreaming : {}),
-              }}
-            >
-              <div style={styles.statusInner}>
-                <span
+          <div style={styles.headerRight}>
+            <div style={styles.controls}>
+              {displaySessions.length > 0 && (
+                <select
+                  id="session-select"
                   style={{
-                    ...styles.statusDot,
-                    ...(status === "streaming"
-                      ? styles.statusDotStreaming
-                      : activeConnection?.status === "connected"
-                        ? styles.statusDotConnected
-                        : styles.statusDotDisconnected),
+                    ...styles.select,
+                    ...(displaySessions.length === 1 ? styles.selectSingleSession : {}),
                   }}
-                />
-                <span>{status === "streaming" ? "Streaming" : connectionStatusLabel}</span>
+                  value={selectedSessionId || ""}
+                  onChange={handleSessionChange}
+                  disabled={sessionsLoading || displaySessions.length <= 1}
+                >
+                  {displaySessions.map((session) => (
+                    <option key={session.id} value={session.id}>
+                      {session.toolName} ({session.id.slice(0, 8)}...)
+                    </option>
+                  ))}
+                </select>
+              )}
+              <div
+                style={{
+                  ...styles.statusWrapper,
+                  ...(isStreaming ? styles.statusWrapperStreaming : {}),
+                }}
+              >
+                <div style={styles.statusInner}>
+                  <span
+                    style={{
+                      ...styles.statusDot,
+                      ...(status === "streaming"
+                        ? styles.statusDotStreaming
+                        : activeConnection?.status === "connected"
+                          ? styles.statusDotConnected
+                          : styles.statusDotDisconnected),
+                    }}
+                  />
+                  <span>{status === "streaming" ? "Streaming" : connectionStatusLabel}</span>
+                </div>
               </div>
             </div>
+            <ModeToggle />
+            <Toolbar
+              isLogsPanelVisible={isBottomPanelVisible}
+              onToggleLogsPanel={toggleBottomPanel}
+              isGlobalsPanelVisible={isGlobalsPanelVisible}
+              onToggleGlobalsPanel={toggleGlobalsPanel}
+              isPrimitivesPanelVisible={!isLeftPanelCollapsed}
+              onTogglePrimitivesPanel={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)}
+              hasActiveSession={hasActiveSession}
+            />
           </div>
-          <Toolbar
-            isLogsPanelVisible={isBottomPanelVisible}
-            onToggleLogsPanel={toggleBottomPanel}
-            isGlobalsPanelVisible={isGlobalsPanelVisible}
-            onToggleGlobalsPanel={toggleGlobalsPanel}
-            isPrimitivesPanelVisible={!isLeftPanelCollapsed}
-            onTogglePrimitivesPanel={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)}
+        </header>
+
+        <TabBar
+          tabs={tabs}
+          activeTabId={activeConnectionId}
+          onSelect={(id) => setActiveConnectionId(id)}
+          onClose={(id) => void handleCloseConnection(id)}
+          onAdd={() => setIsConnectionFormOpen(true)}
+        />
+
+        {/* Error Banner */}
+        {error && <div style={styles.errorBanner}>{error}</div>}
+
+        {/* Content Wrapper - horizontal layout */}
+        <div style={styles.contentWrapper}>
+          {/* Left Panel - MCP Primitives (agent) or HumanPanel (human) when session active */}
+          <ModeAwareLeftPanel
             hasActiveSession={hasActiveSession}
-          />
-        </div>
-      </header>
-
-      <TabBar
-        tabs={tabs}
-        activeTabId={activeConnectionId}
-        onSelect={(id) => setActiveConnectionId(id)}
-        onClose={(id) => void handleCloseConnection(id)}
-        onAdd={() => setIsConnectionFormOpen(true)}
-      />
-
-      {/* Error Banner */}
-      {error && <div style={styles.errorBanner}>{error}</div>}
-
-      {/* Content Wrapper - horizontal layout */}
-      <div style={styles.contentWrapper}>
-        {/* Left Panel - MCP Primitives when session active */}
-        {hasActiveSession && (
-          <McpPrimitivesPanel
             tools={displayTools}
             resources={displayResources}
             prompts={displayPrompts}
-            isLoading={primitivesLoading}
-            isVisible={true}
-            isCollapsed={isLeftPanelCollapsed}
+            primitivesLoading={primitivesLoading}
+            isLeftPanelCollapsed={isLeftPanelCollapsed}
             onToggleCollapse={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)}
-            position="left"
-            panelWidth={leftPanelWidth}
-            resizeHandleProps={leftResizeHandleProps}
-            isResizing={isLeftResizing}
+            leftPanelWidth={leftPanelWidth}
+            leftResizeHandleProps={leftResizeHandleProps}
+            isLeftResizing={isLeftResizing}
+            baseUrl={baseUrl}
+            connectionId={activeConnectionId}
           />
-        )}
 
-        {/* Center Column - main content + bottom panel */}
-        <div style={styles.centerColumn}>
-          {/* Main Display */}
-          <main style={styles.main}>
-            {hasActiveSession ? (
-              /* Screencast when session is active */
-              <div
-                style={{
-                  ...styles.displayContainer,
-                  ...(isStreaming ? styles.displayContainerStreaming : {}),
-                  ...(isStreaming ? screencastAspectStyle : {}),
-                }}
-              >
-                <img
-                  src={displayImageData ?? ""}
-                  alt="Live browser view"
-                  style={styles.streamImage}
-                />
-              </div>
-            ) : (
-              /* MCP Primitives in center when no session */
-              <McpPrimitivesPanel
+          {/* Center Column - main content + bottom panel */}
+          <div style={styles.centerColumn}>
+            {/* Main Display */}
+            <main style={styles.main}>
+              <ModeAwareMainContent
+                hasActiveSession={hasActiveSession}
+                selectedSessionId={selectedSessionId}
+                baseUrl={baseUrl}
+                connectionId={activeConnectionId}
+                isStreaming={isStreaming}
+                screencastAspectStyle={screencastAspectStyle}
                 tools={displayTools}
                 resources={displayResources}
                 prompts={displayPrompts}
-                isLoading={primitivesLoading}
-                isVisible={true}
-                position="center"
+                primitivesLoading={primitivesLoading}
               />
-            )}
-          </main>
+            </main>
 
-          {/* Resize Handle */}
-          <div
-            {...resizeHandleProps}
-            style={{
-              ...styles.resizeHandle,
-              ...(isResizing ? styles.resizeHandleActive : {}),
-              ...(!isBottomPanelVisible ? styles.resizeHandleHidden : {}),
-            }}
-          />
-
-          {/* Bottom Panel (Logs + Events + Agent) */}
-          <div
-            style={{
-              ...styles.logsPanel,
-              height: isBottomPanelVisible ? (isPanelCollapsed ? 36 : panelHeight) : 0,
-              ...(!isBottomPanelVisible ? styles.logsPanelHidden : {}),
-            }}
-          >
-            <BottomPanel
-              logs={displayLogs}
-              events={displayEvents}
-              agentEvents={displayAgentEvents}
-              onClearLogs={clearLogs}
-              onClearEvents={clearEvents}
-              onClearAgentEvents={clearAgentEvents}
-              panelHeight={panelHeight}
-              isCollapsed={isPanelCollapsed}
-              onToggleCollapse={togglePanel}
-              panelVisibility={panelVisibility}
-              onTogglePanel={handleTogglePanel}
+            {/* Resize Handle */}
+            <div
+              {...resizeHandleProps}
+              style={{
+                ...styles.resizeHandle,
+                ...(isResizing ? styles.resizeHandleActive : {}),
+                ...(!isBottomPanelVisible ? styles.resizeHandleHidden : {}),
+              }}
             />
-          </div>
-        </div>
 
-        {/* Globals Panel - full height on the right */}
-        <GlobalsPanel globals={displayGlobals} isVisible={isGlobalsPanelVisible} />
+            {/* Bottom Panel (Logs + Events + Agent) */}
+            <div
+              style={{
+                ...styles.logsPanel,
+                height: isBottomPanelVisible ? (isPanelCollapsed ? 36 : panelHeight) : 0,
+                ...(!isBottomPanelVisible ? styles.logsPanelHidden : {}),
+              }}
+            >
+              <BottomPanel
+                logs={displayLogs}
+                events={displayEvents}
+                agentEvents={displayAgentEvents}
+                onClearLogs={clearLogs}
+                onClearEvents={clearEvents}
+                onClearAgentEvents={clearAgentEvents}
+                panelHeight={panelHeight}
+                isCollapsed={isPanelCollapsed}
+                onToggleCollapse={togglePanel}
+                panelVisibility={panelVisibility}
+                onTogglePanel={handleTogglePanel}
+                hasActiveSession={hasActiveSession}
+              />
+            </div>
+          </div>
+
+          {/* Globals Panel - full height on the right */}
+          <GlobalsPanel globals={displayGlobals} isVisible={isGlobalsPanelVisible} />
+        </div>
       </div>
-    </div>
+      <AgentTakeoverDialog />
+    </InspectorModeProvider>
   );
 }
 

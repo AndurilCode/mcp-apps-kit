@@ -9,18 +9,118 @@
  * - GET /dashboard/events?sessionId={id}&connectionId={id} - SSE event stream
  * - GET /dashboard/sessions?connectionId={id} - List active sessions (JSON)
  * - GET /dashboard/globals?connectionId={id} - Get current environment state (JSON)
+ * - GET /dashboard/widget-url?sessionId={id}&connectionId={id} - Get widget iframe URL (JSON)
  * - GET /mcp/primitives?connectionId={id} - Get MCP server primitives (tools, resources, prompts)
  */
 
 import type { IncomingMessage, ServerResponse } from "http";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import * as crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import type { ConnectionParams } from "@mcp-apps-kit/testing";
 import type { ConnectionManager } from "../connection";
 import type { ConnectionRegistry } from "../connection-registry";
 import type { InspectorEvent, AgnosticInspectorEvent } from "../types";
 import { CDPStreamer } from "./cdp-streamer";
+import { UIHostManager } from "../ui-host";
+import {
+  findUIResourceForTool,
+  fetchWidgetHTML,
+  extractToolResult,
+  type MCPCallToolResponse,
+} from "../tools/helpers";
+
+// ===== Dashboard Mode State =====
+
+/** Current dashboard mode — "agent" (default) or "human" */
+let dashboardMode: "human" | "agent" = "agent";
+
+/**
+ * Get the current dashboard mode.
+ *
+ * Exported for use by tool handlers (e.g. to block agent tool calls in human mode).
+ */
+export function getDashboardMode(): "human" | "agent" {
+  return dashboardMode;
+}
+
+// ===== Agent Takeover State =====
+
+/** Pending agent takeover request */
+let pendingTakeover: {
+  id: string;
+  agentId?: string;
+  reason?: string;
+  timestamp: number;
+} | null = null;
+
+/** Resolved takeover results (kept briefly so polling can retrieve the outcome) */
+let lastTakeoverResult: {
+  requestId: string;
+  allowed: boolean;
+  resolvedAt: number;
+} | null = null;
+
+/** SSE clients listening for takeover events */
+const takeoverSSEClients = new Set<ServerResponse>();
+
+/** Emit an event to all takeover SSE clients */
+function emitTakeoverEvent(event: string, data: unknown): void {
+  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const client of takeoverSSEClients) {
+    if (!client.writableEnded) {
+      client.write(payload);
+    }
+  }
+}
+
+/**
+ * Request agent takeover — callable from MCP tools (avoids HTTP overhead).
+ *
+ * Only valid when dashboard is in "human" mode.
+ */
+export function requestTakeover(
+  agentId?: string,
+  reason?: string
+): { requestId: string; status: "pending" } {
+  if (dashboardMode !== "human") {
+    throw new Error("Takeover requests are only valid in human mode");
+  }
+  if (pendingTakeover) {
+    throw new Error("A takeover request is already pending");
+  }
+  const id = crypto.randomUUID();
+  pendingTakeover = { id, agentId, reason, timestamp: Date.now() };
+  lastTakeoverResult = null;
+
+  emitTakeoverEvent("takeover-request", {
+    id,
+    agentId,
+    reason,
+    timestamp: pendingTakeover.timestamp,
+  });
+
+  return { requestId: id, status: "pending" };
+}
+
+/**
+ * Get the status of a takeover request by ID.
+ */
+export function getTakeoverStatus(
+  requestId: string
+): "pending" | "approved" | "denied" | "expired" {
+  // Check if it's the currently pending request
+  if (pendingTakeover && pendingTakeover.id === requestId) {
+    return "pending";
+  }
+  // Check resolved results
+  if (lastTakeoverResult && lastTakeoverResult.requestId === requestId) {
+    return lastTakeoverResult.allowed ? "approved" : "denied";
+  }
+  // Not found — expired or never existed
+  return "expired";
+}
 
 /**
  * Resolve a ConnectionManager from an optional connection ID.
@@ -108,7 +208,7 @@ export async function cleanupCDPStreamer(): Promise<void> {
  */
 function setCorsHeaders(res: ServerResponse): void {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
@@ -272,6 +372,255 @@ export async function handleDashboardRequest(
     return true;
   }
 
+  // ===== Dashboard mode endpoints =====
+
+  /**
+   * GET /dashboard/mode — return current dashboard mode.
+   */
+  if (pathname === "/dashboard/mode" && req.method === "GET") {
+    setCorsHeaders(res);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ mode: dashboardMode }));
+    return true;
+  }
+
+  /**
+   * PUT /dashboard/mode — update dashboard mode.
+   *
+   * Accepts: { mode: "human" | "agent" }
+   */
+  if (pathname === "/dashboard/mode" && req.method === "PUT") {
+    setCorsHeaders(res);
+    try {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(chunk as Buffer);
+      }
+      const body = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as Record<string, unknown>;
+      const newMode = body.mode;
+      if (newMode !== "human" && newMode !== "agent") {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: 'Invalid mode. Expected "human" or "agent".' }));
+        return true;
+      }
+      dashboardMode = newMode;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ mode: dashboardMode }));
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      const isBadInput = e instanceof SyntaxError;
+      res.writeHead(isBadInput ? 400 : 500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: message }));
+    }
+    return true;
+  }
+
+  /**
+   * OPTIONS /dashboard/mode — CORS preflight for mode endpoints.
+   */
+  if (pathname === "/dashboard/mode" && req.method === "OPTIONS") {
+    setCorsHeaders(res);
+    res.writeHead(204);
+    res.end();
+    return true;
+  }
+
+  // ===== Widget URL endpoint =====
+
+  /**
+   * GET /dashboard/widget-url?sessionId={id}&connectionId={id}
+   *
+   * Returns the direct URL for embedding a widget session in an iframe.
+   * Used by the dashboard to render interactive widget content in human mode.
+   */
+  if (pathname === "/dashboard/widget-url" && req.method === "GET") {
+    setCorsHeaders(res);
+    const sessionId = url.searchParams.get("sessionId");
+    if (!sessionId) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Missing sessionId parameter" }));
+      return true;
+    }
+    const connId = url.searchParams.get("connectionId");
+    const cm = resolveConnectionManager(connId, connectionManager, registry);
+    if (!cm) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "No active connection" }));
+      return true;
+    }
+    const sessionMgr = cm.getWidgetSessionManager();
+    const session = sessionMgr.getSession(sessionId);
+    if (!session) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Session not found" }));
+      return true;
+    }
+    try {
+      const widgetServer = await cm.getWidgetServer();
+      const port = widgetServer.getPort();
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ url: `http://127.0.0.1:${port}/host/${sessionId}` }));
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: `Failed to get widget server: ${message}` }));
+    }
+    return true;
+  }
+
+  /**
+   * OPTIONS /dashboard/widget-url — CORS preflight.
+   */
+  if (pathname === "/dashboard/widget-url" && req.method === "OPTIONS") {
+    setCorsHeaders(res);
+    res.writeHead(204);
+    res.end();
+    return true;
+  }
+
+  // ===== Agent Takeover endpoints =====
+
+  /**
+   * POST /dashboard/takeover-request — agent requests to take over from human mode.
+   */
+  if (pathname === "/dashboard/takeover-request" && req.method === "POST") {
+    setCorsHeaders(res);
+    if (dashboardMode !== "human") {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Takeover requests are only valid in human mode" }));
+      return true;
+    }
+    if (pendingTakeover) {
+      res.writeHead(409, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "A takeover request is already pending" }));
+      return true;
+    }
+    try {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(chunk as Buffer);
+      }
+      const body = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as Record<string, unknown>;
+      const result = requestTakeover(
+        body.agentId as string | undefined,
+        body.reason as string | undefined
+      );
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: message }));
+    }
+    return true;
+  }
+
+  /**
+   * PUT /dashboard/takeover-response — human responds to a pending takeover request.
+   */
+  if (pathname === "/dashboard/takeover-response" && req.method === "PUT") {
+    setCorsHeaders(res);
+    try {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(chunk as Buffer);
+      }
+      const body = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as Record<string, unknown>;
+      const requestId = body.requestId as string | undefined;
+      const allow = body.allow as boolean | undefined;
+
+      if (!requestId || typeof allow !== "boolean") {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Missing requestId or allow" }));
+        return true;
+      }
+      if (!pendingTakeover || pendingTakeover.id !== requestId) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "No matching pending takeover request" }));
+        return true;
+      }
+
+      // Resolve the takeover
+      lastTakeoverResult = { requestId, allowed: allow, resolvedAt: Date.now() };
+      if (allow) {
+        dashboardMode = "agent";
+      }
+      pendingTakeover = null;
+
+      emitTakeoverEvent("takeover-response", {
+        requestId,
+        allowed: allow,
+        mode: dashboardMode,
+      });
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ mode: dashboardMode, requestId, allowed: allow }));
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: message }));
+    }
+    return true;
+  }
+
+  /**
+   * GET /dashboard/takeover-stream — SSE stream for takeover events.
+   */
+  if (pathname === "/dashboard/takeover-stream" && req.method === "GET") {
+    setCorsHeaders(res);
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "Access-Control-Allow-Origin": "*",
+    });
+
+    // If there's a pending request, emit it immediately
+    if (pendingTakeover) {
+      res.write(
+        `event: takeover-request\ndata: ${JSON.stringify({
+          id: pendingTakeover.id,
+          agentId: pendingTakeover.agentId,
+          reason: pendingTakeover.reason,
+          timestamp: pendingTakeover.timestamp,
+        })}\n\n`
+      );
+    }
+
+    takeoverSSEClients.add(res);
+
+    // Keepalive every 30s
+    const keepalive = setInterval(() => {
+      if (!res.writableEnded) {
+        res.write(":keepalive\n\n");
+      }
+    }, 30_000);
+
+    const cleanup = (): void => {
+      clearInterval(keepalive);
+      takeoverSSEClients.delete(res);
+    };
+
+    req.on("close", cleanup);
+    req.on("error", cleanup);
+    return true;
+  }
+
+  /**
+   * OPTIONS preflights for takeover endpoints.
+   */
+  if (
+    (pathname === "/dashboard/takeover-request" ||
+      pathname === "/dashboard/takeover-response" ||
+      pathname === "/dashboard/takeover-stream") &&
+    req.method === "OPTIONS"
+  ) {
+    setCorsHeaders(res);
+    res.writeHead(204);
+    res.end();
+    return true;
+  }
+
   // GET /dashboard - Serve HTML
   if (pathname === "/dashboard" && req.method === "GET") {
     serveDashboardHtml(res);
@@ -373,6 +722,240 @@ export async function handleDashboardRequest(
     const connId = url.searchParams.get("connectionId");
     const cm = resolveConnectionManager(connId, connectionManager, registry);
     await serveMcpPrimitives(res, cm);
+    return true;
+  }
+
+  // ===== Human-mode execution endpoints =====
+
+  /**
+   * POST /dashboard/execute-tool — execute an MCP tool (human mode only).
+   *
+   * Body: { connectionId?: string, toolName: string, arguments: Record<string, unknown> }
+   */
+  if (pathname === "/dashboard/execute-tool" && req.method === "POST") {
+    setCorsHeaders(res);
+    if (getDashboardMode() !== "human") {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Tool execution is only available in human mode" }));
+      return true;
+    }
+    try {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(chunk as Buffer);
+      }
+      const body = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as Record<string, unknown>;
+      const toolName = body.toolName as string | undefined;
+      if (!toolName) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Missing toolName" }));
+        return true;
+      }
+      const cm = resolveConnectionManager(
+        (body.connectionId as string | undefined) ?? null,
+        connectionManager,
+        registry
+      );
+      if (!cm) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "No active connection" }));
+        return true;
+      }
+      const toolArgs = (body.arguments ?? {}) as Record<string, unknown>;
+      const start = Date.now();
+      const result = await cm.getClient().callTool(toolName, toolArgs);
+      const duration = Date.now() - start;
+
+      // Try to render widget session if tool has a UI resource
+      let sessionId: string | undefined;
+      try {
+        const rawClient = cm.getClient().raw;
+        const uiResource = await findUIResourceForTool(rawClient, toolName);
+        if (uiResource) {
+          const html = await fetchWidgetHTML(rawClient, uiResource.uri);
+          if (html) {
+            const sharedWidgetServer = await cm.getWidgetServer();
+            const uiHostManager = new UIHostManager(cm.getClient(), { sharedWidgetServer });
+            const environmentState = cm.getEnvironmentState();
+            const viewport = environmentState.viewport;
+            const inspectorUrl = cm.getInspectorUrl();
+
+            const toolResult = extractToolResult(result as MCPCallToolResponse);
+
+            const renderResult = await uiHostManager.renderInBrowser(
+              html,
+              uiResource.protocol,
+              toolResult,
+              toolName,
+              toolArgs,
+              environmentState,
+              viewport,
+              undefined,
+              inspectorUrl ?? undefined
+            );
+
+            const pageUrl = renderResult.page.url();
+            const urlMatch = pageUrl.match(/\/host\/([a-f0-9-]+)/);
+            const widgetSessionId = urlMatch?.[1];
+
+            if (widgetSessionId) {
+              const widgetServerTouch = uiHostManager.createSessionTouchCallback(widgetSessionId);
+              const sessionManager = cm.getWidgetSessionManager();
+              const session = await sessionManager.createSession(
+                toolName,
+                toolArgs,
+                toolResult,
+                renderResult.page,
+                widgetSessionId,
+                uiResource.protocol,
+                "agent",
+                undefined,
+                widgetServerTouch
+              );
+              sessionId = session.id;
+            }
+          }
+        }
+      } catch (widgetError) {
+        // Widget rendering failed, but tool call succeeded — continue without session
+        console.warn("[dashboard/execute-tool] Widget rendering failed:", widgetError);
+      }
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          content: result.content,
+          isError: !!result.isError,
+          duration,
+          sessionId,
+        })
+      );
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: message }));
+    }
+    return true;
+  }
+
+  /**
+   * OPTIONS /dashboard/execute-tool — CORS preflight.
+   */
+  if (pathname === "/dashboard/execute-tool" && req.method === "OPTIONS") {
+    setCorsHeaders(res);
+    res.writeHead(204);
+    res.end();
+    return true;
+  }
+
+  /**
+   * POST /dashboard/read-resource — read an MCP resource (human mode only).
+   *
+   * Body: { connectionId?: string, uri: string }
+   */
+  if (pathname === "/dashboard/read-resource" && req.method === "POST") {
+    setCorsHeaders(res);
+    if (getDashboardMode() !== "human") {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Resource reading is only available in human mode" }));
+      return true;
+    }
+    try {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(chunk as Buffer);
+      }
+      const body = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as Record<string, unknown>;
+      const uri = body.uri as string | undefined;
+      if (!uri) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Missing uri" }));
+        return true;
+      }
+      const cm = resolveConnectionManager(
+        (body.connectionId as string | undefined) ?? null,
+        connectionManager,
+        registry
+      );
+      if (!cm) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "No active connection" }));
+        return true;
+      }
+      const result = await cm.getClient().readResource(uri);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ contents: result.contents }));
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: message }));
+    }
+    return true;
+  }
+
+  /**
+   * OPTIONS /dashboard/read-resource — CORS preflight.
+   */
+  if (pathname === "/dashboard/read-resource" && req.method === "OPTIONS") {
+    setCorsHeaders(res);
+    res.writeHead(204);
+    res.end();
+    return true;
+  }
+
+  /**
+   * POST /dashboard/get-prompt — get an MCP prompt (human mode only).
+   *
+   * Body: { connectionId?: string, promptName: string, arguments?: Record<string, string> }
+   */
+  if (pathname === "/dashboard/get-prompt" && req.method === "POST") {
+    setCorsHeaders(res);
+    if (getDashboardMode() !== "human") {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Prompt execution is only available in human mode" }));
+      return true;
+    }
+    try {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(chunk as Buffer);
+      }
+      const body = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as Record<string, unknown>;
+      const promptName = body.promptName as string | undefined;
+      if (!promptName) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Missing promptName" }));
+        return true;
+      }
+      const cm = resolveConnectionManager(
+        (body.connectionId as string | undefined) ?? null,
+        connectionManager,
+        registry
+      );
+      if (!cm) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "No active connection" }));
+        return true;
+      }
+      const promptArgs = (body.arguments ?? {}) as Record<string, string>;
+      const result = await cm.getClient().getPrompt(promptName, promptArgs);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ messages: result.messages, description: result.description }));
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: message }));
+    }
+    return true;
+  }
+
+  /**
+   * OPTIONS /dashboard/get-prompt — CORS preflight.
+   */
+  if (pathname === "/dashboard/get-prompt" && req.method === "OPTIONS") {
+    setCorsHeaders(res);
+    res.writeHead(204);
+    res.end();
     return true;
   }
 

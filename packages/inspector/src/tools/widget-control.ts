@@ -29,6 +29,7 @@ import {
   describeLocatorStrategy,
   waitForDOMStability,
   validateWidgetSession,
+  assertAgentMode,
 } from "./helpers";
 
 // =============================================================================
@@ -54,6 +55,8 @@ export function createWidgetEvaluateTool(registry: ConnectionRegistry) {
     input: widgetEvaluateInputSchema,
     output: widgetEvaluateOutputSchema,
     handler: async (input): Promise<WidgetEvaluateOutput> => {
+      const modeCheck = assertAgentMode();
+      if (modeCheck.blocked) return modeCheck.result;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const session = sessionManager.getSession(input.sessionId);
@@ -165,6 +168,8 @@ export function createWidgetClickTool(registry: ConnectionRegistry) {
     input: widgetClickInputSchema,
     output: widgetClickOutputSchema,
     handler: async (input): Promise<WidgetClickOutput> => {
+      const modeCheck = assertAgentMode();
+      if (modeCheck.blocked) return modeCheck.result;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const validation = validateWidgetSession(sessionManager, input.sessionId);
@@ -315,6 +320,8 @@ export function createWidgetFillTool(registry: ConnectionRegistry) {
     input: widgetFillInputSchema,
     output: widgetFillOutputSchema,
     handler: async (input): Promise<WidgetFillOutput> => {
+      const modeCheck = assertAgentMode();
+      if (modeCheck.blocked) return modeCheck.result;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const validation = validateWidgetSession(sessionManager, input.sessionId);
@@ -509,6 +516,8 @@ export function createWidgetWaitForSelectorTool(registry: ConnectionRegistry) {
     input: widgetWaitForSelectorInputSchema,
     output: widgetWaitForSelectorOutputSchema,
     handler: async (input): Promise<WidgetWaitForSelectorOutput> => {
+      const modeCheck = assertAgentMode();
+      if (modeCheck.blocked) return modeCheck.result;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const session = sessionManager.getSession(input.sessionId);
@@ -597,6 +606,8 @@ export function createWidgetLocatorTool(registry: ConnectionRegistry) {
     input: widgetLocatorInputSchema,
     output: widgetLocatorOutputSchema,
     handler: async (input): Promise<WidgetLocatorOutput> => {
+      const modeCheck = assertAgentMode();
+      if (modeCheck.blocked) return modeCheck.result;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const session = sessionManager.getSession(input.sessionId);
@@ -724,6 +735,8 @@ export function createWidgetDragTool(registry: ConnectionRegistry) {
     input: widgetDragInputSchema,
     output: widgetDragOutputSchema,
     handler: async (input): Promise<WidgetDragOutput> => {
+      const modeCheck = assertAgentMode();
+      if (modeCheck.blocked) return modeCheck.result;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const session = sessionManager.getSession(input.sessionId);
@@ -892,6 +905,8 @@ export function createWidgetRefreshTool(registry: ConnectionRegistry) {
     input: widgetRefreshInputSchema,
     output: widgetRefreshOutputSchema,
     handler: async (input): Promise<WidgetRefreshOutput> => {
+      const modeCheck = assertAgentMode();
+      if (modeCheck.blocked) return modeCheck.result;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const session = sessionManager.getSession(input.sessionId);

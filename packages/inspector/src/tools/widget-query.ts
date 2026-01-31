@@ -9,7 +9,12 @@ import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
 import type { ConnectionRegistry } from "../connection-registry";
 import type { WidgetQueryOutput, QueryElementInfo, ToolHints } from "../types";
-import { hasLocatorOptions, describeLocatorStrategy, validateWidgetSession } from "./helpers";
+import {
+  hasLocatorOptions,
+  describeLocatorStrategy,
+  validateWidgetSession,
+  assertAgentMode,
+} from "./helpers";
 
 // =============================================================================
 // SCHEMAS
@@ -88,6 +93,8 @@ export function createWidgetQueryTool(registry: ConnectionRegistry) {
     input: widgetQueryInputSchema,
     output: widgetQueryOutputSchema,
     handler: async (input): Promise<WidgetQueryOutput> => {
+      const modeCheck = assertAgentMode();
+      if (modeCheck.blocked) return modeCheck.result;
       const connectionManager = registry.resolveConnection(input.connectionId);
       const sessionManager = connectionManager.getWidgetSessionManager();
       const validation = validateWidgetSession(sessionManager, input.sessionId);

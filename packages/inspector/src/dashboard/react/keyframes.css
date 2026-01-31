@@ -13,3 +13,12 @@
     background-position: 200% 50%;
   }
 }
+
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow: 0 0 8px 2px rgba(32, 178, 170, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 16px 4px rgba(32, 178, 170, 0.7);
+  }
+}
