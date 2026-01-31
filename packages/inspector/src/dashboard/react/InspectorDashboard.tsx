@@ -12,7 +12,6 @@ import { useLogStream, type LogEntry } from "./hooks/useLogStream";
 import { useEventStream } from "./hooks/useEventStream";
 import { useAgentEventStream } from "./hooks/useAgentEventStream";
 import type { InspectorEvent, AgnosticInspectorEvent } from "../../types";
-import { useResizablePanel } from "./hooks/useResizablePanel";
 import { useResizablePanelWidth } from "./hooks/useResizablePanelWidth";
 import { useGlobals, type GlobalsState } from "./hooks/useGlobals";
 import { useConnections } from "./hooks/useConnections";
@@ -22,26 +21,15 @@ import { ConnectionBar } from "./components/ConnectionBar";
 import { TabBar } from "./components/TabBar";
 import { GlobalsPanel } from "./components/GlobalsPanel";
 import { McpPrimitivesPanel } from "./components/McpPrimitivesPanel";
-import { BottomPanel, type PanelVisibility } from "./components/BottomPanel";
+import { RightPanel } from "./components/RightPanel";
+import { NoWidgetPlaceholder } from "./components/NoWidgetPlaceholder";
 import { styles } from "./styles";
 import logoUrl from "../assets/logo.png";
 
 export interface InspectorDashboardProps {
   /** Base URL for the inspector API (default: current origin) */
   baseUrl?: string;
-  /** Initial panel height in pixels (default: 200) */
-  initialPanelHeight?: number;
-  /** Minimum panel height in pixels (default: 100) */
-  minPanelHeight?: number;
 }
-
-const DEFAULT_PANEL_VISIBILITY: PanelVisibility = {
-  logs: true,
-  events: true,
-  agent: true,
-};
-
-const PANEL_VISIBILITY_STORAGE_KEY = "mcp-dashboard-panel-visibility";
 
 interface CachedConnectionState {
   sessions: SessionInfo[];
@@ -53,11 +41,7 @@ interface CachedConnectionState {
   primitives: McpPrimitives | null;
 }
 
-export function InspectorDashboard({
-  baseUrl = "",
-  initialPanelHeight = 200,
-  minPanelHeight = 100,
-}: InspectorDashboardProps): React.ReactElement {
+export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): React.ReactElement {
   // Connection state (includes actions and history)
   const {
     connections,
@@ -138,60 +122,31 @@ export function InspectorDashboard({
     resources.length > 0 ? resources : (cachedState?.primitives?.resources ?? []);
   const displayPrompts = prompts.length > 0 ? prompts : (cachedState?.primitives?.prompts ?? []);
 
-  // Left panel state (for MCP primitives when session is active)
+  // Left panel state (MCP primitives)
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
 
-  // Globals panel state (persisted)
-  const [isGlobalsPanelVisible, setIsGlobalsPanelVisible] = useState(() => {
+  // Right panel state (persisted)
+  const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(() => {
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("mcp-dashboard-globals-panel-visible");
-      return stored !== "false"; // Default to visible
-    }
-    return true;
-  });
-
-  // Bottom panel state (persisted)
-  const [isBottomPanelVisible, setIsBottomPanelVisible] = useState(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("mcp-dashboard-logs-panel-visible");
-      return stored !== "false"; // Default to visible
-    }
-    return true;
-  });
-
-  // Panel collapse state
-  const [isPanelCollapsed, setIsPanelCollapsed] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("mcp-dashboard-logs-panel-collapsed") === "true";
+      try {
+        return localStorage.getItem("mcp-dashboard-right-panel-collapsed") === "true";
+      } catch {
+        return false;
+      }
     }
     return false;
   });
 
-  // Panel visibility state (which panels are shown)
-  const [panelVisibility, setPanelVisibility] = useState<PanelVisibility>(() => {
+  // Globals bar state (persisted)
+  const [isGlobalsBarCollapsed, setIsGlobalsBarCollapsed] = useState(() => {
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem(PANEL_VISIBILITY_STORAGE_KEY);
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored) as Partial<PanelVisibility>;
-          return {
-            logs: parsed.logs ?? DEFAULT_PANEL_VISIBILITY.logs,
-            events: parsed.events ?? DEFAULT_PANEL_VISIBILITY.events,
-            agent: parsed.agent ?? DEFAULT_PANEL_VISIBILITY.agent,
-          };
-        } catch {
-          // Invalid JSON, use defaults
-        }
+      try {
+        return localStorage.getItem("mcp-dashboard-globals-bar-collapsed") === "true";
+      } catch {
+        return false;
       }
     }
-    return DEFAULT_PANEL_VISIBILITY;
-  });
-
-  const { panelHeight, resizeHandleProps, isResizing } = useResizablePanel({
-    initialHeight: initialPanelHeight,
-    minHeight: minPanelHeight,
-    storageKey: "mcp-dashboard-logs-panel-height",
-    disabled: isPanelCollapsed,
+    return false;
   });
 
   // Left panel (MCP primitives) width resize
@@ -205,6 +160,20 @@ export function InspectorDashboard({
     maxWidth: 600,
     storageKey: "mcp-dashboard-primitives-panel-width",
     disabled: isLeftPanelCollapsed,
+  });
+
+  // Right panel width resize
+  const {
+    panelWidth: rightPanelWidth,
+    resizeHandleProps: rightResizeHandleProps,
+    isResizing: isRightResizing,
+  } = useResizablePanelWidth({
+    initialWidth: 320,
+    minWidth: 240,
+    maxWidth: 520,
+    storageKey: "mcp-dashboard-right-panel-width",
+    disabled: isRightPanelCollapsed,
+    resizeDirection: "right",
   });
 
   // Auto-select first session when available
@@ -242,33 +211,27 @@ export function InspectorDashboard({
     }
   }, [displaySessions, activeConnectionId, selectedSessionByConnection, clearLogs, clearEvents]);
 
-  // Save collapsed state
+  // Save right panel collapsed state
   useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("mcp-dashboard-logs-panel-collapsed", String(isPanelCollapsed));
+      try {
+        localStorage.setItem("mcp-dashboard-right-panel-collapsed", String(isRightPanelCollapsed));
+      } catch {
+        // ignore storage access errors
+      }
     }
-  }, [isPanelCollapsed]);
+  }, [isRightPanelCollapsed]);
 
-  // Save globals panel visibility
+  // Save globals bar collapsed state
   useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("mcp-dashboard-globals-panel-visible", String(isGlobalsPanelVisible));
+      try {
+        localStorage.setItem("mcp-dashboard-globals-bar-collapsed", String(isGlobalsBarCollapsed));
+      } catch {
+        // ignore storage access errors
+      }
     }
-  }, [isGlobalsPanelVisible]);
-
-  // Save bottom panel visibility
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("mcp-dashboard-logs-panel-visible", String(isBottomPanelVisible));
-    }
-  }, [isBottomPanelVisible]);
-
-  // Save panel visibility state
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(PANEL_VISIBILITY_STORAGE_KEY, JSON.stringify(panelVisibility));
-    }
-  }, [panelVisibility]);
+  }, [isGlobalsBarCollapsed]);
 
   const handleSessionChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -314,23 +277,12 @@ export function InspectorDashboard({
     prevConnectionIdRef.current = activeConnectionId;
   }, [activeConnectionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const togglePanel = useCallback(() => {
-    setIsPanelCollapsed((prev) => !prev);
+  const toggleRightPanel = useCallback(() => {
+    setIsRightPanelCollapsed((prev) => !prev);
   }, []);
 
-  const toggleGlobalsPanel = useCallback(() => {
-    setIsGlobalsPanelVisible((prev) => !prev);
-  }, []);
-
-  const toggleBottomPanel = useCallback(() => {
-    setIsBottomPanelVisible((prev) => !prev);
-  }, []);
-
-  const handleTogglePanel = useCallback((panel: keyof PanelVisibility) => {
-    setPanelVisibility((prev) => ({
-      ...prev,
-      [panel]: !prev[panel],
-    }));
+  const toggleGlobalsBar = useCallback(() => {
+    setIsGlobalsBarCollapsed((prev) => !prev);
   }, []);
 
   const handleCreateConnection = useCallback(
@@ -398,9 +350,6 @@ export function InspectorDashboard({
           : "Disconnected"
     : "Disconnected";
 
-  // Determine if UI session is active (has screencast)
-  const hasActiveSession = !!selectedSessionId && !!displayImageData;
-
   // Inject keyframe animation for streaming border
   const keyframeStyles = useMemo(
     () => `
@@ -438,7 +387,7 @@ export function InspectorDashboard({
       <header style={styles.header}>
         <div style={styles.headerLeft}>
           <img src={logoUrl} alt="MCP Agent Inspector" style={styles.logo} />
-          <h1 style={styles.title}>MCP Agent Inspector</h1>
+          <h1 style={styles.title}>sirius-mcp inspector</h1>
         </div>
 
         {/* Connection Bar */}
@@ -493,13 +442,10 @@ export function InspectorDashboard({
             </div>
           </div>
           <Toolbar
-            isLogsPanelVisible={isBottomPanelVisible}
-            onToggleLogsPanel={toggleBottomPanel}
-            isGlobalsPanelVisible={isGlobalsPanelVisible}
-            onToggleGlobalsPanel={toggleGlobalsPanel}
             isPrimitivesPanelVisible={!isLeftPanelCollapsed}
             onTogglePrimitivesPanel={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)}
-            hasActiveSession={hasActiveSession}
+            isRightPanelVisible={!isRightPanelCollapsed}
+            onToggleRightPanel={toggleRightPanel}
           />
         </div>
       </header>
@@ -517,34 +463,31 @@ export function InspectorDashboard({
 
       {/* Content Wrapper - horizontal layout */}
       <div style={styles.contentWrapper}>
-        {/* Left Panel - MCP Primitives when session active */}
-        {hasActiveSession && (
-          <McpPrimitivesPanel
-            tools={displayTools}
-            resources={displayResources}
-            prompts={displayPrompts}
-            isLoading={primitivesLoading}
-            isVisible={true}
-            isCollapsed={isLeftPanelCollapsed}
-            onToggleCollapse={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)}
-            position="left"
-            panelWidth={leftPanelWidth}
-            resizeHandleProps={leftResizeHandleProps}
-            isResizing={isLeftResizing}
-          />
-        )}
+        {/* Left Panel - MCP Primitives (always present) */}
+        <McpPrimitivesPanel
+          tools={displayTools}
+          resources={displayResources}
+          prompts={displayPrompts}
+          isLoading={primitivesLoading}
+          isVisible={true}
+          isCollapsed={isLeftPanelCollapsed}
+          onToggleCollapse={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)}
+          position="left"
+          panelWidth={leftPanelWidth}
+          resizeHandleProps={leftResizeHandleProps}
+          isResizing={isLeftResizing}
+        />
 
-        {/* Center Column - main content + bottom panel */}
+        {/* Center Column - screencast + globals bar */}
         <div style={styles.centerColumn}>
-          {/* Main Display */}
           <main style={styles.main}>
-            {hasActiveSession ? (
-              /* Screencast when session is active */
+            {isStreaming ? (
+              /* Screencast when streaming */
               <div
                 style={{
                   ...styles.displayContainer,
-                  ...(isStreaming ? styles.displayContainerStreaming : {}),
-                  ...(isStreaming ? screencastAspectStyle : {}),
+                  ...styles.displayContainerStreaming,
+                  ...screencastAspectStyle,
                 }}
               >
                 <img
@@ -552,56 +495,48 @@ export function InspectorDashboard({
                   alt="Live browser view"
                   style={styles.streamImage}
                 />
+                {isGlobalsBarCollapsed && (
+                  <button
+                    style={styles.globalsCollapsedToggle}
+                    onClick={toggleGlobalsBar}
+                    aria-label="Show Globals"
+                    title="Show Globals"
+                  >
+                    Show Globals
+                  </button>
+                )}
               </div>
             ) : (
-              /* MCP Primitives in center when no session */
-              <McpPrimitivesPanel
-                tools={displayTools}
-                resources={displayResources}
-                prompts={displayPrompts}
-                isLoading={primitivesLoading}
-                isVisible={true}
-                position="center"
-              />
+              /* Tamagotchi placeholder when no widget */
+              <NoWidgetPlaceholder />
             )}
           </main>
 
-          {/* Resize Handle */}
-          <div
-            {...resizeHandleProps}
-            style={{
-              ...styles.resizeHandle,
-              ...(isResizing ? styles.resizeHandleActive : {}),
-              ...(!isBottomPanelVisible ? styles.resizeHandleHidden : {}),
-            }}
-          />
-
-          {/* Bottom Panel (Logs + Events + Agent) */}
-          <div
-            style={{
-              ...styles.logsPanel,
-              height: isBottomPanelVisible ? (isPanelCollapsed ? 36 : panelHeight) : 0,
-              ...(!isBottomPanelVisible ? styles.logsPanelHidden : {}),
-            }}
-          >
-            <BottomPanel
-              logs={displayLogs}
-              events={displayEvents}
-              agentEvents={displayAgentEvents}
-              onClearLogs={clearLogs}
-              onClearEvents={clearEvents}
-              onClearAgentEvents={clearAgentEvents}
-              panelHeight={panelHeight}
-              isCollapsed={isPanelCollapsed}
-              onToggleCollapse={togglePanel}
-              panelVisibility={panelVisibility}
-              onTogglePanel={handleTogglePanel}
+          {/* Globals bar - below screencast, only when streaming */}
+          {isStreaming && (
+            <GlobalsPanel
+              globals={displayGlobals}
+              isVisible={true}
+              isCollapsed={isGlobalsBarCollapsed}
+              onToggleCollapse={toggleGlobalsBar}
             />
-          </div>
+          )}
         </div>
 
-        {/* Globals Panel - full height on the right */}
-        <GlobalsPanel globals={displayGlobals} isVisible={isGlobalsPanelVisible} />
+        {/* Right Panel - Agent/Events/Logs tabs */}
+        <RightPanel
+          logs={displayLogs}
+          events={displayEvents}
+          agentEvents={displayAgentEvents}
+          onClearLogs={clearLogs}
+          onClearEvents={clearEvents}
+          onClearAgent={clearAgentEvents}
+          isCollapsed={isRightPanelCollapsed}
+          onToggleCollapse={toggleRightPanel}
+          panelWidth={rightPanelWidth}
+          resizeHandleProps={rightResizeHandleProps}
+          isResizing={isRightResizing}
+        />
       </div>
     </div>
   );

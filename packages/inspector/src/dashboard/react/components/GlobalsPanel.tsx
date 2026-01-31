@@ -1,7 +1,7 @@
 /**
  * GlobalsPanel Component
  *
- * Displays formatted environment/globals information in collapsible sections.
+ * Displays environment/globals information in a horizontal bar.
  */
 
 import React from "react";
@@ -13,22 +13,10 @@ export interface GlobalsPanelProps {
   globals: GlobalsState | null;
   /** Whether the panel is visible */
   isVisible: boolean;
-  /** Panel width in pixels */
-  width?: number;
-}
-
-interface SectionProps {
-  title: string;
-  children: React.ReactNode;
-}
-
-function Section({ title, children }: SectionProps): React.ReactElement {
-  return (
-    <div style={styles.globalsSection}>
-      <div style={styles.globalsSectionTitle}>{title}</div>
-      {children}
-    </div>
-  );
+  /** Whether the panel is collapsed */
+  isCollapsed: boolean;
+  /** Callback to toggle collapsed state */
+  onToggleCollapse?: () => void;
 }
 
 interface ItemProps {
@@ -39,9 +27,9 @@ interface ItemProps {
 function Item({ label, value }: ItemProps): React.ReactElement | null {
   if (value === undefined || value === null) return null;
   return (
-    <div style={styles.globalsItem}>
-      <span style={styles.globalsItemLabel}>{label}</span>
-      <span style={styles.globalsItemValue}>{String(value)}</span>
+    <div style={styles.globalsBarItem}>
+      <span style={styles.globalsBarItemLabel}>{label}</span>
+      <span style={styles.globalsBarItemValue}>{String(value)}</span>
     </div>
   );
 }
@@ -49,28 +37,35 @@ function Item({ label, value }: ItemProps): React.ReactElement | null {
 export function GlobalsPanel({
   globals,
   isVisible,
-  width = 280,
+  isCollapsed,
+  onToggleCollapse,
 }: GlobalsPanelProps): React.ReactElement {
+  if (!isVisible) {
+    return <div style={{ display: "none" }} />;
+  }
+
   const panelStyle: React.CSSProperties = {
-    ...styles.globalsPanel,
-    width: isVisible ? width : 0,
-    ...(isVisible ? {} : styles.globalsPanelCollapsed),
+    ...styles.globalsBar,
+    ...(isCollapsed ? styles.globalsBarCollapsed : {}),
   };
 
   if (!globals) {
     return (
       <div style={panelStyle}>
-        {isVisible && (
-          <>
-            <div style={styles.globalsPanelHeader}>
-              <span style={styles.globalsPanelTitle}>Environment</span>
-            </div>
-            <div style={styles.globalsPanelContent}>
-              <div style={{ color: "#6b7280", textAlign: "center", padding: "1rem" }}>
-                Loading...
-              </div>
-            </div>
-          </>
+        {isCollapsed ? (
+          <div style={styles.globalsBarCollapsedContent}>
+            <button
+              style={styles.globalsBarExpandBtn}
+              onClick={onToggleCollapse}
+              disabled={!onToggleCollapse}
+            >
+              Show Environment
+            </button>
+          </div>
+        ) : (
+          <div style={styles.globalsBarContent}>
+            <span style={styles.globalsBarLoading}>Loading environment…</span>
+          </div>
         )}
       </div>
     );
@@ -90,50 +85,36 @@ export function GlobalsPanel({
 
   return (
     <div style={panelStyle}>
-      {isVisible && (
-        <>
-          <div style={styles.globalsPanelHeader}>
-            <span style={styles.globalsPanelTitle}>Environment</span>
-          </div>
-          <div style={styles.globalsPanelContent}>
-            <Section title="Display">
-              <Item label="Theme" value={theme} />
-              <Item label="Display Mode" value={displayMode} />
-            </Section>
-
-            <Section title="Locale">
-              <Item label="Locale" value={locale} />
-              <Item label="Timezone" value={timeZone} />
-            </Section>
-
-            <Section title="Viewport">
-              <Item label="Dimensions" value={`${viewport.width} × ${viewport.height}`} />
-              {maxHeight !== undefined && <Item label="Max Height" value={`${maxHeight}px`} />}
-            </Section>
-
-            <Section title="Safe Area">
-              <Item
-                label="Insets"
-                value={`T:${safeAreaInsets.top} R:${safeAreaInsets.right} B:${safeAreaInsets.bottom} L:${safeAreaInsets.left}`}
-              />
-            </Section>
-
-            <Section title="Device">
-              <Item label="Type" value={userAgent.device?.type ?? "unknown"} />
-              <Item label="Hover" value={userAgent.capabilities?.hover ? "Yes" : "No"} />
-              <Item label="Touch" value={userAgent.capabilities?.touch ? "Yes" : "No"} />
-            </Section>
-
-            {userLocation && (
-              <Section title="Location">
-                {userLocation.city && <Item label="City" value={userLocation.city} />}
-                {userLocation.region && <Item label="Region" value={userLocation.region} />}
-                {userLocation.country && <Item label="Country" value={userLocation.country} />}
-                {userLocation.timezone && <Item label="Timezone" value={userLocation.timezone} />}
-              </Section>
-            )}
-          </div>
-        </>
+      {isCollapsed ? (
+        <div style={styles.globalsBarCollapsedContent}>
+          <button
+            style={styles.globalsBarExpandBtn}
+            onClick={onToggleCollapse}
+            disabled={!onToggleCollapse}
+          >
+            Show Environment
+          </button>
+        </div>
+      ) : (
+        <div style={styles.globalsBarContent}>
+          <Item label="Theme" value={theme} />
+          <Item label="Display" value={displayMode} />
+          <Item label="Locale" value={locale} />
+          <Item label="Timezone" value={timeZone} />
+          <Item label="Viewport" value={`${viewport.width} × ${viewport.height}`} />
+          {maxHeight !== undefined && <Item label="Max H" value={`${maxHeight}px`} />}
+          <Item
+            label="Safe Area"
+            value={`T:${safeAreaInsets.top} R:${safeAreaInsets.right} B:${safeAreaInsets.bottom} L:${safeAreaInsets.left}`}
+          />
+          <Item label="Device" value={userAgent.device?.type ?? "unknown"} />
+          <Item label="Hover" value={userAgent.capabilities?.hover ? "Yes" : "No"} />
+          <Item label="Touch" value={userAgent.capabilities?.touch ? "Yes" : "No"} />
+          {userLocation?.city && <Item label="City" value={userLocation.city} />}
+          {userLocation?.region && <Item label="Region" value={userLocation.region} />}
+          {userLocation?.country && <Item label="Country" value={userLocation.country} />}
+          {userLocation?.timezone && <Item label="TZ" value={userLocation.timezone} />}
+        </div>
       )}
     </div>
   );

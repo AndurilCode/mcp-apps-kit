@@ -22,6 +22,10 @@ export interface AgentPanelProps {
   onClearEvents: () => void;
   /** Whether to show the header (default: true) */
   showHeader?: boolean;
+  /** Whether to show the title in the header (default: true) */
+  showTitle?: boolean;
+  /** Whether to show the clear button in the header (default: true) */
+  showClearButton?: boolean;
 }
 
 // Agent events only use the "agent" category, but we support filtering for consistency
@@ -31,6 +35,8 @@ export function AgentPanel({
   events,
   onClearEvents,
   showHeader = true,
+  showTitle = true,
+  showClearButton = true,
 }: AgentPanelProps): React.ReactElement {
   const [categoryFilter, setCategoryFilter] = useState<EventCategory | "all">("all");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -58,7 +64,7 @@ export function AgentPanel({
     <div style={styles.eventsPanel as React.CSSProperties}>
       {showHeader && (
         <div style={styles.eventsPanelHeader as React.CSSProperties}>
-          <span style={styles.eventsPanelTitle as React.CSSProperties}>Agent</span>
+          {showTitle && <span style={styles.eventsPanelTitle as React.CSSProperties}>Agent</span>}
           <div style={styles.eventsPanelControls as React.CSSProperties}>
             <select
               style={styles.filterSelect as React.CSSProperties}
@@ -76,9 +82,11 @@ export function AgentPanel({
                 );
               })}
             </select>
-            <button style={styles.clearLogsBtn as React.CSSProperties} onClick={onClearEvents}>
-              Clear
-            </button>
+            {showClearButton && (
+              <button style={styles.clearLogsBtn as React.CSSProperties} onClick={onClearEvents}>
+                Clear
+              </button>
+            )}
           </div>
         </div>
       )}
