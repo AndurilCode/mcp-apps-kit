@@ -22,6 +22,7 @@ export function useWidgetUrl(
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const urlRef = useRef<string | null>(null);
 
   useEffect(() => {
     // Abort any in-flight request
@@ -31,6 +32,7 @@ export function useWidgetUrl(
     }
 
     // Reset when no session
+    urlRef.current = null;
     if (!sessionId) {
       setUrl(null);
       setIsLoading(false);
@@ -63,6 +65,7 @@ export function useWidgetUrl(
 
         const data = (await res.json()) as { url: string };
         setUrl(data.url);
+        urlRef.current = data.url;
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") {
           return; // Ignore aborted requests
@@ -77,10 +80,18 @@ export function useWidgetUrl(
 
     void fetchUrl();
 
+    // Retry on failure — widget server may still be starting up from background render
+    const retryInterval = setInterval(() => {
+      if (!controller.signal.aborted && urlRef.current === null) {
+        void fetchUrl();
+      }
+    }, 2000);
+
     return () => {
       controller.abort();
+      clearInterval(retryInterval);
     };
-  }, [baseUrl, sessionId, connectionId]);
+  }, [baseUrl, sessionId, connectionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { url, isLoading, error };
 }
