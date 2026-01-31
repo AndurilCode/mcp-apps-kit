@@ -64,10 +64,10 @@ export const styles: Record<string, CSSProperties> = {
   },
 
   toolbarBtn: {
-    background: "transparent",
-    border: "none",
-    borderRadius: "4px",
-    padding: "0.375rem",
+    backgroundColor: "#1a1a1a",
+    border: "1px solid #2d2f2f",
+    borderRadius: "8px",
+    padding: "0.4rem",
     cursor: "pointer",
     display: "flex",
     alignItems: "center",
@@ -78,7 +78,9 @@ export const styles: Record<string, CSSProperties> = {
 
   toolbarBtnActive: {
     color: "#20b2aa",
-    backgroundColor: "rgba(32, 178, 170, 0.1)",
+    backgroundColor: "#111111",
+    borderColor: "#20b2aa",
+    boxShadow: "0 0 6px rgba(32, 178, 170, 0.4)",
   },
 
   title: {
