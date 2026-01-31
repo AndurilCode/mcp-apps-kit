@@ -128,7 +128,11 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
   // Right panel state (persisted)
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("mcp-dashboard-right-panel-collapsed") === "true";
+      try {
+        return localStorage.getItem("mcp-dashboard-right-panel-collapsed") === "true";
+      } catch {
+        return false;
+      }
     }
     return false;
   });
@@ -136,7 +140,11 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
   // Globals bar state (persisted)
   const [isGlobalsBarCollapsed, setIsGlobalsBarCollapsed] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("mcp-dashboard-globals-bar-collapsed") === "true";
+      try {
+        return localStorage.getItem("mcp-dashboard-globals-bar-collapsed") === "true";
+      } catch {
+        return false;
+      }
     }
     return false;
   });
@@ -206,14 +214,22 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
   // Save right panel collapsed state
   useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("mcp-dashboard-right-panel-collapsed", String(isRightPanelCollapsed));
+      try {
+        localStorage.setItem("mcp-dashboard-right-panel-collapsed", String(isRightPanelCollapsed));
+      } catch {
+        // ignore storage access errors
+      }
     }
   }, [isRightPanelCollapsed]);
 
   // Save globals bar collapsed state
   useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("mcp-dashboard-globals-bar-collapsed", String(isGlobalsBarCollapsed));
+      try {
+        localStorage.setItem("mcp-dashboard-globals-bar-collapsed", String(isGlobalsBarCollapsed));
+      } catch {
+        // ignore storage access errors
+      }
     }
   }, [isGlobalsBarCollapsed]);
 

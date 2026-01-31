@@ -46,9 +46,13 @@ export function RightPanel({
   const noop = (): void => undefined;
   const [activeTab, setActiveTab] = useState<RightPanelTab>(() => {
     if (typeof window !== "undefined") {
-      const stored = window.localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
-      if (stored === "agent" || stored === "events" || stored === "logs") {
-        return stored;
+      try {
+        const stored = window.localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
+        if (stored === "agent" || stored === "events" || stored === "logs") {
+          return stored;
+        }
+      } catch {
+        // ignore storage access errors (e.g. private browsing)
       }
     }
     return "agent";
@@ -56,7 +60,11 @@ export function RightPanel({
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab);
+      try {
+        window.localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab);
+      } catch {
+        // ignore storage access errors
+      }
     }
   }, [activeTab]);
 
