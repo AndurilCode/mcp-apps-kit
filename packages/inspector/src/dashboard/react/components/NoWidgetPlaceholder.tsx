@@ -1,12 +1,21 @@
 /**
  * NoWidgetPlaceholder Component
  *
- * Animated crystalline star placeholder for empty screencast state.
- * Icy blue 8-pointed star with glass facets, glowing center, orbital rings.
+ * Crystalline 8-pointed star with perfect rotational symmetry.
+ * Mathematically computed vertices for the compass rose shape.
  */
 
 import React from "react";
 import { styles } from "../styles";
+
+// Perfectly symmetric 8-pointed star: 16 vertices alternating tips and valleys.
+// Cardinal tips (N/E/S/W) at radius 88, diagonal tips at radius 62,
+// valleys between each pair at radius 36. Center at (100,100).
+const STAR_POINTS =
+  "100,12 113.8,66.7 143.8,56.2 133.3,86.2 " +
+  "188,100 133.3,113.8 143.8,143.8 113.8,133.3 " +
+  "100,188 86.2,133.3 56.2,143.8 66.7,113.8 " +
+  "12,100 66.7,86.2 56.2,56.2 86.2,66.7";
 
 export function NoWidgetPlaceholder(): React.ReactElement {
   return (
@@ -20,239 +29,208 @@ export function NoWidgetPlaceholder(): React.ReactElement {
         style={styles.noWidgetStar}
       >
         <defs>
-          {/* Core glow — icy white to blue */}
+          {/* Core glow — bright white to icy blue */}
           <radialGradient id="siriusCoreGlow" cx="50%" cy="50%" r="50%">
             <stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
-            <stop offset="25%" stopColor="#d6e5f8" stopOpacity="0.9" />
-            <stop offset="55%" stopColor="#8bb0d4" stopOpacity="0.4" />
-            <stop offset="100%" stopColor="#5a82a8" stopOpacity="0" />
+            <stop offset="20%" stopColor="#e8f2ff" stopOpacity="0.95" />
+            <stop offset="50%" stopColor="#a8c8e8" stopOpacity="0.5" />
+            <stop offset="100%" stopColor="#6b98be" stopOpacity="0" />
           </radialGradient>
 
-          {/* Main facets — light steel blue */}
-          <linearGradient id="siriusFacetA" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#b8d0e8" stopOpacity="0.8" />
-            <stop offset="40%" stopColor="#7aabcf" stopOpacity="0.45" />
-            <stop offset="100%" stopColor="#4a6e8e" stopOpacity="0.2" />
+          {/* Main star fill — bright icy */}
+          <linearGradient id="siriusIce" x1="30%" y1="0%" x2="70%" y2="100%">
+            <stop offset="0%" stopColor="#d6e5f8" stopOpacity="0.85" />
+            <stop offset="35%" stopColor="#a8c8e8" stopOpacity="0.6" />
+            <stop offset="70%" stopColor="#7aabcf" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#5a82a8" stopOpacity="0.25" />
           </linearGradient>
 
-          {/* Diagonal facets — softer */}
-          <linearGradient id="siriusFacetB" x1="100%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#a8c8e8" stopOpacity="0.6" />
-            <stop offset="50%" stopColor="#6b98be" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#3d6080" stopOpacity="0.12" />
+          {/* Facet overlay — inner crystalline */}
+          <linearGradient id="siriusFacet" x1="50%" y1="0%" x2="50%" y2="100%">
+            <stop offset="0%" stopColor="#e0ecf8" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#7aabcf" stopOpacity="0.08" />
           </linearGradient>
 
           {/* Outer halo */}
           <radialGradient id="siriusHalo" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#7aabcf" stopOpacity="0" />
-            <stop offset="70%" stopColor="#7aabcf" stopOpacity="0" />
-            <stop offset="85%" stopColor="#7aabcf" stopOpacity="0.08" />
+            <stop offset="0%" stopColor="#a8c8e8" stopOpacity="0" />
+            <stop offset="65%" stopColor="#a8c8e8" stopOpacity="0" />
+            <stop offset="82%" stopColor="#8bb0d4" stopOpacity="0.1" />
             <stop offset="100%" stopColor="#7aabcf" stopOpacity="0" />
           </radialGradient>
 
-          {/* Glow filters */}
           <filter id="siriusGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feGaussianBlur stdDeviation="4" result="blur" />
             <feComposite in="SourceGraphic" in2="blur" operator="over" />
           </filter>
 
           <filter id="siriusSoftGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="8" />
+            <feGaussianBlur stdDeviation="10" />
           </filter>
         </defs>
 
-        {/* Animated group */}
         <g style={styles.noWidgetStarFloat}>
           {/* Orbital rings */}
           <ellipse
             cx="100"
             cy="100"
-            rx="78"
-            ry="78"
+            rx="80"
+            ry="80"
             fill="none"
-            stroke="#7aabcf"
+            stroke="#8bb0d4"
             strokeWidth="0.4"
-            strokeOpacity="0.18"
-            strokeDasharray="3 6"
+            strokeOpacity="0.2"
+            strokeDasharray="3 7"
             style={styles.noWidgetOrbitRing}
           />
           <ellipse
             cx="100"
             cy="100"
-            rx="62"
-            ry="62"
+            rx="64"
+            ry="64"
             fill="none"
-            stroke="#8bb0d4"
+            stroke="#a8c8e8"
             strokeWidth="0.3"
-            strokeOpacity="0.12"
-            strokeDasharray="2 8"
+            strokeOpacity="0.14"
+            strokeDasharray="2 9"
             style={styles.noWidgetOrbitRingReverse}
           />
 
           {/* Halo */}
-          <circle cx="100" cy="100" r="85" fill="url(#siriusHalo)" />
+          <circle cx="100" cy="100" r="90" fill="url(#siriusHalo)" />
 
-          {/* Cardinal points — broad compass-style */}
+          {/* Main star shape — single polygon, perfect symmetry */}
           <polygon
-            points="100,12 118,74 100,90 82,74"
-            fill="url(#siriusFacetA)"
-            stroke="#a8c8e8"
-            strokeWidth="0.5"
-            strokeOpacity="0.5"
-          />
-          <polygon
-            points="188,100 126,118 110,100 126,82"
-            fill="url(#siriusFacetA)"
-            stroke="#a8c8e8"
-            strokeWidth="0.5"
-            strokeOpacity="0.5"
-          />
-          <polygon
-            points="100,188 82,126 100,110 118,126"
-            fill="url(#siriusFacetA)"
-            stroke="#a8c8e8"
-            strokeWidth="0.5"
-            strokeOpacity="0.5"
-          />
-          <polygon
-            points="12,100 74,82 90,100 74,118"
-            fill="url(#siriusFacetA)"
-            stroke="#a8c8e8"
-            strokeWidth="0.5"
-            strokeOpacity="0.5"
+            points={STAR_POINTS}
+            fill="url(#siriusIce)"
+            stroke="#b8d0e8"
+            strokeWidth="0.6"
+            strokeOpacity="0.55"
+            strokeLinejoin="round"
           />
 
-          {/* Diagonal points — broad, slightly shorter */}
-          <polygon
-            points="162,38 118,82 100,92 112,72"
-            fill="url(#siriusFacetB)"
-            stroke="#8bb0d4"
+          {/* Inner facet lines — crystalline refraction */}
+          <line
+            x1="100"
+            y1="12"
+            x2="100"
+            y2="188"
+            stroke="#d6e5f8"
             strokeWidth="0.4"
-            strokeOpacity="0.35"
+            strokeOpacity="0.2"
           />
-          <polygon
-            points="162,162 118,118 108,100 128,112"
-            fill="url(#siriusFacetB)"
-            stroke="#8bb0d4"
+          <line
+            x1="12"
+            y1="100"
+            x2="188"
+            y2="100"
+            stroke="#d6e5f8"
             strokeWidth="0.4"
-            strokeOpacity="0.35"
+            strokeOpacity="0.2"
           />
-          <polygon
-            points="38,162 82,118 92,100 72,128"
-            fill="url(#siriusFacetB)"
-            stroke="#8bb0d4"
-            strokeWidth="0.4"
-            strokeOpacity="0.35"
-          />
-          <polygon
-            points="38,38 82,82 92,100 72,88"
-            fill="url(#siriusFacetB)"
-            stroke="#8bb0d4"
-            strokeWidth="0.4"
-            strokeOpacity="0.35"
-          />
-
-          {/* Inner crystalline facets */}
-          <polygon
-            points="100,64 114,88 100,98 86,88"
-            fill="#b8d0e8"
-            fillOpacity="0.2"
-            stroke="#a8c8e8"
+          <line
+            x1="56.2"
+            y1="56.2"
+            x2="143.8"
+            y2="143.8"
+            stroke="#b8d0e8"
             strokeWidth="0.3"
-            strokeOpacity="0.35"
+            strokeOpacity="0.15"
           />
-          <polygon
-            points="136,100 112,114 102,100 112,86"
-            fill="#b8d0e8"
-            fillOpacity="0.16"
-            stroke="#a8c8e8"
+          <line
+            x1="143.8"
+            y1="56.2"
+            x2="56.2"
+            y2="143.8"
+            stroke="#b8d0e8"
             strokeWidth="0.3"
-            strokeOpacity="0.3"
+            strokeOpacity="0.15"
           />
+
+          {/* Inner diamond facets */}
           <polygon
-            points="100,136 86,112 98,102 114,112"
-            fill="#b8d0e8"
-            fillOpacity="0.13"
-            stroke="#a8c8e8"
+            points="100,60 130,100 100,140 70,100"
+            fill="url(#siriusFacet)"
+            stroke="#b8d0e8"
             strokeWidth="0.3"
             strokeOpacity="0.25"
           />
           <polygon
-            points="64,100 88,86 98,98 88,114"
-            fill="#b8d0e8"
-            fillOpacity="0.1"
-            stroke="#a8c8e8"
-            strokeWidth="0.3"
-            strokeOpacity="0.22"
+            points="100,75 118,100 100,125 82,100"
+            fill="#d6e5f8"
+            fillOpacity="0.12"
+            stroke="#d6e5f8"
+            strokeWidth="0.25"
+            strokeOpacity="0.2"
           />
 
-          {/* Core glow */}
+          {/* Core glow — big soft */}
           <circle
             cx="100"
             cy="100"
-            r="18"
+            r="22"
             fill="url(#siriusCoreGlow)"
             filter="url(#siriusSoftGlow)"
             style={styles.noWidgetCorePulse}
           />
 
           {/* Bright center */}
-          <circle cx="100" cy="100" r="3.5" fill="#ffffff" fillOpacity="0.95" />
+          <circle cx="100" cy="100" r="4" fill="#ffffff" fillOpacity="0.95" />
           <circle
             cx="100"
             cy="100"
-            r="7"
-            fill="#e0ecf8"
-            fillOpacity="0.45"
+            r="8"
+            fill="#e8f2ff"
+            fillOpacity="0.5"
             filter="url(#siriusGlow)"
           />
 
-          {/* Ambient sparkles */}
+          {/* Sparkle dots */}
           <circle
-            cx="36"
-            cy="30"
-            r="0.9"
-            fill="#b8d0e8"
+            cx="34"
+            cy="28"
+            r="0.8"
+            fill="#d6e5f8"
             fillOpacity="0.5"
             style={styles.noWidgetSparkle}
           />
           <circle
-            cx="168"
-            cy="44"
-            r="0.7"
-            fill="#d6e5f8"
+            cx="170"
+            cy="42"
+            r="0.6"
+            fill="#e0ecf8"
             fillOpacity="0.45"
             style={styles.noWidgetSparkle2}
           />
           <circle
-            cx="156"
-            cy="172"
-            r="0.8"
-            fill="#a8c8e8"
+            cx="158"
+            cy="174"
+            r="0.7"
+            fill="#b8d0e8"
             fillOpacity="0.4"
             style={styles.noWidgetSparkle}
           />
           <circle
-            cx="40"
-            cy="164"
-            r="0.6"
-            fill="#b8d0e8"
+            cx="38"
+            cy="166"
+            r="0.5"
+            fill="#d6e5f8"
             fillOpacity="0.35"
             style={styles.noWidgetSparkle2}
           />
           <circle
-            cx="174"
-            cy="96"
-            r="0.5"
+            cx="176"
+            cy="98"
+            r="0.4"
             fill="#ffffff"
-            fillOpacity="0.35"
+            fillOpacity="0.4"
             style={styles.noWidgetSparkle}
           />
           <circle
-            cx="26"
-            cy="112"
-            r="0.6"
-            fill="#d6e5f8"
+            cx="24"
+            cy="108"
+            r="0.5"
+            fill="#e0ecf8"
             fillOpacity="0.3"
             style={styles.noWidgetSparkle2}
           />
