@@ -40,12 +40,12 @@ export const styles: Record<string, CSSProperties> = {
   headerLeft: {
     display: "flex",
     alignItems: "center",
-    gap: "0.75rem",
+    gap: "0.4rem",
   },
 
   logo: {
-    width: "28px",
-    height: "28px",
+    width: "36px",
+    height: "36px",
     objectFit: "contain",
   },
 
