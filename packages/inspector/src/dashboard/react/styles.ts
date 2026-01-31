@@ -1028,7 +1028,8 @@ export const styles: Record<string, CSSProperties> = {
   },
 
   noWidgetStar: {
-    filter: "drop-shadow(0 0 24px rgba(122, 171, 207, 0.25))",
+    filter: "drop-shadow(0 0 16px rgba(255, 255, 255, 0.15))",
+    imageRendering: "pixelated" as CSSProperties["imageRendering"],
   },
 
   noWidgetStarFloat: {
