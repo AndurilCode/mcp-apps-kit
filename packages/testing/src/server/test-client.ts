@@ -42,17 +42,41 @@ export async function createTestClient(
 
   try {
     if (params.transport === "stdio") {
-      // SECURITY NOTE: When env is provided, it's merged with process.env.
-      // This passes all parent environment variables to the child process.
-      // For isolated environments, pass a complete env object without relying on merge.
-      // Merge process.env with user-provided env, filtering out undefined values
+      // Only inherit safe, non-sensitive environment variables from the parent process.
+      // This prevents leaking API keys, credentials, or tokens to child MCP servers.
+      const SAFE_ENV_VARS = new Set([
+        "PATH",
+        "HOME",
+        "USER",
+        "LOGNAME",
+        "SHELL",
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+        "TERM",
+        "TMPDIR",
+        "TMP",
+        "TEMP",
+        "NODE_PATH",
+        "NODE_ENV",
+        "NODE_EXTRA_CA_CERTS",
+        "XDG_CONFIG_HOME",
+        "XDG_DATA_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_RUNTIME_DIR",
+      ]);
+      const safeParentEnv = Object.fromEntries(
+        Object.entries(process.env).filter(
+          (entry): entry is [string, string] =>
+            entry[1] !== undefined && SAFE_ENV_VARS.has(entry[0])
+        )
+      );
+      // User-provided env vars override safe parent vars; parent secrets are never included.
       const mergedEnv = params.env
-        ? Object.fromEntries(
-            Object.entries({ ...process.env, ...params.env }).filter(
-              (entry): entry is [string, string] => entry[1] !== undefined
-            )
-          )
-        : undefined;
+        ? { ...safeParentEnv, ...params.env }
+        : params.inheritEnv === false
+          ? safeParentEnv
+          : undefined;
       transport = new StdioClientTransport({
         command: params.command,
         args: params.args,

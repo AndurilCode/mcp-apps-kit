@@ -585,11 +585,18 @@ export type ConnectionParams =
       args?: string[];
       /**
        * Environment variables for the child process.
-       * When provided, these are merged with process.env. This means all parent
-       * environment variables (including sensitive ones) are passed to the child.
-       * For production deployments, consider providing a complete env object
-       * instead of relying on merge behavior.
+       * When provided, user-supplied vars are merged with a safe subset of
+       * parent process env (PATH, HOME, LANG, etc.). Sensitive variables
+       * (API keys, credentials, tokens) are never inherited automatically.
        */
       env?: Record<string, string>;
+      /**
+       * When `false`, only the safe allowlisted parent env vars are passed
+       * (PATH, HOME, etc.) plus any explicit `env` overrides.
+       * When `true` or omitted with no `env`, the child inherits the default
+       * Node.js behavior (full process.env).
+       * Default: `true` when `env` is not provided, `false` otherwise.
+       */
+      inheritEnv?: boolean;
       cwd?: string;
     };
