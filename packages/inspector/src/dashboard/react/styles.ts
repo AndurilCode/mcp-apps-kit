@@ -395,6 +395,8 @@ export const styles: Record<string, CSSProperties> = {
   logsContainer: {
     fontFamily: FONT_MONO,
     flex: 1,
+    display: "flex",
+    flexDirection: "column" as const,
     overflowY: "auto",
     padding: "0.5rem",
     fontSize: "0.75rem",
@@ -405,9 +407,10 @@ export const styles: Record<string, CSSProperties> = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    height: "100%",
-    color: "#4b5563",
+    flex: 1,
+    color: "#6b7280",
     fontSize: "0.75rem",
+    fontFamily: FONT_SANS,
   },
 
   // Log Entry
@@ -669,6 +672,8 @@ export const styles: Record<string, CSSProperties> = {
   eventsContainer: {
     fontFamily: FONT_MONO,
     flex: 1,
+    display: "flex",
+    flexDirection: "column" as const,
     overflowY: "auto",
     padding: "0.25rem",
     fontSize: "0.75rem",
@@ -679,9 +684,10 @@ export const styles: Record<string, CSSProperties> = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    height: "100%",
-    color: "#4b5563",
+    flex: 1,
+    color: "#6b7280",
     fontSize: "0.75rem",
+    fontFamily: FONT_SANS,
   },
 
   // Filter Select
@@ -1003,6 +1009,8 @@ export const styles: Record<string, CSSProperties> = {
   rightPanelContent: {
     flex: 1,
     overflow: "auto",
+    display: "flex",
+    flexDirection: "column" as const,
   },
 
   // =========================================================================
