@@ -1028,35 +1028,8 @@ export const styles: Record<string, CSSProperties> = {
   },
 
   noWidgetStar: {
-    filter: "drop-shadow(0 0 16px rgba(255, 255, 255, 0.15))",
-    imageRendering: "pixelated" as CSSProperties["imageRendering"],
-  },
-
-  noWidgetStarFloat: {
     animation: "starFloat 4s ease-in-out infinite",
-    transformOrigin: "100px 100px",
-  },
-
-  noWidgetCorePulse: {
-    animation: "corePulse 3s ease-in-out infinite",
-  },
-
-  noWidgetOrbitRing: {
-    animation: "orbitSpin 40s linear infinite",
-    transformOrigin: "100px 100px",
-  },
-
-  noWidgetOrbitRingReverse: {
-    animation: "orbitSpin 30s linear infinite reverse",
-    transformOrigin: "100px 100px",
-  },
-
-  noWidgetSparkle: {
-    animation: "sparkle 3s ease-in-out infinite",
-  },
-
-  noWidgetSparkle2: {
-    animation: "sparkle 3s ease-in-out infinite 1.5s",
+    objectFit: "contain" as CSSProperties["objectFit"],
   },
 
   noWidgetMessage: {

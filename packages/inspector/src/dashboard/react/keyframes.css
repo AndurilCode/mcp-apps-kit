@@ -1,8 +1,5 @@
 /**
  * Dashboard Keyframes
- *
- * CSS keyframes animations used by the dashboard.
- * These cannot be defined inline and must be in a stylesheet.
  */
 
 @keyframes snakeBorder {
@@ -14,44 +11,11 @@
   }
 }
 
-/* Sirius star — gentle floating */
 @keyframes starFloat {
   0%, 100% {
     transform: translateY(0);
   }
   50% {
     transform: translateY(-6px);
-  }
-}
-
-/* Core glow pulse */
-@keyframes corePulse {
-  0%, 100% {
-    opacity: 0.8;
-    r: 16;
-  }
-  50% {
-    opacity: 1;
-    r: 18;
-  }
-}
-
-/* Orbital ring rotation */
-@keyframes orbitSpin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-/* Ambient sparkle */
-@keyframes sparkle {
-  0%, 100% {
-    opacity: 0.2;
-  }
-  50% {
-    opacity: 0.8;
   }
 }
