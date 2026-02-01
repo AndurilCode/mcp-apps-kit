@@ -749,7 +749,7 @@ export function createStandaloneInspectorServer(
         try {
           const parsed = JSON.parse(body.toString("utf-8")) as {
             method?: string;
-            params?: { name?: string; arguments?: unknown };
+            params?: { name?: string; arguments?: unknown; reasoning?: string };
           };
           // Check if this is a tools/call request (MCP JSON-RPC)
           if (parsed.method === "tools/call" && parsed.params?.name) {
@@ -761,11 +761,19 @@ export function createStandaloneInspectorServer(
             // Record inspector tool call event
             const connectionManager = getActiveConnectionManager();
             if (connectionManager) {
-              connectionManager.recordAgentEvent("agent-tool-call", {
+              const eventPayload: Record<string, unknown> = {
                 name: inspectorToolCall.name,
                 arguments: inspectorToolCall.arguments,
                 source: "inspector",
-              });
+              };
+              // Forward reasoning if provided by the caller
+              if (
+                typeof parsed.params.reasoning === "string" &&
+                parsed.params.reasoning.length > 0
+              ) {
+                eventPayload.reasoning = parsed.params.reasoning;
+              }
+              connectionManager.recordAgentEvent("agent-tool-call", eventPayload);
             }
           }
         } catch {

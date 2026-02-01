@@ -94,7 +94,7 @@ export function AgentPanel({
         {filteredEvents.length === 0 ? (
           <div style={styles.eventsEmpty as React.CSSProperties}>No agent events yet</div>
         ) : (
-          filteredEvents.map((event) => <EventRow key={event.id} event={event} />)
+          filteredEvents.map((event) => <EventRow key={event.id} event={event} isAgentView />)
         )}
       </div>
     </div>

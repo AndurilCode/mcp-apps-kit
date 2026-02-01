@@ -20,3 +20,23 @@
     transform: translateY(-6px);
   }
 }
+
+@keyframes reasoningReveal {
+  from {
+    max-height: 0;
+    opacity: 0;
+  }
+  to {
+    max-height: 200px;
+    opacity: 1;
+  }
+}
+
+@keyframes reasoningCursorBlink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
