@@ -5,6 +5,46 @@
 import type { TemplateOptions } from "./types";
 
 /**
+ * Options for generating a dev-mode HTML document.
+ *
+ * Unlike the production {@link TemplateOptions}, the dev template does not
+ * receive a bundled script.  Instead it emits Vite HMR client tags and
+ * imports a virtual module that the Vite plugin resolves at request time.
+ */
+export interface DevHTMLOptions {
+  /**
+   * Widget key used to derive the virtual module path
+   * (`virtual:mcp-react-ui/<key>`).
+   */
+  key: string;
+
+  /**
+   * Human-readable name shown in the page `<title>`.
+   */
+  name: string;
+
+  /**
+   * Optional extra CSS appended after the base CSS reset.
+   */
+  css?: string;
+
+  /**
+   * Base URL of the Vite dev server.
+   *
+   * When the generated HTML is served from an origin other than the Vite dev
+   * server itself, set this to the full origin so that `/@vite/client` and
+   * the virtual-module import resolve correctly.
+   *
+   * A trailing slash, if present, is stripped automatically.
+   *
+   * @default "" (same origin)
+   *
+   * @example "http://localhost:5173"
+   */
+  devServerUrl?: string;
+}
+
+/**
  * Default base CSS reset for all UIs.
  * Provides a consistent starting point across platforms.
  */
@@ -84,6 +124,70 @@ export function generateHTML(options: TemplateOptions): string {
 <body>
   <div id="root"></div>
   <script type="module">${script.replace(/<\/script>/gi, "</scr" + "ipt>")}</script>
+</body>
+</html>`;
+}
+
+/**
+ * Generate a dev-mode HTML document for a React UI.
+ *
+ * The generated HTML includes:
+ * - DOCTYPE and valid HTML5 structure
+ * - Meta tags for responsive design
+ * - Inlined CSS (base reset + optional custom CSS)
+ * - Vite HMR client script (`/@vite/client`)
+ * - React Refresh preamble (required by `@vitejs/plugin-react`)
+ * - ES module import of the virtual module `virtual:mcp-react-ui/<key>`
+ *
+ * This is the dev-mode counterpart of {@link generateHTML}.  Instead of an
+ * inlined production bundle the page loads scripts through Vite's dev server
+ * so that Hot Module Replacement (HMR) and React Fast Refresh work.
+ *
+ * @param options - Dev template options with key, name, optional CSS and dev server URL
+ * @returns Complete HTML document as a string
+ *
+ * @example
+ * ```typescript
+ * const html = generateDevHTML({
+ *   key: "restaurant-list",
+ *   name: "Restaurant List Widget",
+ *   devServerUrl: "http://localhost:5173",
+ * });
+ * ```
+ *
+ * @internal
+ */
+export function generateDevHTML(options: DevHTMLOptions): string {
+  const { key, name, css, devServerUrl = "" } = options;
+
+  // Strip trailing slashes so paths like "http://host:5173/" don't produce
+  // double-slash URLs ("http://host:5173//@vite/client").
+  const baseUrl = devServerUrl.replace(/\/+$/, "");
+
+  const combinedCss = css ? `${DEFAULT_BASE_CSS}\n${css}` : DEFAULT_BASE_CSS;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="mcp-ui-key" content="${escapeHtml(key)}">
+  <title>${escapeHtml(name)}</title>
+  <style>${combinedCss}</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="${baseUrl}/@vite/client"></script>
+  <script type="module">
+    import RefreshRuntime from "${baseUrl}/@react-refresh"
+    RefreshRuntime.injectIntoGlobalHook(window)
+    window.$RefreshReg$ = () => {}
+    window.$RefreshSig$ = () => (type) => type
+    window.__vite_plugin_react_preamble_installed__ = true
+  </script>
+  <script type="module">
+    import "${baseUrl}/virtual:mcp-react-ui/${escapeHtml(key)}"
+  </script>
 </body>
 </html>`;
 }
