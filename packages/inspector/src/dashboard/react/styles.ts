@@ -12,6 +12,12 @@ const FONT_SANS =
 const FONT_MONO =
   "'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace";
 
+// Base payload style — shared by default and agent-tinted variants
+const eventPayloadBase: CSSProperties = {
+  padding: "0.5rem 0.5rem 0.5rem 1.5rem",
+  borderTop: "1px solid rgba(255, 255, 255, 0.05)",
+};
+
 export const styles: Record<string, CSSProperties> = {
   // Root
   root: {
@@ -833,10 +839,7 @@ export const styles: Record<string, CSSProperties> = {
     whiteSpace: "nowrap",
   },
 
-  eventPayload: {
-    padding: "0.5rem 0.5rem 0.5rem 1.5rem",
-    borderTop: "1px solid rgba(255, 255, 255, 0.05)",
-  },
+  eventPayload: eventPayloadBase,
 
   // ===========================================================================
   // JSON VIEWER
@@ -1145,14 +1148,14 @@ export const styles: Record<string, CSSProperties> = {
 
   // Tinted payload sections for agent tool-call (input) vs tool-result (output)
   agentPayloadInput: {
-    padding: "0.5rem 0.5rem 0.5rem 1.5rem",
+    ...eventPayloadBase,
     borderTop: "1px solid rgba(96, 165, 250, 0.15)",
     backgroundColor: "rgba(96, 165, 250, 0.06)",
     borderLeft: "2px solid rgba(96, 165, 250, 0.3)",
   },
 
   agentPayloadOutput: {
-    padding: "0.5rem 0.5rem 0.5rem 1.5rem",
+    ...eventPayloadBase,
     borderTop: "1px solid rgba(74, 222, 128, 0.15)",
     backgroundColor: "rgba(74, 222, 128, 0.06)",
     borderLeft: "2px solid rgba(74, 222, 128, 0.3)",
@@ -1174,7 +1177,7 @@ export const styles: Record<string, CSSProperties> = {
     padding: "0.375rem 0.625rem",
     maxWidth: "90%",
     animation: "reasoningReveal 0.4s ease-out forwards",
-    overflow: "hidden",
+    overflowY: "auto",
   },
 
   reasoningLabel: {

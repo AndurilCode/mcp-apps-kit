@@ -74,19 +74,34 @@ function getPayloadReasoning(payload: unknown): string | undefined {
   return undefined;
 }
 
+// Characters per second for the typing effect
+const CHARS_PER_SECOND = 120;
+
 /**
- * Reasoning bubble with a streaming/typing animation
+ * Reasoning bubble with a streaming/typing animation.
+ * When `skipAnimation` is true the full text is shown immediately (no replay on re-expand).
  */
-function ReasoningBubble({ text }: { text: string }): React.ReactElement {
-  const [displayedLength, setDisplayedLength] = useState(0);
-  const [isDone, setIsDone] = useState(false);
+function ReasoningBubble({
+  text,
+  skipAnimation = false,
+  onAnimationDone,
+}: {
+  text: string;
+  skipAnimation?: boolean;
+  onAnimationDone?: () => void;
+}): React.ReactElement {
+  const [displayedLength, setDisplayedLength] = useState(skipAnimation ? text.length : 0);
+  const [isDone, setIsDone] = useState(skipAnimation);
   const rafRef = useRef<number | null>(null);
   const startTimeRef = useRef<number | null>(null);
 
-  // Characters per second for the typing effect
-  const CHARS_PER_SECOND = 120;
-
   useEffect(() => {
+    if (skipAnimation) {
+      setDisplayedLength(text.length);
+      setIsDone(true);
+      return;
+    }
+
     startTimeRef.current = null;
     setDisplayedLength(0);
     setIsDone(false);
@@ -103,6 +118,7 @@ function ReasoningBubble({ text }: { text: string }): React.ReactElement {
         rafRef.current = requestAnimationFrame(animate);
       } else {
         setIsDone(true);
+        onAnimationDone?.();
       }
     };
 
@@ -113,7 +129,7 @@ function ReasoningBubble({ text }: { text: string }): React.ReactElement {
         cancelAnimationFrame(rafRef.current);
       }
     };
-  }, [text]);
+  }, [text, skipAnimation, onAnimationDone]);
 
   return (
     <div style={styles.reasoningContainer as React.CSSProperties}>
@@ -131,6 +147,8 @@ function ReasoningBubble({ text }: { text: string }): React.ReactElement {
 export function EventRow({ event, isAgentView = false }: EventRowProps): React.ReactElement {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  // Track whether reasoning animation already played (persists across collapse/expand)
+  const reasoningAnimatedRef = useRef(false);
 
   const toggleExpand = useCallback(() => {
     setIsExpanded((prev) => !prev);
@@ -228,7 +246,15 @@ export function EventRow({ event, isAgentView = false }: EventRowProps): React.R
       </div>
       {isExpanded && (
         <>
-          {reasoning && <ReasoningBubble text={reasoning} />}
+          {reasoning && (
+            <ReasoningBubble
+              text={reasoning}
+              skipAnimation={reasoningAnimatedRef.current}
+              onAnimationDone={() => {
+                reasoningAnimatedRef.current = true;
+              }}
+            />
+          )}
           <div style={payloadStyle}>
             <JsonViewer data={event.payload} />
           </div>
