@@ -28,6 +28,8 @@ import { registerProxyToolsDirectly } from "./proxy-tools";
 import { registerProxyResources } from "./proxy-resources";
 import { handleDashboardRequest } from "./dashboard/dashboard-server";
 import { handleOAuthRoutes } from "./oauth/callback-handler";
+import { createWellKnownProxy } from "./oauth/wellknown-proxy";
+import type { WellKnownProxyContext } from "./oauth/wellknown-proxy";
 import {
   createConnectTool,
   createDisconnectTool,
@@ -172,6 +174,33 @@ export function createDualInspectorServer(
 
   const defaultPort = options.port ?? 6274;
 
+  // Well-known endpoint proxy for OAuth discovery in dual mode
+  const wellKnownProxy = createWellKnownProxy({ debug: options.debug });
+
+  /**
+   * Build the WellKnownProxyContext from the current connection state.
+   * Returns null when no OAuth-protected upstream is connected.
+   */
+  const getWellKnownContext = (): WellKnownProxyContext | null => {
+    const cm = getActiveConnectionManager();
+    if (!cm) return null;
+
+    const state = cm.getState();
+    if (!state.connected || !state.serverUrl) return null;
+
+    // Only active when an OAuth provider is configured (i.e., upstream is OAuth-protected)
+    if (!cm.getOAuthProvider()) return null;
+
+    const inspectorUrl = cm.getInspectorUrl();
+    if (!inspectorUrl) return null;
+
+    return {
+      upstreamUrl: state.serverUrl,
+      proxyUrl: inspectorUrl,
+      authToken: cm.getAuthToken(),
+    };
+  };
+
   // Create agent app with observation-only tools (always available)
   const agentTools = createAgentTools(registry);
   const agentApp = createApp({
@@ -280,6 +309,12 @@ export function createDualInspectorServer(
     // OAuth routes (/oauth/callback + /api/oauth/*)
     if (url.startsWith("/oauth/") || url.startsWith("/api/oauth/")) {
       const handled = await handleOAuthRoutes(req, res, registry, getActiveConnectionManager);
+      if (handled) return;
+    }
+
+    // Well-known OAuth discovery endpoints (proxy from upstream)
+    if (url.startsWith("/.well-known/oauth-")) {
+      const handled = await wellKnownProxy.handleWellKnownRequest(req, res, getWellKnownContext());
       if (handled) return;
     }
 
