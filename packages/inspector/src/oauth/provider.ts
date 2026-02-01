@@ -433,7 +433,8 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
       }
 
       this._supportsRevocation = true;
-      const endpointUrl = revocationEndpoint;
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-conversion -- SDK returns URL object at runtime despite string type
+      const endpointUrl = revocationEndpoint.toString();
 
       // Build client authentication (client_id + optional client_secret)
       const clientInfo = await this.clientInformation();
