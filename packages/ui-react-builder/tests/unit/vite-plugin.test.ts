@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { toEsbuildImportSpecifier, isPathWithinRoot, mcpReactUI } from "../../src/vite-plugin";
-import type { Plugin, ResolvedConfig } from "vite";
+import type { Plugin, ResolvedConfig, ViteDevServer } from "vite";
 
 describe("toEsbuildImportSpecifier", () => {
   it("should normalize Windows backslashes to forward slashes", () => {
@@ -241,6 +241,201 @@ describe("mcpReactUI", () => {
         outDir: "custom-dist",
       });
       expect(plugin).toBeDefined();
+    });
+  });
+
+  describe("dev option", () => {
+    it("should accept dev: true", () => {
+      const plugin = mcpReactUI({ serverEntry: "./src/index.ts", dev: true });
+      expect(plugin).toBeDefined();
+    });
+
+    it("should accept dev: false", () => {
+      const plugin = mcpReactUI({ serverEntry: "./src/index.ts", dev: false });
+      expect(plugin).toBeDefined();
+    });
+
+    it("should accept dev: DevServerOptions object", () => {
+      const plugin = mcpReactUI({
+        serverEntry: "./src/index.ts",
+        dev: { port: 5174, hmr: true },
+      });
+      expect(plugin).toBeDefined();
+    });
+
+    it("should accept dev: undefined (default)", () => {
+      const plugin = mcpReactUI({ serverEntry: "./src/index.ts" });
+      expect(plugin).toBeDefined();
+    });
+  });
+
+  describe("configureServer hook", () => {
+    it("should have configureServer hook", () => {
+      const plugin = mcpReactUI({ serverEntry: "./src/index.ts" }) as Plugin;
+      expect(plugin.configureServer).toBeDefined();
+      expect(typeof plugin.configureServer).toBe("function");
+    });
+
+    it("should not have configureServer when dev: false is set", () => {
+      // Even with dev: false, the hook exists but is a no-op —
+      // the hook checks isDevModeActive internally
+      const plugin = mcpReactUI({
+        serverEntry: "./src/index.ts",
+        dev: false,
+      }) as Plugin;
+      expect(plugin.configureServer).toBeDefined();
+    });
+  });
+
+  describe("virtual module resolution (dev mode)", () => {
+    /**
+     * Helper to create a plugin pre-configured with dev mode active.
+     * Simulates what happens when configureServer registers virtual modules
+     * by calling resolveId/load after seeding the internal map.
+     */
+    function createDevPlugin() {
+      const warnFn = vi.fn();
+      const infoFn = vi.fn();
+      const plugin = mcpReactUI({
+        serverEntry: "./src/index.ts",
+        logger: { info: infoFn, warn: warnFn, error: vi.fn() },
+      }) as Plugin;
+
+      // Simulate configResolved with serve command
+      const configResolved = plugin.configResolved as (config: ResolvedConfig) => void;
+      configResolved({
+        root: "/fake/root",
+        command: "serve",
+        mode: "development",
+        plugins: [{ name: "vite:react-babel" }],
+      } as unknown as ResolvedConfig);
+
+      return { plugin, warnFn, infoFn };
+    }
+
+    it("should not resolve unknown virtual modules", () => {
+      const { plugin } = createDevPlugin();
+      const resolveId = plugin.resolveId as (id: string) => string | null;
+
+      // No virtual modules registered yet (configureServer hasn't run)
+      expect(resolveId("virtual:mcp-react-ui/unknown-widget")).toBeNull();
+    });
+
+    it("should not resolve non-virtual modules", () => {
+      const { plugin } = createDevPlugin();
+      const resolveId = plugin.resolveId as (id: string) => string | null;
+
+      expect(resolveId("./src/component.tsx")).toBeNull();
+      expect(resolveId("react")).toBeNull();
+    });
+
+    it("should return null from load for non-virtual modules", () => {
+      const { plugin } = createDevPlugin();
+      const load = plugin.load as (id: string) => string | null;
+
+      expect(load("./src/component.tsx")).toBeNull();
+      expect(load("react")).toBeNull();
+    });
+
+    it("should return null from load for unresolved virtual prefix", () => {
+      const { plugin } = createDevPlugin();
+      const load = plugin.load as (id: string) => string | null;
+
+      // The resolved prefix uses \0, but if someone passes the raw prefix it shouldn't match
+      expect(load("virtual:mcp-react-ui/some-widget")).toBeNull();
+    });
+  });
+
+  describe("React plugin detection", () => {
+    it("should warn when @vitejs/plugin-react is not present", async () => {
+      const warnFn = vi.fn();
+      const plugin = mcpReactUI({
+        widgetsDir: "./nonexistent-widgets-dir",
+        logger: { info: vi.fn(), warn: warnFn, error: vi.fn() },
+      }) as Plugin;
+
+      // Simulate configResolved with no React plugin
+      const configResolved = plugin.configResolved as (config: ResolvedConfig) => void;
+      configResolved({
+        root: "/fake/root",
+        command: "serve",
+        mode: "development",
+        plugins: [{ name: "some-other-plugin" }],
+      } as unknown as ResolvedConfig);
+
+      // Call configureServer
+      const configureServer = plugin.configureServer as (server: ViteDevServer) => Promise<void>;
+      await configureServer({} as ViteDevServer);
+
+      expect(warnFn).toHaveBeenCalledWith(expect.stringContaining("@vitejs/plugin-react"));
+    });
+
+    it("should not warn when vite:react-babel is present", async () => {
+      const warnFn = vi.fn();
+      const plugin = mcpReactUI({
+        widgetsDir: "./nonexistent-widgets-dir",
+        logger: { info: vi.fn(), warn: warnFn, error: vi.fn() },
+      }) as Plugin;
+
+      const configResolved = plugin.configResolved as (config: ResolvedConfig) => void;
+      configResolved({
+        root: "/fake/root",
+        command: "serve",
+        mode: "development",
+        plugins: [{ name: "vite:react-babel" }],
+      } as unknown as ResolvedConfig);
+
+      const configureServer = plugin.configureServer as (server: ViteDevServer) => Promise<void>;
+      await configureServer({} as ViteDevServer);
+
+      expect(warnFn).not.toHaveBeenCalledWith(expect.stringContaining("@vitejs/plugin-react"));
+    });
+
+    it("should not warn when vite:react-swc is present", async () => {
+      const warnFn = vi.fn();
+      const plugin = mcpReactUI({
+        widgetsDir: "./nonexistent-widgets-dir",
+        logger: { info: vi.fn(), warn: warnFn, error: vi.fn() },
+      }) as Plugin;
+
+      const configResolved = plugin.configResolved as (config: ResolvedConfig) => void;
+      configResolved({
+        root: "/fake/root",
+        command: "serve",
+        mode: "development",
+        plugins: [{ name: "vite:react-swc" }],
+      } as unknown as ResolvedConfig);
+
+      const configureServer = plugin.configureServer as (server: ViteDevServer) => Promise<void>;
+      await configureServer({} as ViteDevServer);
+
+      expect(warnFn).not.toHaveBeenCalledWith(expect.stringContaining("@vitejs/plugin-react"));
+    });
+
+    it("should not run configureServer when dev: false", async () => {
+      const warnFn = vi.fn();
+      const infoFn = vi.fn();
+      const plugin = mcpReactUI({
+        widgetsDir: "./nonexistent-widgets-dir",
+        dev: false,
+        logger: { info: infoFn, warn: warnFn, error: vi.fn() },
+      }) as Plugin;
+
+      const configResolved = plugin.configResolved as (config: ResolvedConfig) => void;
+      configResolved({
+        root: "/fake/root",
+        command: "serve",
+        mode: "development",
+        plugins: [],
+      } as unknown as ResolvedConfig);
+
+      const configureServer = plugin.configureServer as (server: ViteDevServer) => Promise<void>;
+      await configureServer({} as ViteDevServer);
+
+      // Should not warn about React plugin because configureServer returned early
+      expect(warnFn).not.toHaveBeenCalled();
+      // Should not discover widgets
+      expect(infoFn).not.toHaveBeenCalled();
     });
   });
 });

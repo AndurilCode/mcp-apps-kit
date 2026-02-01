@@ -36,12 +36,13 @@
  * ```
  */
 
-import type { Plugin, ResolvedConfig } from "vite";
+import type { Plugin, ResolvedConfig, ViteDevServer } from "vite";
 import type { AcceptedPlugin } from "postcss";
+import type { DevServerOptions } from "./types";
 import * as esbuild from "esbuild";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { generateHTML } from "./html";
+import { generateDevHTML, generateHTML } from "./html";
 import { parseReactUIDefinitions } from "./ast-parser";
 import { parseWidgetFile } from "./widget-parser";
 
@@ -325,6 +326,34 @@ export interface McpReactUIOptions {
    * ```
    */
   serverConfig?: McpServerConfig;
+
+  /**
+   * Development server options for HMR (Hot Module Replacement) support.
+   *
+   * When Vite runs in serve mode (`vite dev`), the plugin generates dev HTML
+   * files that load widgets through Vite's dev server with React Fast Refresh.
+   *
+   * - `true` or `{}`: Enable dev server features with defaults.
+   * - `false`: Explicitly disable dev server features even in serve mode
+   *   (widgets will be bundled with esbuild as in production).
+   * - `DevServerOptions`: Enable with custom configuration.
+   *
+   * When not specified, dev server features are automatically enabled in serve
+   * mode.
+   *
+   * @example
+   * ```typescript
+   * // Enable with defaults
+   * mcpReactUI({ serverEntry: "./src/index.ts", dev: true })
+   *
+   * // Disable in dev mode (always use esbuild)
+   * mcpReactUI({ serverEntry: "./src/index.ts", dev: false })
+   *
+   * // Custom config
+   * mcpReactUI({ serverEntry: "./src/index.ts", dev: { port: 3001 } })
+   * ```
+   */
+  dev?: DevServerOptions | boolean;
 }
 
 /**
@@ -568,6 +597,50 @@ async function discoverWidgetFiles(
 }
 
 /**
+ * Discover widgets using the configured discovery mode.
+ *
+ * Consolidates the serverEntry/widgetsDir discovery branching so that both
+ * `configureServer` and `buildStart` can call the same function.
+ *
+ * @internal
+ */
+async function discoverWidgets(
+  options: McpReactUIOptions,
+  root: string,
+  logger: PluginLogger
+): Promise<DiscoveredUI[]> {
+  let discovered: DiscoveredUI[];
+
+  if (options.widgetsDir) {
+    discovered = await discoverWidgetFiles(options.widgetsDir, root, logger);
+
+    if (discovered.length === 0) {
+      logger.info("[mcp-react-ui] No widget files found in " + options.widgetsDir);
+      return [];
+    }
+
+    logger.info(
+      `[mcp-react-ui] Found ${discovered.length} widget(s): ${discovered.map((d) => d.key).join(", ")}`
+    );
+  } else if (options.serverEntry) {
+    discovered = await discoverReactUIs(options.serverEntry, root, logger);
+
+    if (discovered.length === 0) {
+      logger.info("[mcp-react-ui] No defineReactUI calls found");
+      return [];
+    }
+
+    logger.info(
+      `[mcp-react-ui] Found ${discovered.length} React UI(s): ${discovered.map((d) => d.componentName).join(", ")}`
+    );
+  } else {
+    return [];
+  }
+
+  return discovered;
+}
+
+/**
  * Build discovered React UI components.
  */
 async function buildDiscoveredUIs(
@@ -702,6 +775,57 @@ if (rootElement) {
  * })
  * ```
  */
+/**
+ * Virtual module prefix for dev-mode widget entry points.
+ *
+ * Each widget gets a virtual module at `virtual:mcp-react-ui/<key>` that
+ * the dev HTML imports.  The plugin resolves these to a synthetic entry
+ * point that mounts the actual React component.
+ *
+ * @internal
+ */
+const VIRTUAL_MODULE_PREFIX = "virtual:mcp-react-ui/";
+
+/**
+ * Resolved virtual module prefix used internally by Vite.
+ *
+ * Vite convention: resolved virtual modules are prefixed with `\0` so they
+ * are never matched by file-system resolve or other plugins.
+ *
+ * @internal
+ */
+const RESOLVED_VIRTUAL_PREFIX = "\0" + VIRTUAL_MODULE_PREFIX;
+
+/**
+ * Determine whether dev server features should be active.
+ *
+ * Rules:
+ * - `dev: false` → always off
+ * - `dev: true | DevServerOptions | undefined` + `command === 'serve'` → on
+ * - `command === 'build'` → always off
+ *
+ * @internal
+ */
+function isDevModeActive(devOption: McpReactUIOptions["dev"], command: "build" | "serve"): boolean {
+  if (devOption === false) return false;
+  return command === "serve";
+}
+
+/**
+ * Check whether `@vitejs/plugin-react` (or a compatible React plugin) is
+ * present in the resolved Vite config.
+ *
+ * @internal
+ */
+function hasReactPlugin(config: ResolvedConfig): boolean {
+  return config.plugins.some(
+    (p) =>
+      p.name === "vite:react-babel" || // @vitejs/plugin-react
+      p.name === "vite:react-swc" || // @vitejs/plugin-react-swc
+      p.name === "vite:react-refresh" // older versions
+  );
+}
+
 export function mcpReactUI(options: McpReactUIOptions): Plugin {
   let config: ResolvedConfig;
 
@@ -723,6 +847,10 @@ export function mcpReactUI(options: McpReactUIOptions): Plugin {
   const logger: PluginLogger =
     options.logger === false ? silentLogger : (options.logger ?? defaultLogger);
 
+  // Map of widget key → DiscoveredUI, populated by configureServer or buildStart
+  // in dev mode.  Used by resolveId/load to serve virtual modules.
+  const virtualModules = new Map<string, DiscoveredUI>();
+
   return {
     name: "mcp-react-ui",
 
@@ -730,51 +858,96 @@ export function mcpReactUI(options: McpReactUIOptions): Plugin {
       config = resolvedConfig;
     },
 
+    /**
+     * configureServer — runs only in `vite dev` (serve mode).
+     *
+     * 1. Warn if @vitejs/plugin-react is missing.
+     * 2. Discover widgets (serverEntry or widgetsDir).
+     * 3. Populate `virtualModules` map so resolveId/load can serve them.
+     * 4. Write dev HTML files to outDir via generateDevHTML.
+     */
+    async configureServer(_server: ViteDevServer) {
+      if (!isDevModeActive(options.dev, config.command)) return;
+
+      // Warn if React plugin is missing — Fast Refresh won't work without it
+      if (!hasReactPlugin(config)) {
+        logger.warn(
+          "[mcp-react-ui] @vitejs/plugin-react (or plugin-react-swc) was not detected. " +
+            "React Fast Refresh will not work in dev mode. " +
+            "Add @vitejs/plugin-react to your Vite config for HMR support."
+        );
+      }
+
+      const root = config.root;
+
+      // Discover widgets
+      const discovered = await discoverWidgets(options, root, logger);
+      if (discovered.length === 0) return;
+
+      // Register virtual modules
+      for (const ui of discovered) {
+        virtualModules.set(ui.key, ui);
+      }
+
+      // Write dev HTML files
+      const outDir = options.outDir ?? "./dist/ui";
+      for (const ui of discovered) {
+        const html = generateDevHTML({
+          key: ui.key,
+          name: ui.name,
+        });
+
+        const outputPath = path.resolve(root, outDir, `${ui.key}.html`);
+        await fs.mkdir(path.dirname(outputPath), { recursive: true });
+        await fs.writeFile(outputPath, html, "utf-8");
+
+        logger.info(`[mcp-react-ui] Dev HTML: ${ui.key}.html`);
+      }
+    },
+
     // Run build at the start of the build process
     async buildStart() {
       const root = config.root;
       const isProduction = config.mode === "production";
 
-      // Discover UIs based on configured mode
-      let discovered: DiscoveredUI[];
-
-      if (options.widgetsDir) {
-        // File-based discovery mode
-        discovered = await discoverWidgetFiles(options.widgetsDir, root, logger);
-
-        if (discovered.length === 0) {
-          logger.info("[mcp-react-ui] No widget files found in " + options.widgetsDir);
-          return;
+      // In serve mode with dev features enabled, write dev HTML instead of
+      // esbuild-bundled production HTML.  Virtual modules are already
+      // registered by configureServer.
+      if (isDevModeActive(options.dev, config.command)) {
+        // configureServer already wrote the dev HTML files and registered
+        // virtual modules.  If it hasn't run (e.g. edge case), discover now.
+        if (virtualModules.size === 0) {
+          const discovered = await discoverWidgets(options, root, logger);
+          const outDir = options.outDir ?? "./dist/ui";
+          for (const ui of discovered) {
+            virtualModules.set(ui.key, ui);
+            const html = generateDevHTML({ key: ui.key, name: ui.name });
+            const outputPath = path.resolve(root, outDir, `${ui.key}.html`);
+            await fs.mkdir(path.dirname(outputPath), { recursive: true });
+            await fs.writeFile(outputPath, html, "utf-8");
+            logger.info(`[mcp-react-ui] Dev HTML: ${ui.key}.html`);
+          }
         }
-
-        logger.info(
-          `[mcp-react-ui] Found ${discovered.length} widget(s): ${discovered.map((d) => d.key).join(", ")}`
-        );
-      } else if (options.serverEntry) {
-        // serverEntry-based discovery mode
-        discovered = await discoverReactUIs(options.serverEntry, root, logger);
-
-        if (discovered.length === 0) {
-          logger.info("[mcp-react-ui] No defineReactUI calls found");
-          return;
-        }
-
-        logger.info(
-          `[mcp-react-ui] Found ${discovered.length} React UI(s): ${discovered.map((d) => d.componentName).join(", ")}`
-        );
-      } else {
-        // This should never happen due to validation at plugin creation
         return;
       }
 
-      // Build discovered UIs
+      // Production path: discover and build with esbuild (unchanged)
+      const discovered = await discoverWidgets(options, root, logger);
+      if (discovered.length === 0) return;
+
       await buildDiscoveredUIs(discovered, options, root, isProduction, logger);
     },
 
-    // Provide a virtual empty module so Vite doesn't complain about missing entry
+    // Resolve virtual modules: both standalone entry and per-widget dev modules
     resolveId(id) {
       if (standalone && id === "virtual:mcp-react-ui-entry") {
         return id;
+      }
+      if (id.startsWith(VIRTUAL_MODULE_PREFIX)) {
+        const key = id.slice(VIRTUAL_MODULE_PREFIX.length);
+        if (virtualModules.has(key)) {
+          return RESOLVED_VIRTUAL_PREFIX + key;
+        }
       }
       return null;
     },
@@ -782,6 +955,38 @@ export function mcpReactUI(options: McpReactUIOptions): Plugin {
     load(id) {
       if (standalone && id === "virtual:mcp-react-ui-entry") {
         return "export default {}";
+      }
+      if (id.startsWith(RESOLVED_VIRTUAL_PREFIX)) {
+        const key = id.slice(RESOLVED_VIRTUAL_PREFIX.length);
+        const ui = virtualModules.get(key);
+        if (!ui) return null;
+
+        const importPath = toEsbuildImportSpecifier(ui.componentPath);
+
+        // Generate AppsProvider props based on autoResize setting
+        const providerProps = ui.autoResize === undefined ? "" : ` autoResize={${ui.autoResize}}`;
+
+        // Return entry-point code that mounts the widget component.
+        // This code runs in the browser via Vite's dev server transform
+        // pipeline, so React Fast Refresh applies automatically.
+        return `
+import React from "react";
+import { createRoot } from "react-dom/client";
+import { AppsProvider } from "@mcp-apps-kit/ui-react";
+import Component from "${importPath}";
+
+const rootElement = document.getElementById("root");
+if (rootElement) {
+  const root = createRoot(rootElement);
+  root.render(
+    <React.StrictMode>
+      <AppsProvider${providerProps}>
+        <Component />
+      </AppsProvider>
+    </React.StrictMode>
+  );
+}
+`;
       }
       return null;
     },
@@ -816,5 +1021,7 @@ export function mcpReactUI(options: McpReactUIOptions): Plugin {
     },
   };
 }
+
+export type { DevServerOptions };
 
 export default mcpReactUI;
