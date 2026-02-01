@@ -9,6 +9,7 @@ import { EventEmitter } from "node:events";
 import type { ConnectionParams } from "@mcp-apps-kit/testing";
 import { ConnectionManager } from "./connection";
 import type { ConnectOptions, ConnectionStatusOutput, InspectorServerOptions } from "./types";
+import type { OAuthState } from "./oauth/types";
 
 /**
  * Event map emitted by the connection registry.
@@ -37,6 +38,8 @@ export interface ConnectionRegistryOptions {
  */
 export interface ConnectionInfo extends ConnectionStatusOutput {
   id: string;
+  /** OAuth authentication state (present for HTTP connections with OAuth) */
+  oauth?: OAuthState;
 }
 
 /**
@@ -183,6 +186,7 @@ export class ConnectionRegistry extends EventEmitter {
   listConnections(): ConnectionInfo[] {
     return Array.from(this.connections.entries()).map(([id, connection]) => {
       const state = connection.getState();
+      const oauthState = connection.getOAuthState();
       const info: ConnectionInfo = {
         id,
         connected: state.connected,
@@ -190,6 +194,7 @@ export class ConnectionRegistry extends EventEmitter {
         serverInfo: state.serverInfo,
         historyEnabled: state.historyEnabled,
         callCount: state.callCount,
+        ...(oauthState ? { oauth: oauthState } : {}),
       };
       return info;
     });

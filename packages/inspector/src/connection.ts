@@ -26,6 +26,8 @@ import type {
 import { getEventCategory } from "./types";
 import { WidgetSessionManager } from "./widget-session-manager";
 import { WidgetServer } from "./widget-server";
+import { InspectorOAuthProvider } from "./oauth/provider";
+import type { OAuthState, OAuthClientConfig } from "./oauth/types";
 
 /**
  * Protocol type inferred from connected server's tools
@@ -141,6 +143,9 @@ export class ConnectionManager extends EventEmitter {
   /** Auth token for proxied requests (from OAuth flow) */
   private authToken: string | null = null;
 
+  /** OAuth client provider for authenticated connections */
+  private oauthProvider: InspectorOAuthProvider | null = null;
+
   /** Inspector URL for injected sync scripts (set when server starts) */
   private inspectorUrl: string | null = null;
 
@@ -178,7 +183,7 @@ export class ConnectionManager extends EventEmitter {
     resourceCount: number;
     promptCount: number;
   }> {
-    const { trackHistory = true, timeout = this.defaultTimeout } = options;
+    const { trackHistory = true, timeout = this.defaultTimeout, oauthConfig } = options;
 
     // Generate display label
     const label =
@@ -222,11 +227,36 @@ export class ConnectionManager extends EventEmitter {
           }
         : undefined;
 
+    // Set up OAuth provider for HTTP connections when config is provided
+    let authProvider: InspectorOAuthProvider | undefined;
+    if (params.transport === "http" && oauthConfig) {
+      // Port is set later via setInspectorUrl, default to 6274
+      const port = this.inspectorUrl ? new URL(this.inspectorUrl).port : "6274";
+
+      authProvider = new InspectorOAuthProvider({
+        serverUrl: params.url,
+        config: oauthConfig,
+        callbackPort: parseInt(port, 10),
+        debug: this.debug,
+      });
+
+      // Track OAuth status changes
+      authProvider.onStatusChange = () => {
+        if (this.debug) {
+          const state = authProvider!.getOAuthState();
+          console.log(`[inspector] OAuth status changed: ${state.status}`);
+        }
+      };
+
+      this.oauthProvider = authProvider;
+    }
+
     // Create test client using @mcp-apps-kit/testing
     const client = await createTestClient(params, {
       trackHistory,
       timeout,
       onTransportClose,
+      authProvider,
     });
 
     // Get server capabilities by listing tools, resources, prompts
@@ -422,6 +452,9 @@ export class ConnectionManager extends EventEmitter {
 
     // Clear auth token
     this.authToken = null;
+
+    // Clear OAuth provider
+    this.oauthProvider = null;
 
     if (this.debug) {
       console.log(`[inspector] Disconnected from ${previousUrl}`);
@@ -870,6 +903,32 @@ export class ConnectionManager extends EventEmitter {
         console.warn(`[inspector] Error reading resource ${uri}:`, error);
       }
       return null;
+    }
+  }
+
+  /**
+   * Get the OAuth provider for this connection (if configured).
+   */
+  getOAuthProvider(): InspectorOAuthProvider | null {
+    return this.oauthProvider;
+  }
+
+  /**
+   * Get the current OAuth state for this connection.
+   *
+   * @returns OAuth state or undefined if no OAuth is configured
+   */
+  getOAuthState(): OAuthState | undefined {
+    return this.oauthProvider?.getOAuthState();
+  }
+
+  /**
+   * Set the OAuth provider externally (e.g., for CLI preset mode).
+   */
+  setOAuthProvider(provider: InspectorOAuthProvider): void {
+    this.oauthProvider = provider;
+    if (this.debug) {
+      console.log(`[inspector] OAuth provider set externally`);
     }
   }
 
