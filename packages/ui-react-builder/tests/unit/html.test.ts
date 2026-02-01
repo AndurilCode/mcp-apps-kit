@@ -372,6 +372,70 @@ describe("generateDevHTML", () => {
     expect(html).not.toContain("createRoot");
     expect(html).not.toContain("react-dom/client");
   });
+
+  it("should contain exactly three script type='module' blocks", () => {
+    const html = generateDevHTML({
+      key: "test-widget",
+      name: "Test Widget",
+    });
+
+    const moduleScripts = html.match(/<script type="module"/g);
+    expect(moduleScripts).toHaveLength(3);
+  });
+
+  it("should emit scripts in correct order: vite client, preamble, virtual import", () => {
+    const html = generateDevHTML({
+      key: "my-widget",
+      name: "My Widget",
+    });
+
+    const viteClientIdx = html.indexOf("/@vite/client");
+    const preambleIdx = html.indexOf("/@react-refresh");
+    const virtualModuleIdx = html.indexOf("virtual:mcp-react-ui/my-widget");
+
+    expect(viteClientIdx).toBeGreaterThan(-1);
+    expect(preambleIdx).toBeGreaterThan(-1);
+    expect(virtualModuleIdx).toBeGreaterThan(-1);
+
+    // Vite client must come first, then preamble, then the virtual module import
+    expect(viteClientIdx).toBeLessThan(preambleIdx);
+    expect(preambleIdx).toBeLessThan(virtualModuleIdx);
+  });
+
+  it("should produce structurally different output from generateHTML", () => {
+    const devHtml = generateDevHTML({
+      key: "widget",
+      name: "Widget",
+    });
+
+    const prodHtml = generateHTML({
+      key: "widget",
+      name: "Widget",
+      script: "console.log('prod');",
+    });
+
+    // Dev HTML has vite client, prod does not
+    expect(devHtml).toContain("/@vite/client");
+    expect(prodHtml).not.toContain("/@vite/client");
+
+    // Dev HTML has react-refresh preamble, prod does not
+    expect(devHtml).toContain("@react-refresh");
+    expect(prodHtml).not.toContain("@react-refresh");
+
+    // Dev HTML has virtual module import, prod does not
+    expect(devHtml).toContain("virtual:mcp-react-ui/");
+    expect(prodHtml).not.toContain("virtual:mcp-react-ui/");
+
+    // Prod HTML has inlined script, dev does not
+    expect(prodHtml).toContain("console.log('prod');");
+    expect(devHtml).not.toContain("console.log");
+
+    // Both share the same base structure
+    expect(devHtml).toContain("<!DOCTYPE html>");
+    expect(prodHtml).toContain("<!DOCTYPE html>");
+    expect(devHtml).toContain('<div id="root"></div>');
+    expect(prodHtml).toContain('<div id="root"></div>');
+  });
 });
 
 describe("extractInlineCSS", () => {
