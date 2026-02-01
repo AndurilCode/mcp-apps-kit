@@ -165,6 +165,61 @@ const oauthPanelStyles: Record<string, React.CSSProperties> = {
     gap: "0.5rem",
     alignItems: "center",
   },
+  scopeChipsContainer: {
+    display: "flex",
+    flexWrap: "wrap" as const,
+    gap: "0.375rem",
+  },
+  scopeChip: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "0.25rem",
+    padding: "0.25rem 0.5rem",
+    borderRadius: "4px",
+    fontSize: "0.6875rem",
+    fontFamily: "inherit",
+    fontWeight: 500,
+    cursor: "pointer",
+    border: "1px solid #2d2f2f",
+    backgroundColor: "#111111",
+    color: "#9ca3af",
+    transition: "all 0.15s ease",
+    userSelect: "none" as const,
+  },
+  scopeChipSelected: {
+    backgroundColor: "rgba(32, 178, 170, 0.15)",
+    borderColor: "#20b2aa",
+    color: "#20b2aa",
+  },
+  scopeCustomRow: {
+    display: "flex",
+    gap: "0.375rem",
+    alignItems: "center",
+    marginTop: "0.25rem",
+  },
+  scopeCustomInput: {
+    flex: 1,
+    backgroundColor: "#111111",
+    border: "1px solid #2d2f2f",
+    borderRadius: "6px",
+    color: "#e8e8e8",
+    padding: "0.25rem 0.5rem",
+    fontSize: "0.6875rem",
+    fontFamily: "inherit",
+    outline: "none",
+  },
+  scopeAddButton: {
+    fontFamily: "inherit",
+    backgroundColor: "#20b2aa",
+    border: "none",
+    borderRadius: "4px",
+    color: "#ffffff",
+    padding: "0.25rem 0.5rem",
+    fontSize: "0.6875rem",
+    fontWeight: 600,
+    cursor: "pointer",
+    whiteSpace: "nowrap" as const,
+  },
 };
 
 // =============================================================================
@@ -232,8 +287,52 @@ export function OAuthPanel({
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [scopes, setScopes] = useState("");
+  const [customScopeInput, setCustomScopeInput] = useState("");
 
   const { oauthState, isConfigured, authorizationUrl, isLoading, error, configure, revoke } = oauth;
+
+  const supportedScopes = oauthState?.supportedScopes;
+  const hasSupportedScopes = Array.isArray(supportedScopes) && supportedScopes.length > 0;
+
+  // Parse current scopes string into a Set for quick lookups
+  const selectedScopesSet = new Set(
+    scopes
+      .split(/\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+  );
+
+  const toggleScope = useCallback(
+    (scope: string) => {
+      const current = new Set(
+        scopes
+          .split(/\s+/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+      );
+      if (current.has(scope)) {
+        current.delete(scope);
+      } else {
+        current.add(scope);
+      }
+      setScopes(Array.from(current).join(" "));
+    },
+    [scopes]
+  );
+
+  const addCustomScope = useCallback(() => {
+    const trimmed = customScopeInput.trim();
+    if (!trimmed) return;
+    const current = new Set(
+      scopes
+        .split(/\s+/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+    );
+    current.add(trimmed);
+    setScopes(Array.from(current).join(" "));
+    setCustomScopeInput("");
+  }, [customScopeInput, scopes]);
 
   const status = oauthState?.status ?? "unauthenticated";
   const isAuthenticated = status === "authenticated";
@@ -414,14 +513,86 @@ export function OAuthPanel({
 
             <div style={oauthPanelStyles.field}>
               <label style={oauthPanelStyles.label}>Scopes</label>
-              <input
-                type="text"
-                style={oauthPanelStyles.input}
-                value={scopes}
-                onChange={(e) => setScopes(e.target.value)}
-                placeholder="e.g. read write openid"
-                data-testid="oauth-scopes"
-              />
+              {hasSupportedScopes ? (
+                <>
+                  <div style={oauthPanelStyles.scopeChipsContainer} data-testid="oauth-scope-chips">
+                    {supportedScopes.map((scope) => {
+                      const isSelected = selectedScopesSet.has(scope);
+                      return (
+                        <button
+                          key={scope}
+                          type="button"
+                          style={{
+                            ...oauthPanelStyles.scopeChip,
+                            ...(isSelected ? oauthPanelStyles.scopeChipSelected : {}),
+                          }}
+                          onClick={() => toggleScope(scope)}
+                          data-testid={`oauth-scope-chip-${scope}`}
+                          aria-pressed={isSelected}
+                        >
+                          <span>{isSelected ? "✓" : "+"}</span>
+                          {scope}
+                        </button>
+                      );
+                    })}
+                    {/* Render chips for custom scopes not in the discovered list */}
+                    {Array.from(selectedScopesSet)
+                      .filter((s) => !supportedScopes.includes(s))
+                      .map((scope) => (
+                        <button
+                          key={scope}
+                          type="button"
+                          style={{
+                            ...oauthPanelStyles.scopeChip,
+                            ...oauthPanelStyles.scopeChipSelected,
+                          }}
+                          onClick={() => toggleScope(scope)}
+                          data-testid={`oauth-scope-chip-${scope}`}
+                          aria-pressed={true}
+                        >
+                          <span>✓</span>
+                          {scope}
+                        </button>
+                      ))}
+                  </div>
+                  <div style={oauthPanelStyles.scopeCustomRow}>
+                    <input
+                      type="text"
+                      style={oauthPanelStyles.scopeCustomInput}
+                      value={customScopeInput}
+                      onChange={(e) => setCustomScopeInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addCustomScope();
+                        }
+                      }}
+                      placeholder="Add custom scope…"
+                      data-testid="oauth-scope-custom-input"
+                    />
+                    <button
+                      type="button"
+                      style={oauthPanelStyles.scopeAddButton}
+                      onClick={addCustomScope}
+                      data-testid="oauth-scope-add-btn"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  <span style={oauthPanelStyles.hint}>
+                    Click scopes to toggle. Add custom scopes below.
+                  </span>
+                </>
+              ) : (
+                <input
+                  type="text"
+                  style={oauthPanelStyles.input}
+                  value={scopes}
+                  onChange={(e) => setScopes(e.target.value)}
+                  placeholder="e.g. read write openid"
+                  data-testid="oauth-scopes"
+                />
+              )}
             </div>
 
             <button
