@@ -475,7 +475,7 @@ export class ConnectionManager extends EventEmitter {
 
     // Fire-and-forget server-side token revocation before clearing provider
     if (this.oauthProvider) {
-      this.oauthProvider.revokeTokens().catch((err) => {
+      this.oauthProvider.revokeTokens().catch((err: unknown) => {
         if (this.debug) {
           console.warn(`[inspector] Token revocation during disconnect failed:`, err);
         }

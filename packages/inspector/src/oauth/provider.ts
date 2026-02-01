@@ -433,7 +433,7 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
       }
 
       this._supportsRevocation = true;
-      const endpointUrl = revocationEndpoint.toString();
+      const endpointUrl = revocationEndpoint;
 
       // Build client authentication (client_id + optional client_secret)
       const clientInfo = await this.clientInformation();

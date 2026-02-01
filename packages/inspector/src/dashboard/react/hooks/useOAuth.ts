@@ -108,7 +108,9 @@ export function useOAuth(
       const data = (await res.json()) as OAuthStatusResponse;
 
       // Guard against stale responses
-      if (activeConnectionIdRef.current !== connectionId) return;
+      if (activeConnectionIdRef.current !== connectionId) {
+        return;
+      }
 
       setIsConfigured(data.configured);
       setAuthorizationUrl(data.authorizationUrl ?? null);
@@ -143,8 +145,12 @@ export function useOAuth(
     }
 
     void fetchStatus();
-    const interval = setInterval(() => void fetchStatus(), pollInterval);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      void fetchStatus();
+    }, pollInterval);
+    return () => {
+      clearInterval(interval);
+    };
   }, [fetchStatus, connectionId, pollInterval]);
 
   /**
@@ -171,9 +177,9 @@ export function useOAuth(
         const body: OAuthConfigureParams = {
           connectionId,
           config: {
-            clientId: params.clientId || undefined,
-            clientSecret: params.clientSecret || undefined,
-            scopes: params.scopes || undefined,
+            clientId: params.clientId ?? undefined,
+            clientSecret: params.clientSecret ?? undefined,
+            scopes: params.scopes ?? undefined,
             enableDynamicRegistration: !params.clientId,
           },
         };

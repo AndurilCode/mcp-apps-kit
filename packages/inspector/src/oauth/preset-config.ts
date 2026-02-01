@@ -70,10 +70,10 @@ export interface PresetProviderOptions {
  */
 export function hasPresetFlags(flags: PresetCLIFlags): boolean {
   return !!(
-    flags.oauthClientId ||
-    flags.oauthClientSecret ||
-    flags.oauthScopes ||
-    flags.oauthConfig ||
+    flags.oauthClientId ??
+    flags.oauthClientSecret ??
+    flags.oauthScopes ??
+    flags.oauthConfig ??
     flags.oauthAutoRegister
   );
 }
@@ -211,9 +211,9 @@ export async function resolvePresetConfig(flags: PresetCLIFlags): Promise<OAuthC
 
   // If only a config file was provided (no inline flags), return file config
   const hasInlineFlags = !!(
-    flags.oauthClientId ||
-    flags.oauthClientSecret ||
-    flags.oauthScopes ||
+    flags.oauthClientId ??
+    flags.oauthClientSecret ??
+    flags.oauthScopes ??
     flags.oauthAutoRegister
   );
 

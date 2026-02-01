@@ -108,7 +108,9 @@ export function createWellKnownProxy(options: WellKnownProxyOptions = {}) {
   async function fetchUpstream<T>(url: string, authToken?: string | null): Promise<T | null> {
     log(`Fetching upstream: ${url}`);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
+    const timeout = setTimeout(() => {
+      controller.abort();
+    }, 10_000);
     try {
       const headers: Record<string, string> = {
         Accept: "application/json",
