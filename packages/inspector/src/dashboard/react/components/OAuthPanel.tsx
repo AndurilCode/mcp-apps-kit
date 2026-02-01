@@ -13,7 +13,7 @@ import type { UseOAuthResult } from "../hooks/useOAuth";
 // STYLES
 // =============================================================================
 
-const oauthPanelStyles: Record<string, React.CSSProperties> = {
+const oauthPanelStyles = {
   popover: {
     position: "absolute",
     backgroundColor: "#1e1e1e",
@@ -220,7 +220,7 @@ const oauthPanelStyles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     whiteSpace: "nowrap" as const,
   },
-};
+} satisfies Record<string, React.CSSProperties>;
 
 // =============================================================================
 // HELPERS
