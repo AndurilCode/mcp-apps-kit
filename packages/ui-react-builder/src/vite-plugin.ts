@@ -812,6 +812,21 @@ function isDevModeActive(devOption: McpReactUIOptions["dev"], command: "build" |
 }
 
 /**
+ * Resolve the `dev` option into a concrete {@link DevServerOptions} object.
+ *
+ * - `true` / `undefined` → empty object (all defaults)
+ * - `false` → `null` (dev mode disabled — caller should not use the result)
+ * - `DevServerOptions` → returned as-is
+ *
+ * @internal
+ */
+function resolveDevOptions(devOption: McpReactUIOptions["dev"]): DevServerOptions | null {
+  if (devOption === false) return null;
+  if (devOption === true || devOption === undefined) return {};
+  return devOption;
+}
+
+/**
  * Check whether `@vitejs/plugin-react` (or a compatible React plugin) is
  * present in the resolved Vite config.
  *
@@ -879,6 +894,7 @@ export function mcpReactUI(options: McpReactUIOptions): Plugin {
       }
 
       const root = config.root;
+      const devOpts = resolveDevOptions(options.dev);
 
       // Discover widgets
       const discovered = await discoverWidgets(options, root, logger);
@@ -895,6 +911,7 @@ export function mcpReactUI(options: McpReactUIOptions): Plugin {
         const html = generateDevHTML({
           key: ui.key,
           name: ui.name,
+          devServerUrl: devOpts?.baseUrl,
         });
 
         const outputPath = path.resolve(root, outDir, `${ui.key}.html`);
@@ -917,11 +934,16 @@ export function mcpReactUI(options: McpReactUIOptions): Plugin {
         // configureServer already wrote the dev HTML files and registered
         // virtual modules.  If it hasn't run (e.g. edge case), discover now.
         if (virtualModules.size === 0) {
+          const devOpts = resolveDevOptions(options.dev);
           const discovered = await discoverWidgets(options, root, logger);
           const outDir = options.outDir ?? "./dist/ui";
           for (const ui of discovered) {
             virtualModules.set(ui.key, ui);
-            const html = generateDevHTML({ key: ui.key, name: ui.name });
+            const html = generateDevHTML({
+              key: ui.key,
+              name: ui.name,
+              devServerUrl: devOpts?.baseUrl,
+            });
             const outputPath = path.resolve(root, outDir, `${ui.key}.html`);
             await fs.mkdir(path.dirname(outputPath), { recursive: true });
             await fs.writeFile(outputPath, html, "utf-8");

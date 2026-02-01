@@ -263,6 +263,14 @@ describe("mcpReactUI", () => {
       expect(plugin).toBeDefined();
     });
 
+    it("should accept dev: DevServerOptions with baseUrl", () => {
+      const plugin = mcpReactUI({
+        serverEntry: "./src/index.ts",
+        dev: { baseUrl: "http://localhost:5173" },
+      });
+      expect(plugin).toBeDefined();
+    });
+
     it("should accept dev: undefined (default)", () => {
       const plugin = mcpReactUI({ serverEntry: "./src/index.ts" });
       expect(plugin).toBeDefined();
