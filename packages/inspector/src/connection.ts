@@ -27,7 +27,7 @@ import { getEventCategory } from "./types";
 import { WidgetSessionManager } from "./widget-session-manager";
 import { WidgetServer } from "./widget-server";
 import { InspectorOAuthProvider } from "./oauth/provider";
-import type { OAuthState, OAuthClientConfig } from "./oauth/types";
+import type { OAuthState } from "./oauth/types";
 
 /**
  * Protocol type inferred from connected server's tools

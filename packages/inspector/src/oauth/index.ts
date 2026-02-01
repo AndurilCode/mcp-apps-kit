@@ -7,6 +7,7 @@
 export { InspectorOAuthProvider } from "./provider";
 export type { InspectorOAuthProviderOptions } from "./provider";
 export { TokenStore, getTokenStorePath, hashServerUrl } from "./token-store";
+export { handleOAuthRoutes } from "./callback-handler";
 export type {
   OAuthClientConfig,
   OAuthState,

@@ -103,7 +103,7 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
    */
   get clientMetadata(): OAuthClientMetadata {
     return {
-      redirect_uris: [this.redirectUrl],
+      redirect_uris: [this.redirectUrl.toString()],
       client_name: this.config.clientName ?? "MCP Inspector",
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],

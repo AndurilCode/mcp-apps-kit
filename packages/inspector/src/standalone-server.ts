@@ -59,6 +59,7 @@ import {
   createListConnectionsTool,
 } from "./tools";
 import type { InspectorEventType } from "./types";
+import { handleOAuthRoutes } from "./oauth/callback-handler";
 
 // =============================================================================
 // VALID INSPECTOR EVENT TYPES (for validation)
@@ -341,6 +342,12 @@ export function createStandaloneInspectorServer(
         })
       );
       return;
+    }
+
+    // OAuth routes (/oauth/callback + /api/oauth/*)
+    if (url.startsWith("/oauth/") || url.startsWith("/api/oauth/")) {
+      const handled = await handleOAuthRoutes(req, res, registry, getActiveConnectionManager);
+      if (handled) return;
     }
 
     // Health check

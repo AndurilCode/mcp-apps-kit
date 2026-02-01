@@ -27,6 +27,7 @@ import type {
 import { registerProxyToolsDirectly } from "./proxy-tools";
 import { registerProxyResources } from "./proxy-resources";
 import { handleDashboardRequest } from "./dashboard/dashboard-server";
+import { handleOAuthRoutes } from "./oauth/callback-handler";
 import {
   createConnectTool,
   createDisconnectTool,
@@ -274,6 +275,12 @@ export function createDualInspectorServer(
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(body);
       return;
+    }
+
+    // OAuth routes (/oauth/callback + /api/oauth/*)
+    if (url.startsWith("/oauth/") || url.startsWith("/api/oauth/")) {
+      const handled = await handleOAuthRoutes(req, res, registry, getActiveConnectionManager);
+      if (handled) return;
     }
 
     // API: Connect to a target server
