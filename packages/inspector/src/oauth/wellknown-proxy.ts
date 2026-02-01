@@ -107,6 +107,8 @@ export function createWellKnownProxy(options: WellKnownProxyOptions = {}) {
    */
   async function fetchUpstream<T>(url: string, authToken?: string | null): Promise<T | null> {
     log(`Fetching upstream: ${url}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
     try {
       const headers: Record<string, string> = {
         Accept: "application/json",
@@ -115,7 +117,7 @@ export function createWellKnownProxy(options: WellKnownProxyOptions = {}) {
         headers["Authorization"] = `Bearer ${authToken}`;
       }
 
-      const response = await fetch(url, { headers });
+      const response = await fetch(url, { headers, signal: controller.signal });
 
       if (!response.ok) {
         log(`Upstream returned ${response.status} for ${url}`);
@@ -127,6 +129,8 @@ export function createWellKnownProxy(options: WellKnownProxyOptions = {}) {
       const message = error instanceof Error ? error.message : String(error);
       log(`Failed to fetch upstream ${url}: ${message}`);
       return null;
+    } finally {
+      clearTimeout(timeout);
     }
   }
 

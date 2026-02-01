@@ -61,7 +61,6 @@ import { TokenStore, hashServerUrl, getTokenStorePath } from "../src/oauth/token
 import { handleOAuthRoutes } from "../src/oauth/callback-handler";
 import { createWellKnownProxy } from "../src/oauth/wellknown-proxy";
 import {
-  hasPresetFlags,
   parsePresetFlags,
   resolvePresetConfig,
   createPresetProvider,

@@ -137,6 +137,8 @@ export function useOAuth(
       setOauthState(null);
       setIsConfigured(false);
       setAuthorizationUrl(null);
+      setError(null);
+      setIsLoading(false);
       return;
     }
 

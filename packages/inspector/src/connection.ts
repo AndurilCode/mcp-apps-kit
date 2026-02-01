@@ -239,9 +239,10 @@ export class ConnectionManager extends EventEmitter {
       authProvider = prebuiltAuthProvider;
 
       // Track OAuth status changes
-      authProvider.onStatusChange = () => {
+      const provider = authProvider;
+      provider.onStatusChange = () => {
         if (this.debug) {
-          const state = authProvider!.getOAuthState();
+          const state = provider.getOAuthState();
           console.log(`[inspector] OAuth status changed: ${state.status}`);
         }
       };
@@ -259,9 +260,10 @@ export class ConnectionManager extends EventEmitter {
       });
 
       // Track OAuth status changes
-      authProvider.onStatusChange = () => {
+      const provider = authProvider;
+      provider.onStatusChange = () => {
         if (this.debug) {
-          const state = authProvider!.getOAuthState();
+          const state = provider.getOAuthState();
           console.log(`[inspector] OAuth status changed: ${state.status}`);
         }
       };

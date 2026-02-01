@@ -9,9 +9,8 @@
  */
 
 import { createHash } from "node:crypto";
-import { readFile, writeFile, mkdir, unlink, readdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, unlink, readdir, rename } from "node:fs/promises";
 import { join } from "node:path";
-import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type {
   OAuthTokens,
@@ -69,9 +68,7 @@ export class TokenStore {
    * Ensure the token store directory exists.
    */
   private async ensureDir(): Promise<void> {
-    if (!existsSync(this.storePath)) {
-      await mkdir(this.storePath, { recursive: true, mode: 0o700 });
-    }
+    await mkdir(this.storePath, { recursive: true, mode: 0o700 });
   }
 
   /**
@@ -92,8 +89,9 @@ export class TokenStore {
     try {
       const content = await readFile(filePath, "utf-8");
       const data = JSON.parse(content) as PersistedTokenData;
-      // Validate basic structure
-      if (!data.serverUrl || !data.tokens) {
+      // Validate basic structure (tokens may be absent for entries
+      // that only store clientInformation or codeVerifier)
+      if (!data.serverUrl) {
         return undefined;
       }
       return data;
@@ -116,10 +114,7 @@ export class TokenStore {
     const existing = await this.load(serverUrl);
     const merged: PersistedTokenData = {
       serverUrl,
-      tokens:
-        data.tokens ??
-        existing?.tokens ??
-        ({ access_token: "", token_type: "bearer" } as OAuthTokens),
+      tokens: (data.tokens ?? existing?.tokens) as OAuthTokens,
       codeVerifier: data.codeVerifier ?? existing?.codeVerifier,
       clientInformation: data.clientInformation ?? existing?.clientInformation,
       expiresAt: data.expiresAt ?? existing?.expiresAt,
@@ -134,7 +129,6 @@ export class TokenStore {
     await writeFile(tmpPath, content, { encoding: "utf-8", mode: 0o600 });
 
     // Atomic rename
-    const { rename } = await import("node:fs/promises");
     await rename(tmpPath, filePath);
   }
 
@@ -197,7 +191,7 @@ export class TokenStore {
         try {
           const content = await readFile(join(this.storePath, file), "utf-8");
           const data = JSON.parse(content) as PersistedTokenData;
-          if (data.serverUrl && data.tokens) {
+          if (data.serverUrl) {
             results.push(data);
           }
         } catch {

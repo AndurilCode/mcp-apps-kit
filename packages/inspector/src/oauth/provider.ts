@@ -21,6 +21,7 @@ import type {
   OAuthMetadata,
 } from "./types";
 import { discoverAuthorizationServerMetadata } from "@modelcontextprotocol/sdk/client/auth.js";
+import type { OAuthClientInformationFull } from "@modelcontextprotocol/sdk/shared/auth.js";
 import { TokenStore } from "./token-store";
 
 /**
@@ -158,8 +159,7 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
     }
 
     await this.tokenStore.save(this.serverUrl, {
-      clientInformation:
-        clientInformation as import("@modelcontextprotocol/sdk/shared/auth.js").OAuthClientInformationFull,
+      clientInformation: clientInformation as OAuthClientInformationFull,
     });
     this.log("Client information saved from dynamic registration");
   }
@@ -189,7 +189,7 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
    */
   async saveTokens(tokens: OAuthTokens): Promise<void> {
     // Compute absolute expiry timestamp from relative expires_in
-    if (tokens.expires_in != null && tokens.expires_in > 0) {
+    if (tokens.expires_in !== undefined && tokens.expires_in !== null && tokens.expires_in > 0) {
       this._expiresAt = Date.now() + tokens.expires_in * 1000;
     } else {
       this._expiresAt = undefined;
@@ -248,11 +248,13 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
       this._codeVerifier = null;
       this.updateStatus("unauthenticated");
     } else if (scope === "tokens") {
-      // Only clear tokens, keep client info
+      // Only clear tokens, keep client info.
+      // Delete first then re-save only clientInformation, because save()
+      // uses nullish-coalescing fallback that would preserve existing tokens.
       const existing = await this.tokenStore.load(this.serverUrl);
-      if (existing) {
+      await this.tokenStore.delete(this.serverUrl);
+      if (existing?.clientInformation) {
         await this.tokenStore.save(this.serverUrl, {
-          tokens: undefined,
           clientInformation: existing.clientInformation,
         });
       }
@@ -311,8 +313,16 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
     if (!this._pendingAuthUrl) {
       return Promise.resolve();
     }
-    return new Promise<void>((resolve) => {
-      this._pendingAuthResolve = resolve;
+    return new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this._pendingAuthResolve = null;
+        reject(new Error("Authorization timed out after 5 minutes"));
+      }, 300_000);
+
+      this._pendingAuthResolve = () => {
+        clearTimeout(timeout);
+        resolve();
+      };
     });
   }
 

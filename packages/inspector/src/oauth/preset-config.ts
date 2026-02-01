@@ -13,7 +13,7 @@
 import { readFile } from "node:fs/promises";
 import { InspectorOAuthProvider } from "./provider";
 import { TokenStore } from "./token-store";
-import type { OAuthClientConfig, OAuthPresetConfig } from "./types";
+import type { OAuthClientConfig } from "./types";
 
 // =============================================================================
 // TYPES
