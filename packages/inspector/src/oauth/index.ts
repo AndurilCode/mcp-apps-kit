@@ -8,6 +8,17 @@ export { InspectorOAuthProvider } from "./provider";
 export type { InspectorOAuthProviderOptions } from "./provider";
 export { TokenStore, getTokenStorePath, hashServerUrl } from "./token-store";
 export { handleOAuthRoutes } from "./callback-handler";
+export { createWellKnownProxy } from "./wellknown-proxy";
+export type { WellKnownProxyOptions, WellKnownProxyContext } from "./wellknown-proxy";
+export {
+  hasPresetFlags,
+  parsePresetFlags,
+  loadPresetConfigFile,
+  resolvePresetConfig,
+  createPresetProvider,
+  checkExistingTokens,
+} from "./preset-config";
+export type { PresetCLIFlags, PresetConfigFile, PresetProviderOptions } from "./preset-config";
 export type {
   OAuthClientConfig,
   OAuthState,
