@@ -18,7 +18,9 @@ import type {
   OAuthClientConfig,
   OAuthState,
   OAuthStatus,
+  OAuthMetadata,
 } from "./types";
+import { discoverAuthorizationServerMetadata } from "@modelcontextprotocol/sdk/client/auth.js";
 import { TokenStore } from "./token-store";
 
 /**
@@ -68,6 +70,15 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
 
   /** Error message if auth failed */
   private _errorMessage?: string;
+
+  /** Token expiry timestamp (ms since epoch) */
+  private _expiresAt?: number;
+
+  /** Whether the auth server exposes a revocation endpoint */
+  private _supportsRevocation?: boolean;
+
+  /** Cached supported scopes from auth server metadata discovery */
+  private _supportedScopes: string[] = [];
 
   /** Callback invoked when auth status changes */
   onStatusChange?: (state: OAuthState) => void;
@@ -155,10 +166,16 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
 
   /**
    * Load existing tokens from persistent store.
+   *
+   * Also hydrates the in-memory expiresAt from persisted data.
    */
   async tokens(): Promise<OAuthTokens | undefined> {
     const persisted = await this.tokenStore.load(this.serverUrl);
     if (persisted?.tokens?.access_token) {
+      // Restore expiresAt from persisted data if not already set
+      if (this._expiresAt === undefined && persisted.expiresAt) {
+        this._expiresAt = persisted.expiresAt;
+      }
       return persisted.tokens;
     }
     return undefined;
@@ -166,9 +183,19 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
 
   /**
    * Save new tokens after authorization or refresh.
+   *
+   * Computes expiresAt from expires_in (seconds from now) and persists it
+   * alongside the tokens for dashboard display.
    */
   async saveTokens(tokens: OAuthTokens): Promise<void> {
-    await this.tokenStore.saveTokens(this.serverUrl, tokens);
+    // Compute absolute expiry timestamp from relative expires_in
+    if (tokens.expires_in != null && tokens.expires_in > 0) {
+      this._expiresAt = Date.now() + tokens.expires_in * 1000;
+    } else {
+      this._expiresAt = undefined;
+    }
+
+    await this.tokenStore.saveTokens(this.serverUrl, tokens, this._expiresAt);
     this.updateStatus("authenticated");
     this.log("Tokens saved");
   }
@@ -255,6 +282,9 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
     return {
       status: this._status,
       errorMessage: this._errorMessage,
+      expiresAt: this._expiresAt,
+      supportsRevocation: this._supportsRevocation,
+      ...(this._supportedScopes.length > 0 ? { supportedScopes: this._supportedScopes } : {}),
     };
   }
 
@@ -320,9 +350,161 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
     return this.tokenStore;
   }
 
+  /**
+   * Get cached supported scopes from auth server metadata.
+   * Returns an empty array if scopes haven't been discovered yet.
+   */
+  getSupportedScopes(): string[] {
+    return this._supportedScopes;
+  }
+
+  /**
+   * Discover and cache supported scopes from the auth server metadata.
+   *
+   * Fetches RFC 8414 authorization server metadata, extracting
+   * `scopes_supported`. Results are cached so subsequent calls are no-ops.
+   */
+  async discoverSupportedScopes(): Promise<string[]> {
+    if (this._supportedScopes.length > 0) {
+      return this._supportedScopes;
+    }
+
+    try {
+      const metadata = await discoverAuthorizationServerMetadata(this.serverUrl);
+      if (metadata?.scopes_supported) {
+        this._supportedScopes = [...metadata.scopes_supported];
+      }
+
+      // Also detect revocation support while we have the metadata
+      if (metadata && this._supportsRevocation === undefined) {
+        this._supportsRevocation = !!(metadata as OAuthMetadata).revocation_endpoint;
+      }
+    } catch {
+      this.log("Scope discovery failed — auth server metadata unavailable");
+    }
+
+    this.log(`Discovered ${this._supportedScopes.length} supported scopes`);
+    return this._supportedScopes;
+  }
+
+  /**
+   * Revoke tokens at the auth server's revocation endpoint (RFC 7009).
+   *
+   * Discovers the auth server metadata to find the revocation_endpoint,
+   * then POSTs the access token (and refresh token if present) for revocation.
+   *
+   * Gracefully handles failures — if the server is unreachable or doesn't
+   * support revocation, this method logs the issue but does not throw.
+   *
+   * @returns true if server-side revocation succeeded, false otherwise
+   */
+  async revokeTokens(): Promise<boolean> {
+    const currentTokens = await this.tokens();
+    if (!currentTokens?.access_token) {
+      this.log("No tokens to revoke");
+      return false;
+    }
+
+    try {
+      // Discover auth server metadata for the revocation endpoint
+      const metadata = await discoverAuthorizationServerMetadata(this.serverUrl);
+      if (!metadata) {
+        this.log("Auth server metadata not found, skipping server-side revocation");
+        this._supportsRevocation = false;
+        return false;
+      }
+
+      // revocation_endpoint is on OAuthMetadata (not all AuthorizationServerMetadata variants)
+      const revocationEndpoint = (metadata as OAuthMetadata).revocation_endpoint;
+      if (!revocationEndpoint) {
+        this.log("Auth server does not expose a revocation endpoint");
+        this._supportsRevocation = false;
+        return false;
+      }
+
+      this._supportsRevocation = true;
+      const endpointUrl = revocationEndpoint.toString();
+
+      // Build client authentication (client_id + optional client_secret)
+      const clientInfo = await this.clientInformation();
+
+      // Revoke the access token per RFC 7009
+      await this.postRevocation(
+        endpointUrl,
+        currentTokens.access_token,
+        "access_token",
+        clientInfo
+      );
+
+      // Also revoke the refresh token if present
+      if (currentTokens.refresh_token) {
+        await this.postRevocation(
+          endpointUrl,
+          currentTokens.refresh_token,
+          "refresh_token",
+          clientInfo
+        );
+      }
+
+      this.log("Server-side token revocation succeeded");
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.log(`Server-side token revocation failed: ${message}`);
+      return false;
+    }
+  }
+
   // =========================================================================
   // Private helpers
   // =========================================================================
+
+  /**
+   * POST a token revocation request per RFC 7009.
+   */
+  private async postRevocation(
+    endpointUrl: string,
+    token: string,
+    tokenTypeHint: string,
+    clientInfo?: OAuthClientInformationMixed
+  ): Promise<void> {
+    const params = new URLSearchParams({
+      token,
+      token_type_hint: tokenTypeHint,
+    });
+
+    // Include client_id for identification (required by many servers)
+    if (clientInfo) {
+      params.set("client_id", clientInfo.client_id);
+    }
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/x-www-form-urlencoded",
+    };
+
+    // Use HTTP Basic auth for confidential clients (client_secret_basic)
+    if (clientInfo && "client_secret" in clientInfo && clientInfo.client_secret) {
+      const credentials = Buffer.from(
+        `${clientInfo.client_id}:${clientInfo.client_secret}`
+      ).toString("base64");
+      headers["Authorization"] = `Basic ${credentials}`;
+      // Remove client_id from body when using Basic auth
+      params.delete("client_id");
+    }
+
+    const response = await fetch(endpointUrl, {
+      method: "POST",
+      headers,
+      body: params.toString(),
+    });
+
+    // RFC 7009: The server responds with HTTP 200 for both successful
+    // and invalid token revocations (the client shouldn't need to know).
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`Revocation endpoint returned ${response.status}: ${body}`);
+    }
+  }
 
   private updateStatus(status: OAuthStatus): void {
     this._status = status;

@@ -122,6 +122,7 @@ export class TokenStore {
         ({ access_token: "", token_type: "bearer" } as OAuthTokens),
       codeVerifier: data.codeVerifier ?? existing?.codeVerifier,
       clientInformation: data.clientInformation ?? existing?.clientInformation,
+      expiresAt: data.expiresAt ?? existing?.expiresAt,
       requestedScopes: data.requestedScopes ?? existing?.requestedScopes,
       savedAt: Date.now(),
     };
@@ -139,9 +140,13 @@ export class TokenStore {
 
   /**
    * Save only tokens (convenience method for token refresh).
+   *
+   * @param serverUrl - The server URL to save tokens for
+   * @param tokens - OAuth tokens to persist
+   * @param expiresAt - Optional absolute expiry timestamp (ms since epoch)
    */
-  async saveTokens(serverUrl: string, tokens: OAuthTokens): Promise<void> {
-    await this.save(serverUrl, { tokens });
+  async saveTokens(serverUrl: string, tokens: OAuthTokens, expiresAt?: number): Promise<void> {
+    await this.save(serverUrl, { tokens, expiresAt });
   }
 
   /**

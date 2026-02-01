@@ -322,6 +322,12 @@ async function handleOAuthConfigure(
     // transport triggers auth on the next request.
   }
 
+  // Discover supported scopes from auth server metadata (non-blocking).
+  // Results are cached on the provider and included in status polls.
+  void provider.discoverSupportedScopes().catch(() => {
+    // Scope discovery is best-effort — don't block configure response
+  });
+
   jsonResponse(res, 200, {
     configured: true,
     connectionId: cm.id,
@@ -385,11 +391,13 @@ async function handleOAuthStatus(
 
   const state = provider.getOAuthState();
   const pendingUrl = provider.getPendingAuthUrl();
+  const supportedScopes = provider.getSupportedScopes();
 
   jsonResponse(res, 200, {
     configured: true,
     connectionId: cm.id,
     ...state,
+    ...(supportedScopes.length > 0 ? { supportedScopes } : {}),
     authorizationUrl: pendingUrl?.toString() ?? null,
   });
   return true;
@@ -451,10 +459,13 @@ async function handleOAuthRevoke(
       return true;
     }
 
-    // Invalidate tokens locally (transport/SDK handles refresh errors)
+    // Revoke server-side first (RFC 7009), then clean up locally
+    const serverRevoked = await provider.revokeTokens();
+
+    // Always invalidate tokens locally regardless of server-side result
     await provider.invalidateCredentials("tokens");
 
-    jsonResponse(res, 200, { revoked: true, connectionId: cm.id });
+    jsonResponse(res, 200, { revoked: true, serverRevoked, connectionId: cm.id });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     jsonResponse(res, 500, { revoked: false, error: message });

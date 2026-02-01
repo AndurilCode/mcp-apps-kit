@@ -50,6 +50,9 @@ export interface PersistedTokenData {
   /** Timestamp when tokens were last saved */
   savedAt: number;
 
+  /** Absolute token expiry timestamp (ms since epoch), computed from expires_in */
+  expiresAt?: number;
+
   /** The scopes that were requested for this token */
   requestedScopes?: string;
 }
