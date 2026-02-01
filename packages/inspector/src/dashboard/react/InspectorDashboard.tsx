@@ -15,6 +15,7 @@ import type { InspectorEvent, AgnosticInspectorEvent } from "../../types";
 import { useResizablePanelWidth } from "./hooks/useResizablePanelWidth";
 import { useGlobals, type GlobalsState } from "./hooks/useGlobals";
 import { useConnections } from "./hooks/useConnections";
+import { useOAuth } from "./hooks/useOAuth";
 import { useMcpPrimitives, type McpPrimitives } from "./hooks/useMcpPrimitives";
 import { Toolbar } from "./components/Toolbar";
 import { ConnectionBar } from "./components/ConnectionBar";
@@ -108,6 +109,9 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     prompts,
     isLoading: primitivesLoading,
   } = useMcpPrimitives(baseUrl, activeConnection?.status === "connected", activeConnectionId);
+
+  // OAuth state (connection-scoped, polls status)
+  const oauth = useOAuth(baseUrl, activeConnectionId);
 
   // Use live data with cache fallback for instant tab switching
   const displaySessions = sessions.length > 0 ? sessions : (cachedState?.sessions ?? []);
@@ -398,6 +402,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           onCreateConnection={handleCreateConnection}
           onClose={() => setIsConnectionFormOpen(false)}
           getMatchingEntries={getMatchingEntries}
+          oauth={activeConnection?.status === "connected" ? oauth : undefined}
         />
 
         <div style={styles.headerRight}>
@@ -446,6 +451,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
             onTogglePrimitivesPanel={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)}
             isRightPanelVisible={!isRightPanelCollapsed}
             onToggleRightPanel={toggleRightPanel}
+            oauthStatus={oauth.oauthState?.status}
           />
         </div>
       </header>

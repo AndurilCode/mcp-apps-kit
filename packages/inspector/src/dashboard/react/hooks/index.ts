@@ -43,3 +43,9 @@ export {
   type DashboardConnectionStatus,
   type UseConnectionsResult,
 } from "./useConnections";
+export {
+  useOAuth,
+  type UseOAuthResult,
+  type OAuthStatusResponse,
+  type OAuthConfigureParams,
+} from "./useOAuth";
