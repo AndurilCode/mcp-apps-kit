@@ -305,10 +305,28 @@ async function handleOAuthConfigure(
 
   cm.setOAuthProvider(provider);
 
+  // Initiate the OAuth auth flow so the authorization URL is available immediately.
+  // This avoids a race where the dashboard would need to poll /api/oauth/status
+  // before the URL is ready.
+  let authorizationUrl: string | null = null;
+  try {
+    const result = await auth(provider, { serverUrl });
+    if (result === "REDIRECT") {
+      const pendingUrl = provider.getPendingAuthUrl();
+      authorizationUrl = pendingUrl?.toString() ?? null;
+    }
+    // "AUTHORIZED" means tokens already exist — no redirect needed
+  } catch {
+    // Auth discovery/initiation may fail (e.g., server unreachable).
+    // Not fatal — URL will appear in subsequent status polls once the
+    // transport triggers auth on the next request.
+  }
+
   jsonResponse(res, 200, {
     configured: true,
     connectionId: cm.id,
     state: provider.getOAuthState(),
+    authorizationUrl,
   });
   return true;
 }

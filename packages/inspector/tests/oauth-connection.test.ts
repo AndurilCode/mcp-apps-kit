@@ -154,6 +154,68 @@ describe("OAuth + Connection integration", () => {
       expect(manager.getOAuthProvider()).toBeNull();
     });
 
+    it("should use pre-built authProvider over oauthConfig", async () => {
+      const tokenStore = new TokenStore(tempDir);
+      const prebuiltProvider = new InspectorOAuthProvider({
+        serverUrl: "http://localhost:3000/mcp",
+        config: {
+          clientId: "preset-client",
+          redirectUri: "http://127.0.0.1:6274/oauth/callback",
+        },
+        callbackPort: 6274,
+        tokenStore,
+      });
+
+      const manager = new ConnectionManager();
+
+      await manager.connect(
+        { transport: "http", url: "http://localhost:3000/mcp" },
+        { authProvider: prebuiltProvider }
+      );
+
+      // Should use the pre-built provider, not create a new one
+      const provider = manager.getOAuthProvider();
+      expect(provider).toBe(prebuiltProvider);
+
+      // Verify createTestClient was called with the pre-built provider
+      expect(createTestClientSpy).toHaveBeenCalledWith(
+        { transport: "http", url: "http://localhost:3000/mcp" },
+        expect.objectContaining({
+          authProvider: prebuiltProvider,
+        })
+      );
+    });
+
+    it("should prefer authProvider over oauthConfig when both provided", async () => {
+      const tokenStore = new TokenStore(tempDir);
+      const prebuiltProvider = new InspectorOAuthProvider({
+        serverUrl: "http://localhost:3000/mcp",
+        config: {
+          clientId: "preset-client",
+          redirectUri: "http://127.0.0.1:6274/oauth/callback",
+        },
+        callbackPort: 6274,
+        tokenStore,
+      });
+
+      const manager = new ConnectionManager();
+
+      await manager.connect(
+        { transport: "http", url: "http://localhost:3000/mcp" },
+        {
+          authProvider: prebuiltProvider,
+          oauthConfig: {
+            clientId: "config-client",
+            redirectUri: "http://127.0.0.1:6274/oauth/callback",
+          },
+        }
+      );
+
+      // Should use the pre-built provider, ignoring oauthConfig
+      const provider = manager.getOAuthProvider();
+      expect(provider).toBe(prebuiltProvider);
+    });
+
     it("should allow setting OAuth provider externally", async () => {
       const manager = new ConnectionManager();
       const tokenStore = new TokenStore(tempDir);

@@ -344,6 +344,7 @@ async function main(): Promise<void> {
       maxHistorySize: options.maxHistory,
       sessionTtl: options.sessionTtl,
       targetUrl: options.url ?? undefined,
+      oauthProvider,
     });
 
     if (options.debug) {

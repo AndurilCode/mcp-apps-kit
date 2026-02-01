@@ -60,6 +60,7 @@ import {
 } from "./tools";
 import type { InspectorEventType } from "./types";
 import { handleOAuthRoutes } from "./oauth/callback-handler";
+import type { InspectorOAuthProvider } from "./oauth/provider";
 
 // =============================================================================
 // VALID INSPECTOR EVENT TYPES (for validation)
@@ -193,6 +194,8 @@ export interface StandaloneInspectorServerOptions extends InspectorServerOptions
   port?: number;
   /** Maximum number of concurrent connections. Default: 20 */
   maxConnections?: number;
+  /** Pre-built OAuth provider for auto-connect mode (e.g., from CLI preset flags) */
+  oauthProvider?: InspectorOAuthProvider;
 }
 
 /**
@@ -301,6 +304,7 @@ export function createStandaloneInspectorServer(
 
   const defaultPort = options.port ?? 6274;
   const targetUrl = options.targetUrl;
+  const presetOAuthProvider = options.oauthProvider;
 
   // Create MCP app with inspector tools
   // Add reasoning field to all tools for agent view transparency
@@ -941,7 +945,10 @@ export function createStandaloneInspectorServer(
             // Auto-connect if targetUrl is provided
             if (targetUrl) {
               void registry
-                .createConnection({ transport: "http", url: targetUrl }, { trackHistory: true })
+                .createConnection(
+                  { transport: "http", url: targetUrl },
+                  { trackHistory: true, authProvider: presetOAuthProvider }
+                )
                 .then(() => {
                   // Mark server as ready now that auto-connect succeeded
                   isReady = true;

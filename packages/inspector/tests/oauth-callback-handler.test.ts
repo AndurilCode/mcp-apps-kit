@@ -487,6 +487,8 @@ describe("OAuth Callback Handler", () => {
     });
 
     it("should configure OAuth on active connection", async () => {
+      // auth() throws on discovery (no real server), which is handled gracefully
+      mockAuth.mockRejectedValue(new Error("discovery failed"));
       const cm = mockConnectionManager({
         serverUrl: "http://localhost:3000/mcp",
         provider: null,
@@ -504,7 +506,65 @@ describe("OAuth Callback Handler", () => {
       expect(res._statusCode).toBe(200);
       const body = JSON.parse(res._body);
       expect(body.configured).toBe(true);
+      expect(body.authorizationUrl).toBeNull();
       expect(cm.setOAuthProvider).toHaveBeenCalled();
+    });
+
+    it("should return authorizationUrl when auth flow triggers redirect", async () => {
+      // Simulate auth() triggering redirectToAuthorization on the provider
+      mockAuth.mockImplementation(async (provider: InspectorOAuthProvider) => {
+        await provider.redirectToAuthorization(
+          new URL("https://auth.example.com/authorize?client_id=new-client&state=xyz")
+        );
+        return "REDIRECT";
+      });
+
+      const cm = mockConnectionManager({
+        serverUrl: "http://localhost:3000/mcp",
+        provider: null,
+      });
+      const req = mockRequest(
+        "POST",
+        "/api/oauth/configure",
+        JSON.stringify({
+          config: { clientId: "new-client", redirectUri: "http://127.0.0.1:6274/oauth/callback" },
+        })
+      );
+      const res = mockResponse();
+      await handleOAuthRoutes(req, res, mockRegistry(), () => cm);
+
+      expect(res._statusCode).toBe(200);
+      const body = JSON.parse(res._body);
+      expect(body.configured).toBe(true);
+      expect(body.authorizationUrl).toBe(
+        "https://auth.example.com/authorize?client_id=new-client&state=xyz"
+      );
+    });
+
+    it("should return authorizationUrl=null when already authorized", async () => {
+      mockAuth.mockResolvedValue("AUTHORIZED");
+
+      const cm = mockConnectionManager({
+        serverUrl: "http://localhost:3000/mcp",
+        provider: null,
+      });
+      const req = mockRequest(
+        "POST",
+        "/api/oauth/configure",
+        JSON.stringify({
+          config: {
+            clientId: "existing-client",
+            redirectUri: "http://127.0.0.1:6274/oauth/callback",
+          },
+        })
+      );
+      const res = mockResponse();
+      await handleOAuthRoutes(req, res, mockRegistry(), () => cm);
+
+      expect(res._statusCode).toBe(200);
+      const body = JSON.parse(res._body);
+      expect(body.configured).toBe(true);
+      expect(body.authorizationUrl).toBeNull();
     });
   });
 });

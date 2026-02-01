@@ -183,7 +183,12 @@ export class ConnectionManager extends EventEmitter {
     resourceCount: number;
     promptCount: number;
   }> {
-    const { trackHistory = true, timeout = this.defaultTimeout, oauthConfig } = options;
+    const {
+      trackHistory = true,
+      timeout = this.defaultTimeout,
+      oauthConfig,
+      authProvider: prebuiltAuthProvider,
+    } = options;
 
     // Generate display label
     const label =
@@ -227,9 +232,22 @@ export class ConnectionManager extends EventEmitter {
           }
         : undefined;
 
-    // Set up OAuth provider for HTTP connections when config is provided
+    // Set up OAuth provider for HTTP connections.
+    // Prefer pre-built provider (e.g., from CLI preset) over oauthConfig.
     let authProvider: InspectorOAuthProvider | undefined;
-    if (params.transport === "http" && oauthConfig) {
+    if (params.transport === "http" && prebuiltAuthProvider) {
+      authProvider = prebuiltAuthProvider;
+
+      // Track OAuth status changes
+      authProvider.onStatusChange = () => {
+        if (this.debug) {
+          const state = authProvider!.getOAuthState();
+          console.log(`[inspector] OAuth status changed: ${state.status}`);
+        }
+      };
+
+      this.oauthProvider = authProvider;
+    } else if (params.transport === "http" && oauthConfig) {
       // Port is set later via setInspectorUrl, default to 6274
       const port = this.inspectorUrl ? new URL(this.inspectorUrl).port : "6274";
 

@@ -7,6 +7,7 @@
 import type { TestClient, ConnectionParams } from "@mcp-apps-kit/testing";
 import type { ServerInfo } from "./server-types";
 import type { OAuthState, OAuthClientConfig } from "../oauth/types";
+import type { InspectorOAuthProvider } from "../oauth/provider";
 
 // =============================================================================
 // CONNECTION TYPES
@@ -27,6 +28,12 @@ export interface ConnectOptions {
    * When provided, the connection will use OAuth 2.1 + PKCE for authentication.
    */
   oauthConfig?: OAuthClientConfig;
+
+  /**
+   * Pre-built OAuth provider (e.g., from CLI preset mode).
+   * When provided, takes precedence over oauthConfig.
+   */
+  authProvider?: InspectorOAuthProvider;
 }
 
 /**

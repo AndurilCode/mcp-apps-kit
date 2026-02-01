@@ -191,16 +191,19 @@ export function useOAuth(
           configured: boolean;
           connectionId: string;
           state: OAuthState;
+          authorizationUrl?: string | null;
         };
 
         if (activeConnectionIdRef.current === connectionId) {
           setIsConfigured(data.configured);
           setOauthState(data.state);
+          if (data.authorizationUrl) {
+            setAuthorizationUrl(data.authorizationUrl);
+          }
         }
 
-        // After configuring, poll immediately to get the auth URL
-        await fetchStatus();
-        return authorizationUrl;
+        // Return the URL from the response directly (not stale React state)
+        return data.authorizationUrl ?? null;
       } catch (err) {
         const message = err instanceof Error ? err.message : "Configuration failed";
         setError(message);
@@ -209,7 +212,7 @@ export function useOAuth(
         setIsLoading(false);
       }
     },
-    [baseUrl, connectionId, fetchStatus, authorizationUrl]
+    [baseUrl, connectionId]
   );
 
   /**
