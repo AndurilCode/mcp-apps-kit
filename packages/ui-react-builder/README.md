@@ -14,6 +14,8 @@ Build tool for React-based MCP application UIs.
 - [Install](#install)
 - [Usage](#usage)
 - [Vite Plugin](#vite-plugin)
+  - [Discovery Modes](#discovery-modes)
+  - [HMR (Dev Mode)](#hmr-dev-mode)
 - [API](#api)
 - [Examples](#examples)
 - [Contributing](#contributing)
@@ -27,11 +29,14 @@ Building interactive UI widgets for MCP applications traditionally requires manu
 
 - `defineReactUI()` helper for type-safe React component definitions
 - Vite plugin for automatic discovery and building of React UIs
+- **Two discovery modes**: `serverEntry` (AST-based scan of `defineReactUI` calls) or `widgetsDir` (file-based scan of a widgets directory)
+- **HMR with React Fast Refresh** — edit widgets and see changes instantly via Vite's dev server
 - **AST-based parsing** using `@typescript-eslint/typescript-estree` for reliable detection
-- esbuild-powered bundling to self-contained HTML
+- esbuild-powered bundling to self-contained HTML (production)
 - Auto-generated HTML paths from component names (kebab-case)
-- Global CSS injection support
+- Global CSS injection support with PostCSS/Tailwind processing
 - Configurable logging for plugin output
+- Server configuration injection via `serverConfig` option
 - Full compatibility with `defineTool()` from `@mcp-apps-kit/core`
 
 ## Compatibility
@@ -105,9 +110,13 @@ const app = createApp({
 
 ## Vite Plugin
 
-The Vite plugin automatically discovers `defineReactUI` calls and builds them into self-contained HTML files.
+The Vite plugin automatically discovers React UI components and builds them into self-contained HTML files. In dev mode it serves widgets through Vite's dev server with HMR and React Fast Refresh.
 
-### Configuration
+### Discovery Modes
+
+The plugin supports two mutually exclusive discovery modes:
+
+**`serverEntry` mode** — scans a server entry file for `defineReactUI` calls using AST parsing:
 
 ```ts
 // vite.config.ts
@@ -117,29 +126,98 @@ import { mcpReactUI } from "@mcp-apps-kit/ui-react-builder/vite";
 export default defineConfig({
   plugins: [
     mcpReactUI({
-      // Server entry point to scan for defineReactUI calls
       serverEntry: "./src/index.ts",
-      // Output directory for built HTML files
       outDir: "./src/ui/dist",
-      // Optional: Global CSS to include in all UIs
       globalCss: "./src/ui/styles.css",
-
-      // Optional: Standalone mode takes over the Vite build and outputs only UI HTML.
-      // Use this if this Vite config exists solely to build MCP UI widgets.
-      // standalone: true,
     }),
   ],
 });
 ```
 
+**`widgetsDir` mode** — scans a directory for `.tsx` files that export a default React component and a `ui` metadata object:
+
+```ts
+// vite.config.ts
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { mcpReactUI } from "@mcp-apps-kit/ui-react-builder/vite";
+
+export default defineConfig({
+  plugins: [
+    react(),
+    mcpReactUI({
+      widgetsDir: "./ui/widgets",
+      outDir: "./ui/dist",
+      globalCss: "./ui/styles.css",
+      standalone: true,
+    }),
+  ],
+});
+```
+
+Widget files in `widgetsDir` should follow this pattern:
+
+```tsx
+// ui/widgets/get-weather.tsx
+import { useToolResult } from "@mcp-apps-kit/ui-react";
+import type { WidgetMetadata } from "@mcp-apps-kit/core";
+
+export default function WeatherWidget() {
+  const result = useToolResult<{ temperature: number }>();
+  return <div>{result?.temperature}°C</div>;
+}
+
+export const ui: WidgetMetadata = {
+  name: "Weather Display",
+  prefersBorder: true,
+};
+```
+
+The HTML output path is inferred from the file name (e.g., `get-weather.tsx` → `get-weather.html`).
+
+### HMR (Dev Mode)
+
+When Vite runs in serve mode (`vite dev`), the plugin generates lightweight HTML files that load widgets through Vite's dev server with React Fast Refresh instead of bundling with esbuild. This gives you instant feedback on widget changes without full rebuilds.
+
+**Requirements:**
+
+- `@vitejs/plugin-react` (or `plugin-react-swc`) must be in your Vite config for Fast Refresh to work. The plugin will log a warning if it's missing.
+
+```ts
+mcpReactUI({
+  widgetsDir: "./ui/widgets",
+  // Enable HMR with custom dev server URL (useful when MCP server and Vite are on different ports)
+  dev: {
+    baseUrl: "http://localhost:5173",
+  },
+});
+```
+
+The `dev` option accepts:
+
+- `true` or `{}` — enable with defaults (automatic in serve mode)
+- `false` — disable HMR even in serve mode (always use esbuild)
+- `DevServerOptions` — enable with custom configuration
+
+When the MCP server and Vite dev server run on different ports, set `dev.baseUrl` to the Vite dev server origin so `/@vite/client` and virtual module imports resolve correctly.
+
 ### How it works
 
-1. The plugin scans your `serverEntry` file for `defineReactUI` calls using AST parsing
+**Production (`vite build`):**
+
+1. The plugin discovers widgets (via `serverEntry` AST scan or `widgetsDir` file scan)
 2. It resolves component imports to their source files
-3. Each component is bundled with React, ReactDOM, and `@mcp-apps-kit/ui-react`
+3. Each component is bundled with React, ReactDOM, and `@mcp-apps-kit/ui-react` via esbuild
 4. Self-contained HTML files are written to `outDir`
 
-The plugin uses `@typescript-eslint/typescript-estree` for reliable AST-based detection of imports and `defineReactUI` calls. This is more robust than regex-based parsing and correctly handles:
+**Development (`vite dev`):**
+
+1. The plugin discovers widgets and registers virtual modules (`virtual:mcp-react-ui/<key>.tsx`)
+2. Dev HTML files are written to `outDir`, containing Vite HMR client, React Refresh preamble, and a virtual module import
+3. Virtual modules resolve to entry-point code that mounts the widget component wrapped in `AppsProvider`
+4. Vite serves and transforms the modules on the fly with HMR support
+
+The `serverEntry` mode uses `@typescript-eslint/typescript-estree` for reliable AST-based detection of imports and `defineReactUI` calls. This is more robust than regex-based parsing and correctly handles:
 
 - Nested `defineReactUI` calls (e.g., inside `defineTool`)
 - Comments around definitions
@@ -169,6 +247,22 @@ The plugin discovers `defineReactUI` calls using static analysis. For reliable d
 If you need patterns not supported by auto-discovery, use `defineUI({ html: "..." })` with manual Vite bundling.
 
 ### Build commands
+
+With HMR (recommended for development):
+
+```json
+{
+  "scripts": {
+    "dev": "concurrently \"pnpm dev:server\" \"pnpm dev:ui\"",
+    "dev:server": "tsx watch src/index.ts",
+    "dev:ui": "vite dev",
+    "build": "pnpm build:ui && tsc",
+    "build:ui": "vite build"
+  }
+}
+```
+
+Without HMR (esbuild-only workflow):
 
 ```json
 {
@@ -204,13 +298,15 @@ If you need patterns not supported by auto-discovery, use `defineUI({ html: "...
 
 ### Types
 
-| Type           | Description                             |
-| -------------- | --------------------------------------- |
-| `ReactUIInput` | Input type for `defineReactUI()`        |
-| `ReactUIDef`   | Output type (extends `UIDef` from core) |
-| `BuildOptions` | Options for the build process           |
-| `BuildResult`  | Result of building React UIs            |
-| `PluginLogger` | Logger interface for Vite plugin        |
+| Type               | Description                             |
+| ------------------ | --------------------------------------- |
+| `ReactUIInput`     | Input type for `defineReactUI()`        |
+| `ReactUIDef`       | Output type (extends `UIDef` from core) |
+| `BuildOptions`     | Options for the build process           |
+| `BuildResult`      | Result of building React UIs            |
+| `PluginLogger`     | Logger interface for Vite plugin        |
+| `DevHTMLOptions`   | Options for `generateDevHTML()`         |
+| `DevServerOptions` | HMR/dev server configuration            |
 
 ### Build Functions
 
@@ -238,10 +334,11 @@ If you need patterns not supported by auto-discovery, use `defineUI({ html: "...
 
 ### HTML Utilities
 
-| Export               | Description                            |
-| -------------------- | -------------------------------------- |
-| `generateHTML`       | Generate HTML document from bundled JS |
-| `generateEntryPoint` | Generate React entry point code        |
+| Export               | Description                                       |
+| -------------------- | ------------------------------------------------- |
+| `generateHTML`       | Generate production HTML document from bundled JS |
+| `generateDevHTML`    | Generate dev-mode HTML with Vite HMR support      |
+| `generateEntryPoint` | Generate React entry point code                   |
 
 ### Vite Plugin
 
@@ -249,14 +346,17 @@ If you need patterns not supported by auto-discovery, use `defineUI({ html: "...
 import { mcpReactUI } from "@mcp-apps-kit/ui-react-builder/vite";
 ```
 
-| Option        | Type                    | Default        | Description                                 |
-| ------------- | ----------------------- | -------------- | ------------------------------------------- |
-| `serverEntry` | `string`                | (required)     | Server entry point to scan                  |
-| `outDir`      | `string`                | `"./dist/ui"`  | Output directory for HTML files             |
-| `minify`      | `boolean`               | `true` in prod | Minify output JavaScript                    |
-| `globalCss`   | `string`                | -              | Path to global CSS file                     |
-| `logger`      | `PluginLogger \| false` | console        | Custom logger or `false` to disable logging |
-| `standalone`  | `boolean`               | `false`        | Take over Vite build (emit only UI HTML)    |
+| Option         | Type                          | Default        | Description                                                              |
+| -------------- | ----------------------------- | -------------- | ------------------------------------------------------------------------ |
+| `serverEntry`  | `string`                      | -              | Server entry point to scan (mutually exclusive with `widgetsDir`)        |
+| `widgetsDir`   | `string`                      | -              | Directory of widget `.tsx` files (mutually exclusive with `serverEntry`) |
+| `outDir`       | `string`                      | `"./dist/ui"`  | Output directory for HTML files                                          |
+| `minify`       | `boolean`                     | `true` in prod | Minify output JavaScript                                                 |
+| `globalCss`    | `string`                      | -              | Path to global CSS file (processed through PostCSS if available)         |
+| `logger`       | `PluginLogger \| false`       | console        | Custom logger or `false` to disable logging                              |
+| `standalone`   | `boolean`                     | `false`        | Take over Vite build (emit only UI HTML)                                 |
+| `serverConfig` | `McpServerConfig`             | -              | Server config injected into UIs at build time                            |
+| `dev`          | `DevServerOptions \| boolean` | auto           | HMR/dev server options (auto-enabled in serve mode)                      |
 
 #### Custom logging
 
@@ -280,7 +380,8 @@ mcpReactUI({
 
 ## Examples
 
-- `../../examples/minimal` - Simple hello world with React UI
+- `../../examples/minimal` - Simple hello world with React UI (`serverEntry` mode)
+- `../../examples/weather-app` - Full-featured app with `widgetsDir` mode and HMR
 
 ## Contributing
 

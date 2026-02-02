@@ -107,5 +107,5 @@ export {
 // HTML UTILITIES
 // =============================================================================
 
-export type { EntryPointOptions } from "./html";
-export { generateHTML, generateEntryPoint } from "./html";
+export type { EntryPointOptions, DevHTMLOptions } from "./html";
+export { generateHTML, generateDevHTML, generateEntryPoint } from "./html";

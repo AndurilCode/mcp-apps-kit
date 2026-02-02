@@ -43,7 +43,7 @@
 | **Colocated Widgets**             | React UIs in `ui/widgets/` auto-bind to matching tools             |
 | **Type-Safe End-to-End**          | Full TypeScript inference from inputs to UI props                  |
 | **Dual Platform**                 | Single codebase deploys to MCP Apps & ChatGPT                      |
-| **Hot Module Reload**             | Vite-powered dev server with instant feedback                      |
+| **Hot Module Reload**             | Vite-powered HMR with React Fast Refresh for widgets               |
 | **Zero Boilerplate**              | No manifest files to maintain — codegen handles it                 |
 
 ---
@@ -176,7 +176,7 @@ export const ui: WidgetMetadata = {
 npm run dev
 ```
 
-The codegen watches for changes and regenerates the manifest. Your tools and widgets are instantly available.
+The codegen watches for changes and regenerates the manifest. Your tools and widgets are instantly available. Widget changes are picked up by Vite's HMR with React Fast Refresh — no full reload needed.
 
 ---
 
@@ -201,7 +201,7 @@ Files are automatically converted to camelCase identifiers:
 | [`@mcp-apps-kit/codegen`](packages/codegen/README.md)                   | File-based discovery and manifest generation |
 | [`@mcp-apps-kit/ui`](packages/ui/README.md)                             | Client SDK (vanilla JS)                      |
 | [`@mcp-apps-kit/ui-react`](packages/ui-react/README.md)                 | React bindings and hooks                     |
-| [`@mcp-apps-kit/ui-react-builder`](packages/ui-react-builder/README.md) | Vite plugin for widget bundling              |
+| [`@mcp-apps-kit/ui-react-builder`](packages/ui-react-builder/README.md) | Vite plugin for widget bundling and HMR      |
 | [`@mcp-apps-kit/create-app`](packages/create-app/README.md)             | CLI scaffolding tool                         |
 | [`@mcp-apps-kit/testing`](packages/testing/README.md)                   | Test utilities and mocks                     |
 

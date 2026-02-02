@@ -3,7 +3,12 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { generateHTML, generateEntryPoint, extractInlineCSS } from "../../src/html";
+import {
+  generateHTML,
+  generateDevHTML,
+  generateEntryPoint,
+  extractInlineCSS,
+} from "../../src/html";
 
 describe("generateHTML", () => {
   it("should generate valid HTML5 document", () => {
@@ -192,6 +197,253 @@ describe("generateEntryPoint", () => {
 
     expect(code).toContain("<AppsProvider>");
     expect(code).not.toContain("autoResize");
+  });
+});
+
+describe("generateDevHTML", () => {
+  it("should generate valid HTML5 document", () => {
+    const html = generateDevHTML({
+      key: "test-widget",
+      name: "Test Widget",
+    });
+
+    expect(html).toContain("<!DOCTYPE html>");
+    expect(html).toContain('<html lang="en">');
+    expect(html).toContain("</html>");
+  });
+
+  it("should include proper meta tags", () => {
+    const html = generateDevHTML({
+      key: "test-widget",
+      name: "Test Widget",
+    });
+
+    expect(html).toContain('<meta charset="UTF-8">');
+    expect(html).toContain('<meta name="viewport"');
+    expect(html).toContain('<meta name="mcp-ui-key" content="test-widget">');
+  });
+
+  it("should set the title from name", () => {
+    const html = generateDevHTML({
+      key: "test-widget",
+      name: "My Custom Title",
+    });
+
+    expect(html).toContain("<title>My Custom Title</title>");
+  });
+
+  it("should include root div for React mounting", () => {
+    const html = generateDevHTML({
+      key: "test-widget",
+      name: "Test Widget",
+    });
+
+    expect(html).toContain('<div id="root"></div>');
+  });
+
+  it("should include Vite HMR client script", () => {
+    const html = generateDevHTML({
+      key: "test-widget",
+      name: "Test Widget",
+    });
+
+    expect(html).toContain('<script type="module" src="/@vite/client"></script>');
+  });
+
+  it("should include React Refresh preamble", () => {
+    const html = generateDevHTML({
+      key: "test-widget",
+      name: "Test Widget",
+    });
+
+    expect(html).toContain('import RefreshRuntime from "/@react-refresh"');
+    expect(html).toContain("RefreshRuntime.injectIntoGlobalHook(window)");
+    expect(html).toContain("window.$RefreshReg$ = () => {}");
+    expect(html).toContain("window.$RefreshSig$ = () => (type) => type");
+    expect(html).toContain("window.__vite_plugin_react_preamble_installed__ = true");
+  });
+
+  it("should import the virtual module for the widget key", () => {
+    const html = generateDevHTML({
+      key: "restaurant-list",
+      name: "Restaurant List",
+    });
+
+    expect(html).toContain('import "/virtual:mcp-react-ui/restaurant-list.tsx"');
+  });
+
+  it("should include base CSS reset", () => {
+    const html = generateDevHTML({
+      key: "test-widget",
+      name: "Test Widget",
+    });
+
+    expect(html).toContain("<style>");
+    expect(html).toContain("box-sizing: border-box");
+    expect(html).toContain("font-family:");
+  });
+
+  it("should include custom CSS when provided", () => {
+    const customCss = ".my-class { color: red; }";
+    const html = generateDevHTML({
+      key: "test-widget",
+      name: "Test Widget",
+      css: customCss,
+    });
+
+    expect(html).toContain(".my-class { color: red; }");
+  });
+
+  it("should support dark mode styles", () => {
+    const html = generateDevHTML({
+      key: "test-widget",
+      name: "Test Widget",
+    });
+
+    expect(html).toContain("prefers-color-scheme: dark");
+  });
+
+  it("should reject keys with unsafe characters", () => {
+    expect(() =>
+      generateDevHTML({
+        key: "test<script>alert('xss')</script>",
+        name: "Test Widget",
+      })
+    ).toThrow(/Invalid widget key/);
+  });
+
+  it("should escape HTML in name", () => {
+    const html = generateDevHTML({
+      key: "test-widget",
+      name: "Test<script>alert('xss')</script>",
+    });
+
+    expect(html).not.toContain("<script>alert");
+    expect(html).toContain("&lt;script&gt;");
+  });
+
+  it("should prefix paths with devServerUrl when provided", () => {
+    const html = generateDevHTML({
+      key: "test-widget",
+      name: "Test Widget",
+      devServerUrl: "http://localhost:5173",
+    });
+
+    expect(html).toContain(
+      '<script type="module" src="http://localhost:5173/@vite/client"></script>'
+    );
+    expect(html).toContain('import RefreshRuntime from "http://localhost:5173/@react-refresh"');
+    expect(html).toContain('import "http://localhost:5173/virtual:mcp-react-ui/test-widget.tsx"');
+  });
+
+  it("should strip trailing slash from devServerUrl", () => {
+    const html = generateDevHTML({
+      key: "test-widget",
+      name: "Test Widget",
+      devServerUrl: "http://localhost:5173/",
+    });
+
+    // Should not produce double slashes
+    expect(html).not.toContain("5173//");
+    expect(html).toContain("http://localhost:5173/@vite/client");
+  });
+
+  it("should strip multiple trailing slashes from devServerUrl", () => {
+    const html = generateDevHTML({
+      key: "test-widget",
+      name: "Test Widget",
+      devServerUrl: "http://localhost:5173///",
+    });
+
+    expect(html).not.toContain("5173//");
+    expect(html).toContain("http://localhost:5173/@vite/client");
+  });
+
+  it("should default devServerUrl to empty string (same origin)", () => {
+    const html = generateDevHTML({
+      key: "test-widget",
+      name: "Test Widget",
+    });
+
+    // Paths should be root-relative (no origin prefix)
+    expect(html).toContain('src="/@vite/client"');
+    expect(html).toContain('from "/@react-refresh"');
+    expect(html).toContain('import "/virtual:mcp-react-ui/test-widget.tsx"');
+  });
+
+  it("should not contain an inlined script bundle", () => {
+    const html = generateDevHTML({
+      key: "test-widget",
+      name: "Test Widget",
+    });
+
+    // Production generateHTML inlines a script; dev mode must not
+    expect(html).not.toContain("createRoot");
+    expect(html).not.toContain("react-dom/client");
+  });
+
+  it("should contain exactly three script type='module' blocks", () => {
+    const html = generateDevHTML({
+      key: "test-widget",
+      name: "Test Widget",
+    });
+
+    const moduleScripts = html.match(/<script type="module"/g);
+    expect(moduleScripts).toHaveLength(3);
+  });
+
+  it("should emit scripts in correct order: vite client, preamble, virtual import", () => {
+    const html = generateDevHTML({
+      key: "my-widget",
+      name: "My Widget",
+    });
+
+    const viteClientIdx = html.indexOf("/@vite/client");
+    const preambleIdx = html.indexOf("/@react-refresh");
+    const virtualModuleIdx = html.indexOf("virtual:mcp-react-ui/my-widget");
+
+    expect(viteClientIdx).toBeGreaterThan(-1);
+    expect(preambleIdx).toBeGreaterThan(-1);
+    expect(virtualModuleIdx).toBeGreaterThan(-1);
+
+    // Vite client must come first, then preamble, then the virtual module import
+    expect(viteClientIdx).toBeLessThan(preambleIdx);
+    expect(preambleIdx).toBeLessThan(virtualModuleIdx);
+  });
+
+  it("should produce structurally different output from generateHTML", () => {
+    const devHtml = generateDevHTML({
+      key: "widget",
+      name: "Widget",
+    });
+
+    const prodHtml = generateHTML({
+      key: "widget",
+      name: "Widget",
+      script: "console.log('prod');",
+    });
+
+    // Dev HTML has vite client, prod does not
+    expect(devHtml).toContain("/@vite/client");
+    expect(prodHtml).not.toContain("/@vite/client");
+
+    // Dev HTML has react-refresh preamble, prod does not
+    expect(devHtml).toContain("@react-refresh");
+    expect(prodHtml).not.toContain("@react-refresh");
+
+    // Dev HTML has virtual module import, prod does not
+    expect(devHtml).toContain("virtual:mcp-react-ui/");
+    expect(prodHtml).not.toContain("virtual:mcp-react-ui/");
+
+    // Prod HTML has inlined script, dev does not
+    expect(prodHtml).toContain("console.log('prod');");
+    expect(devHtml).not.toContain("console.log");
+
+    // Both share the same base structure
+    expect(devHtml).toContain("<!DOCTYPE html>");
+    expect(prodHtml).toContain("<!DOCTYPE html>");
+    expect(devHtml).toContain('<div id="root"></div>');
+    expect(prodHtml).toContain('<div id="root"></div>');
   });
 });
 

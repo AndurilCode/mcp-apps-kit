@@ -259,12 +259,47 @@ export interface BuildError {
 // =============================================================================
 
 /**
- * Options for the development server.
- * Reserved for future implementation.
+ * Options for the Vite development server HMR integration.
  *
- * @internal
+ * These options control how the plugin behaves when Vite runs in serve mode
+ * (`vite dev`). In dev mode the plugin generates lightweight HTML files that
+ * load widgets through Vite's dev server with React Fast Refresh instead of
+ * bundling with esbuild.
+ *
+ * Pass as the `dev` option to {@link McpReactUIOptions} (from the Vite
+ * plugin entry point).
+ *
+ * @example
+ * ```typescript
+ * import { mcpReactUI } from "@mcp-apps-kit/ui-react-builder/vite";
+ *
+ * mcpReactUI({
+ *   serverEntry: "./src/index.ts",
+ *   dev: {
+ *     baseUrl: "http://localhost:5173",
+ *   },
+ * })
+ * ```
  */
 export interface DevServerOptions {
+  /**
+   * Base URL of the Vite dev server.
+   *
+   * When the generated dev HTML files are loaded from an origin other than
+   * the Vite dev server itself (e.g. served by the MCP server on a different
+   * port), set this to the full origin of the Vite dev server so that
+   * `/@vite/client`, `/@react-refresh`, and virtual module imports resolve
+   * correctly.
+   *
+   * A trailing slash, if present, is stripped automatically.
+   *
+   * When omitted the generated HTML uses root-relative paths, which works
+   * when the HTML is served by the same Vite dev server.
+   *
+   * @example "http://localhost:5173"
+   */
+  baseUrl?: string;
+
   /**
    * Port for the dev server.
    * @default 5173
