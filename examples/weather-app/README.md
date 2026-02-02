@@ -66,9 +66,16 @@ pnpm install
 # Generate manifest (run after adding/removing tools)
 pnpm -C examples/weather-app generate
 
-# Run development server
+# Run development server with HMR
 pnpm -C examples/weather-app dev
 ```
+
+The `dev` command runs both:
+
+- **Server with hot reload** (`mcp-serve --watch`): Automatically reloads tools when files in `tools/` or `workflows/` change
+- **Vite dev server with HMR**: Enables Hot Module Replacement for widget files in `ui/widgets/` with React Fast Refresh
+
+When you edit widget files (`.tsx` files in `ui/widgets/`), changes will be reflected instantly without a full page reload. Tool changes will trigger a server reload.
 
 ## Build
 

@@ -778,13 +778,24 @@ if (rootElement) {
 /**
  * Virtual module prefix for dev-mode widget entry points.
  *
- * Each widget gets a virtual module at `virtual:mcp-react-ui/<key>` that
+ * Each widget gets a virtual module at `virtual:mcp-react-ui/<key>.tsx` that
  * the dev HTML imports.  The plugin resolves these to a synthetic entry
  * point that mounts the actual React component.
+ *
+ * The `.tsx` suffix is critical: it tells Vite's React plugin to transform
+ * the JSX in the virtual module. Without it, Vite would treat the content
+ * as plain JavaScript and fail to parse the JSX syntax.
  *
  * @internal
  */
 const VIRTUAL_MODULE_PREFIX = "virtual:mcp-react-ui/";
+
+/**
+ * Virtual module suffix for TypeScript JSX files.
+ *
+ * @internal
+ */
+const VIRTUAL_MODULE_SUFFIX = ".tsx";
 
 /**
  * Resolved virtual module prefix used internally by Vite.
@@ -881,7 +892,7 @@ export function mcpReactUI(options: McpReactUIOptions): Plugin {
      * 3. Populate `virtualModules` map so resolveId/load can serve them.
      * 4. Write dev HTML files to outDir via generateDevHTML.
      */
-    async configureServer(_server: ViteDevServer) {
+    async configureServer(server: ViteDevServer) {
       if (!isDevModeActive(options.dev, config.command)) return;
 
       // Warn if React plugin is missing — Fast Refresh won't work without it
@@ -905,12 +916,30 @@ export function mcpReactUI(options: McpReactUIOptions): Plugin {
         virtualModules.set(ui.key, ui);
       }
 
+      // Load and process global CSS if specified
+      let globalCss: string | undefined;
+      if (options.globalCss) {
+        const globalCssPath = path.resolve(root, options.globalCss);
+        try {
+          const rawCss = await fs.readFile(globalCssPath, "utf-8");
+          // Process CSS through PostCSS (for Tailwind, etc.)
+          globalCss = await processPostCSS(rawCss, globalCssPath, root, logger);
+        } catch (error) {
+          logger.warn(
+            `[mcp-react-ui] globalCss file not found or unreadable: ${globalCssPath} - ${
+              error instanceof Error ? error.message : error
+            }`
+          );
+        }
+      }
+
       // Write dev HTML files
       const outDir = options.outDir ?? "./dist/ui";
       for (const ui of discovered) {
         const html = generateDevHTML({
           key: ui.key,
           name: ui.name,
+          css: globalCss,
           devServerUrl: devOpts?.baseUrl,
         });
 
@@ -920,6 +949,58 @@ export function mcpReactUI(options: McpReactUIOptions): Plugin {
 
         logger.info(`[mcp-react-ui] Dev HTML: ${ui.key}.html`);
       }
+
+      // Add middleware to serve virtual modules via HTTP requests.
+      // This is needed because Vite's dev server doesn't automatically
+      // route HTTP requests to `resolveId`/`load` for custom virtual modules.
+      // We register this directly (not in returned function) so it runs
+      // BEFORE Vite's internal middlewares including the 404 handler.
+      // Guard: only register if middlewares is available (won't be in unit tests)
+      if (!server.middlewares) return;
+
+      server.middlewares.use(async (req, res, next) => {
+        const url = req.url;
+        if (!url || !url.startsWith("/" + VIRTUAL_MODULE_PREFIX)) {
+          return next();
+        }
+
+        // Extract the widget key from the URL, stripping .tsx suffix if present
+        let key = url.slice(("/" + VIRTUAL_MODULE_PREFIX).length);
+        if (key.endsWith(VIRTUAL_MODULE_SUFFIX)) {
+          key = key.slice(0, -VIRTUAL_MODULE_SUFFIX.length);
+        }
+        const ui = virtualModules.get(key);
+
+        if (!ui) {
+          return next();
+        }
+
+        try {
+          // Use Vite's transform pipeline to process the virtual module.
+          // This will:
+          // 1. Call our resolveId → returns \0virtual:mcp-react-ui/xxx.tsx
+          // 2. Call our load → returns JSX code
+          // 3. Call our transform → converts JSX to JS
+          // 4. Call Vite's import analysis → rewrites bare imports to URLs
+          const result = await server.transformRequest(
+            VIRTUAL_MODULE_PREFIX + key + VIRTUAL_MODULE_SUFFIX,
+            { ssr: false }
+          );
+
+          if (result) {
+            res.setHeader("Content-Type", "application/javascript");
+            res.setHeader("Cache-Control", "no-cache");
+            res.end(result.code);
+          } else {
+            // This shouldn't happen if virtualModules.has(key) is true
+            logger.error(`[mcp-react-ui] transformRequest returned null for ${key}`);
+            next(new Error(`Failed to transform virtual module: ${key}`));
+          }
+        } catch (err) {
+          logger.error(`[mcp-react-ui] Error serving virtual module: ${err}`);
+          next(err);
+        }
+      });
     },
 
     // Run build at the start of the build process
@@ -937,11 +1018,29 @@ export function mcpReactUI(options: McpReactUIOptions): Plugin {
           const devOpts = resolveDevOptions(options.dev);
           const discovered = await discoverWidgets(options, root, logger);
           const outDir = options.outDir ?? "./dist/ui";
+
+          // Load and process global CSS if specified
+          let globalCss: string | undefined;
+          if (options.globalCss) {
+            const globalCssPath = path.resolve(root, options.globalCss);
+            try {
+              const rawCss = await fs.readFile(globalCssPath, "utf-8");
+              globalCss = await processPostCSS(rawCss, globalCssPath, root, logger);
+            } catch (error) {
+              logger.warn(
+                `[mcp-react-ui] globalCss file not found: ${globalCssPath} - ${
+                  error instanceof Error ? error.message : error
+                }`
+              );
+            }
+          }
+
           for (const ui of discovered) {
             virtualModules.set(ui.key, ui);
             const html = generateDevHTML({
               key: ui.key,
               name: ui.name,
+              css: globalCss,
               devServerUrl: devOpts?.baseUrl,
             });
             const outputPath = path.resolve(root, outDir, `${ui.key}.html`);
@@ -966,9 +1065,14 @@ export function mcpReactUI(options: McpReactUIOptions): Plugin {
         return id;
       }
       if (id.startsWith(VIRTUAL_MODULE_PREFIX)) {
-        const key = id.slice(VIRTUAL_MODULE_PREFIX.length);
+        // Extract key, stripping the .tsx suffix if present
+        let key = id.slice(VIRTUAL_MODULE_PREFIX.length);
+        if (key.endsWith(VIRTUAL_MODULE_SUFFIX)) {
+          key = key.slice(0, -VIRTUAL_MODULE_SUFFIX.length);
+        }
         if (virtualModules.has(key)) {
-          return RESOLVED_VIRTUAL_PREFIX + key;
+          // Keep the .tsx suffix in the resolved ID so Vite treats it as TSX
+          return RESOLVED_VIRTUAL_PREFIX + key + VIRTUAL_MODULE_SUFFIX;
         }
       }
       return null;
@@ -979,7 +1083,11 @@ export function mcpReactUI(options: McpReactUIOptions): Plugin {
         return "export default {}";
       }
       if (id.startsWith(RESOLVED_VIRTUAL_PREFIX)) {
-        const key = id.slice(RESOLVED_VIRTUAL_PREFIX.length);
+        // Extract key, stripping the .tsx suffix if present
+        let key = id.slice(RESOLVED_VIRTUAL_PREFIX.length);
+        if (key.endsWith(VIRTUAL_MODULE_SUFFIX)) {
+          key = key.slice(0, -VIRTUAL_MODULE_SUFFIX.length);
+        }
         const ui = virtualModules.get(key);
         if (!ui) return null;
 
@@ -989,8 +1097,8 @@ export function mcpReactUI(options: McpReactUIOptions): Plugin {
         const providerProps = ui.autoResize === undefined ? "" : ` autoResize={${ui.autoResize}}`;
 
         // Return entry-point code that mounts the widget component.
-        // This code runs in the browser via Vite's dev server transform
-        // pipeline, so React Fast Refresh applies automatically.
+        // Note: This returns JSX that needs to be transformed before sending
+        // to the browser. The middleware handles transformation for HTTP requests.
         return `
 import React from "react";
 import { createRoot } from "react-dom/client";
@@ -1011,6 +1119,36 @@ if (rootElement) {
 `;
       }
       return null;
+    },
+
+    // Transform JSX to JavaScript for our virtual modules.
+    // This runs before Vite's import analysis, so bare imports like 'react'
+    // will be properly rewritten to Vite dev server URLs.
+    async transform(code, id) {
+      // Only transform our virtual modules
+      if (!id.startsWith(RESOLVED_VIRTUAL_PREFIX)) {
+        return null;
+      }
+
+      // Skip if it doesn't look like JSX (already transformed or empty entry)
+      if (!code.includes("<") || !code.includes("React")) {
+        return null;
+      }
+
+      // Transform JSX to JavaScript using esbuild with classic mode
+      const result = await esbuild.transform(code, {
+        loader: "tsx",
+        jsx: "transform",
+        jsxFactory: "React.createElement",
+        jsxFragment: "React.Fragment",
+        format: "esm",
+        target: "es2020",
+      });
+
+      return {
+        code: result.code,
+        map: result.map,
+      };
     },
 
     // Override the config to use our virtual entry

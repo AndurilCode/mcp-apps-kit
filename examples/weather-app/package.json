@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "concurrently \"pnpm dev:server\" \"pnpm dev:ui\"",
     "dev:server": "pnpm exec mcp-serve --watch",
-    "dev:ui": "vite build --watch --config ui/vite.config.ts",
+    "dev:ui": "vite --config ui/vite.config.ts",
     "start": "pnpm exec mcp-serve",
     "generate": "pnpm exec mcp-codegen",
     "build": "pnpm generate && pnpm build:ui && tsc",

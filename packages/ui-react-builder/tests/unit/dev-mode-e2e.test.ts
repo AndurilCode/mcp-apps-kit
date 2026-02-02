@@ -125,7 +125,7 @@ describe("AC1: Dev HTML contains HMR client, React Refresh preamble, virtual mod
     expect(html).toContain("@react-refresh");
     expect(html).toContain("__vite_plugin_react_preamble_installed__");
     // Virtual module import for this widget
-    expect(html).toContain("virtual:mcp-react-ui/my-widget");
+    expect(html).toContain("virtual:mcp-react-ui/my-widget.tsx");
   });
 
   it("generates one dev HTML per widget", async () => {
@@ -140,8 +140,8 @@ describe("AC1: Dev HTML contains HMR client, React Refresh preamble, virtual mod
     const html1 = await fs.readFile(path.join(outDir, "my-widget.html"), "utf-8");
     const html2 = await fs.readFile(path.join(outDir, "second-widget.html"), "utf-8");
 
-    expect(html1).toContain("virtual:mcp-react-ui/my-widget");
-    expect(html2).toContain("virtual:mcp-react-ui/second-widget");
+    expect(html1).toContain("virtual:mcp-react-ui/my-widget.tsx");
+    expect(html2).toContain("virtual:mcp-react-ui/second-widget.tsx");
 
     // Each HTML is distinct
     expect(html1).not.toContain("second-widget");
@@ -179,7 +179,9 @@ describe("AC2: Virtual modules resolve and load entry-point code", () => {
     await configureServer({} as ViteDevServer);
 
     const resolveId = plugin.resolveId as (id: string) => string | null;
-    expect(resolveId("virtual:mcp-react-ui/my-widget")).toBe("\0virtual:mcp-react-ui/my-widget");
+    expect(resolveId("virtual:mcp-react-ui/my-widget.tsx")).toBe(
+      "\0virtual:mcp-react-ui/my-widget.tsx"
+    );
   });
 
   it("loads entry-point code importing the actual widget component", async () => {
@@ -190,7 +192,7 @@ describe("AC2: Virtual modules resolve and load entry-point code", () => {
     await configureServer({} as ViteDevServer);
 
     const load = plugin.load as (id: string) => string | null;
-    const code = load("\0virtual:mcp-react-ui/my-widget");
+    const code = load("\0virtual:mcp-react-ui/my-widget.tsx");
 
     expect(code).not.toBeNull();
     // Must import the real widget file
@@ -269,7 +271,7 @@ describe("AC3: React Fast Refresh preconditions", () => {
     await configureServer({} as ViteDevServer);
 
     const load = plugin.load as (id: string) => string | null;
-    const code = load("\0virtual:mcp-react-ui/my-widget");
+    const code = load("\0virtual:mcp-react-ui/my-widget.tsx");
 
     // JSX that will be transformed by plugin-react for Fast Refresh
     expect(code).toContain("<React.StrictMode>");
@@ -328,7 +330,7 @@ describe("AC4: buildStart in serve mode writes dev HTML", () => {
     // Must be dev HTML (has HMR markers)
     expect(html).toContain("/@vite/client");
     expect(html).toContain("@react-refresh");
-    expect(html).toContain("virtual:mcp-react-ui/my-widget");
+    expect(html).toContain("virtual:mcp-react-ui/my-widget.tsx");
 
     // Must NOT be production HTML (no inlined bundle code)
     expect(html).not.toContain("createRoot");
@@ -345,7 +347,7 @@ describe("AC4: buildStart in serve mode writes dev HTML", () => {
 
     const html = await fs.readFile(path.join(outDir, "my-widget.html"), "utf-8");
     expect(html).toContain("/@vite/client");
-    expect(html).toContain("virtual:mcp-react-ui/my-widget");
+    expect(html).toContain("virtual:mcp-react-ui/my-widget.tsx");
   });
 
   it("buildStart registers virtual modules even without configureServer", async () => {
@@ -358,10 +360,12 @@ describe("AC4: buildStart in serve mode writes dev HTML", () => {
 
     // Virtual modules should be registered
     const resolveId = plugin.resolveId as (id: string) => string | null;
-    expect(resolveId("virtual:mcp-react-ui/my-widget")).toBe("\0virtual:mcp-react-ui/my-widget");
+    expect(resolveId("virtual:mcp-react-ui/my-widget.tsx")).toBe(
+      "\0virtual:mcp-react-ui/my-widget.tsx"
+    );
 
     const load = plugin.load as (id: string) => string | null;
-    const code = load("\0virtual:mcp-react-ui/my-widget");
+    const code = load("\0virtual:mcp-react-ui/my-widget.tsx");
     expect(code).toContain("import Component from");
   });
 });
@@ -432,7 +436,7 @@ describe("AC5: Production build path unchanged", () => {
     const { plugin } = createPluginHelper(opts, { command: "build", mode: "production" });
 
     const resolveId = plugin.resolveId as (id: string) => string | null;
-    expect(resolveId("virtual:mcp-react-ui/my-widget")).toBeNull();
+    expect(resolveId("virtual:mcp-react-ui/my-widget.tsx")).toBeNull();
   });
 });
 
@@ -525,7 +529,7 @@ describe("AC7: dev: false disables dev features in serve mode", () => {
     await configureServer({} as ViteDevServer);
 
     const resolveId = plugin.resolveId as (id: string) => string | null;
-    expect(resolveId("virtual:mcp-react-ui/my-widget")).toBeNull();
+    expect(resolveId("virtual:mcp-react-ui/my-widget.tsx")).toBeNull();
   });
 
   it("buildStart falls through to production path when dev: false", async () => {
@@ -746,14 +750,16 @@ const ui = defineReactUI({
     // Dev HTML should be written (key derived from component name)
     const html = await fs.readFile(path.join(outDir, "my-widget.html"), "utf-8");
     expect(html).toContain("/@vite/client");
-    expect(html).toContain("virtual:mcp-react-ui/my-widget");
+    expect(html).toContain("virtual:mcp-react-ui/my-widget.tsx");
 
     // Virtual module should resolve and load
     const resolveId = plugin.resolveId as (id: string) => string | null;
-    expect(resolveId("virtual:mcp-react-ui/my-widget")).toBe("\0virtual:mcp-react-ui/my-widget");
+    expect(resolveId("virtual:mcp-react-ui/my-widget.tsx")).toBe(
+      "\0virtual:mcp-react-ui/my-widget.tsx"
+    );
 
     const load = plugin.load as (id: string) => string | null;
-    const code = load("\0virtual:mcp-react-ui/my-widget");
+    const code = load("\0virtual:mcp-react-ui/my-widget.tsx");
     expect(code).toContain("MyWidget.tsx");
   });
 });

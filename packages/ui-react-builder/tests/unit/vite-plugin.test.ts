@@ -525,7 +525,7 @@ export default function TestWidget() {
         expect(html).toContain("<!DOCTYPE html>");
         expect(html).toContain("/@vite/client");
         expect(html).toContain("@react-refresh");
-        expect(html).toContain("virtual:mcp-react-ui/test-widget");
+        expect(html).toContain("virtual:mcp-react-ui/test-widget.tsx");
       });
 
       it("should write dev HTML with devServerUrl when configured", async () => {
@@ -540,7 +540,7 @@ export default function TestWidget() {
 
         expect(html).toContain("http://localhost:3000/@vite/client");
         expect(html).toContain("http://localhost:3000/@react-refresh");
-        expect(html).toContain("http://localhost:3000/virtual:mcp-react-ui/test-widget");
+        expect(html).toContain("http://localhost:3000/virtual:mcp-react-ui/test-widget.tsx");
       });
     });
 
@@ -561,7 +561,7 @@ export default function TestWidget() {
         // Must contain dev-mode markers
         expect(html).toContain("/@vite/client");
         expect(html).toContain("@react-refresh");
-        expect(html).toContain("virtual:mcp-react-ui/test-widget");
+        expect(html).toContain("virtual:mcp-react-ui/test-widget.tsx");
 
         // Must NOT contain production-mode markers (esbuild inline bundle)
         expect(html).not.toContain("createRoot");
@@ -577,7 +577,7 @@ export default function TestWidget() {
 
         const html = await fs.readFile(path.join(outDir, "test-widget.html"), "utf-8");
         expect(html).toContain("/@vite/client");
-        expect(html).toContain("virtual:mcp-react-ui/test-widget");
+        expect(html).toContain("virtual:mcp-react-ui/test-widget.tsx");
 
         // Should have logged discovery
         expect(infoFn).toHaveBeenCalledWith(expect.stringContaining("test-widget"));
@@ -627,8 +627,8 @@ export default function TestWidget() {
         const resolveId = plugin.resolveId as (id: string) => string | null;
         const resolved = resolveId("virtual:mcp-react-ui/test-widget");
 
-        // Resolved id should use the \0 prefix convention
-        expect(resolved).toBe("\0virtual:mcp-react-ui/test-widget");
+        // Resolved id should use the \0 prefix convention and include .tsx suffix
+        expect(resolved).toBe("\0virtual:mcp-react-ui/test-widget.tsx");
       });
 
       it("should not resolve virtual module for undiscovered widget key", async () => {
@@ -648,7 +648,7 @@ export default function TestWidget() {
         await configureServer({} as ViteDevServer);
 
         const load = plugin.load as (id: string) => string | null;
-        const code = load("\0virtual:mcp-react-ui/test-widget");
+        const code = load("\0virtual:mcp-react-ui/test-widget.tsx");
 
         expect(code).not.toBeNull();
         // Should import React and ReactDOM
@@ -673,7 +673,7 @@ export default function TestWidget() {
         await configureServer({} as ViteDevServer);
 
         const load = plugin.load as (id: string) => string | null;
-        const code = load("\0virtual:mcp-react-ui/test-widget");
+        const code = load("\0virtual:mcp-react-ui/test-widget.tsx");
 
         // Widget has autoResize: false in its metadata
         expect(code).toContain("autoResize={false}");
@@ -686,7 +686,7 @@ export default function TestWidget() {
         await configureServer({} as ViteDevServer);
 
         const load = plugin.load as (id: string) => string | null;
-        expect(load("\0virtual:mcp-react-ui/nonexistent")).toBeNull();
+        expect(load("\0virtual:mcp-react-ui/nonexistent.tsx")).toBeNull();
       });
     });
 
@@ -714,18 +714,18 @@ export default function SecondWidget() {
 
         const resolveId = plugin.resolveId as (id: string) => string | null;
         expect(resolveId("virtual:mcp-react-ui/test-widget")).toBe(
-          "\0virtual:mcp-react-ui/test-widget"
+          "\0virtual:mcp-react-ui/test-widget.tsx"
         );
         expect(resolveId("virtual:mcp-react-ui/second-widget")).toBe(
-          "\0virtual:mcp-react-ui/second-widget"
+          "\0virtual:mcp-react-ui/second-widget.tsx"
         );
 
         // Both HTML files should be written
         const html1 = await fs.readFile(path.join(outDir, "test-widget.html"), "utf-8");
         const html2 = await fs.readFile(path.join(outDir, "second-widget.html"), "utf-8");
 
-        expect(html1).toContain("virtual:mcp-react-ui/test-widget");
-        expect(html2).toContain("virtual:mcp-react-ui/second-widget");
+        expect(html1).toContain("virtual:mcp-react-ui/test-widget.tsx");
+        expect(html2).toContain("virtual:mcp-react-ui/second-widget.tsx");
       });
 
       it("should load each widget virtual module independently", async () => {
@@ -735,8 +735,8 @@ export default function SecondWidget() {
         await configureServer({} as ViteDevServer);
 
         const load = plugin.load as (id: string) => string | null;
-        const code1 = load("\0virtual:mcp-react-ui/test-widget");
-        const code2 = load("\0virtual:mcp-react-ui/second-widget");
+        const code1 = load("\0virtual:mcp-react-ui/test-widget.tsx");
+        const code2 = load("\0virtual:mcp-react-ui/second-widget.tsx");
 
         expect(code1).toContain("test-widget.tsx");
         expect(code2).toContain("second-widget.tsx");

@@ -186,7 +186,7 @@ export function generateDevHTML(options: DevHTMLOptions): string {
     window.__vite_plugin_react_preamble_installed__ = true
   </script>
   <script type="module">
-    import "${baseUrl}/virtual:mcp-react-ui/${escapeHtml(key)}"
+    import "${baseUrl}/virtual:mcp-react-ui/${escapeHtml(key)}.tsx"
   </script>
 </body>
 </html>`;

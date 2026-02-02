@@ -269,7 +269,7 @@ describe("generateDevHTML", () => {
       name: "Restaurant List",
     });
 
-    expect(html).toContain('import "/virtual:mcp-react-ui/restaurant-list"');
+    expect(html).toContain('import "/virtual:mcp-react-ui/restaurant-list.tsx"');
   });
 
   it("should include base CSS reset", () => {
@@ -324,7 +324,7 @@ describe("generateDevHTML", () => {
       '<script type="module" src="http://localhost:5173/@vite/client"></script>'
     );
     expect(html).toContain('import RefreshRuntime from "http://localhost:5173/@react-refresh"');
-    expect(html).toContain('import "http://localhost:5173/virtual:mcp-react-ui/test-widget"');
+    expect(html).toContain('import "http://localhost:5173/virtual:mcp-react-ui/test-widget.tsx"');
   });
 
   it("should strip trailing slash from devServerUrl", () => {
@@ -359,7 +359,7 @@ describe("generateDevHTML", () => {
     // Paths should be root-relative (no origin prefix)
     expect(html).toContain('src="/@vite/client"');
     expect(html).toContain('from "/@react-refresh"');
-    expect(html).toContain('import "/virtual:mcp-react-ui/test-widget"');
+    expect(html).toContain('import "/virtual:mcp-react-ui/test-widget.tsx"');
   });
 
   it("should not contain an inlined script bundle", () => {
