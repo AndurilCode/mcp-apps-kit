@@ -184,6 +184,104 @@ function isInVersionedUIWidgetsDir(filePath: string, uiWidgetDirs: string[]): bo
 }
 
 /**
+ * Tracks known widget files to distinguish genuine add/remove from
+ * editor atomic-save operations (which appear as unlink + add).
+ *
+ * - `unlink` for a known file → content edit (atomic save step 1), skip regeneration
+ * - `add` for an already-known file → content edit (atomic save step 2), skip regeneration
+ * - `add` for an unknown file → genuinely new widget, trigger regeneration
+ * - `unlink` for a file not re-added within a short window → genuine deletion, trigger regeneration
+ *
+ * We use a simpler deterministic approach: track the full set of known files.
+ * On `add`, if the file is already known it's an atomic save — skip.
+ * On `unlink`, remove from known and schedule a delayed check; if it's re-added
+ * (atomic save) the add handler will cancel the pending deletion regeneration.
+ */
+class WidgetFileTracker {
+  private knownFiles = new Set<string>();
+  private pendingUnlinks = new Map<string, ReturnType<typeof setTimeout>>();
+
+  /** Delay before treating an unlink as a genuine deletion (ms) */
+  private static readonly UNLINK_GRACE_MS = 150;
+
+  /**
+   * Initialize with existing files from widget directories
+   */
+  async init(widgetDirs: string[]): Promise<void> {
+    const fsPromises = await import("node:fs/promises");
+    for (const dir of widgetDirs) {
+      try {
+        const entries = await fsPromises.readdir(dir, { recursive: true });
+        for (const entry of entries) {
+          const fullPath = path.resolve(dir, entry.toString());
+          if (hasValidExtension(fullPath) && !shouldSkipFile(fullPath)) {
+            this.knownFiles.add(fullPath);
+          }
+        }
+      } catch {
+        // Directory might not exist yet — that's fine
+      }
+    }
+  }
+
+  /**
+   * Handle an `add` event for a widget file.
+   * @returns true if regeneration should be triggered (genuinely new file)
+   */
+  handleAdd(filePath: string): boolean {
+    const absolutePath = path.resolve(filePath);
+
+    // Cancel any pending unlink timer — this is the second half of an atomic save
+    const pendingTimer = this.pendingUnlinks.get(absolutePath);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      this.pendingUnlinks.delete(absolutePath);
+    }
+
+    if (this.knownFiles.has(absolutePath)) {
+      // Already known → atomic save (editor re-created the file), skip
+      return false;
+    }
+
+    // Genuinely new file
+    this.knownFiles.add(absolutePath);
+    return true;
+  }
+
+  /**
+   * Handle an `unlink` event for a widget file.
+   * Schedules a delayed check — if the file is re-added (atomic save),
+   * the add handler cancels this. If not, fires the callback.
+   *
+   * @param filePath - The file that was unlinked
+   * @param onGenuineDelete - Callback if this turns out to be a real deletion
+   */
+  handleUnlink(filePath: string, onGenuineDelete: () => void): void {
+    const absolutePath = path.resolve(filePath);
+
+    // Schedule a delayed check — if add comes in within the grace period,
+    // it's an atomic save and the timer gets cancelled
+    const timer = setTimeout(() => {
+      this.pendingUnlinks.delete(absolutePath);
+      this.knownFiles.delete(absolutePath);
+      onGenuineDelete();
+    }, WidgetFileTracker.UNLINK_GRACE_MS);
+
+    this.pendingUnlinks.set(absolutePath, timer);
+  }
+
+  /**
+   * Clean up pending timers
+   */
+  dispose(): void {
+    for (const timer of this.pendingUnlinks.values()) {
+      clearTimeout(timer);
+    }
+    this.pendingUnlinks.clear();
+  }
+}
+
+/**
  * Check if a path is within one of the watched directories
  */
 function isInWatchedDirectory(
@@ -389,6 +487,28 @@ export function setupWatcher(server: ViteDevServer, options: WatcherOptions): ()
   // Add directories to watch
   watcher.add(dirsToWatch);
 
+  // Track known widget files to distinguish atomic saves from genuine add/remove.
+  // Resolves the widget dirs to track — supports both single and versioned configs.
+  const widgetDirs: string[] = isVersioned
+    ? versionedUIWidgetDirs
+    : directories.uiWidgets
+      ? [path.resolve(projectRoot, directories.uiWidgets)]
+      : [];
+
+  const widgetTracker = new WidgetFileTracker();
+  // Fire-and-forget init — tracker is ready before first file events since
+  // Vite's watcher uses ignoreInitial:true and httpServer hasn't started yet.
+  if (widgetDirs.length > 0) {
+    void widgetTracker.init(widgetDirs);
+  }
+
+  // Helper to check if a file is in a UI widgets directory
+  const isWidgetFile = (filePath: string): boolean => {
+    return isVersioned
+      ? isInVersionedUIWidgetsDir(filePath, versionedUIWidgetDirs)
+      : isInUIWidgetsDir(filePath, projectRoot, directories);
+  };
+
   // Handler for file changes
   const handleFileChange = (eventType: "add" | "unlink" | "change") => (filePath: string) => {
     // Check if file is in watched directories
@@ -400,21 +520,31 @@ export function setupWatcher(server: ViteDevServer, options: WatcherOptions): ()
       return;
     }
 
-    // Skip UI widget files — they don't affect the server manifest.
-    // Widget components are built separately by the UI builder (Vite plugin)
-    // and changes should be handled by widget HMR, not server regeneration.
-    const inWidgetsDir = isVersioned
-      ? isInVersionedUIWidgetsDir(filePath, versionedUIWidgetDirs)
-      : isInUIWidgetsDir(filePath, projectRoot, directories);
-
-    if (inWidgetsDir) {
+    if (!shouldTriggerRegeneration(eventType, filePath)) {
       return;
     }
 
-    if (shouldTriggerRegeneration(eventType, filePath)) {
+    // For widget files, use the tracker to distinguish atomic saves from
+    // genuine file additions/deletions. Content edits (atomic saves) should
+    // NOT trigger manifest regeneration — only the UI builder handles those.
+    if (isWidgetFile(filePath)) {
+      if (eventType === "add") {
+        const isNew = widgetTracker.handleAdd(filePath);
+        if (!isNew) return; // Atomic save — skip
+        logger.info(`Widget added: ${path.relative(projectRoot, filePath)}`);
+      } else if (eventType === "unlink") {
+        widgetTracker.handleUnlink(filePath, () => {
+          // Genuine deletion — trigger regeneration after grace period
+          logger.info(`Widget removed: ${path.relative(projectRoot, filePath)}`);
+          debouncedRegenerate(filePath);
+        });
+        return; // Wait for grace period
+      }
+    } else {
       logger.info(`File ${eventType}: ${path.relative(projectRoot, filePath)}`);
-      debouncedRegenerate(filePath);
     }
+
+    debouncedRegenerate(filePath);
   };
 
   // Set up event listeners
@@ -426,6 +556,7 @@ export function setupWatcher(server: ViteDevServer, options: WatcherOptions): ()
     if (regenerateTimeout) {
       clearTimeout(regenerateTimeout);
     }
+    widgetTracker.dispose();
     // Note: We don't need to remove listeners as Vite handles this
     // when the server is closed
   };
@@ -580,7 +711,19 @@ export async function createStandaloneWatcher(
     alwaysStat: true,
   });
 
-  // Helper to check if a file is in a UI widgets directory (should skip regeneration)
+  // Track known widget files to distinguish atomic saves from genuine add/remove
+  const widgetDirs: string[] = isVersioned
+    ? versionedUIWidgetDirs
+    : directories.uiWidgets
+      ? [path.resolve(projectRoot, directories.uiWidgets)]
+      : [];
+
+  const widgetTracker = new WidgetFileTracker();
+  if (widgetDirs.length > 0) {
+    await widgetTracker.init(widgetDirs);
+  }
+
+  // Helper to check if a file is in a UI widgets directory
   const isWidgetFile = (filePath: string): boolean => {
     return isVersioned
       ? isInVersionedUIWidgetsDir(filePath, versionedUIWidgetDirs)
@@ -588,16 +731,28 @@ export async function createStandaloneWatcher(
   };
 
   // Handle file add/unlink events
-  // Skip UI widget files — they don't affect the server manifest and are
-  // built separately by the UI builder (Vite plugin / widget HMR).
+  // For widget files, use tracker to distinguish atomic saves from genuine changes.
   watcher.on("add", (filePath: string) => {
-    if (isWidgetFile(filePath)) return;
+    if (isWidgetFile(filePath)) {
+      const isNew = widgetTracker.handleAdd(filePath);
+      if (!isNew) return; // Atomic save — skip
+      logger.info(`Widget added: ${path.relative(projectRoot, filePath)}`);
+      debouncedRegenerate(filePath);
+      return;
+    }
     logger.info(`File added: ${path.relative(projectRoot, filePath)}`);
     debouncedRegenerate(filePath);
   });
 
   watcher.on("unlink", (filePath: string) => {
-    if (isWidgetFile(filePath)) return;
+    if (isWidgetFile(filePath)) {
+      widgetTracker.handleUnlink(filePath, () => {
+        // Genuine deletion — trigger regeneration after grace period
+        logger.info(`Widget removed: ${path.relative(projectRoot, filePath)}`);
+        debouncedRegenerate(filePath);
+      });
+      return;
+    }
     logger.info(`File removed: ${path.relative(projectRoot, filePath)}`);
     debouncedRegenerate(filePath);
   });
@@ -612,6 +767,7 @@ export async function createStandaloneWatcher(
       if (regenerateTimeout) {
         clearTimeout(regenerateTimeout);
       }
+      widgetTracker.dispose();
       void watcher.close();
     },
   };
