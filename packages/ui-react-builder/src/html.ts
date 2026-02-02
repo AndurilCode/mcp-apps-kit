@@ -160,11 +160,19 @@ export function generateHTML(options: TemplateOptions): string {
 export function generateDevHTML(options: DevHTMLOptions): string {
   const { key, name, css, devServerUrl = "" } = options;
 
+  // Keys are embedded in JS import statements — reject anything outside
+  // the safe set to prevent injection.
+  assertSafeKey(key);
+
   // Strip trailing slashes so paths like "http://host:5173/" don't produce
   // double-slash URLs ("http://host:5173//@vite/client").
   const baseUrl = devServerUrl.replace(/\/+$/, "");
 
   const combinedCss = css ? `${DEFAULT_BASE_CSS}\n${css}` : DEFAULT_BASE_CSS;
+
+  // Build the virtual module path as a proper JS string literal so that
+  // special characters can never break out of the import.
+  const virtualModulePath = JSON.stringify(`${baseUrl}/virtual:mcp-react-ui/${key}.tsx`);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -186,7 +194,7 @@ export function generateDevHTML(options: DevHTMLOptions): string {
     window.__vite_plugin_react_preamble_installed__ = true
   </script>
   <script type="module">
-    import "${baseUrl}/virtual:mcp-react-ui/${escapeHtml(key)}.tsx"
+    import ${virtualModulePath}
   </script>
 </body>
 </html>`;
@@ -292,6 +300,30 @@ if (rootElement) {
   );
 }
 `;
+}
+
+/**
+ * Regex for valid widget keys: alphanumeric, hyphens, underscores only.
+ *
+ * Keys are embedded in HTML attributes and JS import specifiers, so we
+ * restrict them to a safe character set rather than trying to escape for
+ * multiple output contexts.
+ */
+const SAFE_KEY_RE = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * Assert that a widget key contains only safe characters.
+ *
+ * @param key - Widget key to validate
+ * @throws If the key contains characters outside the safe set
+ */
+function assertSafeKey(key: string): void {
+  if (!SAFE_KEY_RE.test(key)) {
+    throw new Error(
+      `[mcp-react-ui] Invalid widget key ${JSON.stringify(key)}. ` +
+        `Keys must match /^[A-Za-z0-9_-]+$/.`
+    );
+  }
 }
 
 /**

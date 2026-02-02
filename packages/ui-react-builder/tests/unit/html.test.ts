@@ -303,9 +303,18 @@ describe("generateDevHTML", () => {
     expect(html).toContain("prefers-color-scheme: dark");
   });
 
-  it("should escape HTML in key and name", () => {
+  it("should reject keys with unsafe characters", () => {
+    expect(() =>
+      generateDevHTML({
+        key: "test<script>alert('xss')</script>",
+        name: "Test Widget",
+      })
+    ).toThrow(/Invalid widget key/);
+  });
+
+  it("should escape HTML in name", () => {
     const html = generateDevHTML({
-      key: "test<script>alert('xss')</script>",
+      key: "test-widget",
       name: "Test<script>alert('xss')</script>",
     });
 
