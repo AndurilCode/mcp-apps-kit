@@ -958,10 +958,11 @@ export function mcpReactUI(options: McpReactUIOptions): Plugin {
       // Guard: only register if middlewares is available (won't be in unit tests)
       if (!server.middlewares) return;
 
-      server.middlewares.use(async (req, res, next) => {
+      server.middlewares.use((req, res, next) => {
         const url = req.url;
-        if (!url || !url.startsWith("/" + VIRTUAL_MODULE_PREFIX)) {
-          return next();
+        if (!url?.startsWith("/" + VIRTUAL_MODULE_PREFIX)) {
+          next();
+          return;
         }
 
         // Extract the widget key from the URL, stripping .tsx suffix if present
@@ -972,34 +973,33 @@ export function mcpReactUI(options: McpReactUIOptions): Plugin {
         const ui = virtualModules.get(key);
 
         if (!ui) {
-          return next();
+          next();
+          return;
         }
 
-        try {
-          // Use Vite's transform pipeline to process the virtual module.
-          // This will:
-          // 1. Call our resolveId → returns \0virtual:mcp-react-ui/xxx.tsx
-          // 2. Call our load → returns JSX code
-          // 3. Call our transform → converts JSX to JS
-          // 4. Call Vite's import analysis → rewrites bare imports to URLs
-          const result = await server.transformRequest(
-            VIRTUAL_MODULE_PREFIX + key + VIRTUAL_MODULE_SUFFIX,
-            { ssr: false }
-          );
-
-          if (result) {
-            res.setHeader("Content-Type", "application/javascript");
-            res.setHeader("Cache-Control", "no-cache");
-            res.end(result.code);
-          } else {
-            // This shouldn't happen if virtualModules.has(key) is true
-            logger.error(`[mcp-react-ui] transformRequest returned null for ${key}`);
-            next(new Error(`Failed to transform virtual module: ${key}`));
-          }
-        } catch (err) {
-          logger.error(`[mcp-react-ui] Error serving virtual module: ${err}`);
-          next(err);
-        }
+        // Use Vite's transform pipeline to process the virtual module.
+        // This will:
+        // 1. Call our resolveId → returns \0virtual:mcp-react-ui/xxx.tsx
+        // 2. Call our load → returns JSX code
+        // 3. Call our transform → converts JSX to JS
+        // 4. Call Vite's import analysis → rewrites bare imports to URLs
+        void server
+          .transformRequest(VIRTUAL_MODULE_PREFIX + key + VIRTUAL_MODULE_SUFFIX, { ssr: false })
+          .then((result) => {
+            if (result) {
+              res.setHeader("Content-Type", "application/javascript");
+              res.setHeader("Cache-Control", "no-cache");
+              res.end(result.code);
+            } else {
+              // This shouldn't happen if virtualModules.has(key) is true
+              logger.error(`[mcp-react-ui] transformRequest returned null for ${key}`);
+              next(new Error(`Failed to transform virtual module: ${key}`));
+            }
+          })
+          .catch((err: unknown) => {
+            logger.error(`[mcp-react-ui] Error serving virtual module: ${err}`);
+            next(err);
+          });
       });
     },
 

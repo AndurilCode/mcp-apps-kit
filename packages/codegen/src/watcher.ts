@@ -213,7 +213,7 @@ class WidgetFileTracker {
       try {
         const entries = await fsPromises.readdir(dir, { recursive: true });
         for (const entry of entries) {
-          const fullPath = path.resolve(dir, entry.toString());
+          const fullPath = path.resolve(dir, entry);
           if (hasValidExtension(fullPath) && !shouldSkipFile(fullPath)) {
             this.knownFiles.add(fullPath);
           }
