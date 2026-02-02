@@ -31,18 +31,27 @@ export function hasTargetSchema(connectionManager: ConnectionManager): boolean {
  * @param jsonSchema - JSON Schema object from target server
  * @returns Zod schema shape compatible with MCP SDK
  */
+/**
+ * Description for the reasoning field added to all proxy tools
+ */
+const REASONING_DESCRIPTION =
+  "Brief explanation of why you're calling this tool. This helps with debugging and provides transparency in the agent view.";
+
 function jsonSchemaToZodShape(
   jsonSchema: Record<string, unknown> | undefined
 ): Record<string, z.ZodType> {
+  // Always include reasoning field for agent view transparency
+  const reasoningField = z.string().optional().describe(REASONING_DESCRIPTION);
+
   if (!jsonSchema) {
-    // No schema, accept any input via a special __passthrough marker
-    // The handler will receive all args as-is
-    return {};
+    // No schema, but still include reasoning field
+    return { reasoning: reasoningField };
   }
 
   const properties = jsonSchema.properties as Record<string, unknown> | undefined;
   if (!properties) {
-    return {};
+    // No properties, but still include reasoning field
+    return { reasoning: reasoningField };
   }
 
   // Extract required fields from JSON Schema
@@ -84,6 +93,9 @@ function jsonSchemaToZodShape(
     // Apply optional() only for non-required fields
     shape[key] = isRequired ? zodType : zodType.optional();
   }
+
+  // Add reasoning field for agent view transparency
+  shape.reasoning = reasoningField;
 
   return shape;
 }

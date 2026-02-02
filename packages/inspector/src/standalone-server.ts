@@ -10,9 +10,10 @@
  * and can interact with widgets via widget_click, widget_fill, etc.
  */
 
-import { createApp, type App, type ToolDefs } from "@mcp-apps-kit/core";
+import { createApp, type App, type ToolDefs, type ToolDef } from "@mcp-apps-kit/core";
 import type { Server } from "http";
 import http from "http";
+import { z } from "zod";
 import { ConnectionManager, inferProtocolType, type ProtocolType } from "./connection";
 import { ConnectionRegistry } from "./connection-registry";
 import type { InspectorServerOptions } from "./types";
@@ -130,6 +131,57 @@ function filterConnectionTools(tools: ToolDefs, exclude: boolean): ToolDefs {
     }
   }
   return filtered;
+}
+
+// =============================================================================
+// REASONING SCHEMA EXTENSION (for agent view)
+// =============================================================================
+
+/**
+ * Description for the reasoning field added to all tools
+ */
+const REASONING_DESCRIPTION =
+  "Brief explanation of why you're calling this tool. This helps with debugging and provides transparency in the agent view.";
+
+/**
+ * Reasoning field schema to be added to all tools
+ */
+const reasoningFieldShape = {
+  reasoning: z.string().optional().describe(REASONING_DESCRIPTION),
+};
+
+/**
+ * Extend each tool's input schema with an optional `reasoning` field.
+ *
+ * This allows the agent to provide context for why it's calling each tool,
+ * which is displayed in the inspector's Agent panel for debugging and transparency.
+ *
+ * Uses ZodObject.extend() instead of z.intersection() because the core framework's
+ * extractZodShape() only handles ZodObject instances. z.intersection() creates a
+ * ZodIntersection which gets wrapped as { value: schema }, breaking all tool input parsing.
+ *
+ * @param tools - Original tool definitions
+ * @returns Tool definitions with reasoning field added to each input schema
+ */
+function addReasoningToTools(tools: ToolDefs): ToolDefs {
+  const enhanced: ToolDefs = {};
+  for (const [name, tool] of Object.entries(tools)) {
+    const originalTool = tool as ToolDef;
+    // Use .extend() to preserve ZodObject type for extractZodShape() compatibility
+    if (originalTool.input instanceof z.ZodObject) {
+      const extendedInput = (originalTool.input as z.ZodObject<Record<string, z.ZodType>>).extend(
+        reasoningFieldShape
+      );
+      enhanced[name] = {
+        ...originalTool,
+        input: extendedInput,
+      } as ToolDef;
+    } else {
+      // Non-object schemas (shouldn't happen for inspector tools) - skip reasoning
+      enhanced[name] = originalTool;
+    }
+  }
+  return enhanced;
 }
 
 /**
@@ -250,9 +302,11 @@ export function createStandaloneInspectorServer(
   const targetUrl = options.targetUrl;
 
   // Create MCP app with inspector tools
+  // Add reasoning field to all tools for agent view transparency
   // Filter out connection tools when auto-connect mode is enabled (targetUrl provided)
   const allTools = createInspectorTools(registry);
-  const tools = filterConnectionTools(allTools, !!targetUrl);
+  const toolsWithReasoning = addReasoningToTools(allTools);
+  const tools = filterConnectionTools(toolsWithReasoning, !!targetUrl);
   const app = createApp({
     name: "mcp-inspector",
     version: "1.0.0",
@@ -749,7 +803,7 @@ export function createStandaloneInspectorServer(
         try {
           const parsed = JSON.parse(body.toString("utf-8")) as {
             method?: string;
-            params?: { name?: string; arguments?: unknown; reasoning?: string };
+            params?: { name?: string; arguments?: unknown };
           };
           // Check if this is a tools/call request (MCP JSON-RPC)
           if (parsed.method === "tools/call" && parsed.params?.name) {
@@ -766,12 +820,10 @@ export function createStandaloneInspectorServer(
                 arguments: inspectorToolCall.arguments,
                 source: "inspector",
               };
-              // Forward reasoning if provided by the caller
-              if (
-                typeof parsed.params.reasoning === "string" &&
-                parsed.params.reasoning.length > 0
-              ) {
-                eventPayload.reasoning = parsed.params.reasoning;
+              // Extract reasoning from tool arguments (it's part of the input schema)
+              const args = parsed.params.arguments as Record<string, unknown> | undefined;
+              if (args && typeof args.reasoning === "string" && args.reasoning.length > 0) {
+                eventPayload.reasoning = args.reasoning;
               }
               connectionManager.recordAgentEvent("agent-tool-call", eventPayload);
             }

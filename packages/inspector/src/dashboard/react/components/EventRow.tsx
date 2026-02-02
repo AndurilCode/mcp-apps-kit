@@ -77,6 +77,10 @@ function getPayloadReasoning(payload: unknown): string | undefined {
 // Characters per second for the typing effect
 const CHARS_PER_SECOND = 120;
 
+// Module-level cache to track which event IDs have had their reasoning animated
+// This persists across component remounts (e.g., tab switches)
+const animatedReasoningCache = new Set<string>();
+
 /**
  * Reasoning bubble with a streaming/typing animation.
  * When `skipAnimation` is true the full text is shown immediately (no replay on re-expand).
@@ -147,8 +151,8 @@ function ReasoningBubble({
 export function EventRow({ event, isAgentView = false }: EventRowProps): React.ReactElement {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  // Track whether reasoning animation already played (persists across collapse/expand)
-  const reasoningAnimatedRef = useRef(false);
+  // Check if this event's reasoning was already animated (persists across remounts)
+  const wasAlreadyAnimated = animatedReasoningCache.has(event.id);
 
   const toggleExpand = useCallback(() => {
     setIsExpanded((prev) => !prev);
@@ -244,21 +248,21 @@ export function EventRow({ event, isAgentView = false }: EventRowProps): React.R
           {summary}
         </span>
       </div>
+      {/* Show reasoning bubble for agent tool calls even when collapsed */}
+      {reasoning && (
+        <ReasoningBubble
+          text={reasoning}
+          skipAnimation={wasAlreadyAnimated}
+          onAnimationDone={() => {
+            // Mark this event as animated in the global cache
+            animatedReasoningCache.add(event.id);
+          }}
+        />
+      )}
       {isExpanded && (
-        <>
-          {reasoning && (
-            <ReasoningBubble
-              text={reasoning}
-              skipAnimation={reasoningAnimatedRef.current}
-              onAnimationDone={() => {
-                reasoningAnimatedRef.current = true;
-              }}
-            />
-          )}
-          <div style={payloadStyle}>
-            <JsonViewer data={event.payload} />
-          </div>
-        </>
+        <div style={payloadStyle}>
+          <JsonViewer data={event.payload} />
+        </div>
       )}
     </div>
   );
