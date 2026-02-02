@@ -118,6 +118,72 @@ function shouldTriggerRegeneration(
 }
 
 /**
+ * Check if a file is inside a UI widgets directory
+ *
+ * Widget files (.tsx/.jsx components) don't affect the server manifest —
+ * they are built separately by the UI builder (Vite plugin). Changes to
+ * widget files should NOT trigger manifest regeneration or tool hot-reload,
+ * as that would cause unnecessary server churn and interfere with widget HMR.
+ *
+ * @param filePath - Absolute file path to check
+ * @param projectRoot - Project root directory
+ * @param directories - Directory configuration
+ * @returns true if the file is inside a uiWidgets directory
+ */
+function isInUIWidgetsDir(
+  filePath: string,
+  projectRoot: string,
+  directories: DirectoriesConfig
+): boolean {
+  const absolutePath = path.resolve(filePath);
+
+  // Check explicit uiWidgets directory
+  if (directories.uiWidgets) {
+    const uiWidgetsDir = path.resolve(projectRoot, directories.uiWidgets);
+    if (absolutePath.startsWith(uiWidgetsDir + path.sep) || absolutePath === uiWidgetsDir) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Resolve all UI widget directories from a versioned config
+ *
+ * @param config - Versioned file-based config
+ * @param projectRoot - Project root directory
+ * @returns Array of absolute paths for all uiWidgets directories
+ */
+function getVersionedUIWidgetDirs(config: VersionedFileBasedConfig, projectRoot: string): string[] {
+  const dirs: string[] = [];
+
+  for (const [versionKey, versionConfig] of Object.entries(config.versions)) {
+    const versionDirs = getVersionDirectories(versionKey, versionConfig);
+    if (versionDirs.uiWidgets) {
+      dirs.push(path.resolve(projectRoot, versionDirs.uiWidgets));
+    }
+  }
+
+  return dirs;
+}
+
+/**
+ * Check if a file is inside any versioned UI widgets directory
+ *
+ * @param filePath - Absolute file path to check
+ * @param uiWidgetDirs - Array of absolute uiWidgets directory paths
+ * @returns true if the file is inside any uiWidgets directory
+ */
+function isInVersionedUIWidgetsDir(filePath: string, uiWidgetDirs: string[]): boolean {
+  const absolutePath = path.resolve(filePath);
+
+  return uiWidgetDirs.some(
+    (dir) => absolutePath.startsWith(dir + path.sep) || absolutePath === dir
+  );
+}
+
+/**
  * Check if a path is within one of the watched directories
  */
 function isInWatchedDirectory(
@@ -193,10 +259,12 @@ export function setupWatcher(server: ViteDevServer, options: WatcherOptions): ()
   // Determine directories to watch based on config type
   let dirsToWatch: string[];
   let isVersioned = false;
+  let versionedUIWidgetDirs: string[] = [];
 
   if (isVersionedConfig(config)) {
     isVersioned = true;
     dirsToWatch = getVersionedWatchDirs(config, projectRoot);
+    versionedUIWidgetDirs = getVersionedUIWidgetDirs(config, projectRoot);
     logger.info(`Watching versioned directories: ${dirsToWatch.length} paths`);
   } else {
     const toolsDir = path.resolve(projectRoot, directories.tools ?? "tools");
@@ -332,6 +400,17 @@ export function setupWatcher(server: ViteDevServer, options: WatcherOptions): ()
       return;
     }
 
+    // Skip UI widget files — they don't affect the server manifest.
+    // Widget components are built separately by the UI builder (Vite plugin)
+    // and changes should be handled by widget HMR, not server regeneration.
+    const inWidgetsDir = isVersioned
+      ? isInVersionedUIWidgetsDir(filePath, versionedUIWidgetDirs)
+      : isInUIWidgetsDir(filePath, projectRoot, directories);
+
+    if (inWidgetsDir) {
+      return;
+    }
+
     if (shouldTriggerRegeneration(eventType, filePath)) {
       logger.info(`File ${eventType}: ${path.relative(projectRoot, filePath)}`);
       debouncedRegenerate(filePath);
@@ -372,9 +451,13 @@ export async function createStandaloneWatcher(
 
   // Determine directories to watch based on config type
   let dirsToWatch: string[];
+  let isVersioned = false;
+  let versionedUIWidgetDirs: string[] = [];
 
   if (isVersionedConfig(config)) {
+    isVersioned = true;
     dirsToWatch = getVersionedWatchDirs(config, projectRoot);
+    versionedUIWidgetDirs = getVersionedUIWidgetDirs(config, projectRoot);
     logger.info(`Watching versioned directories: ${dirsToWatch.length} paths`);
   } else {
     const toolsDir = path.resolve(projectRoot, directories.tools ?? "tools");
@@ -497,13 +580,24 @@ export async function createStandaloneWatcher(
     alwaysStat: true,
   });
 
+  // Helper to check if a file is in a UI widgets directory (should skip regeneration)
+  const isWidgetFile = (filePath: string): boolean => {
+    return isVersioned
+      ? isInVersionedUIWidgetsDir(filePath, versionedUIWidgetDirs)
+      : isInUIWidgetsDir(filePath, projectRoot, directories);
+  };
+
   // Handle file add/unlink events
+  // Skip UI widget files — they don't affect the server manifest and are
+  // built separately by the UI builder (Vite plugin / widget HMR).
   watcher.on("add", (filePath: string) => {
+    if (isWidgetFile(filePath)) return;
     logger.info(`File added: ${path.relative(projectRoot, filePath)}`);
     debouncedRegenerate(filePath);
   });
 
   watcher.on("unlink", (filePath: string) => {
+    if (isWidgetFile(filePath)) return;
     logger.info(`File removed: ${path.relative(projectRoot, filePath)}`);
     debouncedRegenerate(filePath);
   });
