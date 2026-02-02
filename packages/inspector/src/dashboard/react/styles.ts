@@ -12,6 +12,12 @@ const FONT_SANS =
 const FONT_MONO =
   "'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace";
 
+// Base payload style — shared by default and agent-tinted variants
+const eventPayloadBase: CSSProperties = {
+  padding: "0.5rem 0.5rem 0.5rem 1.5rem",
+  borderTop: "1px solid rgba(255, 255, 255, 0.05)",
+};
+
 export const styles: Record<string, CSSProperties> = {
   // Root
   root: {
@@ -833,10 +839,7 @@ export const styles: Record<string, CSSProperties> = {
     whiteSpace: "nowrap",
   },
 
-  eventPayload: {
-    padding: "0.5rem 0.5rem 0.5rem 1.5rem",
-    borderTop: "1px solid rgba(255, 255, 255, 0.05)",
-  },
+  eventPayload: eventPayloadBase,
 
   // ===========================================================================
   // JSON VIEWER
@@ -1120,5 +1123,88 @@ export const styles: Record<string, CSSProperties> = {
     color: "#6b7280",
     fontSize: "0.6875rem",
     fontStyle: "italic",
+  },
+
+  // ===========================================================================
+  // AGENT EVENT ROW — Arrow Icons & Tinted Sections
+  // ===========================================================================
+
+  agentArrowIcon: {
+    fontSize: "0.75rem",
+    fontWeight: 700,
+    flexShrink: 0,
+    width: "16px",
+    textAlign: "center",
+    lineHeight: 1,
+  },
+
+  agentArrowInput: {
+    color: "#60a5fa",
+  },
+
+  agentArrowOutput: {
+    color: "#4ade80",
+  },
+
+  // Tinted payload sections for agent tool-call (input) vs tool-result (output)
+  agentPayloadInput: {
+    ...eventPayloadBase,
+    borderTop: "1px solid rgba(96, 165, 250, 0.15)",
+    backgroundColor: "rgba(96, 165, 250, 0.06)",
+    borderLeft: "2px solid rgba(96, 165, 250, 0.3)",
+  },
+
+  agentPayloadOutput: {
+    ...eventPayloadBase,
+    borderTop: "1px solid rgba(74, 222, 128, 0.15)",
+    backgroundColor: "rgba(74, 222, 128, 0.06)",
+    borderLeft: "2px solid rgba(74, 222, 128, 0.3)",
+  },
+
+  // ===========================================================================
+  // REASONING BUBBLE (chatbot-style, above tool call)
+  // ===========================================================================
+
+  reasoningContainer: {
+    padding: "0.375rem 0.5rem 0.25rem 1.5rem",
+    borderTop: "1px solid rgba(255, 255, 255, 0.04)",
+  },
+
+  reasoningBubble: {
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    borderRadius: "8px",
+    border: "1px solid rgba(255, 255, 255, 0.08)",
+    padding: "0.375rem 0.625rem",
+    maxWidth: "90%",
+    animation: "reasoningReveal 0.4s ease-out forwards",
+    overflowY: "auto",
+  },
+
+  reasoningLabel: {
+    fontSize: "0.5rem",
+    fontWeight: 600,
+    color: "#6b7280",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    marginBottom: "0.2rem",
+  },
+
+  reasoningText: {
+    fontSize: "0.6875rem",
+    color: "#b0b0b0",
+    lineHeight: 1.5,
+    fontStyle: "italic",
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+  },
+
+  reasoningCursor: {
+    display: "inline-block",
+    width: "2px",
+    height: "0.75em",
+    backgroundColor: "#6b7280",
+    marginLeft: "1px",
+    verticalAlign: "text-bottom",
+    animation: "reasoningCursorBlink 1s step-end infinite",
   },
 };

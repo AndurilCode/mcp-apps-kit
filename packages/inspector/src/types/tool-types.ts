@@ -41,6 +41,8 @@ export interface ToolInfo {
 export interface CallToolInput {
   name: string;
   arguments: Record<string, unknown>;
+  /** Optional reasoning from the LLM explaining why this tool is being called */
+  reasoning?: string;
 }
 
 /**
