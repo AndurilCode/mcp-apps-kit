@@ -91,9 +91,16 @@ export class ConnectionRegistry extends EventEmitter {
       this.emit("authRequired", id, event);
     });
 
+    // Emit "created" before connect() so listeners can set inspectorUrl
+    // (needed for OAuth callback redirect URI to use the correct port)
+    this.connections.set(id, connectionManager);
+    this.emit("created", id, connectionManager);
+
     try {
       await connectionManager.connect(params, options);
     } catch (error) {
+      // Clean up on failed connect
+      this.connections.delete(id);
       try {
         await connectionManager.disconnect();
       } catch {
@@ -101,9 +108,6 @@ export class ConnectionRegistry extends EventEmitter {
       }
       throw error;
     }
-
-    this.connections.set(id, connectionManager);
-    this.emit("created", id, connectionManager);
     this.setActive(id);
 
     return { id, connectionManager };

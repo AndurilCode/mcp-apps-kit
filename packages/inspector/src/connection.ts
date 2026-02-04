@@ -268,13 +268,16 @@ export class ConnectionManager extends EventEmitter {
       // Status handler and this.oauthProvider already set from the configure step
       authProvider = this.oauthProvider;
     } else if (params.transport === "http" && oauthConfig) {
-      // Port is set later via setInspectorUrl, default to 6274
-      const port = this.inspectorUrl ? new URL(this.inspectorUrl).port : "6274";
+      // Derive callback host + port from inspectorUrl (set via registry "created" event)
+      const inspectorParsed = this.inspectorUrl ? new URL(this.inspectorUrl) : null;
+      const port = inspectorParsed?.port || "6274";
+      const host = inspectorParsed?.hostname || "127.0.0.1";
 
       authProvider = new InspectorOAuthProvider({
         serverUrl: params.url,
         config: oauthConfig,
         callbackPort: parseInt(port, 10),
+        callbackHost: host,
         debug: this.debug,
       });
 

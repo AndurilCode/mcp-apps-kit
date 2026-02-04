@@ -42,6 +42,9 @@ export interface InspectorOAuthProviderOptions {
   /** Port the inspector server runs on (for callback URL) */
   callbackPort: number;
 
+  /** Hostname for the callback URL (default: "127.0.0.1") */
+  callbackHost?: string;
+
   /** Custom token store (for testing) */
   tokenStore?: TokenStore;
 
@@ -71,6 +74,8 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
 
   /** The port for constructing the redirect/callback URL */
   private readonly callbackPort: number;
+  /** The hostname for constructing the redirect/callback URL */
+  private readonly callbackHost: string;
 
   /** In-memory PKCE code verifier (per auth flow) */
   private _codeVerifier: string | null = null;
@@ -103,6 +108,7 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
     this.serverUrl = options.serverUrl;
     this.config = options.config;
     this.callbackPort = options.callbackPort;
+    this.callbackHost = options.callbackHost ?? "127.0.0.1";
     this.tokenStore = options.tokenStore ?? new TokenStore();
     this._debug = options.debug ?? false;
     this._discoveryResults = options.discoveryResults;
@@ -117,7 +123,7 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
    * Points to the inspector's /oauth/callback endpoint.
    */
   get redirectUrl(): URL {
-    return new URL(`http://127.0.0.1:${this.callbackPort}/oauth/callback`);
+    return new URL(`http://${this.callbackHost}:${this.callbackPort}/oauth/callback`);
   }
 
   /**
