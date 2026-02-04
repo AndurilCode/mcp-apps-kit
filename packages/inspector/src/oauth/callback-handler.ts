@@ -10,10 +10,12 @@
  *   POST /api/oauth/configure     — set OAuth config for a connection
  *   GET  /api/oauth/status        — get current OAuth state (?connectionId=X optional)
  *   POST /api/oauth/revoke        — revoke tokens (?connectionId=X optional)
+ *   GET  /api/oauth/discover      — discover auth requirements for a server URL
  */
 
 import type http from "http";
 import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
+import { discoverAuthRequirements } from "./discovery";
 import { InspectorOAuthProvider } from "./provider";
 import type { OAuthClientConfig } from "./types";
 import type { ConnectionRegistry } from "../connection-registry";
@@ -111,6 +113,10 @@ export async function handleOAuthRoutes(
 
   if (url.pathname === "/api/oauth/revoke") {
     return handleOAuthRevoke(req, res, url, registry, getActiveConnectionManager);
+  }
+
+  if (url.pathname === "/api/oauth/discover") {
+    return handleOAuthDiscover(req, res, url);
   }
 
   return false;
@@ -469,6 +475,61 @@ async function handleOAuthRevoke(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     jsonResponse(res, 500, { revoked: false, error: message });
+  }
+
+  return true;
+}
+
+// =============================================================================
+// GET /api/oauth/discover — Discover auth requirements for a server URL
+// =============================================================================
+
+/**
+ * Handle OAuth discovery requests.
+ *
+ * Server-side proxy for .well-known endpoint discovery, bypassing CORS
+ * restrictions when called from the browser dashboard.
+ *
+ * Query: ?url=<serverUrl> (required)
+ */
+async function handleOAuthDiscover(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  url: URL
+): Promise<boolean> {
+  setCorsHeaders(res, "GET");
+
+  if (req.method === "OPTIONS") {
+    res.writeHead(204);
+    res.end();
+    return true;
+  }
+
+  if (req.method !== "GET") {
+    jsonResponse(res, 405, { error: "Method not allowed" });
+    return true;
+  }
+
+  const serverUrl = url.searchParams.get("url");
+  if (!serverUrl) {
+    jsonResponse(res, 400, { error: "Missing required 'url' query parameter" });
+    return true;
+  }
+
+  // Validate URL format
+  try {
+    new URL(serverUrl);
+  } catch {
+    jsonResponse(res, 400, { error: "Invalid URL format" });
+    return true;
+  }
+
+  try {
+    const result = await discoverAuthRequirements(serverUrl);
+    jsonResponse(res, 200, result as unknown as Record<string, unknown>);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    jsonResponse(res, 502, { error: "Discovery failed", message });
   }
 
   return true;

@@ -26,6 +26,8 @@ export type {
   OAuthPresetConfig,
   PersistedTokenData,
 } from "./types";
+export { discoverAuthRequirements } from "./discovery";
+export type { AuthRequiredEvent } from "./discovery";
 
 // Re-export SDK types for convenience
 export type {
