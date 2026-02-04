@@ -393,6 +393,15 @@ export function ConnectionBar({
 
   // OAuth status for button styling
 
+  // Clear inputs when form opens
+  useEffect(() => {
+    if (isOpen) {
+      setInputValue("");
+      setCommand("");
+      setStdioArgs("");
+    }
+  }, [isOpen]);
+
   // Determine if the current form is submittable
   const canSubmit = transport === "http" ? !!inputValue.trim() : !!command.trim();
 
