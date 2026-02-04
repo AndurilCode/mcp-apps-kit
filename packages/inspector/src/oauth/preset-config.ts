@@ -308,3 +308,94 @@ export async function checkExistingTokens(
     hasRefreshToken: !!persisted.tokens.refresh_token,
   };
 }
+
+// =============================================================================
+// DISCOVERY-BASED PROVIDER FACTORY (CLI auto-auth)
+// =============================================================================
+
+/**
+ * Options for creating a provider from auto-discovery results.
+ */
+export interface DiscoveryProviderOptions {
+  /** Target MCP server URL */
+  serverUrl: string;
+
+  /** Discovery results from discoverAuthRequirements() */
+  discoveryResults: import("./discovery").AuthRequiredEvent;
+
+  /** Port for redirect URI construction */
+  callbackPort: number;
+
+  /** Custom token store (for testing) */
+  tokenStore?: TokenStore;
+
+  /** Enable debug logging */
+  debug?: boolean;
+}
+
+/**
+ * Create an InspectorOAuthProvider pre-loaded with auto-discovery results.
+ *
+ * Unlike `createPresetProvider` (which requires explicit OAuth flags and throws
+ * on redirect), this creates an interactive provider for the CLI auto-auth flow:
+ * - Discovery results are passed through to enable DCR auto-registration
+ * - `redirectToAuthorization` opens the user's browser (interactive CLI mode)
+ * - The provider can wait for the OAuth callback via `waitForAuthorization()`
+ *
+ * This is used when the CLI detects a 401 without any `--oauth-*` flags and
+ * auto-discovers that the server supports Dynamic Client Registration.
+ *
+ * @param options - Provider creation options with discovery results
+ * @returns A configured InspectorOAuthProvider for interactive CLI auth
+ */
+export function createProviderFromDiscovery(
+  options: DiscoveryProviderOptions
+): InspectorOAuthProvider {
+  const { serverUrl, discoveryResults, callbackPort, tokenStore, debug } = options;
+
+  // Build config from discovery results
+  const config: OAuthClientConfig = {
+    redirectUri: `http://127.0.0.1:${callbackPort}/oauth/callback`,
+    enableDynamicRegistration: discoveryResults.supportsDCR,
+    scopes:
+      discoveryResults.suggestedScopes.length > 0
+        ? discoveryResults.suggestedScopes.join(" ")
+        : undefined,
+  };
+
+  const provider = new InspectorOAuthProvider({
+    serverUrl,
+    config,
+    callbackPort,
+    tokenStore,
+    debug,
+    discoveryResults,
+  });
+
+  // Override redirectToAuthorization to open the user's browser
+  const originalRedirect = provider.redirectToAuthorization.bind(provider);
+  provider.redirectToAuthorization = async (authorizationUrl: URL): Promise<void> => {
+    // Store the URL first (for callback handler)
+    await originalRedirect(authorizationUrl);
+
+    // Open the user's browser
+    const urlStr = authorizationUrl.toString();
+    try {
+      const { exec: execCb } = await import("node:child_process");
+      const platform = process.platform;
+      if (platform === "darwin") {
+        execCb(`open "${urlStr}"`);
+      } else if (platform === "win32") {
+        execCb(`start "" "${urlStr}"`);
+      } else {
+        execCb(`xdg-open "${urlStr}"`);
+      }
+    } catch {
+      // If browser open fails, log the URL for manual copy
+      // eslint-disable-next-line no-console
+      console.log(`\nOpen this URL in your browser to authorize:\n  ${urlStr}\n`);
+    }
+  };
+
+  return provider;
+}
