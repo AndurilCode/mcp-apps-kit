@@ -183,6 +183,7 @@ export async function handleDashboardRequest(
 
       // Normalize to ConnectionParams (backward compat: { url } → { transport: "http", url })
       let params: ConnectionParams;
+      let connectOptions: import("../types").ConnectOptions | undefined;
       const transport = (body.transport as string | undefined) ?? (body.url ? "http" : undefined);
 
       if (transport === "stdio") {
@@ -228,13 +229,32 @@ export async function handleDashboardRequest(
           return true;
         }
         params = { transport: "http", url: urlStr };
+
+        // Extract optional OAuth credentials from the request body
+        const oauthClientId = body.oauthClientId as string | undefined;
+        const oauthClientSecret = body.oauthClientSecret as string | undefined;
+        const oauthScopes = body.oauthScopes as string | undefined;
+
+        if (oauthClientId) {
+          // Derive callback port from the request's Host header
+          const host = req.headers.host ?? "127.0.0.1:6274";
+          const port = host.includes(":") ? host.split(":")[1] : "6274";
+          connectOptions = {
+            oauthConfig: {
+              clientId: oauthClientId,
+              clientSecret: oauthClientSecret,
+              scopes: oauthScopes,
+              redirectUri: `http://127.0.0.1:${port}/oauth/callback`,
+            },
+          };
+        }
       } else {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Missing transport type or url" }));
         return true;
       }
 
-      const { id, connectionManager: cm } = await registry.createConnection(params);
+      const { id, connectionManager: cm } = await registry.createConnection(params, connectOptions);
       const state = cm.getState();
       const discoveryResults = cm.getDiscoveryResults();
       const responseBody: Record<string, unknown> = {

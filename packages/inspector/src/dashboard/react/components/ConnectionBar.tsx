@@ -384,12 +384,18 @@ export function ConnectionBar({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [envVars, setEnvVars] = useState("");
   const [cwd, setCwd] = useState("");
+  // HTTP OAuth settings
+  const [showHttpSettings, setShowHttpSettings] = useState(false);
+  const [oauthClientId, setOauthClientId] = useState("");
+  const [oauthClientSecret, setOauthClientSecret] = useState("");
+  const [oauthScopes, setOauthScopes] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const httpSettingsButtonRef = useRef<HTMLButtonElement>(null);
 
   // OAuth status for button styling
 
@@ -399,6 +405,10 @@ export function ConnectionBar({
       setInputValue("");
       setCommand("");
       setStdioArgs("");
+      setOauthClientId("");
+      setOauthClientSecret("");
+      setOauthScopes("");
+      setShowHttpSettings(false);
     }
   }, [isOpen]);
 
@@ -439,7 +449,15 @@ export function ConnectionBar({
     if (transport === "http") {
       const url = inputValue.trim();
       if (!url) return null;
-      return { transport: "http", url };
+      const params: ConnectionParams & {
+        oauthClientId?: string;
+        oauthClientSecret?: string;
+        oauthScopes?: string;
+      } = { transport: "http", url };
+      if (oauthClientId.trim()) params.oauthClientId = oauthClientId.trim();
+      if (oauthClientSecret.trim()) params.oauthClientSecret = oauthClientSecret.trim();
+      if (oauthScopes.trim()) params.oauthScopes = oauthScopes.trim();
+      return params;
     }
     const cmd = command.trim();
     if (!cmd) return null;
@@ -453,7 +471,17 @@ export function ConnectionBar({
       })(),
       ...(cwd.trim() ? { cwd: cwd.trim() } : {}),
     };
-  }, [transport, inputValue, command, stdioArgs, envVars, cwd]);
+  }, [
+    transport,
+    inputValue,
+    command,
+    stdioArgs,
+    envVars,
+    cwd,
+    oauthClientId,
+    oauthClientSecret,
+    oauthScopes,
+  ]);
 
   const handleCreate = useCallback(async () => {
     if (isCreating) return;
@@ -633,6 +661,34 @@ export function ConnectionBar({
             )}
           </button>
 
+          {transport === "http" && (
+            <button
+              ref={httpSettingsButtonRef}
+              type="button"
+              style={{
+                ...connectionBarStyles.actionButton,
+                ...(showHttpSettings ? connectionBarStyles.settingsButtonActive : {}),
+              }}
+              onClick={() => setShowHttpSettings((prev) => !prev)}
+              title="OAuth Settings"
+              aria-expanded={showHttpSettings}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+              </svg>
+            </button>
+          )}
+
           {transport === "stdio" && (
             <button
               ref={settingsButtonRef}
@@ -704,6 +760,49 @@ export function ConnectionBar({
                 value={cwd}
                 onChange={(e) => setCwd(e.target.value)}
                 placeholder="/path/to/project"
+              />
+            </div>
+          </div>
+        </Popover>
+      )}
+
+      {/* HTTP OAuth Settings Popover */}
+      {transport === "http" && (
+        <Popover
+          isOpen={showHttpSettings}
+          anchorRef={httpSettingsButtonRef}
+          containerRef={containerRef}
+          onClose={() => setShowHttpSettings(false)}
+        >
+          <div style={connectionBarStyles.popoverContent}>
+            <div style={connectionBarStyles.advancedField}>
+              <label style={connectionBarStyles.advancedLabel}>OAuth Client ID</label>
+              <input
+                type="text"
+                style={connectionBarStyles.advancedInput}
+                value={oauthClientId}
+                onChange={(e) => setOauthClientId(e.target.value)}
+                placeholder="(optional — auto-registers if empty)"
+              />
+            </div>
+            <div style={connectionBarStyles.advancedField}>
+              <label style={connectionBarStyles.advancedLabel}>OAuth Client Secret</label>
+              <input
+                type="password"
+                style={connectionBarStyles.advancedInput}
+                value={oauthClientSecret}
+                onChange={(e) => setOauthClientSecret(e.target.value)}
+                placeholder="(optional)"
+              />
+            </div>
+            <div style={connectionBarStyles.advancedField}>
+              <label style={connectionBarStyles.advancedLabel}>OAuth Scopes</label>
+              <input
+                type="text"
+                style={connectionBarStyles.advancedInput}
+                value={oauthScopes}
+                onChange={(e) => setOauthScopes(e.target.value)}
+                placeholder="e.g. read write openid"
               />
             </div>
           </div>
