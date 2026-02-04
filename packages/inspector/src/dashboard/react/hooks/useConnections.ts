@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ConnectionParams } from "@mcp-apps-kit/testing";
 import { useServerHistory, type ServerHistoryEntry } from "./useServerHistory";
+import type { AuthRequiredEvent } from "../../../oauth/discovery";
 
 /**
  * Dashboard connection lifecycle status.
@@ -38,6 +39,8 @@ interface CreateConnectionResponse {
   id: string;
   url: string;
   serverInfo?: { name?: string; version?: string } | null;
+  authRequired?: boolean;
+  discoveryResults?: AuthRequiredEvent;
 }
 
 /**
@@ -54,6 +57,10 @@ export interface UseConnectionsResult {
   createConnection: (params: ConnectionParams) => Promise<DashboardConnection | null>;
   closeConnection: (id: string) => Promise<boolean>;
   getMatchingEntries: (filter: string) => ServerHistoryEntry[];
+  /** Discovery results from 401 auto-detection on the most recent connection attempt */
+  authDiscovery: AuthRequiredEvent | null;
+  /** Clear the auth discovery state */
+  clearAuthDiscovery: () => void;
 }
 
 function normalizeConnection(entry: {
@@ -82,6 +89,11 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [authDiscovery, setAuthDiscovery] = useState<AuthRequiredEvent | null>(null);
+
+  const clearAuthDiscovery = useCallback(() => {
+    setAuthDiscovery(null);
+  }, []);
 
   const { addEntry, getMatchingEntries } = useServerHistory();
 
@@ -115,6 +127,7 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
     async (params: ConnectionParams): Promise<DashboardConnection | null> => {
       setIsCreating(true);
       setError(null);
+      setAuthDiscovery(null);
       try {
         const res = await fetch(`${baseUrl}/dashboard/connections`, {
           method: "POST",
@@ -126,11 +139,17 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
           throw new Error(body.error ?? `HTTP ${res.status}`);
         }
         const data = (await res.json()) as CreateConnectionResponse;
+
+        // Capture auth discovery results from 401 auto-detection
+        if (data.authRequired && data.discoveryResults) {
+          setAuthDiscovery(data.discoveryResults);
+        }
+
         const newConn: DashboardConnection = {
           id: data.id,
           url: data.url,
           serverInfo: data.serverInfo ?? null,
-          status: "connected",
+          status: data.authRequired ? "disconnected" : "connected",
         };
         setConnections((prev) => {
           const filtered = prev.filter((c) => c.id !== newConn.id);
@@ -202,6 +221,8 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
     createConnection,
     closeConnection,
     getMatchingEntries,
+    authDiscovery,
+    clearAuthDiscovery,
   };
 }
 

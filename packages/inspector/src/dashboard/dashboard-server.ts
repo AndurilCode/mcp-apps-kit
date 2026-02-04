@@ -133,12 +133,22 @@ export async function handleDashboardRequest(
       res.end(JSON.stringify({ connections: [] }));
       return true;
     }
-    const connections = registry.listConnections().map((c) => ({
-      id: c.id,
-      connected: c.connected,
-      serverUrl: c.serverUrl,
-      serverInfo: c.serverInfo,
-    }));
+    const connections = registry.listConnections().map((c) => {
+      const entry: Record<string, unknown> = {
+        id: c.id,
+        connected: c.connected,
+        serverUrl: c.serverUrl,
+        serverInfo: c.serverInfo,
+      };
+      // Include pending auth discovery when available
+      const cm = registry.getConnection(c.id);
+      const discovery = cm.getDiscoveryResults();
+      if (discovery) {
+        entry.authRequired = true;
+        entry.discoveryResults = discovery;
+      }
+      return entry;
+    });
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ connections }));
     return true;
@@ -221,15 +231,20 @@ export async function handleDashboardRequest(
 
       const { id, connectionManager: cm } = await registry.createConnection(params);
       const state = cm.getState();
+      const discoveryResults = cm.getDiscoveryResults();
+      const responseBody: Record<string, unknown> = {
+        id,
+        url: state.serverUrl,
+        transport: params.transport,
+        serverInfo: state.serverInfo,
+      };
+      // Include auth discovery data when 401 auto-detection triggered
+      if (discoveryResults) {
+        responseBody.authRequired = true;
+        responseBody.discoveryResults = discoveryResults;
+      }
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(
-        JSON.stringify({
-          id,
-          url: state.serverUrl,
-          transport: params.transport,
-          serverInfo: state.serverInfo,
-        })
-      );
+      res.end(JSON.stringify(responseBody));
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       const isBadInput = e instanceof SyntaxError || message.includes("Invalid URL");

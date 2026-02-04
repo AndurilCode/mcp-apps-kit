@@ -53,6 +53,8 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     createConnection,
     closeConnection,
     getMatchingEntries,
+    authDiscovery,
+    clearAuthDiscovery,
   } = useConnections(baseUrl);
 
   // Per-connection state cache for instant tab switching
@@ -112,6 +114,13 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
 
   // OAuth state (connection-scoped, polls status)
   const oauth = useOAuth(baseUrl, activeConnectionId);
+
+  // Sync discovery results from connection creation into OAuth hook
+  useEffect(() => {
+    if (authDiscovery) {
+      oauth.setDiscoveryResults(authDiscovery);
+    }
+  }, [authDiscovery]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Use live data with cache fallback for instant tab switching
   const displaySessions = sessions.length > 0 ? sessions : (cachedState?.sessions ?? []);
@@ -402,7 +411,9 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           onCreateConnection={handleCreateConnection}
           onClose={() => setIsConnectionFormOpen(false)}
           getMatchingEntries={getMatchingEntries}
-          oauth={activeConnection?.status === "connected" ? oauth : undefined}
+          oauth={activeConnectionId ? oauth : undefined}
+          authDiscovery={authDiscovery}
+          onDismissDiscovery={clearAuthDiscovery}
         />
 
         <div style={styles.headerRight}>

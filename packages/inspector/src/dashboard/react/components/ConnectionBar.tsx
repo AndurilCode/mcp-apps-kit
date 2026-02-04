@@ -13,7 +13,9 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from "react"
 import type { ConnectionParams } from "@mcp-apps-kit/testing";
 import type { ServerHistoryEntry } from "../hooks";
 import type { UseOAuthResult } from "../hooks/useOAuth";
+import type { AuthRequiredEvent } from "../../../oauth/discovery";
 import { OAuthPanel } from "./OAuthPanel";
+import { OAuthDiscoveryPanel } from "./OAuthDiscoveryPanel";
 
 /**
  * Parse an environment string (KEY=value pairs separated by commas or newlines)
@@ -45,6 +47,10 @@ export interface ConnectionBarProps {
   getMatchingEntries: (filter: string) => ServerHistoryEntry[];
   /** OAuth hook result for the active connection (optional) */
   oauth?: UseOAuthResult;
+  /** Auth discovery results from a failed connection attempt */
+  authDiscovery?: AuthRequiredEvent | null;
+  /** Clear the auth discovery state (dismiss panel) */
+  onDismissDiscovery?: () => void;
 }
 
 // Connection bar styles (extends base styles)
@@ -369,6 +375,8 @@ export function ConnectionBar({
   onClose,
   getMatchingEntries,
   oauth,
+  authDiscovery,
+  onDismissDiscovery,
 }: ConnectionBarProps): React.ReactElement {
   const [inputValue, setInputValue] = useState("");
   const [transport, setTransport] = useState<"http" | "stdio">("http");
@@ -777,6 +785,22 @@ export function ConnectionBar({
           containerRef={containerRef}
           onClose={() => setShowOAuth(false)}
           oauth={oauth}
+        />
+      )}
+
+      {/* OAuth Discovery Panel (shown on 401 auto-detection) */}
+      {authDiscovery && oauth && (
+        <OAuthDiscoveryPanel
+          discovery={authDiscovery}
+          isDiscovering={oauth.isDiscovering}
+          error={oauth.error}
+          isConfiguring={oauth.isLoading}
+          onConfigure={async (params) => {
+            return await oauth.configureFromDiscovery(params);
+          }}
+          onDismiss={() => {
+            onDismissDiscovery?.();
+          }}
         />
       )}
 

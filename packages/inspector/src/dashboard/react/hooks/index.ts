@@ -48,4 +48,5 @@ export {
   type UseOAuthResult,
   type OAuthStatusResponse,
   type OAuthConfigureParams,
+  type DiscoveryConfigureParams,
 } from "./useOAuth";

@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { OAuthStatus, OAuthState } from "../../../oauth/types";
+import type { AuthRequiredEvent } from "../../../oauth/discovery";
 
 /**
  * OAuth status response from the /api/oauth/status endpoint.
@@ -39,6 +40,16 @@ export interface OAuthConfigureParams {
 }
 
 /**
+ * Discovery configuration parameters passed to configureFromDiscovery.
+ */
+export interface DiscoveryConfigureParams {
+  clientId?: string;
+  clientSecret?: string;
+  scopes?: string;
+  enableDynamicRegistration?: boolean;
+}
+
+/**
  * Result shape for the useOAuth hook.
  */
 export interface UseOAuthResult {
@@ -60,6 +71,16 @@ export interface UseOAuthResult {
   }) => Promise<string | null>;
   /** Revoke OAuth tokens for the connection */
   revoke: () => Promise<boolean>;
+  /** Discovery results from 401 auto-detection, set externally or fetched */
+  discoveryResults: AuthRequiredEvent | null;
+  /** Set discovery results (e.g., from connection creation response) */
+  setDiscoveryResults: (results: AuthRequiredEvent | null) => void;
+  /** Whether browser-side discovery is in progress */
+  isDiscovering: boolean;
+  /** Fetch discovery results from the backend for a given server URL */
+  discover: (serverUrl: string) => Promise<AuthRequiredEvent | null>;
+  /** Configure OAuth from discovery results + optional overrides */
+  configureFromDiscovery: (overrides?: DiscoveryConfigureParams) => Promise<string | null>;
 }
 
 /**
@@ -82,6 +103,8 @@ export function useOAuth(
   const [authorizationUrl, setAuthorizationUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [discoveryResults, setDiscoveryResults] = useState<AuthRequiredEvent | null>(null);
+  const [isDiscovering, setIsDiscovering] = useState(false);
 
   // Track the active connectionId to avoid stale updates
   const activeConnectionIdRef = useRef(connectionId);
@@ -265,6 +288,130 @@ export function useOAuth(
     }
   }, [baseUrl, connectionId, fetchStatus]);
 
+  /**
+   * Fetch discovery results from the backend for a server URL.
+   *
+   * Calls GET /api/oauth/discover?url=<serverUrl> to probe the server's
+   * .well-known endpoints for OAuth capabilities.
+   */
+  const discover = useCallback(
+    async (serverUrl: string): Promise<AuthRequiredEvent | null> => {
+      setIsDiscovering(true);
+      setError(null);
+
+      try {
+        const res = await fetch(
+          `${baseUrl}/api/oauth/discover?url=${encodeURIComponent(serverUrl)}`
+        );
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+          throw new Error(data.message ?? data.error ?? `HTTP ${res.status}`);
+        }
+        const data = (await res.json()) as AuthRequiredEvent;
+        setDiscoveryResults(data);
+        return data;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Discovery failed";
+        setError(message);
+        return null;
+      } finally {
+        setIsDiscovering(false);
+      }
+    },
+    [baseUrl]
+  );
+
+  /**
+   * Configure OAuth from discovery results + optional overrides.
+   *
+   * Uses the stored discoveryResults to build a configure request.
+   * Falls back to the overrides if discovery results are not available.
+   */
+  const configureFromDiscovery = useCallback(
+    async (overrides?: DiscoveryConfigureParams): Promise<string | null> => {
+      if (!connectionId) {
+        setError("No connection selected");
+        return null;
+      }
+
+      const useDCR = overrides?.enableDynamicRegistration ?? discoveryResults?.supportsDCR ?? false;
+      const scopes = overrides?.scopes ?? discoveryResults?.suggestedScopes?.join(" ") ?? undefined;
+
+      const result = await configure({
+        clientId: overrides?.clientId,
+        clientSecret: overrides?.clientSecret,
+        scopes,
+      });
+
+      // If configure was called with DCR intent but configure() doesn't pass it,
+      // we need to call the endpoint directly with the DCR flag
+      if (useDCR && !overrides?.clientId) {
+        setIsLoading(true);
+        setError(null);
+
+        try {
+          const body: OAuthConfigureParams = {
+            connectionId,
+            config: {
+              enableDynamicRegistration: true,
+              scopes,
+              clientId: overrides?.clientId,
+              clientSecret: overrides?.clientSecret,
+            },
+          };
+
+          const res = await fetch(`${baseUrl}/api/oauth/configure`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+
+          if (!res.ok) {
+            const data = (await res.json().catch(() => ({}))) as { error?: string };
+            throw new Error(data.error ?? `HTTP ${res.status}`);
+          }
+
+          const data = (await res.json()) as {
+            configured: boolean;
+            connectionId: string;
+            state: OAuthState;
+            authorizationUrl?: string | null;
+          };
+
+          if (activeConnectionIdRef.current === connectionId) {
+            setIsConfigured(data.configured);
+            setOauthState(data.state);
+            if (data.authorizationUrl) {
+              setAuthorizationUrl(data.authorizationUrl);
+            }
+            // Clear discovery results after successful configuration
+            setDiscoveryResults(null);
+          }
+
+          return data.authorizationUrl ?? null;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Configuration failed";
+          setError(message);
+          return null;
+        } finally {
+          setIsLoading(false);
+        }
+      }
+
+      // For non-DCR, configure() already handled it
+      if (result) {
+        setDiscoveryResults(null);
+      }
+      return result;
+    },
+    [baseUrl, connectionId, configure, discoveryResults]
+  );
+
+  // Clear discovery results when connection changes
+  useEffect(() => {
+    setDiscoveryResults(null);
+  }, [connectionId]);
+
   return {
     oauthState,
     isConfigured,
@@ -273,6 +420,11 @@ export function useOAuth(
     error,
     configure,
     revoke,
+    discoveryResults,
+    setDiscoveryResults,
+    isDiscovering,
+    discover,
+    configureFromDiscovery,
   };
 }
 
