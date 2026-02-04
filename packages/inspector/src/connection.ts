@@ -520,9 +520,12 @@ export class ConnectionManager extends EventEmitter {
   }
 
   /**
-   * Disconnect from the current target server
+   * Disconnect from the current target server.
+   * @param options - Disconnect options
+   * @param options.revokeTokens - If true, revoke OAuth tokens (default: false).
+   *   Use for explicit logout. Tab close should NOT revoke tokens.
    */
-  async disconnect(): Promise<string | null> {
+  async disconnect(options?: { revokeTokens?: boolean }): Promise<string | null> {
     const previousUrl = this.state.serverUrl;
 
     // Bump generation so any in-flight restart aborts
@@ -570,8 +573,8 @@ export class ConnectionManager extends EventEmitter {
     // Clear auth token
     this.authToken = null;
 
-    // Fire-and-forget server-side token revocation before clearing provider
-    if (this.oauthProvider) {
+    // Only revoke tokens on explicit logout, not on tab close
+    if (options?.revokeTokens && this.oauthProvider) {
       this.oauthProvider.revokeTokens().catch((err: unknown) => {
         if (this.debug) {
           console.warn(`[inspector] Token revocation during disconnect failed:`, err);

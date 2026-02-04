@@ -358,6 +358,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
         url: connection.url,
         serverInfo: connection.serverInfo,
         status: connection.status,
+        isOAuth: connection.isOAuth,
       })),
     [connections]
   );

@@ -140,12 +140,17 @@ export async function handleDashboardRequest(
         serverUrl: c.serverUrl,
         serverInfo: c.serverInfo,
       };
-      // Include pending auth discovery when available
       const cm = registry.getConnection(c.id);
+      // Include pending auth discovery when available
       const discovery = cm.getDiscoveryResults();
       if (discovery) {
         entry.authRequired = true;
         entry.discoveryResults = discovery;
+      }
+      // Flag connections that have an OAuth provider configured
+      const oauthState = cm.getOAuthState();
+      if (oauthState) {
+        entry.isOAuth = true;
       }
       return entry;
     });

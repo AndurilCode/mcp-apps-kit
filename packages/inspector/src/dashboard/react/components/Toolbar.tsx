@@ -137,9 +137,6 @@ export function Toolbar({
 }: ToolbarProps): React.ReactElement {
   return (
     <div style={styles.toolbar}>
-      {/* OAuth status badge */}
-      {oauthStatus && <OAuthBadge status={oauthStatus} />}
-
       {/* Primitives panel toggle */}
       <button
         style={{

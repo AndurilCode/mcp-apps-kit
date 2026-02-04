@@ -24,6 +24,8 @@ export interface DashboardConnection {
   url: string;
   serverInfo: { name?: string; version?: string } | null;
   status: DashboardConnectionStatus;
+  /** Whether this connection uses OAuth authentication */
+  isOAuth?: boolean;
 }
 
 interface ConnectionsResponse {
@@ -201,7 +203,7 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
           connected: boolean;
           serverInfo: { name?: string; version?: string } | null;
         };
-        // Update connection status
+        // Update connection status + mark as OAuth
         setConnections((prev) =>
           prev.map((c) =>
             c.id === id
@@ -209,6 +211,7 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
                   ...c,
                   status: data.connected ? "connected" : "disconnected",
                   serverInfo: data.serverInfo,
+                  isOAuth: true,
                 }
               : c
           )
