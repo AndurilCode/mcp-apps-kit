@@ -10,6 +10,7 @@ import type { ConnectionParams } from "@mcp-apps-kit/testing";
 import { ConnectionManager } from "./connection";
 import type { ConnectOptions, ConnectionStatusOutput, InspectorServerOptions } from "./types";
 import type { OAuthState } from "./oauth/types";
+import type { AuthRequiredEvent } from "./oauth/discovery";
 
 /**
  * Event map emitted by the connection registry.
@@ -21,6 +22,8 @@ export interface ConnectionRegistryEvents {
   closed: [id: string];
   /** Emitted when a connection is activated. */
   activated: [id: string];
+  /** Forwarded from ConnectionManager when 401 auto-detection triggers. */
+  authRequired: [id: string, event: AuthRequiredEvent];
 }
 
 /**
@@ -81,6 +84,11 @@ export class ConnectionRegistry extends EventEmitter {
     const connectionManager = new ConnectionManager({
       ...this.connectionManagerOptions,
       id,
+    });
+
+    // Forward authRequired events from the connection manager
+    connectionManager.on("authRequired", (event: AuthRequiredEvent) => {
+      this.emit("authRequired", id, event);
     });
 
     try {
@@ -217,6 +225,18 @@ export class ConnectionRegistry extends EventEmitter {
 
     this.activeConnectionId = id;
     this.emit("activated", id);
+  }
+
+  /**
+   * Get cached discovery results for a connection.
+   *
+   * Convenience wrapper around ConnectionManager.getDiscoveryResults().
+   *
+   * @param connectionId - Connection id to look up.
+   * @returns Discovery results or null.
+   */
+  getDiscoveryResults(connectionId: string): AuthRequiredEvent | null {
+    return this.getConnection(connectionId).getDiscoveryResults();
   }
 
   /**

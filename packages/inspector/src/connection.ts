@@ -11,6 +11,7 @@ import {
   type ToolCall,
   type ConnectionParams,
 } from "@mcp-apps-kit/testing";
+import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import type {
   ConnectionState,
   ConnectOptions,
@@ -28,6 +29,7 @@ import { WidgetSessionManager } from "./widget-session-manager";
 import { WidgetServer } from "./widget-server";
 import { InspectorOAuthProvider } from "./oauth/provider";
 import type { OAuthState } from "./oauth/types";
+import { discoverAuthRequirements, type AuthRequiredEvent } from "./oauth/discovery";
 
 /**
  * Protocol type inferred from connected server's tools
@@ -80,6 +82,8 @@ export interface ConnectionManagerEvents {
   disconnected: [previousUrl: string | null];
   /** Emitted when a session-agnostic agent event is recorded */
   agentEvent: [event: AgnosticInspectorEvent];
+  /** Emitted when a 401/auth error is detected and discovery results are available */
+  authRequired: [event: AuthRequiredEvent];
 }
 
 /**
@@ -157,6 +161,9 @@ export class ConnectionManager extends EventEmitter {
 
   /** Counter for generating unique agent event IDs */
   private agentEventIdCounter = 0;
+
+  /** Cached discovery results from 401 auto-detection */
+  private discoveryResults: AuthRequiredEvent | null = null;
 
   constructor(options: InspectorServerOptions & { id?: string } = {}) {
     super();
@@ -271,13 +278,52 @@ export class ConnectionManager extends EventEmitter {
       this.oauthProvider = authProvider;
     }
 
-    // Create test client using @mcp-apps-kit/testing
-    const client = await createTestClient(params, {
-      trackHistory,
-      timeout,
-      onTransportClose,
-      authProvider,
-    });
+    // Create test client and list capabilities.
+    // Wrapped in try/catch to detect auth-related errors (401, UnauthorizedError)
+    // and auto-trigger OAuth discovery instead of surfacing raw errors.
+    let client: TestClient;
+    try {
+      client = await createTestClient(params, {
+        trackHistory,
+        timeout,
+        onTransportClose,
+        authProvider,
+      });
+    } catch (error) {
+      // Check if this is an auth error on an HTTP connection without OAuth configured
+      if (params.transport === "http" && !authProvider && !oauthConfig && isAuthError(error)) {
+        if (this.debug) {
+          console.log(`[inspector] Auth error detected during connect, running discovery`);
+        }
+
+        // Run discovery and emit authRequired instead of throwing
+        const discovery = await discoverAuthRequirements(params.url);
+        this.discoveryResults = discovery;
+
+        // Set state to reflect pending-auth (not connected, not failed)
+        this.state = {
+          connected: false,
+          serverUrl: label,
+          serverInfo: null,
+          historyEnabled: trackHistory,
+          callCount: 0,
+          client: null,
+          connectionParams: params,
+        };
+
+        this.emit("authRequired", discovery);
+
+        return {
+          serverInfo: null,
+          toolCount: 0,
+          resourceCount: 0,
+          promptCount: 0,
+        };
+      }
+
+      // Non-auth error or auth error with OAuth already configured — rethrow
+      throw error;
+    }
 
     // Get server capabilities by listing tools, resources, prompts
     // Use try-catch for each to handle servers that don't support all capabilities
@@ -287,8 +333,44 @@ export class ConnectionManager extends EventEmitter {
 
     try {
       tools = await client.listTools();
-    } catch {
-      // Server doesn't support tools capability
+    } catch (error) {
+      if (params.transport === "http" && !authProvider && !oauthConfig && isAuthError(error)) {
+        // Auth error during capability listing (server accepted transport but rejected request)
+        if (this.debug) {
+          console.log(`[inspector] Auth error during capability listing, running discovery`);
+        }
+
+        const discovery = await discoverAuthRequirements(params.url);
+        this.discoveryResults = discovery;
+
+        this.state = {
+          connected: false,
+          serverUrl: label,
+          serverInfo: null,
+          historyEnabled: trackHistory,
+          callCount: 0,
+          client: null,
+          connectionParams: params,
+        };
+
+        // Clean up the client we created
+        try {
+          await client.disconnect();
+        } catch {
+          // Best-effort cleanup
+        }
+
+        this.emit("authRequired", discovery);
+
+        return {
+          serverInfo: null,
+          toolCount: 0,
+          resourceCount: 0,
+          promptCount: 0,
+        };
+      }
+
+      // Server doesn't support tools capability (non-auth error)
       if (this.debug) {
         console.log(`[inspector] Server doesn't support tools capability`);
       }
@@ -332,6 +414,9 @@ export class ConnectionManager extends EventEmitter {
       // Server info not available, continue without it
       serverInfo = null;
     }
+
+    // Clear discovery results on successful connection (with or without OAuth)
+    this.discoveryResults = null;
 
     // Update state
     this.state = {
@@ -962,6 +1047,19 @@ export class ConnectionManager extends EventEmitter {
   }
 
   /**
+   * Get cached discovery results from 401 auto-detection.
+   *
+   * Non-null when connect() detected an auth error and ran discovery
+   * instead of throwing. The connection is in "pending auth" state.
+   * Cleared on successful reconnect.
+   *
+   * @returns Discovery results or null if no auth detection occurred
+   */
+  getDiscoveryResults(): AuthRequiredEvent | null {
+    return this.discoveryResults;
+  }
+
+  /**
    * Record a session-agnostic agent event
    *
    * Used for tracking agent tool calls on the connected MCP server
@@ -1027,4 +1125,47 @@ export class ConnectionManager extends EventEmitter {
 
     return count;
   }
+}
+
+// =============================================================================
+// AUTH ERROR DETECTION
+// =============================================================================
+
+/**
+ * Auth-related error patterns in error messages.
+ * Matched case-insensitively against error.message.
+ */
+const AUTH_ERROR_PATTERNS = [/\bunauthorized\b/i, /\b401\b/, /\binvalid_token\b/i];
+
+/**
+ * Detect whether an error is authentication-related.
+ *
+ * Checks for:
+ * - UnauthorizedError from the MCP SDK
+ * - Error messages containing "unauthorized", "401", or "invalid_token"
+ * - Wrapper errors (e.g., ConnectionError) whose cause is an auth error
+ *
+ * @param error - The caught error to inspect
+ * @returns true if the error indicates an authentication problem
+ */
+export function isAuthError(error: unknown): boolean {
+  if (error instanceof UnauthorizedError) {
+    return true;
+  }
+
+  if (error instanceof Error) {
+    const msg = error.message;
+    for (const pattern of AUTH_ERROR_PATTERNS) {
+      if (pattern.test(msg)) {
+        return true;
+      }
+    }
+
+    // Check wrapped cause (e.g., ConnectionError wrapping an auth error)
+    if ("cause" in error && error.cause) {
+      return isAuthError(error.cause);
+    }
+  }
+
+  return false;
 }
