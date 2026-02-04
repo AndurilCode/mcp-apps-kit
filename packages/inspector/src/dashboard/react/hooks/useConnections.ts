@@ -43,6 +43,7 @@ interface CreateConnectionResponse {
   serverInfo?: { name?: string; version?: string } | null;
   authRequired?: boolean;
   discoveryResults?: AuthRequiredEvent;
+  authorizationUrl?: string;
 }
 
 /**
@@ -147,6 +148,19 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
         // Capture auth discovery results from 401 auto-detection
         if (data.authRequired && data.discoveryResults) {
           setAuthDiscovery(data.discoveryResults);
+        } else if (data.authRequired) {
+          // Pre-registration flow: no auto-discovery happened, but we still need
+          // authDiscovery truthy so the auto-reconnect effect fires after OAuth completes
+          setAuthDiscovery({
+            serverUrl: typeof params.url === "string" ? params.url : "",
+            resourceMetadata: null,
+            authServerUrl: null,
+            authServerMetadata: null,
+            supportsDCR: false,
+            supportsCIMD: false,
+            requiresPreRegistration: true,
+            suggestedScopes: [],
+          });
         }
 
         // Pre-registration flow: auth URL ready, open browser for authorization
