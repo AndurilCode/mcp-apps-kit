@@ -149,6 +149,11 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
           setAuthDiscovery(data.discoveryResults);
         }
 
+        // Pre-registration flow: auth URL ready, open browser for authorization
+        if (data.authRequired && data.authorizationUrl) {
+          window.open(data.authorizationUrl, "_blank", "noopener,noreferrer");
+        }
+
         const newConn: DashboardConnection = {
           id: data.id,
           url: data.url,

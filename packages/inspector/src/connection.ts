@@ -333,7 +333,37 @@ export class ConnectionManager extends EventEmitter {
         };
       }
 
-      // Non-auth error or auth error with OAuth already configured — rethrow
+      // OAuth credentials provided but auth failed — check for pending auth URL
+      // (SDK built the authorization URL but we need to return it to the frontend)
+      if (params.transport === "http" && authProvider && isAuthError(error)) {
+        const pendingUrl = authProvider.getPendingAuthUrl?.();
+        if (pendingUrl || this.oauthProvider) {
+          if (this.debug) {
+            console.log(
+              `[inspector] Auth error with OAuth configured, pending auth URL: ${pendingUrl}`
+            );
+          }
+
+          this.state = {
+            connected: false,
+            serverUrl: label,
+            serverInfo: null,
+            historyEnabled: trackHistory,
+            callCount: 0,
+            client: null,
+            connectionParams: params,
+          };
+
+          return {
+            serverInfo: null,
+            toolCount: 0,
+            resourceCount: 0,
+            promptCount: 0,
+          };
+        }
+      }
+
+      // Non-auth error — rethrow
       throw error;
     }
 

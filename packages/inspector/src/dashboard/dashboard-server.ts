@@ -268,6 +268,13 @@ export async function handleDashboardRequest(
         responseBody.authRequired = true;
         responseBody.discoveryResults = discoveryResults;
       }
+      // Include pending auth URL when OAuth provider has one (pre-registration flow)
+      const provider = cm.getOAuthProvider();
+      const pendingAuthUrl = provider?.getPendingAuthUrl?.();
+      if (pendingAuthUrl && !state.connected) {
+        responseBody.authRequired = true;
+        responseBody.authorizationUrl = pendingAuthUrl.toString();
+      }
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(responseBody));
     } catch (e) {
