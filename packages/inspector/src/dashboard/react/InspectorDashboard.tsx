@@ -124,24 +124,35 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     }
   }, [authDiscovery]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-reconnect when OAuth status becomes "authenticated"
-  // This fires after the user completes the OAuth flow in the browser
-  // or when configure detects existing tokens
+  // Auto-reconnect when OAuth status becomes "authenticated" during active discovery.
+  // Only fires when authDiscovery is set (modal is showing), NOT on tab switches.
   const prevOAuthStatus = useRef<string | null>(null);
   useEffect(() => {
     const currentStatus = oauth.oauthState?.status ?? null;
     const wasNotAuthenticated = prevOAuthStatus.current !== "authenticated";
     prevOAuthStatus.current = currentStatus;
 
-    if (currentStatus === "authenticated" && wasNotAuthenticated && activeConnectionId) {
-      // OAuth just became authorized — reconnect to load tools
+    // Guard: only reconnect during active discovery flow (modal open)
+    if (
+      currentStatus === "authenticated" &&
+      wasNotAuthenticated &&
+      activeConnectionId &&
+      authDiscovery
+    ) {
       void reconnectConnection(activeConnectionId).then((connected) => {
         if (connected) {
+          clearAuthDiscovery();
           setIsConnectionFormOpen(false);
         }
       });
     }
-  }, [oauth.oauthState?.status, activeConnectionId, reconnectConnection]);
+  }, [
+    oauth.oauthState?.status,
+    activeConnectionId,
+    authDiscovery,
+    reconnectConnection,
+    clearAuthDiscovery,
+  ]);
 
   // Use live data with cache fallback for instant tab switching
   const displaySessions = sessions.length > 0 ? sessions : (cachedState?.sessions ?? []);
