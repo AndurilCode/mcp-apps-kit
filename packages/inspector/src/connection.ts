@@ -219,11 +219,19 @@ export class ConnectionManager extends EventEmitter {
     }
 
     // Disconnect existing connection if any
+    // Preserve OAuth provider across reconnects (disconnect() clears it + revokes tokens)
+    const existingProvider = this.oauthProvider;
     if (this.state.connected && this.state.client) {
       if (this.debug) {
         console.log(`[inspector] Disconnecting from previous server: ${this.state.serverUrl}`);
       }
+      // Temporarily clear provider so disconnect() doesn't revoke tokens we still need
+      this.oauthProvider = null;
       await this.disconnect();
+    }
+    // Restore provider for potential reuse in reconnect
+    if (existingProvider && !this.oauthProvider) {
+      this.oauthProvider = existingProvider;
     }
 
     if (this.debug) {
@@ -255,6 +263,10 @@ export class ConnectionManager extends EventEmitter {
       };
 
       this.oauthProvider = authProvider;
+    } else if (params.transport === "http" && !oauthConfig && this.oauthProvider) {
+      // Reconnect: reuse existing provider (e.g., configured via /api/oauth/configure)
+      // Status handler and this.oauthProvider already set from the configure step
+      authProvider = this.oauthProvider;
     } else if (params.transport === "http" && oauthConfig) {
       // Port is set later via setInspectorUrl, default to 6274
       const port = this.inspectorUrl ? new URL(this.inspectorUrl).port : "6274";
