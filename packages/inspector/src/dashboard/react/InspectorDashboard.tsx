@@ -300,9 +300,13 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
 
   const handleCreateConnection = useCallback(
     async (params: import("@mcp-apps-kit/testing").ConnectionParams): Promise<boolean> => {
-      const created = await createConnection(params);
-      if (created) {
-        setIsConnectionFormOpen(false);
+      const conn = await createConnection(params);
+      if (conn) {
+        // Keep form open when auth is required — the OAuthDiscoveryPanel
+        // renders inside ConnectionBar and needs isOpen=true to be visible
+        if (conn.status !== "disconnected") {
+          setIsConnectionFormOpen(false);
+        }
         return true;
       }
       return false;
@@ -413,7 +417,10 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           getMatchingEntries={getMatchingEntries}
           oauth={activeConnectionId ? oauth : undefined}
           authDiscovery={authDiscovery}
-          onDismissDiscovery={clearAuthDiscovery}
+          onDismissDiscovery={() => {
+            clearAuthDiscovery();
+            setIsConnectionFormOpen(false);
+          }}
         />
 
         <div style={styles.headerRight}>
