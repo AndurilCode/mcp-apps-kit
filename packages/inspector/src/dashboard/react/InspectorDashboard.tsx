@@ -603,7 +603,18 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
             error={oauth.error}
             isConfiguring={oauth.isLoading}
             onConfigure={async (params) => {
-              return await oauth.configureFromDiscovery(params);
+              const url = await oauth.configureFromDiscovery(params);
+              // If no auth URL (tokens already exist), reconnect immediately
+              // instead of waiting for the 3s status poll cycle
+              if (!url && activeConnectionId) {
+                void reconnectConnection(activeConnectionId).then((connected) => {
+                  if (connected) {
+                    clearAuthDiscovery();
+                    setIsConnectionFormOpen(false);
+                  }
+                });
+              }
+              return url;
             }}
             onDismiss={() => {
               clearAuthDiscovery();
