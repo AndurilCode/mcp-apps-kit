@@ -949,7 +949,25 @@ export function createStandaloneInspectorServer(
                   { transport: "http", url: targetUrl },
                   { trackHistory: true, authProvider: presetOAuthProvider }
                 )
-                .then(() => {
+                .then(({ id, connectionManager: cm }) => {
+                  // Check if connect() silently detected auth requirement
+                  // (returns zero counts + stores discovery results for dashboard panel)
+                  // In CLI auto-connect, this should be treated as a failure
+                  // so the CLI's handleAutoAuth can trigger the browser auth flow.
+                  const discovery = cm.getDiscoveryResults();
+                  if (discovery) {
+                    // Clean up the unusable connection
+                    void registry.closeConnection(id).catch(() => {});
+                    httpServer?.close();
+                    // Use "Unauthorized" so isAuthError() in the CLI catch block matches
+                    reject(
+                      new Error(
+                        `Auto-connect to ${targetUrl} failed: Unauthorized (server requires OAuth authentication)`
+                      )
+                    );
+                    return;
+                  }
+
                   // Mark server as ready now that auto-connect succeeded
                   isReady = true;
                   if (options.debug) {
