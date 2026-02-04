@@ -2,13 +2,14 @@
  * OAuth Client Provider tests
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { InspectorOAuthProvider } from "../src/oauth/provider";
 import { TokenStore } from "../src/oauth/token-store";
 import type { OAuthTokens } from "@modelcontextprotocol/sdk/shared/auth.js";
+import type { AuthRequiredEvent } from "../src/oauth/discovery";
 
 describe("InspectorOAuthProvider", () => {
   let tempDir: string;
@@ -30,6 +31,7 @@ describe("InspectorOAuthProvider", () => {
       enableDynamicRegistration?: boolean;
       serverUrl?: string;
       noClientId?: boolean;
+      discoveryResults?: AuthRequiredEvent;
     } = {}
   ): InspectorOAuthProvider {
     return new InspectorOAuthProvider({
@@ -42,7 +44,23 @@ describe("InspectorOAuthProvider", () => {
       },
       callbackPort: 6274,
       tokenStore,
+      discoveryResults: overrides.discoveryResults,
     });
+  }
+
+  /** Helper to build an AuthRequiredEvent with sensible defaults */
+  function makeDiscoveryResults(overrides: Partial<AuthRequiredEvent> = {}): AuthRequiredEvent {
+    return {
+      serverUrl: "http://localhost:3000/mcp",
+      resourceMetadata: null,
+      authServerUrl: "https://auth.example.com",
+      authServerMetadata: null,
+      supportsDCR: false,
+      supportsCIMD: false,
+      requiresPreRegistration: true,
+      suggestedScopes: [],
+      ...overrides,
+    };
   }
 
   describe("redirectUrl", () => {
@@ -335,6 +353,271 @@ describe("InspectorOAuthProvider", () => {
     it("should return the configured server URL", () => {
       const provider = createProvider({ serverUrl: "http://special:9000/mcp" });
       expect(provider.getServerUrl()).toBe("http://special:9000/mcp");
+    });
+  });
+
+  // ===========================================================================
+  // DCR Auto-Registration & Registration Method
+  // ===========================================================================
+
+  describe("getRegistrationMethod", () => {
+    it("should return 'dcr' when discovery indicates DCR support", () => {
+      const provider = createProvider({
+        noClientId: true,
+        discoveryResults: makeDiscoveryResults({ supportsDCR: true }),
+      });
+      expect(provider.getRegistrationMethod()).toBe("dcr");
+    });
+
+    it("should return 'cimd' when discovery indicates CIMD support (no DCR)", () => {
+      const provider = createProvider({
+        noClientId: true,
+        discoveryResults: makeDiscoveryResults({ supportsCIMD: true }),
+      });
+      expect(provider.getRegistrationMethod()).toBe("cimd");
+    });
+
+    it("should prefer 'dcr' over 'cimd' when both are supported", () => {
+      const provider = createProvider({
+        noClientId: true,
+        discoveryResults: makeDiscoveryResults({
+          supportsDCR: true,
+          supportsCIMD: true,
+        }),
+      });
+      expect(provider.getRegistrationMethod()).toBe("dcr");
+    });
+
+    it("should return 'pre_registered' when neither DCR nor CIMD is available", () => {
+      const provider = createProvider({
+        noClientId: true,
+        discoveryResults: makeDiscoveryResults(),
+      });
+      expect(provider.getRegistrationMethod()).toBe("pre_registered");
+    });
+
+    it("should return 'pre_registered' when no discovery results provided", () => {
+      const provider = createProvider({ noClientId: true });
+      expect(provider.getRegistrationMethod()).toBe("pre_registered");
+    });
+  });
+
+  describe("needsManualRegistration", () => {
+    it("should return true when no stored client and no DCR/CIMD", async () => {
+      const provider = createProvider({
+        noClientId: true,
+        discoveryResults: makeDiscoveryResults(),
+      });
+      expect(await provider.needsManualRegistration()).toBe(true);
+    });
+
+    it("should return false when config has a clientId", async () => {
+      const provider = createProvider({
+        clientId: "my-client",
+        discoveryResults: makeDiscoveryResults(),
+      });
+      expect(await provider.needsManualRegistration()).toBe(false);
+    });
+
+    it("should return false when persisted client info exists", async () => {
+      const serverUrl = "http://localhost:3000/mcp";
+      await tokenStore.saveClientInformation(serverUrl, {
+        client_id: "persisted-client",
+        redirect_uris: [new URL("http://127.0.0.1:6274/oauth/callback")],
+      } as never);
+
+      const provider = createProvider({
+        noClientId: true,
+        serverUrl,
+        discoveryResults: makeDiscoveryResults(),
+      });
+      expect(await provider.needsManualRegistration()).toBe(false);
+    });
+
+    it("should return false when DCR is available", async () => {
+      const provider = createProvider({
+        noClientId: true,
+        discoveryResults: makeDiscoveryResults({ supportsDCR: true }),
+      });
+      expect(await provider.needsManualRegistration()).toBe(false);
+    });
+
+    it("should return false when CIMD is available", async () => {
+      const provider = createProvider({
+        noClientId: true,
+        discoveryResults: makeDiscoveryResults({ supportsCIMD: true }),
+      });
+      expect(await provider.needsManualRegistration()).toBe(false);
+    });
+
+    it("should return true when no discovery results and no client info", async () => {
+      const provider = createProvider({ noClientId: true });
+      expect(await provider.needsManualRegistration()).toBe(true);
+    });
+  });
+
+  describe("clientInformation with DCR auto-registration", () => {
+    it("should return stored client info when available (existing behavior)", async () => {
+      const provider = createProvider({
+        clientId: "existing-client",
+        discoveryResults: makeDiscoveryResults({ supportsDCR: true }),
+      });
+      const info = await provider.clientInformation();
+      expect(info).toBeDefined();
+      expect(info!.client_id).toBe("existing-client");
+    });
+
+    it("should prefer persisted client info over DCR", async () => {
+      const serverUrl = "http://localhost:3000/mcp";
+      await tokenStore.saveClientInformation(serverUrl, {
+        client_id: "persisted-client",
+        redirect_uris: [new URL("http://127.0.0.1:6274/oauth/callback")],
+      } as never);
+
+      const provider = createProvider({
+        noClientId: true,
+        serverUrl,
+        discoveryResults: makeDiscoveryResults({
+          supportsDCR: true,
+          authServerMetadata: {
+            issuer: "https://auth.example.com",
+            authorization_endpoint: "https://auth.example.com/authorize",
+            token_endpoint: "https://auth.example.com/token",
+            registration_endpoint: "https://auth.example.com/register",
+            response_types_supported: ["code"],
+          },
+        }),
+      });
+
+      const info = await provider.clientInformation();
+      expect(info!.client_id).toBe("persisted-client");
+    });
+
+    it("should auto-register via DCR when no stored client", async () => {
+      // Mock fetch to intercept the DCR registration POST
+      const originalFetch = globalThis.fetch;
+      const fetchSpy = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+        const url = input.toString();
+        if (url.includes("/register")) {
+          return new Response(
+            JSON.stringify({
+              client_id: "dcr-auto-client",
+              client_secret: "dcr-secret",
+              redirect_uris: ["http://127.0.0.1:6274/oauth/callback"],
+            }),
+            { status: 201, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        return originalFetch(input);
+      });
+      globalThis.fetch = fetchSpy;
+
+      try {
+        const provider = createProvider({
+          noClientId: true,
+          discoveryResults: makeDiscoveryResults({
+            supportsDCR: true,
+            authServerUrl: "https://auth.example.com",
+            authServerMetadata: {
+              issuer: "https://auth.example.com",
+              authorization_endpoint: "https://auth.example.com/authorize",
+              token_endpoint: "https://auth.example.com/token",
+              registration_endpoint: "https://auth.example.com/register",
+              response_types_supported: ["code"],
+            },
+          }),
+        });
+
+        const info = await provider.clientInformation();
+        expect(info).toBeDefined();
+        expect(info!.client_id).toBe("dcr-auto-client");
+
+        // Verify fetch was called with the registration endpoint
+        const calls = fetchSpy.mock.calls;
+        const registrationCall = calls.find(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (c: any[]) => c[0]?.toString().includes("/register")
+        );
+        expect(registrationCall).toBeDefined();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        expect((registrationCall as any[])[1]).toMatchObject({ method: "POST" });
+
+        // Verify it was persisted
+        const persisted = await tokenStore.load("http://localhost:3000/mcp");
+        expect(persisted?.clientInformation?.client_id).toBe("dcr-auto-client");
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it("should return undefined when DCR registration fails", async () => {
+      // Mock fetch to return an error for the registration endpoint
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+        const url = input.toString();
+        if (url.includes("/register")) {
+          return new Response("Forbidden", { status: 403 });
+        }
+        return originalFetch(input);
+      });
+
+      try {
+        const provider = createProvider({
+          noClientId: true,
+          discoveryResults: makeDiscoveryResults({
+            supportsDCR: true,
+            authServerUrl: "https://auth.example.com",
+            authServerMetadata: {
+              issuer: "https://auth.example.com",
+              authorization_endpoint: "https://auth.example.com/authorize",
+              token_endpoint: "https://auth.example.com/token",
+              registration_endpoint: "https://auth.example.com/register",
+              response_types_supported: ["code"],
+            },
+          }),
+        });
+
+        const info = await provider.clientInformation();
+        expect(info).toBeUndefined();
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it("should return undefined when no discovery results and no client config", async () => {
+      const provider = createProvider({ noClientId: true });
+      const info = await provider.clientInformation();
+      expect(info).toBeUndefined();
+    });
+
+    it("should not attempt DCR when authServerMetadata is missing", async () => {
+      const provider = createProvider({
+        noClientId: true,
+        discoveryResults: makeDiscoveryResults({
+          supportsDCR: true,
+          authServerMetadata: null,
+        }),
+      });
+      const info = await provider.clientInformation();
+      expect(info).toBeUndefined();
+    });
+
+    it("should not attempt DCR when registration_endpoint is missing from metadata", async () => {
+      const provider = createProvider({
+        noClientId: true,
+        discoveryResults: makeDiscoveryResults({
+          supportsDCR: true,
+          authServerMetadata: {
+            issuer: "https://auth.example.com",
+            authorization_endpoint: "https://auth.example.com/authorize",
+            token_endpoint: "https://auth.example.com/token",
+            // no registration_endpoint
+            response_types_supported: ["code"],
+          },
+        }),
+      });
+      const info = await provider.clientInformation();
+      expect(info).toBeUndefined();
     });
   });
 });

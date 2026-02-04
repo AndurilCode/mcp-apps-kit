@@ -141,3 +141,16 @@ export interface OAuthPresetConfig {
   /** Requested scopes (space-separated) */
   scopes?: string;
 }
+
+// =============================================================================
+// REGISTRATION METHOD
+// =============================================================================
+
+/**
+ * How the client can register with the authorization server.
+ *
+ * - `"dcr"` — Dynamic Client Registration (RFC 7591) is available
+ * - `"cimd"` — Client ID Metadata Document is available (future use)
+ * - `"pre_registered"` — No auto-registration; client must be manually registered
+ */
+export type RegistrationMethod = "dcr" | "cimd" | "pre_registered";

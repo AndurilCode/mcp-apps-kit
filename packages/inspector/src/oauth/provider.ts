@@ -19,10 +19,15 @@ import type {
   OAuthState,
   OAuthStatus,
   OAuthMetadata,
+  RegistrationMethod,
 } from "./types";
-import { discoverAuthorizationServerMetadata } from "@modelcontextprotocol/sdk/client/auth.js";
+import {
+  discoverAuthorizationServerMetadata,
+  registerClient,
+} from "@modelcontextprotocol/sdk/client/auth.js";
 import type { OAuthClientInformationFull } from "@modelcontextprotocol/sdk/shared/auth.js";
 import { TokenStore } from "./token-store";
+import type { AuthRequiredEvent } from "./discovery";
 
 /**
  * Options for creating an InspectorOAuthProvider.
@@ -42,6 +47,9 @@ export interface InspectorOAuthProviderOptions {
 
   /** Enable debug logging */
   debug?: boolean;
+
+  /** Discovery results from 401 auto-detection (enables DCR auto-registration) */
+  discoveryResults?: AuthRequiredEvent;
 }
 
 /**
@@ -59,6 +67,7 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
   private readonly config: OAuthClientConfig;
   private readonly tokenStore: TokenStore;
   private readonly _debug: boolean;
+  private readonly _discoveryResults?: AuthRequiredEvent;
 
   /** The port for constructing the redirect/callback URL */
   private readonly callbackPort: number;
@@ -96,6 +105,7 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
     this.callbackPort = options.callbackPort;
     this.tokenStore = options.tokenStore ?? new TokenStore();
     this._debug = options.debug ?? false;
+    this._discoveryResults = options.discoveryResults;
   }
 
   // =========================================================================
@@ -125,7 +135,13 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
   }
 
   /**
-   * Load client information from persisted store or config.
+   * Load client information from persisted store, config, or DCR auto-registration.
+   *
+   * Resolution order:
+   * 1. Persisted client info (from previous dynamic registration)
+   * 2. Config-provided client ID (manual / CLI)
+   * 3. Auto-register via DCR if discovery results indicate support
+   * 4. undefined (no client information available)
    */
   async clientInformation(): Promise<OAuthClientInformationMixed | undefined> {
     // Check persisted client info first (from dynamic registration)
@@ -142,7 +158,15 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
       };
     }
 
-    // No client information available (needs dynamic registration)
+    // Attempt DCR auto-registration if discovery results indicate support
+    if (this._discoveryResults?.supportsDCR && this._discoveryResults.authServerMetadata) {
+      const meta = this._discoveryResults.authServerMetadata as Record<string, unknown>;
+      if (meta.registration_endpoint) {
+        return this.autoRegisterViaDCR();
+      }
+    }
+
+    // No client information available (needs manual registration)
     return undefined;
   }
 
@@ -276,6 +300,44 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
   // =========================================================================
   // Inspector-specific methods
   // =========================================================================
+
+  /**
+   * Determine the available registration method based on discovery results.
+   *
+   * @returns `"dcr"` if Dynamic Client Registration is supported,
+   *          `"cimd"` if Client ID Metadata Document is supported,
+   *          `"pre_registered"` otherwise (manual registration needed).
+   */
+  getRegistrationMethod(): RegistrationMethod {
+    if (this._discoveryResults?.supportsDCR) {
+      return "dcr";
+    }
+    if (this._discoveryResults?.supportsCIMD) {
+      return "cimd";
+    }
+    return "pre_registered";
+  }
+
+  /**
+   * Whether the user must manually register a client with the auth server.
+   *
+   * Returns true when there is no stored client information and neither
+   * DCR nor CIMD is available for automatic registration.
+   */
+  async needsManualRegistration(): Promise<boolean> {
+    // Check if we already have client info (persisted or config)
+    const persisted = await this.tokenStore.load(this.serverUrl);
+    if (persisted?.clientInformation) {
+      return false;
+    }
+    if (this.config.clientId) {
+      return false;
+    }
+
+    // No stored/config client → check if auto-registration is possible
+    const method = this.getRegistrationMethod();
+    return method === "pre_registered";
+  }
 
   /**
    * Get the current OAuth state for dashboard display.
@@ -469,6 +531,39 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
   // =========================================================================
   // Private helpers
   // =========================================================================
+
+  /**
+   * Auto-register with the auth server via Dynamic Client Registration (RFC 7591).
+   *
+   * Uses the SDK's `registerClient()` to POST to the auth server's
+   * registration_endpoint. On success, persists the client info and returns it.
+   * On failure, logs the error and returns undefined (graceful fallback).
+   */
+  private async autoRegisterViaDCR(): Promise<OAuthClientInformationFull | undefined> {
+    if (!this._discoveryResults?.authServerMetadata) {
+      return undefined;
+    }
+
+    try {
+      const authServerUrl = this._discoveryResults.authServerUrl ?? this.serverUrl;
+
+      this.log(`Attempting DCR auto-registration at ${authServerUrl}`);
+
+      const clientInfo = await registerClient(authServerUrl, {
+        metadata: this._discoveryResults.authServerMetadata,
+        clientMetadata: this.clientMetadata,
+      });
+
+      // Persist the registered client info for future use
+      await this.tokenStore.saveClientInformation(this.serverUrl, clientInfo);
+      this.log(`DCR auto-registration succeeded: client_id=${clientInfo.client_id}`);
+      return clientInfo;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.log(`DCR auto-registration failed: ${message}`);
+      return undefined;
+    }
+  }
 
   /**
    * POST a token revocation request per RFC 7009.

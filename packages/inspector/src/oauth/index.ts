@@ -25,6 +25,7 @@ export type {
   OAuthStatus,
   OAuthPresetConfig,
   PersistedTokenData,
+  RegistrationMethod,
 } from "./types";
 export { discoverAuthRequirements } from "./discovery";
 export type { AuthRequiredEvent } from "./discovery";
