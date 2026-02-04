@@ -255,6 +255,49 @@ export async function handleDashboardRequest(
   }
 
   /**
+   * POST /dashboard/connections/:id/reconnect — reconnect after OAuth.
+   *
+   * Reconnects an existing connection using its stored params + OAuth provider.
+   * Used after the OAuth callback completes to establish the authenticated session.
+   */
+  if (pathname.match(/^\/dashboard\/connections\/[^/]+\/reconnect$/) && req.method === "POST") {
+    setCorsHeaders(res);
+    if (!registry) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Registry not available" }));
+      return true;
+    }
+    const connId = pathname.replace("/dashboard/connections/", "").replace("/reconnect", "");
+    try {
+      const cm = registry.getConnection(connId);
+      const params = cm.getState().connectionParams;
+      if (!params) {
+        throw new Error("No connection params stored — cannot reconnect");
+      }
+
+      // Reconnect with the same params; the OAuth provider is already
+      // configured on the connection manager from the configure step
+      await cm.connect(params, { trackHistory: true });
+
+      const state = cm.getState();
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          id: connId,
+          url: state.serverUrl,
+          connected: state.connected,
+          serverInfo: state.serverInfo,
+        })
+      );
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: message }));
+    }
+    return true;
+  }
+
+  /**
    * DELETE /dashboard/connections/:id — close connection.
    */
   if (pathname.startsWith("/dashboard/connections/") && req.method === "DELETE") {

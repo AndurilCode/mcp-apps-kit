@@ -57,6 +57,8 @@ export interface UseConnectionsResult {
   createConnection: (params: ConnectionParams) => Promise<DashboardConnection | null>;
   closeConnection: (id: string) => Promise<boolean>;
   getMatchingEntries: (filter: string) => ServerHistoryEntry[];
+  /** Reconnect an existing connection (e.g., after OAuth completes) */
+  reconnectConnection: (id: string) => Promise<boolean>;
   /** Discovery results from 401 auto-detection on the most recent connection attempt */
   authDiscovery: AuthRequiredEvent | null;
   /** Clear the auth discovery state */
@@ -183,6 +185,45 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
     [baseUrl, addEntry]
   );
 
+  const reconnectConnection = useCallback(
+    async (id: string): Promise<boolean> => {
+      try {
+        const res = await fetch(`${baseUrl}/dashboard/connections/${id}/reconnect`, {
+          method: "POST",
+        });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(body.error ?? `HTTP ${res.status}`);
+        }
+        const data = (await res.json()) as {
+          id: string;
+          url: string;
+          connected: boolean;
+          serverInfo: { name?: string; version?: string } | null;
+        };
+        // Update connection status
+        setConnections((prev) =>
+          prev.map((c) =>
+            c.id === id
+              ? {
+                  ...c,
+                  status: data.connected ? "connected" : "disconnected",
+                  serverInfo: data.serverInfo,
+                }
+              : c
+          )
+        );
+        // Clear auth discovery since we're now connected
+        setAuthDiscovery(null);
+        return data.connected;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Reconnect failed");
+        return false;
+      }
+    },
+    [baseUrl]
+  );
+
   const closeConnection = useCallback(
     async (id: string): Promise<boolean> => {
       try {
@@ -219,6 +260,7 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
     error,
     refresh,
     createConnection,
+    reconnectConnection,
     closeConnection,
     getMatchingEntries,
     authDiscovery,

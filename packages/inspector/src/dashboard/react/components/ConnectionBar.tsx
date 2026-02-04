@@ -788,22 +788,6 @@ export function ConnectionBar({
         />
       )}
 
-      {/* OAuth Discovery Panel (shown on 401 auto-detection) */}
-      {authDiscovery && oauth && (
-        <OAuthDiscoveryPanel
-          discovery={authDiscovery}
-          isDiscovering={oauth.isDiscovering}
-          error={oauth.error}
-          isConfiguring={oauth.isLoading}
-          onConfigure={async (params) => {
-            return await oauth.configureFromDiscovery(params);
-          }}
-          onDismiss={() => {
-            onDismissDiscovery?.();
-          }}
-        />
-      )}
-
       {/* History Dropdown */}
       {showDropdown && (
         <div style={connectionBarStyles.dropdown}>

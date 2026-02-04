@@ -24,6 +24,7 @@ import { GlobalsPanel } from "./components/GlobalsPanel";
 import { McpPrimitivesPanel } from "./components/McpPrimitivesPanel";
 import { RightPanel } from "./components/RightPanel";
 import { NoWidgetPlaceholder } from "./components/NoWidgetPlaceholder";
+import { OAuthDiscoveryPanel } from "./components/OAuthDiscoveryPanel";
 import { styles } from "./styles";
 import logoUrl from "../assets/logo.png";
 
@@ -51,6 +52,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     isCreating,
     error: connectionError,
     createConnection,
+    reconnectConnection,
     closeConnection,
     getMatchingEntries,
     authDiscovery,
@@ -121,6 +123,24 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
       oauth.setDiscoveryResults(authDiscovery);
     }
   }, [authDiscovery]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-reconnect when OAuth status becomes "authorized"
+  // This fires after the user completes the OAuth flow in the browser
+  const prevOAuthStatus = useRef<string | null>(null);
+  useEffect(() => {
+    const currentStatus = oauth.oauthState?.status ?? null;
+    const wasAuthorizing = prevOAuthStatus.current !== "authorized";
+    prevOAuthStatus.current = currentStatus;
+
+    if (currentStatus === "authorized" && wasAuthorizing && activeConnectionId) {
+      // OAuth just became authorized — reconnect to load tools
+      void reconnectConnection(activeConnectionId).then((connected) => {
+        if (connected) {
+          setIsConnectionFormOpen(false);
+        }
+      });
+    }
+  }, [oauth.oauthState?.status, activeConnectionId, reconnectConnection]);
 
   // Use live data with cache fallback for instant tab switching
   const displaySessions = sessions.length > 0 ? sessions : (cachedState?.sessions ?? []);
@@ -302,11 +322,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     async (params: import("@mcp-apps-kit/testing").ConnectionParams): Promise<boolean> => {
       const conn = await createConnection(params);
       if (conn) {
-        // Keep form open when auth is required — the OAuthDiscoveryPanel
-        // renders inside ConnectionBar and needs isOpen=true to be visible
-        if (conn.status !== "disconnected") {
-          setIsConnectionFormOpen(false);
-        }
+        setIsConnectionFormOpen(false);
         return true;
       }
       return false;
@@ -417,10 +433,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           getMatchingEntries={getMatchingEntries}
           oauth={activeConnectionId ? oauth : undefined}
           authDiscovery={authDiscovery}
-          onDismissDiscovery={() => {
-            clearAuthDiscovery();
-            setIsConnectionFormOpen(false);
-          }}
+          onDismissDiscovery={clearAuthDiscovery}
         />
 
         <div style={styles.headerRight}>
@@ -562,6 +575,42 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           isResizing={isRightResizing}
         />
       </div>
+
+      {/* OAuth Discovery Modal Overlay */}
+      {authDiscovery && oauth && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+          }}
+          onClick={(e) => {
+            // Close on backdrop click
+            if (e.target === e.currentTarget) {
+              clearAuthDiscovery();
+              setIsConnectionFormOpen(false);
+            }
+          }}
+        >
+          <OAuthDiscoveryPanel
+            discovery={authDiscovery}
+            isDiscovering={oauth.isDiscovering}
+            error={oauth.error}
+            isConfiguring={oauth.isLoading}
+            onConfigure={async (params) => {
+              return await oauth.configureFromDiscovery(params);
+            }}
+            onDismiss={() => {
+              clearAuthDiscovery();
+              setIsConnectionFormOpen(false);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
