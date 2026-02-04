@@ -194,12 +194,14 @@ describe("OAuth Callback Handler", () => {
 
   describe("/oauth/callback", () => {
     it("should handle OPTIONS preflight", async () => {
-      const req = mockRequest("OPTIONS", "/oauth/callback");
+      const req = mockRequest("OPTIONS", "/oauth/callback", undefined, {
+        origin: "http://127.0.0.1:6274",
+      });
       const res = mockResponse();
       const handled = await handleOAuthRoutes(req, res, mockRegistry(), () => null);
       expect(handled).toBe(true);
       expect(res._statusCode).toBe(204);
-      expect(res._headers["Access-Control-Allow-Origin"]).toBe("*");
+      expect(res._headers["Access-Control-Allow-Origin"]).toBe("http://127.0.0.1:6274");
     });
 
     it("should reject non-GET methods", async () => {

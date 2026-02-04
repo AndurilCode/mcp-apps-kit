@@ -14,7 +14,6 @@ import type { ConnectionParams } from "@mcp-apps-kit/testing";
 import type { ServerHistoryEntry } from "../hooks";
 import type { UseOAuthResult } from "../hooks/useOAuth";
 import type { AuthRequiredEvent } from "../../../oauth/discovery";
-import { OAuthDiscoveryPanel } from "./OAuthDiscoveryPanel";
 
 /**
  * Parse an environment string (KEY=value pairs separated by commas or newlines)
@@ -373,9 +372,9 @@ export function ConnectionBar({
   onCreateConnection,
   onClose,
   getMatchingEntries,
-  oauth,
-  authDiscovery,
-  onDismissDiscovery,
+  oauth: _oauth,
+  authDiscovery: _authDiscovery,
+  onDismissDiscovery: _onDismissDiscovery,
 }: ConnectionBarProps): React.ReactElement {
   const [inputValue, setInputValue] = useState("");
   const [transport, setTransport] = useState<"http" | "stdio">("http");

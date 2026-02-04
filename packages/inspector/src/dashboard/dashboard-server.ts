@@ -106,8 +106,21 @@ export async function cleanupCDPStreamer(): Promise<void> {
  *
  * @param res - Server response to mutate.
  */
-function setCorsHeaders(res: ServerResponse): void {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+/**
+ * Restrict CORS to localhost origins only (local dev tool).
+ */
+function setCorsHeaders(req: IncomingMessage, res: ServerResponse): void {
+  const origin = req.headers.origin;
+  if (origin) {
+    try {
+      const parsed = new URL(origin);
+      if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+      }
+    } catch {
+      // Invalid origin — don't set CORS header
+    }
+  }
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
@@ -127,7 +140,7 @@ export async function handleDashboardRequest(
    * GET /dashboard/connections — list all connections.
    */
   if (pathname === "/dashboard/connections" && req.method === "GET") {
-    setCorsHeaders(res);
+    setCorsHeaders(req, res);
     if (!registry) {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ connections: [] }));
@@ -168,7 +181,7 @@ export async function handleDashboardRequest(
    *   - { url: string } (backward compat — defaults to transport: "http")
    */
   if (pathname === "/dashboard/connections" && req.method === "POST") {
-    setCorsHeaders(res);
+    setCorsHeaders(req, res);
     if (!registry) {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Registry not available" }));
@@ -293,7 +306,7 @@ export async function handleDashboardRequest(
    * Used after the OAuth callback completes to establish the authenticated session.
    */
   if (pathname.match(/^\/dashboard\/connections\/[^/]+\/reconnect$/) && req.method === "POST") {
-    setCorsHeaders(res);
+    setCorsHeaders(req, res);
     if (!registry) {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Registry not available" }));
@@ -333,7 +346,7 @@ export async function handleDashboardRequest(
    * DELETE /dashboard/connections/:id — close connection.
    */
   if (pathname.startsWith("/dashboard/connections/") && req.method === "DELETE") {
-    setCorsHeaders(res);
+    setCorsHeaders(req, res);
     if (!registry) {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Registry not available" }));
@@ -356,7 +369,7 @@ export async function handleDashboardRequest(
    * OPTIONS /dashboard/connections — CORS preflight for connection endpoints.
    */
   if (pathname.startsWith("/dashboard/connections") && req.method === "OPTIONS") {
-    setCorsHeaders(res);
+    setCorsHeaders(req, res);
     res.writeHead(204);
     res.end();
     return true;

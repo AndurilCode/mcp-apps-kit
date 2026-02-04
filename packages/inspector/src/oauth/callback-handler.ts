@@ -28,9 +28,17 @@ import type { ConnectionManager } from "../connection";
 /**
  * Read the full request body as a UTF-8 string.
  */
+const MAX_BODY_BYTES = 1024 * 1024; // 1 MB limit
+
 async function readBody(req: http.IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
+  let totalBytes = 0;
   for await (const chunk of req) {
+    totalBytes += (chunk as Buffer).length;
+    if (totalBytes > MAX_BODY_BYTES) {
+      req.destroy();
+      throw new Error("Request body too large");
+    }
     chunks.push(chunk as Buffer);
   }
   return Buffer.concat(chunks).toString("utf-8");
@@ -38,9 +46,24 @@ async function readBody(req: http.IncomingMessage): Promise<string> {
 
 /**
  * Set standard CORS headers on the response.
+ * Restricts origin to localhost/127.0.0.1 to prevent cross-site mutation attacks.
  */
-function setCorsHeaders(res: http.ServerResponse, methods: string): void {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+function setCorsHeaders(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  methods: string
+): void {
+  const origin = req.headers.origin;
+  if (origin) {
+    try {
+      const parsed = new URL(origin);
+      if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+      }
+    } catch {
+      // Invalid origin — don't set CORS header
+    }
+  }
   res.setHeader("Access-Control-Allow-Methods", `${methods}, OPTIONS`);
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
@@ -139,7 +162,7 @@ async function handleOAuthCallback(
   url: URL,
   getActiveConnectionManager: () => ConnectionManager | null
 ): Promise<boolean> {
-  setCorsHeaders(res, "GET");
+  setCorsHeaders(req, res, "GET");
 
   if (req.method === "OPTIONS") {
     res.writeHead(204);
@@ -228,7 +251,7 @@ async function handleOAuthConfigure(
   registry: ConnectionRegistry,
   getActiveConnectionManager: () => ConnectionManager | null
 ): Promise<boolean> {
-  setCorsHeaders(res, "POST");
+  setCorsHeaders(req, res, "POST");
 
   if (req.method === "OPTIONS") {
     res.writeHead(204);
@@ -362,7 +385,7 @@ async function handleOAuthStatus(
   registry: ConnectionRegistry,
   getActiveConnectionManager: () => ConnectionManager | null
 ): Promise<boolean> {
-  setCorsHeaders(res, "GET");
+  setCorsHeaders(req, res, "GET");
 
   if (req.method === "OPTIONS") {
     res.writeHead(204);
@@ -428,7 +451,7 @@ async function handleOAuthRevoke(
   registry: ConnectionRegistry,
   getActiveConnectionManager: () => ConnectionManager | null
 ): Promise<boolean> {
-  setCorsHeaders(res, "POST");
+  setCorsHeaders(req, res, "POST");
 
   if (req.method === "OPTIONS") {
     res.writeHead(204);
@@ -497,7 +520,7 @@ async function handleOAuthDiscover(
   res: http.ServerResponse,
   url: URL
 ): Promise<boolean> {
-  setCorsHeaders(res, "GET");
+  setCorsHeaders(req, res, "GET");
 
   if (req.method === "OPTIONS") {
     res.writeHead(204);

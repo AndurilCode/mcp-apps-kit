@@ -152,7 +152,7 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
           // Pre-registration flow: no auto-discovery happened, but we still need
           // authDiscovery truthy so the auto-reconnect effect fires after OAuth completes
           setAuthDiscovery({
-            serverUrl: typeof params.url === "string" ? params.url : "",
+            serverUrl: "url" in params ? params.url : "",
             resourceMetadata: null,
             authServerUrl: null,
             authServerMetadata: null,
@@ -164,8 +164,12 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
         }
 
         // Pre-registration flow: auth URL ready, open browser for authorization
-        if (data.authRequired && data.authorizationUrl) {
-          window.open(data.authorizationUrl, "_blank", "noopener,noreferrer");
+        if (
+          data.authRequired &&
+          data.authorizationUrl &&
+          typeof globalThis.window !== "undefined"
+        ) {
+          globalThis.window.open(data.authorizationUrl, "_blank", "noopener,noreferrer");
         }
 
         const newConn: DashboardConnection = {

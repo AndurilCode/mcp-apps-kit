@@ -378,17 +378,18 @@ export function createProviderFromDiscovery(
     // Store the URL first (for callback handler)
     await originalRedirect(authorizationUrl);
 
-    // Open the user's browser
+    // Open the user's browser — use execFile (not exec) to avoid shell injection.
+    // The URL comes from the upstream auth server and could contain metacharacters.
     const urlStr = authorizationUrl.toString();
     try {
-      const { exec: execCb } = await import("node:child_process");
+      const { execFile } = await import("node:child_process");
       const platform = process.platform;
       if (platform === "darwin") {
-        execCb(`open "${urlStr}"`);
+        execFile("open", [urlStr]);
       } else if (platform === "win32") {
-        execCb(`start "" "${urlStr}"`);
+        execFile("cmd", ["/c", "start", "", urlStr]);
       } else {
-        execCb(`xdg-open "${urlStr}"`);
+        execFile("xdg-open", [urlStr]);
       }
     } catch {
       // If browser open fails, log the URL for manual copy
