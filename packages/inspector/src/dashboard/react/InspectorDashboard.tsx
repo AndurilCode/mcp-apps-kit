@@ -495,7 +495,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
             onTogglePrimitivesPanel={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)}
             isRightPanelVisible={!isRightPanelCollapsed}
             onToggleRightPanel={toggleRightPanel}
-            oauthStatus={oauth.oauthState?.status}
+            oauth={activeConnectionId ? oauth : undefined}
           />
         </div>
       </header>

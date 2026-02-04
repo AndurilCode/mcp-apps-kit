@@ -14,7 +14,6 @@ import type { ConnectionParams } from "@mcp-apps-kit/testing";
 import type { ServerHistoryEntry } from "../hooks";
 import type { UseOAuthResult } from "../hooks/useOAuth";
 import type { AuthRequiredEvent } from "../../../oauth/discovery";
-import { OAuthPanel } from "./OAuthPanel";
 import { OAuthDiscoveryPanel } from "./OAuthDiscoveryPanel";
 
 /**
@@ -383,7 +382,6 @@ export function ConnectionBar({
   const [command, setCommand] = useState("");
   const [stdioArgs, setStdioArgs] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [showOAuth, setShowOAuth] = useState(false);
   const [envVars, setEnvVars] = useState("");
   const [cwd, setCwd] = useState("");
   const [isFocused, setIsFocused] = useState(false);
@@ -392,10 +390,8 @@ export function ConnectionBar({
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
-  const oauthButtonRef = useRef<HTMLButtonElement>(null);
 
   // OAuth status for button styling
-  const oauthStatus = oauth?.oauthState?.status;
 
   // Determine if the current form is submittable
   const canSubmit = transport === "http" ? !!inputValue.trim() : !!command.trim();
@@ -656,78 +652,6 @@ export function ConnectionBar({
             </button>
           )}
 
-          {/* OAuth button — only for HTTP connections */}
-          {transport === "http" && oauth && (
-            <button
-              ref={oauthButtonRef}
-              type="button"
-              style={{
-                ...connectionBarStyles.actionButton,
-                ...(showOAuth ? connectionBarStyles.settingsButtonActive : {}),
-                ...(oauthStatus === "authenticated"
-                  ? connectionBarStyles.oauthButtonAuthenticated
-                  : {}),
-                ...(oauthStatus === "authenticating"
-                  ? connectionBarStyles.oauthButtonAuthenticating
-                  : {}),
-              }}
-              onClick={() => setShowOAuth((prev) => !prev)}
-              title={
-                oauthStatus === "authenticated"
-                  ? "OAuth: Authenticated"
-                  : oauthStatus === "authenticating"
-                    ? "OAuth: Authenticating..."
-                    : "Configure OAuth"
-              }
-              aria-expanded={showOAuth}
-              data-testid="oauth-trigger-btn"
-            >
-              {oauthStatus === "authenticated" ? (
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
-              ) : oauthStatus === "authenticating" ? (
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="23 4 23 10 17 10" />
-                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-                </svg>
-              ) : (
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0 1 9.9-1" />
-                </svg>
-              )}
-            </button>
-          )}
-
           <button
             type="button"
             style={{
@@ -775,17 +699,6 @@ export function ConnectionBar({
             </div>
           </div>
         </Popover>
-      )}
-
-      {/* OAuth Panel Popover */}
-      {oauth && (
-        <OAuthPanel
-          isOpen={showOAuth}
-          anchorRef={oauthButtonRef}
-          containerRef={containerRef}
-          onClose={() => setShowOAuth(false)}
-          oauth={oauth}
-        />
       )}
 
       {/* History Dropdown */}
