@@ -288,21 +288,27 @@ describe("Connection Layer 401 Auto-Detection", () => {
       expect(discoverAuthRequirementsMock).not.toHaveBeenCalled();
     });
 
-    it("should rethrow auth errors when OAuth config is already provided", async () => {
+    it("should return zero counts when OAuth config is already provided (pending auth)", async () => {
       mockConnectionError(new UnauthorizedError("Token expired"));
       const manager = new ConnectionManager();
 
-      await expect(
-        manager.connect(
-          { transport: "http", url: "https://oauth-server.example.com/mcp" },
-          {
-            oauthConfig: {
-              clientId: "existing-client",
-              redirectUri: "http://127.0.0.1:6274/oauth/callback",
-            },
-          }
-        )
-      ).rejects.toThrow("Token expired");
+      const result = await manager.connect(
+        { transport: "http", url: "https://oauth-server.example.com/mcp" },
+        {
+          oauthConfig: {
+            clientId: "existing-client",
+            redirectUri: "http://127.0.0.1:6274/oauth/callback",
+          },
+        }
+      );
+
+      // Should return zero counts (not throw) so frontend can show auth panel
+      expect(result).toEqual({
+        serverInfo: null,
+        toolCount: 0,
+        resourceCount: 0,
+        promptCount: 0,
+      });
 
       // Should NOT have run discovery — OAuth was already configured
       expect(discoverAuthRequirementsMock).not.toHaveBeenCalled();
