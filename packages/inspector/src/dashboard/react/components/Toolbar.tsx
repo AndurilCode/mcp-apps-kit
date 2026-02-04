@@ -82,9 +82,9 @@ function LockIcon(): React.ReactElement {
 
 const oauthButtonStyles = {
   authenticated: {
-    color: "#20b2aa",
-    backgroundColor: "rgba(32, 178, 170, 0.15)",
-    borderColor: "rgba(32, 178, 170, 0.3)",
+    color: "#ffffff",
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    borderColor: "rgba(255, 255, 255, 0.3)",
   },
   authenticating: {
     color: "#ff9800",
