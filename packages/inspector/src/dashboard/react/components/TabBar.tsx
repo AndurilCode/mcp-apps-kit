@@ -15,6 +15,8 @@ export interface TabInfo {
   url: string;
   serverInfo: { name?: string; version?: string } | null;
   status: string;
+  /** Whether this connection uses OAuth authentication */
+  isOAuth?: boolean;
 }
 
 /**
@@ -142,7 +144,10 @@ export function TabBar({
               tabIndex={0}
               aria-selected={isActive}
             >
-              <div style={tabBarStyles.tabTitle}>{title}</div>
+              <div style={tabBarStyles.tabTitle}>
+                {tab.isOAuth && <span title="OAuth authenticated">🔒 </span>}
+                {title}
+              </div>
               {tab.serverInfo?.name && tab.url ? (
                 <div style={tabBarStyles.tabUrl}>{tab.url}</div>
               ) : null}

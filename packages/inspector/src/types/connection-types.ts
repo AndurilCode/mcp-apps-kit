@@ -6,6 +6,8 @@
 
 import type { TestClient, ConnectionParams } from "@mcp-apps-kit/testing";
 import type { ServerInfo } from "./server-types";
+import type { OAuthState, OAuthClientConfig } from "../oauth/types";
+import type { InspectorOAuthProvider } from "../oauth/provider";
 
 // =============================================================================
 // CONNECTION TYPES
@@ -20,6 +22,18 @@ export interface ConnectOptions {
 
   /** Connection timeout in ms. Default: 30000 */
   timeout?: number;
+
+  /**
+   * OAuth client configuration for authenticated HTTP connections.
+   * When provided, the connection will use OAuth 2.1 + PKCE for authentication.
+   */
+  oauthConfig?: OAuthClientConfig;
+
+  /**
+   * Pre-built OAuth provider (e.g., from CLI preset mode).
+   * When provided, takes precedence over oauthConfig.
+   */
+  authProvider?: InspectorOAuthProvider;
 }
 
 /**
@@ -85,4 +99,6 @@ export interface ConnectionStatusOutput {
   serverInfo: ServerInfo | null;
   historyEnabled: boolean;
   callCount: number;
+  /** OAuth authentication state (present for HTTP connections with OAuth) */
+  oauth?: OAuthState;
 }

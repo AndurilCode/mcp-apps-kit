@@ -5,6 +5,7 @@
  */
 
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import type { ZodType } from "zod";
 
 // =============================================================================
@@ -71,6 +72,12 @@ export interface TestClientOptions {
   retries?: number;
   /** Called when the underlying transport closes (e.g., stdio process exits) */
   onTransportClose?: () => void;
+  /**
+   * OAuth client provider for authenticated HTTP connections.
+   * When provided, the StreamableHTTPClientTransport will use this provider
+   * for the OAuth 2.1 + PKCE authorization flow.
+   */
+  authProvider?: OAuthClientProvider;
 }
 
 /**

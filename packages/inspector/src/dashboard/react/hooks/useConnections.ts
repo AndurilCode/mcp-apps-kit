@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ConnectionParams } from "@mcp-apps-kit/testing";
 import { useServerHistory, type ServerHistoryEntry } from "./useServerHistory";
+import type { AuthRequiredEvent } from "../../../oauth/discovery";
 
 /**
  * Dashboard connection lifecycle status.
@@ -23,6 +24,8 @@ export interface DashboardConnection {
   url: string;
   serverInfo: { name?: string; version?: string } | null;
   status: DashboardConnectionStatus;
+  /** Whether this connection uses OAuth authentication */
+  isOAuth?: boolean;
 }
 
 interface ConnectionsResponse {
@@ -38,6 +41,9 @@ interface CreateConnectionResponse {
   id: string;
   url: string;
   serverInfo?: { name?: string; version?: string } | null;
+  authRequired?: boolean;
+  discoveryResults?: AuthRequiredEvent;
+  authorizationUrl?: string;
 }
 
 /**
@@ -54,6 +60,12 @@ export interface UseConnectionsResult {
   createConnection: (params: ConnectionParams) => Promise<DashboardConnection | null>;
   closeConnection: (id: string) => Promise<boolean>;
   getMatchingEntries: (filter: string) => ServerHistoryEntry[];
+  /** Reconnect an existing connection (e.g., after OAuth completes) */
+  reconnectConnection: (id: string) => Promise<boolean>;
+  /** Discovery results from 401 auto-detection on the most recent connection attempt */
+  authDiscovery: AuthRequiredEvent | null;
+  /** Clear the auth discovery state */
+  clearAuthDiscovery: () => void;
 }
 
 function normalizeConnection(entry: {
@@ -82,6 +94,11 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [authDiscovery, setAuthDiscovery] = useState<AuthRequiredEvent | null>(null);
+
+  const clearAuthDiscovery = useCallback(() => {
+    setAuthDiscovery(null);
+  }, []);
 
   const { addEntry, getMatchingEntries } = useServerHistory();
 
@@ -115,6 +132,7 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
     async (params: ConnectionParams): Promise<DashboardConnection | null> => {
       setIsCreating(true);
       setError(null);
+      setAuthDiscovery(null);
       try {
         const res = await fetch(`${baseUrl}/dashboard/connections`, {
           method: "POST",
@@ -126,11 +144,39 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
           throw new Error(body.error ?? `HTTP ${res.status}`);
         }
         const data = (await res.json()) as CreateConnectionResponse;
+
+        // Capture auth discovery results from 401 auto-detection
+        if (data.authRequired && data.discoveryResults) {
+          setAuthDiscovery(data.discoveryResults);
+        } else if (data.authRequired) {
+          // Pre-registration flow: no auto-discovery happened, but we still need
+          // authDiscovery truthy so the auto-reconnect effect fires after OAuth completes
+          setAuthDiscovery({
+            serverUrl: "url" in params ? params.url : "",
+            resourceMetadata: null,
+            authServerUrl: null,
+            authServerMetadata: null,
+            supportsDCR: false,
+            supportsCIMD: false,
+            requiresPreRegistration: true,
+            suggestedScopes: [],
+          });
+        }
+
+        // Pre-registration flow: auth URL ready, open browser for authorization
+        if (
+          data.authRequired &&
+          data.authorizationUrl &&
+          typeof globalThis.window !== "undefined"
+        ) {
+          globalThis.window.open(data.authorizationUrl, "_blank", "noopener,noreferrer");
+        }
+
         const newConn: DashboardConnection = {
           id: data.id,
           url: data.url,
           serverInfo: data.serverInfo ?? null,
-          status: "connected",
+          status: data.authRequired ? "disconnected" : "connected",
         };
         setConnections((prev) => {
           const filtered = prev.filter((c) => c.id !== newConn.id);
@@ -162,6 +208,46 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
       }
     },
     [baseUrl, addEntry]
+  );
+
+  const reconnectConnection = useCallback(
+    async (id: string): Promise<boolean> => {
+      try {
+        const res = await fetch(`${baseUrl}/dashboard/connections/${id}/reconnect`, {
+          method: "POST",
+        });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(body.error ?? `HTTP ${res.status}`);
+        }
+        const data = (await res.json()) as {
+          id: string;
+          url: string;
+          connected: boolean;
+          serverInfo: { name?: string; version?: string } | null;
+        };
+        // Update connection status + mark as OAuth
+        setConnections((prev) =>
+          prev.map((c) =>
+            c.id === id
+              ? {
+                  ...c,
+                  status: data.connected ? "connected" : "disconnected",
+                  serverInfo: data.serverInfo,
+                  isOAuth: true,
+                }
+              : c
+          )
+        );
+        // Clear auth discovery since we're now connected
+        setAuthDiscovery(null);
+        return data.connected;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Reconnect failed");
+        return false;
+      }
+    },
+    [baseUrl]
   );
 
   const closeConnection = useCallback(
@@ -200,8 +286,11 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
     error,
     refresh,
     createConnection,
+    reconnectConnection,
     closeConnection,
     getMatchingEntries,
+    authDiscovery,
+    clearAuthDiscovery,
   };
 }
 

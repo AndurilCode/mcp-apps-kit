@@ -15,6 +15,7 @@ import type { InspectorEvent, AgnosticInspectorEvent } from "../../types";
 import { useResizablePanelWidth } from "./hooks/useResizablePanelWidth";
 import { useGlobals, type GlobalsState } from "./hooks/useGlobals";
 import { useConnections } from "./hooks/useConnections";
+import { useOAuth } from "./hooks/useOAuth";
 import { useMcpPrimitives, type McpPrimitives } from "./hooks/useMcpPrimitives";
 import { Toolbar } from "./components/Toolbar";
 import { ConnectionBar } from "./components/ConnectionBar";
@@ -23,6 +24,7 @@ import { GlobalsPanel } from "./components/GlobalsPanel";
 import { McpPrimitivesPanel } from "./components/McpPrimitivesPanel";
 import { RightPanel } from "./components/RightPanel";
 import { NoWidgetPlaceholder } from "./components/NoWidgetPlaceholder";
+import { OAuthDiscoveryPanel } from "./components/OAuthDiscoveryPanel";
 import { styles } from "./styles";
 import logoUrl from "../assets/logo.png";
 
@@ -50,8 +52,11 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     isCreating,
     error: connectionError,
     createConnection,
+    reconnectConnection,
     closeConnection,
     getMatchingEntries,
+    authDiscovery,
+    clearAuthDiscovery,
   } = useConnections(baseUrl);
 
   // Per-connection state cache for instant tab switching
@@ -108,6 +113,46 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     prompts,
     isLoading: primitivesLoading,
   } = useMcpPrimitives(baseUrl, activeConnection?.status === "connected", activeConnectionId);
+
+  // OAuth state (connection-scoped, polls status)
+  const oauth = useOAuth(baseUrl, activeConnectionId);
+
+  // Sync discovery results from connection creation into OAuth hook
+  useEffect(() => {
+    if (authDiscovery) {
+      oauth.setDiscoveryResults(authDiscovery);
+    }
+  }, [authDiscovery]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-reconnect when OAuth status becomes "authenticated" during active discovery.
+  // Only fires when authDiscovery is set (modal is showing), NOT on tab switches.
+  const prevOAuthStatus = useRef<string | null>(null);
+  useEffect(() => {
+    const currentStatus = oauth.oauthState?.status ?? null;
+    const wasNotAuthenticated = prevOAuthStatus.current !== "authenticated";
+    prevOAuthStatus.current = currentStatus;
+
+    // Guard: only reconnect during active discovery flow (modal open)
+    if (
+      currentStatus === "authenticated" &&
+      wasNotAuthenticated &&
+      activeConnectionId &&
+      authDiscovery
+    ) {
+      void reconnectConnection(activeConnectionId).then((connected) => {
+        if (connected) {
+          clearAuthDiscovery();
+          setIsConnectionFormOpen(false);
+        }
+      });
+    }
+  }, [
+    oauth.oauthState?.status,
+    activeConnectionId,
+    authDiscovery,
+    reconnectConnection,
+    clearAuthDiscovery,
+  ]);
 
   // Use live data with cache fallback for instant tab switching
   const displaySessions = sessions.length > 0 ? sessions : (cachedState?.sessions ?? []);
@@ -287,8 +332,8 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
 
   const handleCreateConnection = useCallback(
     async (params: import("@mcp-apps-kit/testing").ConnectionParams): Promise<boolean> => {
-      const created = await createConnection(params);
-      if (created) {
+      const conn = await createConnection(params);
+      if (conn) {
         setIsConnectionFormOpen(false);
         return true;
       }
@@ -324,6 +369,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
         url: connection.url,
         serverInfo: connection.serverInfo,
         status: connection.status,
+        isOAuth: connection.isOAuth,
       })),
     [connections]
   );
@@ -398,6 +444,9 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           onCreateConnection={handleCreateConnection}
           onClose={() => setIsConnectionFormOpen(false)}
           getMatchingEntries={getMatchingEntries}
+          oauth={activeConnectionId ? oauth : undefined}
+          authDiscovery={authDiscovery}
+          onDismissDiscovery={clearAuthDiscovery}
         />
 
         <div style={styles.headerRight}>
@@ -446,6 +495,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
             onTogglePrimitivesPanel={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)}
             isRightPanelVisible={!isRightPanelCollapsed}
             onToggleRightPanel={toggleRightPanel}
+            oauth={activeConnectionId ? oauth : undefined}
           />
         </div>
       </header>
@@ -538,6 +588,53 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           isResizing={isRightResizing}
         />
       </div>
+
+      {/* OAuth Discovery Modal Overlay */}
+      {authDiscovery && oauth && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+          }}
+          onClick={(e) => {
+            // Close on backdrop click
+            if (e.target === e.currentTarget) {
+              clearAuthDiscovery();
+              setIsConnectionFormOpen(false);
+            }
+          }}
+        >
+          <OAuthDiscoveryPanel
+            discovery={authDiscovery}
+            isDiscovering={oauth.isDiscovering}
+            error={oauth.error}
+            isConfiguring={oauth.isLoading}
+            onConfigure={async (params) => {
+              const url = await oauth.configureFromDiscovery(params);
+              // If no auth URL (tokens already exist), reconnect immediately
+              // instead of waiting for the 3s status poll cycle
+              if (!url && activeConnectionId) {
+                void reconnectConnection(activeConnectionId).then((connected) => {
+                  if (connected) {
+                    clearAuthDiscovery();
+                    setIsConnectionFormOpen(false);
+                  }
+                });
+              }
+              return url;
+            }}
+            onDismiss={() => {
+              clearAuthDiscovery();
+              setIsConnectionFormOpen(false);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

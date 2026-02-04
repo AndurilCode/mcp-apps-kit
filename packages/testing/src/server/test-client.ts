@@ -30,7 +30,7 @@ export async function createTestClient(
   params: ConnectionParams,
   options: TestClientOptions = {}
 ): Promise<TestClient> {
-  const { trackHistory = false, timeout = 30000, retries = 0 } = options;
+  const { trackHistory = false, timeout = 30000, retries = 0, authProvider } = options;
 
   const label = connectionLabel(params);
   clientLogger("Creating test client for %s", label);
@@ -85,7 +85,9 @@ export async function createTestClient(
         stderr: "pipe",
       });
     } else {
-      transport = new StreamableHTTPClientTransport(new URL(params.url));
+      transport = new StreamableHTTPClientTransport(new URL(params.url), {
+        ...(authProvider ? { authProvider } : {}),
+      });
     }
 
     if (options.onTransportClose) {
