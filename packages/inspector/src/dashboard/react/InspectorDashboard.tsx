@@ -124,15 +124,16 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     }
   }, [authDiscovery]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-reconnect when OAuth status becomes "authorized"
+  // Auto-reconnect when OAuth status becomes "authenticated"
   // This fires after the user completes the OAuth flow in the browser
+  // or when configure detects existing tokens
   const prevOAuthStatus = useRef<string | null>(null);
   useEffect(() => {
     const currentStatus = oauth.oauthState?.status ?? null;
-    const wasAuthorizing = prevOAuthStatus.current !== "authorized";
+    const wasNotAuthenticated = prevOAuthStatus.current !== "authenticated";
     prevOAuthStatus.current = currentStatus;
 
-    if (currentStatus === "authorized" && wasAuthorizing && activeConnectionId) {
+    if (currentStatus === "authenticated" && wasNotAuthenticated && activeConnectionId) {
       // OAuth just became authorized — reconnect to load tools
       void reconnectConnection(activeConnectionId).then((connected) => {
         if (connected) {
