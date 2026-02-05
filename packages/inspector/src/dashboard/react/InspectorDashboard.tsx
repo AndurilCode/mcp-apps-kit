@@ -114,6 +114,51 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     isLoading: primitivesLoading,
   } = useMcpPrimitives(baseUrl, activeConnection?.status === "connected", activeConnectionId);
 
+  // Testing status — activates when new agent events arrive, 60s idle timer
+  const [isTesting, setIsTesting] = useState(false);
+  const prevAgentEventsLengthRef = useRef(0);
+  const testingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Reset testing state when connection changes
+  useEffect(() => {
+    setIsTesting(false);
+    prevAgentEventsLengthRef.current = 0;
+    if (testingTimerRef.current) {
+      clearTimeout(testingTimerRef.current);
+      testingTimerRef.current = null;
+    }
+  }, [activeConnectionId]);
+
+  // Watch agentEvents length for testing status activation
+  useEffect(() => {
+    const prevLen = prevAgentEventsLengthRef.current;
+    const curLen = agentEvents.length;
+    prevAgentEventsLengthRef.current = curLen;
+
+    if (curLen > prevLen && curLen > 0) {
+      // New agent events received — activate testing status
+      setIsTesting(true);
+
+      // Reset the 60-second idle timer
+      if (testingTimerRef.current) {
+        clearTimeout(testingTimerRef.current);
+      }
+      testingTimerRef.current = setTimeout(() => {
+        setIsTesting(false);
+        testingTimerRef.current = null;
+      }, 60_000);
+    }
+  }, [agentEvents.length]);
+
+  // Cleanup testing timer on unmount
+  useEffect(() => {
+    return () => {
+      if (testingTimerRef.current) {
+        clearTimeout(testingTimerRef.current);
+      }
+    };
+  }, []);
+
   // OAuth state (connection-scoped, polls status)
   const oauth = useOAuth(baseUrl, activeConnectionId);
 
@@ -386,6 +431,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
   }, [displayGlobals?.viewport]);
 
   const isStreaming = status === "streaming";
+  const isTestingActive = isTesting && activeConnection?.status === "connected";
   const connectionStatusLabel = activeConnection
     ? activeConnection.status === "connected"
       ? "Connected"
@@ -472,21 +518,29 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
             <div
               style={{
                 ...styles.statusWrapper,
-                ...(isStreaming ? styles.statusWrapperStreaming : {}),
+                ...(isStreaming && !isTestingActive ? styles.statusWrapperStreaming : {}),
               }}
             >
               <div style={styles.statusInner}>
                 <span
                   style={{
                     ...styles.statusDot,
-                    ...(status === "streaming"
-                      ? styles.statusDotStreaming
-                      : activeConnection?.status === "connected"
-                        ? styles.statusDotConnected
-                        : styles.statusDotDisconnected),
+                    ...(isTestingActive
+                      ? styles.statusDotTesting
+                      : status === "streaming"
+                        ? styles.statusDotStreaming
+                        : activeConnection?.status === "connected"
+                          ? styles.statusDotConnected
+                          : styles.statusDotDisconnected),
                   }}
                 />
-                <span>{status === "streaming" ? "Streaming" : connectionStatusLabel}</span>
+                <span>
+                  {isTestingActive
+                    ? "Testing"
+                    : status === "streaming"
+                      ? "Streaming"
+                      : connectionStatusLabel}
+                </span>
               </div>
             </div>
           </div>
