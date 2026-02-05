@@ -110,7 +110,14 @@ export function useConnections(baseUrl: string): UseConnectionsResult {
       }
       const data = (await res.json()) as ConnectionsResponse;
       const normalized = (data.connections ?? []).map(normalizeConnection);
-      setConnections(normalized);
+      // Preserve locally-set flags (e.g. isOAuth) that the REST API doesn't return
+      setConnections((prev) => {
+        const prevMap = new Map(prev.map((c) => [c.id, c]));
+        return normalized.map((c) => {
+          const existing = prevMap.get(c.id);
+          return existing ? { ...c, isOAuth: existing.isOAuth } : c;
+        });
+      });
       if (normalized.length === 0) {
         setActiveConnectionId(null);
       } else if (!activeConnectionId || !normalized.some((c) => c.id === activeConnectionId)) {

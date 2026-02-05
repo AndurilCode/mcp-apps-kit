@@ -30,11 +30,31 @@ export interface TabBarProps {
   onAdd: () => void;
 }
 
+/** Lock icon for OAuth-authenticated connections, matching Toolbar.tsx */
+function LockIcon(): React.ReactElement {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-label="OAuth authenticated"
+    >
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}
+
 const tabBarStyles: Record<string, React.CSSProperties> = {
   container: {
     display: "flex",
     alignItems: "flex-end",
-    backgroundColor: "#111111",
+    backgroundColor: "#0d0e0e",
     borderBottom: "1px solid #2d2f2f",
     padding: "0 0.5rem",
     gap: "0.25rem",
@@ -72,12 +92,10 @@ const tabBarStyles: Record<string, React.CSSProperties> = {
     textOverflow: "ellipsis",
     color: "#e0e0e0",
   },
-  tabUrl: {
-    color: "#9aa0a6",
-    fontSize: "0.6875rem",
-    overflow: "hidden",
-    whiteSpace: "nowrap" as const,
-    textOverflow: "ellipsis",
+  lockIcon: {
+    flexShrink: 0,
+    marginRight: "2px",
+    verticalAlign: "middle",
   },
   closeButton: {
     background: "transparent",
@@ -145,12 +163,13 @@ export function TabBar({
               aria-selected={isActive}
             >
               <div style={tabBarStyles.tabTitle}>
-                {tab.isOAuth && <span title="OAuth authenticated">🔒 </span>}
+                {tab.isOAuth && (
+                  <span style={tabBarStyles.lockIcon} title="OAuth authenticated">
+                    <LockIcon />
+                  </span>
+                )}
                 {title}
               </div>
-              {tab.serverInfo?.name && tab.url ? (
-                <div style={tabBarStyles.tabUrl}>{tab.url}</div>
-              ) : null}
               <button
                 type="button"
                 style={tabBarStyles.closeButton}
