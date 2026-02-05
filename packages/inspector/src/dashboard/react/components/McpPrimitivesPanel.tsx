@@ -186,12 +186,10 @@ const localStyles: Record<string, React.CSSProperties> = {
     backgroundColor: "#111111",
     border: "1px solid #2d2f2f",
     borderRadius: "6px",
-    padding: "0.75rem",
+    padding: "0.5rem 0.75rem",
     marginBottom: "0.5rem",
   },
-  cardCollapsed: {
-    padding: "0.375rem 0.75rem",
-  },
+  cardCollapsed: {},
   cardHeader: {
     display: "flex",
     alignItems: "flex-start",
@@ -629,12 +627,14 @@ function AnimatedCollapse({
       const timer = setTimeout(() => setMaxHeight("none"), 250);
       return () => clearTimeout(timer);
     } else {
-      // Snap to current height first, then animate to 0
+      // Snap to current height first, then animate to 0 on next frame
       const height = el.scrollHeight;
       if (height > 0) {
         setMaxHeight(`${height}px`);
-        void el.offsetHeight;
-        requestAnimationFrame(() => setMaxHeight("0px"));
+        // Double rAF ensures the browser has painted the explicit height before transitioning to 0
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => setMaxHeight("0px"));
+        });
       } else {
         setMaxHeight("0px");
       }
@@ -680,11 +680,6 @@ function ToolCard({ tool }: { tool: McpTool }): React.ReactElement {
           <span style={localStyles.cardName}>{tool.name}</span>
           {hasUI && <span style={localStyles.widgetBadge}>Widget</span>}
         </div>
-        {isExpanded && (
-          <div onClick={(e) => e.stopPropagation()}>
-            <CopyButton data={tool} />
-          </div>
-        )}
       </div>
       <AnimatedCollapse isOpen={isExpanded}>
         {tool.description && <div style={localStyles.cardDescription}>{tool.description}</div>}
@@ -719,6 +714,9 @@ function ToolCard({ tool }: { tool: McpTool }): React.ReactElement {
           data={tool.annotations as Record<string, unknown> | undefined}
         />
         <MetadataSection title="Metadata" data={tool._meta} />
+        <div style={{ marginTop: "0.5rem" }}>
+          <CopyButton data={tool} />
+        </div>
       </AnimatedCollapse>
     </div>
   );
@@ -742,11 +740,6 @@ function ResourceCard({ resource }: { resource: McpResource }): React.ReactEleme
           <span style={localStyles.expandIndicator}>{isExpanded ? "▼" : "▶"}</span>
           <span style={localStyles.cardName}>{resource.name}</span>
         </div>
-        {isExpanded && (
-          <div onClick={(e) => e.stopPropagation()}>
-            <CopyButton data={resource} />
-          </div>
-        )}
       </div>
       <AnimatedCollapse isOpen={isExpanded}>
         <div style={localStyles.resourceUri}>{resource.uri}</div>
@@ -759,6 +752,9 @@ function ResourceCard({ resource }: { resource: McpResource }): React.ReactEleme
           data={resource.annotations as Record<string, unknown> | undefined}
         />
         <MetadataSection title="Metadata" data={resource._meta} />
+        <div style={{ marginTop: "0.5rem" }}>
+          <CopyButton data={resource} />
+        </div>
       </AnimatedCollapse>
     </div>
   );
@@ -782,11 +778,6 @@ function PromptCard({ prompt }: { prompt: McpPrompt }): React.ReactElement {
           <span style={localStyles.expandIndicator}>{isExpanded ? "▼" : "▶"}</span>
           <span style={localStyles.cardName}>{prompt.name}</span>
         </div>
-        {isExpanded && (
-          <div onClick={(e) => e.stopPropagation()}>
-            <CopyButton data={prompt} />
-          </div>
-        )}
       </div>
       <AnimatedCollapse isOpen={isExpanded}>
         {prompt.description && <div style={localStyles.cardDescription}>{prompt.description}</div>}
@@ -794,6 +785,9 @@ function PromptCard({ prompt }: { prompt: McpPrompt }): React.ReactElement {
           <PromptArguments args={prompt.arguments} />
         )}
         <MetadataSection title="Metadata" data={prompt._meta} />
+        <div style={{ marginTop: "0.5rem" }}>
+          <CopyButton data={prompt} />
+        </div>
       </AnimatedCollapse>
     </div>
   );

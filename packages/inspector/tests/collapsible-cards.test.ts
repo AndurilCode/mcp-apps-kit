@@ -332,10 +332,13 @@ describe("AC-3: Collapsed state hides detailed content", () => {
     const props = defaultPanelProps({ tools: [makeTool()] });
     mount(createElement(McpPrimitivesPanel, props));
 
-    // "Copy JSON" should not be visible in collapsed state
-    const buttons = queryAll("button");
-    const copyBtn = buttons.find((b) => b.textContent === "Copy JSON");
-    expect(copyBtn).toBeUndefined();
+    // Copy JSON is inside AnimatedCollapse — hidden via overflow when collapsed
+    expect(isCollapsed("tool-card-header-test_tool")).toBe(true);
+    // Copy JSON button exists in DOM but is inside the collapsed wrapper
+    const wrapper = findCollapseWrapper("tool-card-header-test_tool")!;
+    const copyBtn = wrapper.querySelector("button");
+    expect(copyBtn).not.toBeNull();
+    expect(copyBtn!.textContent).toBe("Copy JSON");
   });
 
   it("collapsed ResourceCard hides URI, description, mimeType", async () => {
@@ -712,9 +715,8 @@ describe("AC-3 supplement: ResourceCard & PromptCard Copy JSON visibility", () =
     const resourcesTab = tabButtons.find((b) => b.textContent?.includes("Resources"));
     click(resourcesTab!);
 
-    const buttons = queryAll("button");
-    const copyBtn = buttons.find((b) => b.textContent === "Copy JSON");
-    expect(copyBtn).toBeUndefined();
+    // Copy JSON inside collapsed AnimatedCollapse wrapper
+    expect(isCollapsed("resource-card-header-test_resource")).toBe(true);
   });
 
   it("expanded ResourceCard shows Copy JSON button", async () => {
@@ -745,9 +747,8 @@ describe("AC-3 supplement: ResourceCard & PromptCard Copy JSON visibility", () =
     const promptsTab = tabButtons.find((b) => b.textContent?.includes("Prompts"));
     click(promptsTab!);
 
-    const buttons = queryAll("button");
-    const copyBtn = buttons.find((b) => b.textContent === "Copy JSON");
-    expect(copyBtn).toBeUndefined();
+    // Copy JSON inside collapsed AnimatedCollapse wrapper
+    expect(isCollapsed("prompt-card-header-test_prompt")).toBe(true);
   });
 
   it("expanded PromptCard shows Copy JSON button", async () => {
@@ -769,8 +770,8 @@ describe("AC-3 supplement: ResourceCard & PromptCard Copy JSON visibility", () =
   });
 });
 
-describe("AC-4 supplement: reduced padding in collapsed state", () => {
-  it("collapsed card has reduced padding vs expanded card", async () => {
+describe("AC-4 supplement: consistent padding eliminates jump", () => {
+  it("card padding stays consistent between collapsed and expanded", async () => {
     const { McpPrimitivesPanel } =
       await import("../src/dashboard/react/components/McpPrimitivesPanel");
     const props = defaultPanelProps({ tools: [makeTool()] });
@@ -779,16 +780,15 @@ describe("AC-4 supplement: reduced padding in collapsed state", () => {
     const header = findByTestId("tool-card-header-test_tool")!;
     const card = header.parentElement!;
 
-    // Collapsed: reduced padding (0.375rem 0.75rem)
+    // Collapsed padding
     const collapsedPadding = card.style.padding;
-    expect(collapsedPadding).toBe("0.375rem 0.75rem");
 
     // Expand
     click(header);
 
-    // Expanded: full padding (0.75rem)
+    // Expanded: same padding (no jump)
     const expandedPadding = card.style.padding;
-    expect(expandedPadding).toBe("0.75rem");
+    expect(expandedPadding).toBe(collapsedPadding);
   });
 });
 
