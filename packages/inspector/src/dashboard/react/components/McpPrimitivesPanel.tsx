@@ -5,7 +5,7 @@
  * Each primitive type is shown as a list of cards with schema details.
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import type {
   McpTool,
   McpResource,
@@ -186,7 +186,7 @@ const localStyles: Record<string, React.CSSProperties> = {
     backgroundColor: "#111111",
     border: "1px solid #2d2f2f",
     borderRadius: "6px",
-    padding: "0.75rem",
+    padding: "0.5rem 0.75rem",
     marginBottom: "0.5rem",
   },
   cardHeader: {
@@ -195,8 +195,24 @@ const localStyles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     marginBottom: "0.5rem",
   },
+  cardHeaderClickable: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    cursor: "pointer",
+    userSelect: "none" as const,
+    gap: "0.5rem",
+  },
+  expandIndicator: {
+    fontSize: "0.5rem",
+    color: "#6b7280",
+    flexShrink: 0,
+    width: "0.75rem",
+    textAlign: "center" as const,
+    transition: "color 0.15s ease",
+  },
   cardName: {
-    fontSize: "0.8125rem",
+    fontSize: "0.9375rem",
     fontWeight: 600,
     color: "#e8e8e8",
     fontFamily: FONT_SANS,
@@ -586,90 +602,230 @@ function MetadataSection({
 }
 
 // =============================================================================
+// Animated Collapse
+// =============================================================================
+
+/** Smooth expand/collapse wrapper using max-height transition */
+const COLLAPSE_TRANSITION_MS = 200;
+const COLLAPSE_TRANSITION_CSS = `${COLLAPSE_TRANSITION_MS / 1000}s`;
+
+function AnimatedCollapse({
+  isOpen,
+  children,
+}: {
+  isOpen: boolean;
+  children: React.ReactNode;
+}): React.ReactElement {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [maxHeight, setMaxHeight] = useState<string>(isOpen ? "none" : "0px");
+  const [overflow, setOverflow] = useState<string>(isOpen ? "visible" : "hidden");
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+
+    let rafId1: number | undefined;
+    let rafId2: number | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    if (isOpen) {
+      // Keep overflow hidden during the expand transition
+      setOverflow("hidden");
+      // Measure content and animate from 0 to its height
+      rafId1 = requestAnimationFrame(() => {
+        const height = el.scrollHeight;
+        setMaxHeight(height > 0 ? `${height}px` : "none");
+      });
+      // After transition completes, switch to none/visible so content can grow
+      timer = setTimeout(() => {
+        setMaxHeight("none");
+        setOverflow("visible");
+      }, COLLAPSE_TRANSITION_MS);
+    } else {
+      // Snap to current measured height, keep overflow hidden
+      setOverflow("hidden");
+      const height = el.scrollHeight;
+      if (height > 0) {
+        setMaxHeight(`${height}px`);
+        // Double rAF ensures the browser has painted the explicit height before transitioning to 0
+        rafId1 = requestAnimationFrame(() => {
+          rafId2 = requestAnimationFrame(() => setMaxHeight("0px"));
+        });
+      } else {
+        setMaxHeight("0px");
+      }
+    }
+
+    return () => {
+      if (rafId1 !== undefined) cancelAnimationFrame(rafId1);
+      if (rafId2 !== undefined) cancelAnimationFrame(rafId2);
+      if (timer !== undefined) clearTimeout(timer);
+    };
+  }, [isOpen]);
+
+  return (
+    <div
+      ref={contentRef}
+      data-collapsed={!isOpen}
+      style={{
+        maxHeight,
+        overflow,
+        transition: `max-height ${COLLAPSE_TRANSITION_CSS} ease-in-out`,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// =============================================================================
 // Card Components
 // =============================================================================
 
 function ToolCard({ tool }: { tool: McpTool }): React.ReactElement {
+  const [isExpanded, setIsExpanded] = useState(false);
   const hasUI = hasToolUI(tool);
 
   return (
     <div style={localStyles.card}>
-      <div style={localStyles.cardHeader}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+      <div
+        style={localStyles.cardHeaderClickable}
+        onClick={() => setIsExpanded((prev) => !prev)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setIsExpanded((prev) => !prev);
+          }
+        }}
+        tabIndex={0}
+        role="button"
+        aria-expanded={isExpanded}
+        data-testid={`tool-card-header-${tool.name}`}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
+          <span style={localStyles.expandIndicator}>{isExpanded ? "▼" : "▶"}</span>
           <span style={localStyles.cardName}>{tool.name}</span>
           {hasUI && <span style={localStyles.widgetBadge}>Widget</span>}
         </div>
-        <CopyButton data={tool} />
       </div>
-      {tool.description && <div style={localStyles.cardDescription}>{tool.description}</div>}
-      {tool.inputSchema?.properties && (
-        <SchemaProperties
-          properties={tool.inputSchema.properties}
-          required={tool.inputSchema.required}
-        />
-      )}
-      {tool.outputSchema?.properties && (
-        <div style={localStyles.schemaSection}>
-          <div style={localStyles.schemaSectionTitle}>Output</div>
-          {Object.entries(tool.outputSchema.properties).map(([name, prop], index, arr) => (
-            <div
-              key={name}
-              style={{
-                ...localStyles.schemaItem,
-                ...(index === arr.length - 1 ? localStyles.schemaItemLast : {}),
-              }}
-            >
-              <div style={localStyles.schemaItemHeader}>
-                <span style={localStyles.schemaName}>{name}</span>
-                <span style={localStyles.schemaType}>{formatType(prop)}</span>
+      <AnimatedCollapse isOpen={isExpanded}>
+        {tool.description && <div style={localStyles.cardDescription}>{tool.description}</div>}
+        {tool.inputSchema?.properties && (
+          <SchemaProperties
+            properties={tool.inputSchema.properties}
+            required={tool.inputSchema.required}
+          />
+        )}
+        {tool.outputSchema?.properties && (
+          <div style={localStyles.schemaSection}>
+            <div style={localStyles.schemaSectionTitle}>Output</div>
+            {Object.entries(tool.outputSchema.properties).map(([name, prop], index, arr) => (
+              <div
+                key={name}
+                style={{
+                  ...localStyles.schemaItem,
+                  ...(index === arr.length - 1 ? localStyles.schemaItemLast : {}),
+                }}
+              >
+                <div style={localStyles.schemaItemHeader}>
+                  <span style={localStyles.schemaName}>{name}</span>
+                  <span style={localStyles.schemaType}>{formatType(prop)}</span>
+                </div>
+                {prop.description && <div style={localStyles.schemaDesc}>{prop.description}</div>}
               </div>
-              {prop.description && <div style={localStyles.schemaDesc}>{prop.description}</div>}
-            </div>
-          ))}
+            ))}
+          </div>
+        )}
+        <MetadataSection
+          title="Annotations"
+          data={tool.annotations as Record<string, unknown> | undefined}
+        />
+        <MetadataSection title="Metadata" data={tool._meta} />
+        <div style={{ marginTop: "0.5rem" }}>
+          <CopyButton data={tool} />
         </div>
-      )}
-      <MetadataSection
-        title="Annotations"
-        data={tool.annotations as Record<string, unknown> | undefined}
-      />
-      <MetadataSection title="Metadata" data={tool._meta} />
+      </AnimatedCollapse>
     </div>
   );
 }
 
 function ResourceCard({ resource }: { resource: McpResource }): React.ReactElement {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   return (
     <div style={localStyles.card}>
-      <div style={localStyles.cardHeader}>
-        <span style={localStyles.cardName}>{resource.name}</span>
-        <CopyButton data={resource} />
+      <div
+        style={localStyles.cardHeaderClickable}
+        onClick={() => setIsExpanded((prev) => !prev)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setIsExpanded((prev) => !prev);
+          }
+        }}
+        tabIndex={0}
+        role="button"
+        aria-expanded={isExpanded}
+        data-testid={`resource-card-header-${resource.name}`}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
+          <span style={localStyles.expandIndicator}>{isExpanded ? "▼" : "▶"}</span>
+          <span style={localStyles.cardName}>{resource.name}</span>
+        </div>
       </div>
-      <div style={localStyles.resourceUri}>{resource.uri}</div>
-      {resource.description && (
-        <div style={localStyles.cardDescription}>{resource.description}</div>
-      )}
-      {resource.mimeType && <span style={localStyles.resourceMimeType}>{resource.mimeType}</span>}
-      <MetadataSection
-        title="Annotations"
-        data={resource.annotations as Record<string, unknown> | undefined}
-      />
-      <MetadataSection title="Metadata" data={resource._meta} />
+      <AnimatedCollapse isOpen={isExpanded}>
+        <div style={localStyles.resourceUri}>{resource.uri}</div>
+        {resource.description && (
+          <div style={localStyles.cardDescription}>{resource.description}</div>
+        )}
+        {resource.mimeType && <span style={localStyles.resourceMimeType}>{resource.mimeType}</span>}
+        <MetadataSection
+          title="Annotations"
+          data={resource.annotations as Record<string, unknown> | undefined}
+        />
+        <MetadataSection title="Metadata" data={resource._meta} />
+        <div style={{ marginTop: "0.5rem" }}>
+          <CopyButton data={resource} />
+        </div>
+      </AnimatedCollapse>
     </div>
   );
 }
 
 function PromptCard({ prompt }: { prompt: McpPrompt }): React.ReactElement {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   return (
     <div style={localStyles.card}>
-      <div style={localStyles.cardHeader}>
-        <span style={localStyles.cardName}>{prompt.name}</span>
-        <CopyButton data={prompt} />
+      <div
+        style={localStyles.cardHeaderClickable}
+        onClick={() => setIsExpanded((prev) => !prev)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setIsExpanded((prev) => !prev);
+          }
+        }}
+        tabIndex={0}
+        role="button"
+        aria-expanded={isExpanded}
+        data-testid={`prompt-card-header-${prompt.name}`}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
+          <span style={localStyles.expandIndicator}>{isExpanded ? "▼" : "▶"}</span>
+          <span style={localStyles.cardName}>{prompt.name}</span>
+        </div>
       </div>
-      {prompt.description && <div style={localStyles.cardDescription}>{prompt.description}</div>}
-      {prompt.arguments && prompt.arguments.length > 0 && (
-        <PromptArguments args={prompt.arguments} />
-      )}
-      <MetadataSection title="Metadata" data={prompt._meta} />
+      <AnimatedCollapse isOpen={isExpanded}>
+        {prompt.description && <div style={localStyles.cardDescription}>{prompt.description}</div>}
+        {prompt.arguments && prompt.arguments.length > 0 && (
+          <PromptArguments args={prompt.arguments} />
+        )}
+        <MetadataSection title="Metadata" data={prompt._meta} />
+        <div style={{ marginTop: "0.5rem" }}>
+          <CopyButton data={prompt} />
+        </div>
+      </AnimatedCollapse>
     </div>
   );
 }
