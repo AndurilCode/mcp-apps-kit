@@ -616,18 +616,28 @@ function AnimatedCollapse({
 }): React.ReactElement {
   const contentRef = useRef<HTMLDivElement>(null);
   const [maxHeight, setMaxHeight] = useState<string>(isOpen ? "none" : "0px");
+  const [overflow, setOverflow] = useState<string>(isOpen ? "visible" : "hidden");
 
   useEffect(() => {
     const el = contentRef.current;
     if (!el) return;
     if (isOpen) {
-      // Measure content and animate to its height, then switch to 'none'
-      const height = el.scrollHeight;
-      setMaxHeight(height > 0 ? `${height}px` : "none");
-      const timer = setTimeout(() => setMaxHeight("none"), 250);
+      // Keep overflow hidden during the expand transition
+      setOverflow("hidden");
+      // Measure content and animate from 0 to its height
+      requestAnimationFrame(() => {
+        const height = el.scrollHeight;
+        setMaxHeight(height > 0 ? `${height}px` : "none");
+      });
+      // After transition completes, switch to none/visible so content can grow
+      const timer = setTimeout(() => {
+        setMaxHeight("none");
+        setOverflow("visible");
+      }, 250);
       return () => clearTimeout(timer);
     } else {
-      // Snap to current height first, then animate to 0 on next frame
+      // Snap to current measured height, keep overflow hidden
+      setOverflow("hidden");
       const height = el.scrollHeight;
       if (height > 0) {
         setMaxHeight(`${height}px`);
@@ -647,7 +657,7 @@ function AnimatedCollapse({
       data-collapsed={!isOpen}
       style={{
         maxHeight,
-        overflow: isOpen ? undefined : "hidden",
+        overflow,
         transition: "max-height 0.2s ease-in-out",
       }}
     >
