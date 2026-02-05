@@ -83,10 +83,10 @@ export const styles: Record<string, CSSProperties> = {
   },
 
   toolbarBtnActive: {
-    color: "#20b2aa",
+    color: "#ffffff",
     backgroundColor: "#111111",
-    borderColor: "#20b2aa",
-    boxShadow: "0 0 6px rgba(32, 178, 170, 0.4)",
+    borderColor: "#ffffff",
+    boxShadow: "0 0 6px rgba(255, 255, 255, 0.4)",
   },
 
   title: {
@@ -153,10 +153,10 @@ export const styles: Record<string, CSSProperties> = {
 
   // Note: The "snakeBorder" keyframes are defined in keyframes.css (imported in main.tsx)
   statusWrapperStreaming: {
-    background: "linear-gradient(90deg, #20b2aa, #00d4ff, #20b2aa)",
+    background: "linear-gradient(90deg, #ffffff, rgba(255, 255, 255, 0.5), #ffffff)",
     backgroundSize: "200% 100%",
     animation: "snakeBorder 2s linear infinite",
-    boxShadow: "0 0 12px rgba(32, 178, 170, 0.4), 0 0 24px rgba(32, 178, 170, 0.2)",
+    boxShadow: "0 0 12px rgba(255, 255, 255, 0.4), 0 0 24px rgba(255, 255, 255, 0.2)",
   },
 
   statusInner: {
@@ -281,8 +281,8 @@ export const styles: Record<string, CSSProperties> = {
     transform: "translateX(-50%)",
     fontFamily: "inherit",
     backgroundColor: "rgba(0, 0, 0, 0.6)",
-    border: "1px solid #20b2aa",
-    color: "#20b2aa",
+    border: "1px solid #ffffff",
+    color: "#ffffff",
     padding: "0.2rem 0.6rem",
     borderRadius: "999px",
     fontSize: "0.625rem",
@@ -308,7 +308,7 @@ export const styles: Record<string, CSSProperties> = {
     height: "56px",
     marginBottom: "1.25rem",
     opacity: 0.4,
-    color: "#20b2aa",
+    color: "#ffffff",
   },
 
   placeholderTitle: {
@@ -331,14 +331,16 @@ export const styles: Record<string, CSSProperties> = {
   // Resize Handle
   resizeHandle: {
     height: "6px",
-    backgroundColor: "#2d2f2f",
+    background:
+      "linear-gradient(to bottom, transparent 2px, #2d2f2f 2px, #2d2f2f 4px, transparent 4px)",
     cursor: "ns-resize",
     flexShrink: 0,
-    transition: "background-color 0.15s ease, height 0.25s ease, opacity 0.2s ease",
+    transition: "background 0.15s ease, height 0.25s ease, opacity 0.2s ease",
   },
 
   resizeHandleActive: {
-    backgroundColor: "#20b2aa",
+    background:
+      "linear-gradient(to bottom, transparent 2px, #ffffff 2px, #ffffff 4px, transparent 4px)",
   },
 
   resizeHandleHidden: {
@@ -574,7 +576,7 @@ export const styles: Record<string, CSSProperties> = {
   globalsSectionTitle: {
     fontSize: "0.6875rem",
     fontWeight: 600,
-    color: "#20b2aa",
+    color: "#ffffff",
     textTransform: "uppercase",
     letterSpacing: "0.05em",
     marginBottom: "0.5rem",
@@ -627,9 +629,9 @@ export const styles: Record<string, CSSProperties> = {
   },
 
   viewModeBtnActive: {
-    backgroundColor: "rgba(32, 178, 170, 0.15)",
-    borderColor: "#20b2aa",
-    color: "#20b2aa",
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    borderColor: "#ffffff",
+    color: "#ffffff",
   },
 
   // Split View
@@ -939,13 +941,15 @@ export const styles: Record<string, CSSProperties> = {
   rightPanelResizeHandle: {
     width: "6px",
     cursor: "ew-resize",
-    backgroundColor: "#2d2f2f",
-    transition: "background-color 0.15s ease",
+    background:
+      "linear-gradient(to right, transparent 2px, #2d2f2f 2px, #2d2f2f 4px, transparent 4px)",
+    transition: "background 0.15s ease",
     flexShrink: 0,
   },
 
   rightPanelResizeHandleActive: {
-    backgroundColor: "#20b2aa",
+    background:
+      "linear-gradient(to right, transparent 2px, #ffffff 2px, #ffffff 4px, transparent 4px)",
   },
 
   rightPanelHeader: {
@@ -979,9 +983,9 @@ export const styles: Record<string, CSSProperties> = {
   },
 
   rightPanelTabActive: {
-    backgroundColor: "rgba(32, 178, 170, 0.15)",
-    borderColor: "#20b2aa",
-    color: "#20b2aa",
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    borderColor: "#ffffff",
+    color: "#ffffff",
   },
 
   rightPanelTabCount: {
@@ -992,7 +996,7 @@ export const styles: Record<string, CSSProperties> = {
   },
 
   rightPanelTabCountActive: {
-    backgroundColor: "rgba(32, 178, 170, 0.2)",
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
   },
 
   rightPanelActions: {
@@ -1166,7 +1170,7 @@ export const styles: Record<string, CSSProperties> = {
   // ===========================================================================
 
   reasoningContainer: {
-    padding: "0.375rem 0.5rem 0.25rem 1.5rem",
+    padding: "0.25rem 0.5rem",
     borderTop: "1px solid rgba(255, 255, 255, 0.04)",
   },
 
@@ -1190,6 +1194,7 @@ export const styles: Record<string, CSSProperties> = {
   },
 
   reasoningText: {
+    fontFamily: FONT_SANS,
     fontSize: "0.6875rem",
     color: "#b0b0b0",
     lineHeight: 1.5,
