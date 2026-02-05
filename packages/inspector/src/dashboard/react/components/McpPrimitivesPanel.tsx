@@ -189,11 +189,30 @@ const localStyles: Record<string, React.CSSProperties> = {
     padding: "0.75rem",
     marginBottom: "0.5rem",
   },
+  cardCollapsed: {
+    padding: "0.375rem 0.75rem",
+  },
   cardHeader: {
     display: "flex",
     alignItems: "flex-start",
     justifyContent: "space-between",
     marginBottom: "0.5rem",
+  },
+  cardHeaderClickable: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    cursor: "pointer",
+    userSelect: "none" as const,
+    gap: "0.5rem",
+  },
+  expandIndicator: {
+    fontSize: "0.5rem",
+    color: "#6b7280",
+    flexShrink: 0,
+    width: "0.75rem",
+    textAlign: "center" as const,
+    transition: "color 0.15s ease",
   },
   cardName: {
     fontSize: "0.8125rem",
@@ -590,86 +609,150 @@ function MetadataSection({
 // =============================================================================
 
 function ToolCard({ tool }: { tool: McpTool }): React.ReactElement {
+  const [isExpanded, setIsExpanded] = useState(false);
   const hasUI = hasToolUI(tool);
 
   return (
-    <div style={localStyles.card}>
-      <div style={localStyles.cardHeader}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+    <div
+      style={isExpanded ? localStyles.card : { ...localStyles.card, ...localStyles.cardCollapsed }}
+    >
+      <div
+        style={localStyles.cardHeaderClickable}
+        onClick={() => setIsExpanded((prev) => !prev)}
+        role="button"
+        aria-expanded={isExpanded}
+        data-testid={`tool-card-header-${tool.name}`}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
+          <span style={localStyles.expandIndicator}>{isExpanded ? "▼" : "▶"}</span>
           <span style={localStyles.cardName}>{tool.name}</span>
           {hasUI && <span style={localStyles.widgetBadge}>Widget</span>}
         </div>
-        <CopyButton data={tool} />
+        {isExpanded && (
+          <div onClick={(e) => e.stopPropagation()}>
+            <CopyButton data={tool} />
+          </div>
+        )}
       </div>
-      {tool.description && <div style={localStyles.cardDescription}>{tool.description}</div>}
-      {tool.inputSchema?.properties && (
-        <SchemaProperties
-          properties={tool.inputSchema.properties}
-          required={tool.inputSchema.required}
-        />
-      )}
-      {tool.outputSchema?.properties && (
-        <div style={localStyles.schemaSection}>
-          <div style={localStyles.schemaSectionTitle}>Output</div>
-          {Object.entries(tool.outputSchema.properties).map(([name, prop], index, arr) => (
-            <div
-              key={name}
-              style={{
-                ...localStyles.schemaItem,
-                ...(index === arr.length - 1 ? localStyles.schemaItemLast : {}),
-              }}
-            >
-              <div style={localStyles.schemaItemHeader}>
-                <span style={localStyles.schemaName}>{name}</span>
-                <span style={localStyles.schemaType}>{formatType(prop)}</span>
-              </div>
-              {prop.description && <div style={localStyles.schemaDesc}>{prop.description}</div>}
+      {isExpanded && (
+        <>
+          {tool.description && <div style={localStyles.cardDescription}>{tool.description}</div>}
+          {tool.inputSchema?.properties && (
+            <SchemaProperties
+              properties={tool.inputSchema.properties}
+              required={tool.inputSchema.required}
+            />
+          )}
+          {tool.outputSchema?.properties && (
+            <div style={localStyles.schemaSection}>
+              <div style={localStyles.schemaSectionTitle}>Output</div>
+              {Object.entries(tool.outputSchema.properties).map(([name, prop], index, arr) => (
+                <div
+                  key={name}
+                  style={{
+                    ...localStyles.schemaItem,
+                    ...(index === arr.length - 1 ? localStyles.schemaItemLast : {}),
+                  }}
+                >
+                  <div style={localStyles.schemaItemHeader}>
+                    <span style={localStyles.schemaName}>{name}</span>
+                    <span style={localStyles.schemaType}>{formatType(prop)}</span>
+                  </div>
+                  {prop.description && <div style={localStyles.schemaDesc}>{prop.description}</div>}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+          <MetadataSection
+            title="Annotations"
+            data={tool.annotations as Record<string, unknown> | undefined}
+          />
+          <MetadataSection title="Metadata" data={tool._meta} />
+        </>
       )}
-      <MetadataSection
-        title="Annotations"
-        data={tool.annotations as Record<string, unknown> | undefined}
-      />
-      <MetadataSection title="Metadata" data={tool._meta} />
     </div>
   );
 }
 
 function ResourceCard({ resource }: { resource: McpResource }): React.ReactElement {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   return (
-    <div style={localStyles.card}>
-      <div style={localStyles.cardHeader}>
-        <span style={localStyles.cardName}>{resource.name}</span>
-        <CopyButton data={resource} />
+    <div
+      style={isExpanded ? localStyles.card : { ...localStyles.card, ...localStyles.cardCollapsed }}
+    >
+      <div
+        style={localStyles.cardHeaderClickable}
+        onClick={() => setIsExpanded((prev) => !prev)}
+        role="button"
+        aria-expanded={isExpanded}
+        data-testid={`resource-card-header-${resource.name}`}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
+          <span style={localStyles.expandIndicator}>{isExpanded ? "▼" : "▶"}</span>
+          <span style={localStyles.cardName}>{resource.name}</span>
+        </div>
+        {isExpanded && (
+          <div onClick={(e) => e.stopPropagation()}>
+            <CopyButton data={resource} />
+          </div>
+        )}
       </div>
-      <div style={localStyles.resourceUri}>{resource.uri}</div>
-      {resource.description && (
-        <div style={localStyles.cardDescription}>{resource.description}</div>
+      {isExpanded && (
+        <>
+          <div style={localStyles.resourceUri}>{resource.uri}</div>
+          {resource.description && (
+            <div style={localStyles.cardDescription}>{resource.description}</div>
+          )}
+          {resource.mimeType && (
+            <span style={localStyles.resourceMimeType}>{resource.mimeType}</span>
+          )}
+          <MetadataSection
+            title="Annotations"
+            data={resource.annotations as Record<string, unknown> | undefined}
+          />
+          <MetadataSection title="Metadata" data={resource._meta} />
+        </>
       )}
-      {resource.mimeType && <span style={localStyles.resourceMimeType}>{resource.mimeType}</span>}
-      <MetadataSection
-        title="Annotations"
-        data={resource.annotations as Record<string, unknown> | undefined}
-      />
-      <MetadataSection title="Metadata" data={resource._meta} />
     </div>
   );
 }
 
 function PromptCard({ prompt }: { prompt: McpPrompt }): React.ReactElement {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   return (
-    <div style={localStyles.card}>
-      <div style={localStyles.cardHeader}>
-        <span style={localStyles.cardName}>{prompt.name}</span>
-        <CopyButton data={prompt} />
+    <div
+      style={isExpanded ? localStyles.card : { ...localStyles.card, ...localStyles.cardCollapsed }}
+    >
+      <div
+        style={localStyles.cardHeaderClickable}
+        onClick={() => setIsExpanded((prev) => !prev)}
+        role="button"
+        aria-expanded={isExpanded}
+        data-testid={`prompt-card-header-${prompt.name}`}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
+          <span style={localStyles.expandIndicator}>{isExpanded ? "▼" : "▶"}</span>
+          <span style={localStyles.cardName}>{prompt.name}</span>
+        </div>
+        {isExpanded && (
+          <div onClick={(e) => e.stopPropagation()}>
+            <CopyButton data={prompt} />
+          </div>
+        )}
       </div>
-      {prompt.description && <div style={localStyles.cardDescription}>{prompt.description}</div>}
-      {prompt.arguments && prompt.arguments.length > 0 && (
-        <PromptArguments args={prompt.arguments} />
+      {isExpanded && (
+        <>
+          {prompt.description && (
+            <div style={localStyles.cardDescription}>{prompt.description}</div>
+          )}
+          {prompt.arguments && prompt.arguments.length > 0 && (
+            <PromptArguments args={prompt.arguments} />
+          )}
+          <MetadataSection title="Metadata" data={prompt._meta} />
+        </>
       )}
-      <MetadataSection title="Metadata" data={prompt._meta} />
     </div>
   );
 }
