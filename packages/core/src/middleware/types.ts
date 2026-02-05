@@ -162,7 +162,7 @@ export function createTypedMiddleware<TState extends Record<string, unknown>>(
  */
 export function composeMiddleware(middleware: Middleware[]): Middleware {
   return (async (context, next) => {
-    const dispatch = async (currentIndex: number): Promise<unknown> => {
+    const dispatch = async (currentIndex: number): Promise<void> => {
       if (currentIndex < middleware.length) {
         const fn = middleware[currentIndex];
         if (fn) {
@@ -175,15 +175,14 @@ export function composeMiddleware(middleware: Middleware[]): Middleware {
             nextCalled = true;
             await dispatch(currentIndex + 1);
           };
-          // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
-          return await fn(context, guardedNext);
+          await fn(context, guardedNext);
+          return;
         }
       }
-      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
-      return await next();
+      await next();
     };
 
-    return await dispatch(0);
+    await dispatch(0);
   }) as Middleware;
 }
 
@@ -203,8 +202,7 @@ export function createErrorHandler(
 ): Middleware {
   return (async (context, next) => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
-      return await next();
+      await next();
     } catch (error) {
       await handler(error as Error, context);
       throw error; // Re-throw unless handler wants to suppress
@@ -225,11 +223,9 @@ export function createConditionalMiddleware(
 ): Middleware {
   return (async (context, next) => {
     if (condition(context)) {
-      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
-      return await middleware(context, next);
+      await middleware(context, next);
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
-      return await next();
+      await next();
     }
   }) as Middleware;
 }
@@ -251,8 +247,7 @@ export function createTimeoutMiddleware(timeoutMs: number): Middleware {
     });
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
-      return await Promise.race([next(), timeoutPromise]);
+      await Promise.race([next(), timeoutPromise]);
     } finally {
       if (timerId !== undefined) {
         clearTimeout(timerId);
