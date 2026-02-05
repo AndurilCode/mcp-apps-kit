@@ -54,6 +54,24 @@ function findCardHeaders(): HTMLElement[] {
   return Array.from(container.querySelectorAll('[role="button"][aria-expanded]')) as HTMLElement[];
 }
 
+/**
+ * Find the AnimatedCollapse wrapper for a card (the div with overflow:hidden + max-height transition).
+ * It's the sibling after the card header div.
+ */
+function findCollapseWrapper(headerTestId: string): HTMLElement | null {
+  const header = findByTestId(headerTestId);
+  if (!header) return null;
+  // The wrapper is the next sibling of the header div
+  return header.nextElementSibling as HTMLElement | null;
+}
+
+/** Check if an AnimatedCollapse wrapper is visually collapsed */
+function isCollapsed(headerTestId: string): boolean {
+  const wrapper = findCollapseWrapper(headerTestId);
+  if (!wrapper) return true;
+  return wrapper.getAttribute("data-collapsed") === "true";
+}
+
 // =============================================================================
 // TEST DATA FACTORIES
 // =============================================================================
@@ -275,7 +293,10 @@ describe("AC-3: Collapsed state hides detailed content", () => {
     });
     mount(createElement(McpPrimitivesPanel, props));
 
-    expect(container.textContent).not.toContain("UNIQUE_TOOL_DESC_12345");
+    // Content is in DOM but visually hidden via AnimatedCollapse (max-height: 0, overflow: hidden)
+    expect(isCollapsed("tool-card-header-test_tool")).toBe(true);
+    const wrapper = findCollapseWrapper("tool-card-header-test_tool")!;
+    expect(wrapper.style.overflow).toBe("hidden");
   });
 
   it("collapsed ToolCard hides parameters", async () => {
@@ -284,8 +305,7 @@ describe("AC-3: Collapsed state hides detailed content", () => {
     const props = defaultPanelProps({ tools: [makeTool()] });
     mount(createElement(McpPrimitivesPanel, props));
 
-    expect(container.textContent).not.toContain("Parameters");
-    expect(container.textContent).not.toContain("The search query");
+    expect(isCollapsed("tool-card-header-test_tool")).toBe(true);
   });
 
   it("collapsed ToolCard hides output schema", async () => {
@@ -294,8 +314,7 @@ describe("AC-3: Collapsed state hides detailed content", () => {
     const props = defaultPanelProps({ tools: [makeToolWithOutput()] });
     mount(createElement(McpPrimitivesPanel, props));
 
-    expect(container.textContent).not.toContain("Output");
-    expect(container.textContent).not.toContain("The result");
+    expect(isCollapsed("tool-card-header-output_tool")).toBe(true);
   });
 
   it("collapsed ToolCard hides annotations and metadata", async () => {
@@ -304,9 +323,7 @@ describe("AC-3: Collapsed state hides detailed content", () => {
     const props = defaultPanelProps({ tools: [makeToolWithOutput()] });
     mount(createElement(McpPrimitivesPanel, props));
 
-    expect(container.textContent).not.toContain("Annotations");
-    expect(container.textContent).not.toContain("readOnlyHint");
-    expect(container.textContent).not.toContain("Metadata");
+    expect(isCollapsed("tool-card-header-output_tool")).toBe(true);
   });
 
   it("collapsed ToolCard hides Copy JSON button", async () => {
@@ -339,9 +356,7 @@ describe("AC-3: Collapsed state hides detailed content", () => {
     const resourcesTab = tabButtons.find((b) => b.textContent?.includes("Resources"));
     click(resourcesTab!);
 
-    expect(container.textContent).not.toContain("UNIQUE_RES_DESC_67890");
-    expect(container.textContent).not.toContain("file:///hidden/path.txt");
-    expect(container.textContent).not.toContain("application/json");
+    expect(isCollapsed("resource-card-header-test_resource")).toBe(true);
   });
 
   it("collapsed PromptCard hides description and arguments", async () => {
@@ -356,9 +371,7 @@ describe("AC-3: Collapsed state hides detailed content", () => {
     const promptsTab = tabButtons.find((b) => b.textContent?.includes("Prompts"));
     click(promptsTab!);
 
-    expect(container.textContent).not.toContain("UNIQUE_PROMPT_DESC_11111");
-    expect(container.textContent).not.toContain("Arguments");
-    expect(container.textContent).not.toContain("The topic to discuss");
+    expect(isCollapsed("prompt-card-header-test_prompt")).toBe(true);
   });
 });
 
@@ -377,12 +390,13 @@ describe("AC-4: Click header toggles expand/collapse", () => {
 
     const header = findByTestId("tool-card-header-test_tool")!;
     expect(header.getAttribute("aria-expanded")).toBe("false");
-    expect(container.textContent).not.toContain("VISIBLE_AFTER_EXPAND");
+    expect(isCollapsed("tool-card-header-test_tool")).toBe(true);
 
     // Click to expand
     click(header);
 
     expect(header.getAttribute("aria-expanded")).toBe("true");
+    expect(isCollapsed("tool-card-header-test_tool")).toBe(false);
     expect(container.textContent).toContain("VISIBLE_AFTER_EXPAND");
   });
 
@@ -404,7 +418,9 @@ describe("AC-4: Click header toggles expand/collapse", () => {
     // Collapse
     click(header);
     expect(header.getAttribute("aria-expanded")).toBe("false");
-    expect(container.textContent).not.toContain("NOW_YOU_SEE_ME");
+    // After collapsing, the AnimatedCollapse wrapper triggers max-height: 0
+    const wrapper = findCollapseWrapper("tool-card-header-test_tool")!;
+    expect(wrapper.style.overflow).toBe("hidden");
   });
 
   it("expanded card shows ▼ indicator, collapsed shows ▶", async () => {
@@ -470,10 +486,11 @@ describe("AC-4: Click header toggles expand/collapse", () => {
 
     const header = findByTestId("resource-card-header-test_resource")!;
     expect(header.getAttribute("aria-expanded")).toBe("false");
-    expect(container.textContent).not.toContain("RES_TOGGLE_TEST");
+    expect(isCollapsed("resource-card-header-test_resource")).toBe(true);
 
     click(header);
     expect(header.getAttribute("aria-expanded")).toBe("true");
+    expect(isCollapsed("resource-card-header-test_resource")).toBe(false);
     expect(container.textContent).toContain("RES_TOGGLE_TEST");
     expect(container.textContent).toContain("file:///test/path.txt");
   });
@@ -615,10 +632,10 @@ describe("Edge cases", () => {
     expect(headerB.getAttribute("aria-expanded")).toBe("true");
     expect(headerC.getAttribute("aria-expanded")).toBe("false");
 
-    // B's content visible, A and C hidden
-    expect(container.textContent).toContain("DESC_B");
-    expect(container.textContent).not.toContain("DESC_A");
-    expect(container.textContent).not.toContain("DESC_C");
+    // B expanded, A and C collapsed
+    expect(isCollapsed("tool-card-header-tool_b")).toBe(false);
+    expect(isCollapsed("tool-card-header-tool_a")).toBe(true);
+    expect(isCollapsed("tool-card-header-tool_c")).toBe(true);
 
     // Expand A too
     click(headerA);
@@ -849,7 +866,8 @@ describe("Edge cases: interaction details", () => {
     click(header);
 
     expect(header.getAttribute("aria-expanded")).toBe("false");
-    expect(container.textContent).not.toContain("RAPID_TEST");
+    // Content hidden via AnimatedCollapse
+    expect(isCollapsed("tool-card-header-test_tool")).toBe(true);
   });
 
   it("expanded ResourceCard shows annotations and metadata when present", async () => {
@@ -866,15 +884,15 @@ describe("Edge cases: interaction details", () => {
     const resourcesTab = tabButtons.find((b) => b.textContent?.includes("Resources"));
     click(resourcesTab!);
 
-    // Collapsed: hidden
-    expect(container.textContent).not.toContain("Annotations");
-    expect(container.textContent).not.toContain("Metadata");
+    // Collapsed: hidden via AnimatedCollapse
+    expect(isCollapsed("resource-card-header-test_resource")).toBe(true);
 
     // Expand
     const header = findByTestId("resource-card-header-test_resource")!;
     click(header);
 
     // Expanded: visible
+    expect(isCollapsed("resource-card-header-test_resource")).toBe(false);
     expect(container.textContent).toContain("Annotations");
     expect(container.textContent).toContain("Metadata");
     expect(container.textContent).toContain("filesystem");
@@ -893,15 +911,15 @@ describe("Edge cases: interaction details", () => {
     const promptsTab = tabButtons.find((b) => b.textContent?.includes("Prompts"));
     click(promptsTab!);
 
-    // Collapsed: hidden
-    expect(container.textContent).not.toContain("Metadata");
-    expect(container.textContent).not.toContain("test-author");
+    // Collapsed: hidden via AnimatedCollapse
+    expect(isCollapsed("prompt-card-header-test_prompt")).toBe(true);
 
     // Expand
     const header = findByTestId("prompt-card-header-test_prompt")!;
     click(header);
 
     // Expanded: visible
+    expect(isCollapsed("prompt-card-header-test_prompt")).toBe(false);
     expect(container.textContent).toContain("Metadata");
     expect(container.textContent).toContain("test-author");
     expect(container.textContent).toContain("2.0");
@@ -919,9 +937,8 @@ describe("Edge cases: interaction details", () => {
     const props = defaultPanelProps({ tools: [tool] });
     mount(createElement(McpPrimitivesPanel, props));
 
-    // Collapsed: no annotations
-    expect(container.textContent).not.toContain("Annotations");
-    expect(container.textContent).not.toContain("idempotentHint");
+    // Collapsed: hidden via AnimatedCollapse
+    expect(isCollapsed("tool-card-header-annotated_only")).toBe(true);
 
     // Expand
     const header = findByTestId("tool-card-header-annotated_only")!;

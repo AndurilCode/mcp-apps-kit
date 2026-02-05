@@ -5,7 +5,7 @@
  * Each primitive type is shown as a list of cards with schema details.
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import type {
   McpTool,
   McpResource,
@@ -215,7 +215,7 @@ const localStyles: Record<string, React.CSSProperties> = {
     transition: "color 0.15s ease",
   },
   cardName: {
-    fontSize: "0.8125rem",
+    fontSize: "0.9375rem",
     fontWeight: 600,
     color: "#e8e8e8",
     fontFamily: FONT_SANS,
@@ -605,6 +605,58 @@ function MetadataSection({
 }
 
 // =============================================================================
+// Animated Collapse
+// =============================================================================
+
+/** Smooth expand/collapse wrapper using max-height transition */
+function AnimatedCollapse({
+  isOpen,
+  children,
+}: {
+  isOpen: boolean;
+  children: React.ReactNode;
+}): React.ReactElement {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [maxHeight, setMaxHeight] = useState<string>(isOpen ? "none" : "0px");
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    if (isOpen) {
+      // Measure content and animate to its height, then switch to 'none'
+      const height = el.scrollHeight;
+      setMaxHeight(height > 0 ? `${height}px` : "none");
+      const timer = setTimeout(() => setMaxHeight("none"), 250);
+      return () => clearTimeout(timer);
+    } else {
+      // Snap to current height first, then animate to 0
+      const height = el.scrollHeight;
+      if (height > 0) {
+        setMaxHeight(`${height}px`);
+        void el.offsetHeight;
+        requestAnimationFrame(() => setMaxHeight("0px"));
+      } else {
+        setMaxHeight("0px");
+      }
+    }
+  }, [isOpen]);
+
+  return (
+    <div
+      ref={contentRef}
+      data-collapsed={!isOpen}
+      style={{
+        maxHeight,
+        overflow: isOpen ? undefined : "hidden",
+        transition: "max-height 0.2s ease-in-out",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// =============================================================================
 // Card Components
 // =============================================================================
 
@@ -634,42 +686,40 @@ function ToolCard({ tool }: { tool: McpTool }): React.ReactElement {
           </div>
         )}
       </div>
-      {isExpanded && (
-        <>
-          {tool.description && <div style={localStyles.cardDescription}>{tool.description}</div>}
-          {tool.inputSchema?.properties && (
-            <SchemaProperties
-              properties={tool.inputSchema.properties}
-              required={tool.inputSchema.required}
-            />
-          )}
-          {tool.outputSchema?.properties && (
-            <div style={localStyles.schemaSection}>
-              <div style={localStyles.schemaSectionTitle}>Output</div>
-              {Object.entries(tool.outputSchema.properties).map(([name, prop], index, arr) => (
-                <div
-                  key={name}
-                  style={{
-                    ...localStyles.schemaItem,
-                    ...(index === arr.length - 1 ? localStyles.schemaItemLast : {}),
-                  }}
-                >
-                  <div style={localStyles.schemaItemHeader}>
-                    <span style={localStyles.schemaName}>{name}</span>
-                    <span style={localStyles.schemaType}>{formatType(prop)}</span>
-                  </div>
-                  {prop.description && <div style={localStyles.schemaDesc}>{prop.description}</div>}
-                </div>
-              ))}
-            </div>
-          )}
-          <MetadataSection
-            title="Annotations"
-            data={tool.annotations as Record<string, unknown> | undefined}
+      <AnimatedCollapse isOpen={isExpanded}>
+        {tool.description && <div style={localStyles.cardDescription}>{tool.description}</div>}
+        {tool.inputSchema?.properties && (
+          <SchemaProperties
+            properties={tool.inputSchema.properties}
+            required={tool.inputSchema.required}
           />
-          <MetadataSection title="Metadata" data={tool._meta} />
-        </>
-      )}
+        )}
+        {tool.outputSchema?.properties && (
+          <div style={localStyles.schemaSection}>
+            <div style={localStyles.schemaSectionTitle}>Output</div>
+            {Object.entries(tool.outputSchema.properties).map(([name, prop], index, arr) => (
+              <div
+                key={name}
+                style={{
+                  ...localStyles.schemaItem,
+                  ...(index === arr.length - 1 ? localStyles.schemaItemLast : {}),
+                }}
+              >
+                <div style={localStyles.schemaItemHeader}>
+                  <span style={localStyles.schemaName}>{name}</span>
+                  <span style={localStyles.schemaType}>{formatType(prop)}</span>
+                </div>
+                {prop.description && <div style={localStyles.schemaDesc}>{prop.description}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+        <MetadataSection
+          title="Annotations"
+          data={tool.annotations as Record<string, unknown> | undefined}
+        />
+        <MetadataSection title="Metadata" data={tool._meta} />
+      </AnimatedCollapse>
     </div>
   );
 }
@@ -698,22 +748,18 @@ function ResourceCard({ resource }: { resource: McpResource }): React.ReactEleme
           </div>
         )}
       </div>
-      {isExpanded && (
-        <>
-          <div style={localStyles.resourceUri}>{resource.uri}</div>
-          {resource.description && (
-            <div style={localStyles.cardDescription}>{resource.description}</div>
-          )}
-          {resource.mimeType && (
-            <span style={localStyles.resourceMimeType}>{resource.mimeType}</span>
-          )}
-          <MetadataSection
-            title="Annotations"
-            data={resource.annotations as Record<string, unknown> | undefined}
-          />
-          <MetadataSection title="Metadata" data={resource._meta} />
-        </>
-      )}
+      <AnimatedCollapse isOpen={isExpanded}>
+        <div style={localStyles.resourceUri}>{resource.uri}</div>
+        {resource.description && (
+          <div style={localStyles.cardDescription}>{resource.description}</div>
+        )}
+        {resource.mimeType && <span style={localStyles.resourceMimeType}>{resource.mimeType}</span>}
+        <MetadataSection
+          title="Annotations"
+          data={resource.annotations as Record<string, unknown> | undefined}
+        />
+        <MetadataSection title="Metadata" data={resource._meta} />
+      </AnimatedCollapse>
     </div>
   );
 }
@@ -742,17 +788,13 @@ function PromptCard({ prompt }: { prompt: McpPrompt }): React.ReactElement {
           </div>
         )}
       </div>
-      {isExpanded && (
-        <>
-          {prompt.description && (
-            <div style={localStyles.cardDescription}>{prompt.description}</div>
-          )}
-          {prompt.arguments && prompt.arguments.length > 0 && (
-            <PromptArguments args={prompt.arguments} />
-          )}
-          <MetadataSection title="Metadata" data={prompt._meta} />
-        </>
-      )}
+      <AnimatedCollapse isOpen={isExpanded}>
+        {prompt.description && <div style={localStyles.cardDescription}>{prompt.description}</div>}
+        {prompt.arguments && prompt.arguments.length > 0 && (
+          <PromptArguments args={prompt.arguments} />
+        )}
+        <MetadataSection title="Metadata" data={prompt._meta} />
+      </AnimatedCollapse>
     </div>
   );
 }
