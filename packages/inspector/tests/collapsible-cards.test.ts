@@ -660,3 +660,276 @@ describe("Edge cases", () => {
     expect(headers[0].getAttribute("role")).toBe("button");
   });
 });
+
+// =============================================================================
+// ADDITIONAL EDGE CASES (Polaris — coverage gaps)
+// =============================================================================
+
+describe("AC-2 supplement: card name uses sans-serif font", () => {
+  it("tool card name element has sans-serif font-family", async () => {
+    const { McpPrimitivesPanel } =
+      await import("../src/dashboard/react/components/McpPrimitivesPanel");
+    const props = defaultPanelProps({ tools: [makeTool({ name: "styled_tool" })] });
+    mount(createElement(McpPrimitivesPanel, props));
+
+    // The card name should use the sans-serif font stack
+    const header = findByTestId("tool-card-header-styled_tool")!;
+    const nameSpan = header.querySelector("span") as HTMLElement;
+    // Walk to the span that contains the tool name text
+    const nameEl = Array.from(header.querySelectorAll("span")).find(
+      (s) => s.textContent === "styled_tool"
+    ) as HTMLElement;
+    expect(nameEl).not.toBeNull();
+    expect(nameEl!.style.fontFamily).toContain("sans-serif");
+  });
+});
+
+describe("AC-3 supplement: ResourceCard & PromptCard Copy JSON visibility", () => {
+  it("collapsed ResourceCard hides Copy JSON button", async () => {
+    const { McpPrimitivesPanel } =
+      await import("../src/dashboard/react/components/McpPrimitivesPanel");
+    const props = defaultPanelProps({ resources: [makeResource()] });
+    mount(createElement(McpPrimitivesPanel, props));
+
+    const tabButtons = queryAll("button");
+    const resourcesTab = tabButtons.find((b) => b.textContent?.includes("Resources"));
+    click(resourcesTab!);
+
+    const buttons = queryAll("button");
+    const copyBtn = buttons.find((b) => b.textContent === "Copy JSON");
+    expect(copyBtn).toBeUndefined();
+  });
+
+  it("expanded ResourceCard shows Copy JSON button", async () => {
+    const { McpPrimitivesPanel } =
+      await import("../src/dashboard/react/components/McpPrimitivesPanel");
+    const props = defaultPanelProps({ resources: [makeResource()] });
+    mount(createElement(McpPrimitivesPanel, props));
+
+    const tabButtons = queryAll("button");
+    const resourcesTab = tabButtons.find((b) => b.textContent?.includes("Resources"));
+    click(resourcesTab!);
+
+    const header = findByTestId("resource-card-header-test_resource")!;
+    click(header);
+
+    const buttons = queryAll("button");
+    const copyBtn = buttons.find((b) => b.textContent === "Copy JSON");
+    expect(copyBtn).toBeDefined();
+  });
+
+  it("collapsed PromptCard hides Copy JSON button", async () => {
+    const { McpPrimitivesPanel } =
+      await import("../src/dashboard/react/components/McpPrimitivesPanel");
+    const props = defaultPanelProps({ prompts: [makePrompt()] });
+    mount(createElement(McpPrimitivesPanel, props));
+
+    const tabButtons = queryAll("button");
+    const promptsTab = tabButtons.find((b) => b.textContent?.includes("Prompts"));
+    click(promptsTab!);
+
+    const buttons = queryAll("button");
+    const copyBtn = buttons.find((b) => b.textContent === "Copy JSON");
+    expect(copyBtn).toBeUndefined();
+  });
+
+  it("expanded PromptCard shows Copy JSON button", async () => {
+    const { McpPrimitivesPanel } =
+      await import("../src/dashboard/react/components/McpPrimitivesPanel");
+    const props = defaultPanelProps({ prompts: [makePrompt()] });
+    mount(createElement(McpPrimitivesPanel, props));
+
+    const tabButtons = queryAll("button");
+    const promptsTab = tabButtons.find((b) => b.textContent?.includes("Prompts"));
+    click(promptsTab!);
+
+    const header = findByTestId("prompt-card-header-test_prompt")!;
+    click(header);
+
+    const buttons = queryAll("button");
+    const copyBtn = buttons.find((b) => b.textContent === "Copy JSON");
+    expect(copyBtn).toBeDefined();
+  });
+});
+
+describe("AC-4 supplement: reduced padding in collapsed state", () => {
+  it("collapsed card has reduced padding vs expanded card", async () => {
+    const { McpPrimitivesPanel } =
+      await import("../src/dashboard/react/components/McpPrimitivesPanel");
+    const props = defaultPanelProps({ tools: [makeTool()] });
+    mount(createElement(McpPrimitivesPanel, props));
+
+    const header = findByTestId("tool-card-header-test_tool")!;
+    const card = header.parentElement!;
+
+    // Collapsed: reduced padding (0.375rem 0.75rem)
+    const collapsedPadding = card.style.padding;
+    expect(collapsedPadding).toBe("0.375rem 0.75rem");
+
+    // Expand
+    click(header);
+
+    // Expanded: full padding (0.75rem)
+    const expandedPadding = card.style.padding;
+    expect(expandedPadding).toBe("0.75rem");
+  });
+});
+
+describe("AC-5 supplement: hasToolUI with openai/outputTemplate", () => {
+  it("shows Widget badge for tool with openai/outputTemplate", async () => {
+    const { McpPrimitivesPanel } =
+      await import("../src/dashboard/react/components/McpPrimitivesPanel");
+    const tool = makeTool({
+      name: "openai_tool",
+      _meta: { "openai/outputTemplate": "<div>{{result}}</div>" },
+    });
+    const props = defaultPanelProps({ tools: [tool] });
+    mount(createElement(McpPrimitivesPanel, props));
+
+    const header = findByTestId("tool-card-header-openai_tool")!;
+    expect(header.textContent).toContain("Widget");
+  });
+});
+
+describe("Edge cases: interaction details", () => {
+  it("CopyButton click does not collapse the card (stopPropagation)", async () => {
+    // Mock clipboard API to prevent jsdom unhandled rejection
+    const originalClipboard = navigator.clipboard;
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+      writable: true,
+      configurable: true,
+    });
+
+    try {
+      const { McpPrimitivesPanel } =
+        await import("../src/dashboard/react/components/McpPrimitivesPanel");
+      const props = defaultPanelProps({
+        tools: [makeTool({ description: "STAY_EXPANDED" })],
+      });
+      mount(createElement(McpPrimitivesPanel, props));
+
+      const header = findByTestId("tool-card-header-test_tool")!;
+      // Expand
+      click(header);
+      expect(header.getAttribute("aria-expanded")).toBe("true");
+      expect(container.textContent).toContain("STAY_EXPANDED");
+
+      // Click Copy JSON — card should stay expanded
+      const buttons = queryAll("button");
+      const copyBtn = buttons.find((b) => b.textContent === "Copy JSON")!;
+      expect(copyBtn).toBeDefined();
+      click(copyBtn);
+
+      // Card should still be expanded (stopPropagation prevents collapse)
+      expect(header.getAttribute("aria-expanded")).toBe("true");
+      expect(container.textContent).toContain("STAY_EXPANDED");
+    } finally {
+      Object.defineProperty(navigator, "clipboard", {
+        value: originalClipboard,
+        writable: true,
+        configurable: true,
+      });
+    }
+  });
+
+  it("rapid double-toggle returns to collapsed state", async () => {
+    const { McpPrimitivesPanel } =
+      await import("../src/dashboard/react/components/McpPrimitivesPanel");
+    const props = defaultPanelProps({
+      tools: [makeTool({ description: "RAPID_TEST" })],
+    });
+    mount(createElement(McpPrimitivesPanel, props));
+
+    const header = findByTestId("tool-card-header-test_tool")!;
+    expect(header.getAttribute("aria-expanded")).toBe("false");
+
+    // Rapid: expand then immediately collapse
+    click(header);
+    click(header);
+
+    expect(header.getAttribute("aria-expanded")).toBe("false");
+    expect(container.textContent).not.toContain("RAPID_TEST");
+  });
+
+  it("expanded ResourceCard shows annotations and metadata when present", async () => {
+    const { McpPrimitivesPanel } =
+      await import("../src/dashboard/react/components/McpPrimitivesPanel");
+    const resource = makeResource({
+      annotations: { audience: ["internal"] } as unknown as McpResource["annotations"],
+      _meta: { source: "filesystem" },
+    });
+    const props = defaultPanelProps({ resources: [resource] });
+    mount(createElement(McpPrimitivesPanel, props));
+
+    const tabButtons = queryAll("button");
+    const resourcesTab = tabButtons.find((b) => b.textContent?.includes("Resources"));
+    click(resourcesTab!);
+
+    // Collapsed: hidden
+    expect(container.textContent).not.toContain("Annotations");
+    expect(container.textContent).not.toContain("Metadata");
+
+    // Expand
+    const header = findByTestId("resource-card-header-test_resource")!;
+    click(header);
+
+    // Expanded: visible
+    expect(container.textContent).toContain("Annotations");
+    expect(container.textContent).toContain("Metadata");
+    expect(container.textContent).toContain("filesystem");
+  });
+
+  it("expanded PromptCard shows metadata when present", async () => {
+    const { McpPrimitivesPanel } =
+      await import("../src/dashboard/react/components/McpPrimitivesPanel");
+    const prompt = makePrompt({
+      _meta: { author: "test-author", version: "2.0" },
+    });
+    const props = defaultPanelProps({ prompts: [prompt] });
+    mount(createElement(McpPrimitivesPanel, props));
+
+    const tabButtons = queryAll("button");
+    const promptsTab = tabButtons.find((b) => b.textContent?.includes("Prompts"));
+    click(promptsTab!);
+
+    // Collapsed: hidden
+    expect(container.textContent).not.toContain("Metadata");
+    expect(container.textContent).not.toContain("test-author");
+
+    // Expand
+    const header = findByTestId("prompt-card-header-test_prompt")!;
+    click(header);
+
+    // Expanded: visible
+    expect(container.textContent).toContain("Metadata");
+    expect(container.textContent).toContain("test-author");
+    expect(container.textContent).toContain("2.0");
+  });
+
+  it("tool with only annotations (no desc/params) shows them only when expanded", async () => {
+    const { McpPrimitivesPanel } =
+      await import("../src/dashboard/react/components/McpPrimitivesPanel");
+    const tool = makeTool({
+      name: "annotated_only",
+      description: undefined,
+      inputSchema: undefined,
+      annotations: { idempotentHint: true, readOnlyHint: false },
+    });
+    const props = defaultPanelProps({ tools: [tool] });
+    mount(createElement(McpPrimitivesPanel, props));
+
+    // Collapsed: no annotations
+    expect(container.textContent).not.toContain("Annotations");
+    expect(container.textContent).not.toContain("idempotentHint");
+
+    // Expand
+    const header = findByTestId("tool-card-header-annotated_only")!;
+    click(header);
+
+    // Expanded: annotations visible
+    expect(container.textContent).toContain("Annotations");
+    expect(container.textContent).toContain("idempotentHint");
+    expect(container.textContent).toContain("readOnlyHint");
+  });
+});
