@@ -9,6 +9,8 @@ import { EventEmitter } from "node:events";
 import type { ConnectionParams } from "@mcp-apps-kit/testing";
 import { ConnectionManager } from "./connection";
 import type { ConnectOptions, ConnectionStatusOutput, InspectorServerOptions } from "./types";
+import type { OAuthState } from "./oauth/types";
+import type { AuthRequiredEvent } from "./oauth/discovery";
 
 /**
  * Event map emitted by the connection registry.
@@ -20,6 +22,8 @@ export interface ConnectionRegistryEvents {
   closed: [id: string];
   /** Emitted when a connection is activated. */
   activated: [id: string];
+  /** Forwarded from ConnectionManager when 401 auto-detection triggers. */
+  authRequired: [id: string, event: AuthRequiredEvent];
 }
 
 /**
@@ -37,6 +41,8 @@ export interface ConnectionRegistryOptions {
  */
 export interface ConnectionInfo extends ConnectionStatusOutput {
   id: string;
+  /** OAuth authentication state (present for HTTP connections with OAuth) */
+  oauth?: OAuthState;
 }
 
 /**
@@ -80,9 +86,21 @@ export class ConnectionRegistry extends EventEmitter {
       id,
     });
 
+    // Forward authRequired events from the connection manager
+    connectionManager.on("authRequired", (event: AuthRequiredEvent) => {
+      this.emit("authRequired", id, event);
+    });
+
+    // Emit "created" before connect() so listeners can set inspectorUrl
+    // (needed for OAuth callback redirect URI to use the correct port)
+    this.connections.set(id, connectionManager);
+    this.emit("created", id, connectionManager);
+
     try {
       await connectionManager.connect(params, options);
     } catch (error) {
+      // Clean up on failed connect
+      this.connections.delete(id);
       try {
         await connectionManager.disconnect();
       } catch {
@@ -90,9 +108,6 @@ export class ConnectionRegistry extends EventEmitter {
       }
       throw error;
     }
-
-    this.connections.set(id, connectionManager);
-    this.emit("created", id, connectionManager);
     this.setActive(id);
 
     return { id, connectionManager };
@@ -183,6 +198,7 @@ export class ConnectionRegistry extends EventEmitter {
   listConnections(): ConnectionInfo[] {
     return Array.from(this.connections.entries()).map(([id, connection]) => {
       const state = connection.getState();
+      const oauthState = connection.getOAuthState();
       const info: ConnectionInfo = {
         id,
         connected: state.connected,
@@ -190,6 +206,7 @@ export class ConnectionRegistry extends EventEmitter {
         serverInfo: state.serverInfo,
         historyEnabled: state.historyEnabled,
         callCount: state.callCount,
+        ...(oauthState ? { oauth: oauthState } : {}),
       };
       return info;
     });
@@ -212,6 +229,18 @@ export class ConnectionRegistry extends EventEmitter {
 
     this.activeConnectionId = id;
     this.emit("activated", id);
+  }
+
+  /**
+   * Get cached discovery results for a connection.
+   *
+   * Convenience wrapper around ConnectionManager.getDiscoveryResults().
+   *
+   * @param connectionId - Connection id to look up.
+   * @returns Discovery results or null.
+   */
+  getDiscoveryResults(connectionId: string): AuthRequiredEvent | null {
+    return this.getConnection(connectionId).getDiscoveryResults();
   }
 
   /**

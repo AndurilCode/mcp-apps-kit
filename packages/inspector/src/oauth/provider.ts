@@ -1,0 +1,635 @@
+/**
+ * OAuth Client Provider for MCP Inspector
+ *
+ * Implements the MCP SDK's OAuthClientProvider interface for use with
+ * StreamableHTTPClientTransport. Handles token persistence, PKCE state,
+ * dynamic client registration, and authorization redirect.
+ *
+ * Usage:
+ *   const provider = new InspectorOAuthProvider({ serverUrl, config, callbackPort });
+ *   const transport = new StreamableHTTPClientTransport(url, { authProvider: provider });
+ */
+
+import type {
+  OAuthClientProvider,
+  OAuthClientMetadata,
+  OAuthClientInformationMixed,
+  OAuthTokens,
+  OAuthClientConfig,
+  OAuthState,
+  OAuthStatus,
+  OAuthMetadata,
+  RegistrationMethod,
+} from "./types";
+import {
+  discoverAuthorizationServerMetadata,
+  registerClient,
+} from "@modelcontextprotocol/sdk/client/auth.js";
+import type { OAuthClientInformationFull } from "@modelcontextprotocol/sdk/shared/auth.js";
+import { TokenStore } from "./token-store";
+import type { AuthRequiredEvent } from "./discovery";
+
+/**
+ * Options for creating an InspectorOAuthProvider.
+ */
+export interface InspectorOAuthProviderOptions {
+  /** The target MCP server URL (used as key for token storage) */
+  serverUrl: string;
+
+  /** OAuth client configuration (from dashboard or CLI) */
+  config: OAuthClientConfig;
+
+  /** Port the inspector server runs on (for callback URL) */
+  callbackPort: number;
+
+  /** Hostname for the callback URL (default: "127.0.0.1") */
+  callbackHost?: string;
+
+  /** Custom token store (for testing) */
+  tokenStore?: TokenStore;
+
+  /** Enable debug logging */
+  debug?: boolean;
+
+  /** Discovery results from 401 auto-detection (enables DCR auto-registration) */
+  discoveryResults?: AuthRequiredEvent;
+}
+
+/**
+ * MCP Inspector's implementation of OAuthClientProvider.
+ *
+ * This provider:
+ * - Persists tokens to disk (XDG path) via TokenStore
+ * - Handles PKCE code verifier storage
+ * - Supports dynamic client registration (opt-in)
+ * - Redirects to authorization URL via a pending-auth callback mechanism
+ * - Tracks auth state for dashboard display
+ */
+export class InspectorOAuthProvider implements OAuthClientProvider {
+  private readonly serverUrl: string;
+  private readonly config: OAuthClientConfig;
+  private readonly tokenStore: TokenStore;
+  private readonly _debug: boolean;
+  private readonly _discoveryResults?: AuthRequiredEvent;
+
+  /** The port for constructing the redirect/callback URL */
+  private readonly callbackPort: number;
+  /** The hostname for constructing the redirect/callback URL */
+  private readonly callbackHost: string;
+
+  /** In-memory PKCE code verifier (per auth flow) */
+  private _codeVerifier: string | null = null;
+
+  /** Current auth status (for dashboard display) */
+  private _status: OAuthStatus = "unauthenticated";
+
+  /** Error message if auth failed */
+  private _errorMessage?: string;
+
+  /** Token expiry timestamp (ms since epoch) */
+  private _expiresAt?: number;
+
+  /** Whether the auth server exposes a revocation endpoint */
+  private _supportsRevocation?: boolean;
+
+  /** Cached supported scopes from auth server metadata discovery */
+  private _supportedScopes: string[] = [];
+
+  /** Callback invoked when auth status changes */
+  onStatusChange?: (state: OAuthState) => void;
+
+  /** Pending authorization URL (set by redirectToAuthorization, consumed by callback handler) */
+  private _pendingAuthUrl: URL | null = null;
+
+  /** Resolve function for pending authorization (blocks until callback completes) */
+  private _pendingAuthResolve: (() => void) | null = null;
+
+  constructor(options: InspectorOAuthProviderOptions) {
+    this.serverUrl = options.serverUrl;
+    this.config = options.config;
+    this.callbackPort = options.callbackPort;
+    this.callbackHost = options.callbackHost ?? "127.0.0.1";
+    this.tokenStore = options.tokenStore ?? new TokenStore();
+    this._debug = options.debug ?? false;
+    this._discoveryResults = options.discoveryResults;
+  }
+
+  // =========================================================================
+  // OAuthClientProvider interface
+  // =========================================================================
+
+  /**
+   * Redirect URL for the OAuth callback.
+   * Points to the inspector's /oauth/callback endpoint.
+   */
+  get redirectUrl(): URL {
+    return new URL(`http://${this.callbackHost}:${this.callbackPort}/oauth/callback`);
+  }
+
+  /**
+   * Client metadata for dynamic registration or authorization requests.
+   */
+  get clientMetadata(): OAuthClientMetadata {
+    return {
+      redirect_uris: [this.redirectUrl.toString()],
+      client_name: this.config.clientName ?? "MCP Inspector",
+      grant_types: ["authorization_code", "refresh_token"],
+      response_types: ["code"],
+      token_endpoint_auth_method: this.config.clientSecret ? "client_secret_basic" : "none",
+      ...(this.config.scopes ? { scope: this.config.scopes } : {}),
+    };
+  }
+
+  /**
+   * Load client information from persisted store, config, or DCR auto-registration.
+   *
+   * Resolution order:
+   * 1. Persisted client info (from previous dynamic registration)
+   * 2. Config-provided client ID (manual / CLI)
+   * 3. Auto-register via DCR if discovery results indicate support
+   * 4. undefined (no client information available)
+   */
+  async clientInformation(): Promise<OAuthClientInformationMixed | undefined> {
+    // Check persisted client info first (from dynamic registration)
+    const persisted = await this.tokenStore.load(this.serverUrl);
+    if (persisted?.clientInformation) {
+      return persisted.clientInformation;
+    }
+
+    // Fall back to config-provided client ID
+    if (this.config.clientId) {
+      return {
+        client_id: this.config.clientId,
+        ...(this.config.clientSecret ? { client_secret: this.config.clientSecret } : {}),
+      };
+    }
+
+    // Attempt DCR auto-registration if discovery results indicate support
+    if (this._discoveryResults?.supportsDCR && this._discoveryResults.authServerMetadata) {
+      const meta = this._discoveryResults.authServerMetadata as Record<string, unknown>;
+      if (meta.registration_endpoint) {
+        return this.autoRegisterViaDCR();
+      }
+    }
+
+    // No client information available (needs manual registration)
+    return undefined;
+  }
+
+  /**
+   * Save client information after dynamic registration.
+   *
+   * Only called when enableDynamicRegistration is true and the auth server
+   * supports RFC 7591.
+   */
+  async saveClientInformation(clientInformation: OAuthClientInformationMixed): Promise<void> {
+    if (!this.config.enableDynamicRegistration) {
+      this.log("saveClientInformation called but dynamic registration is disabled, ignoring");
+      return;
+    }
+
+    await this.tokenStore.save(this.serverUrl, {
+      clientInformation: clientInformation as OAuthClientInformationFull,
+    });
+    this.log("Client information saved from dynamic registration");
+  }
+
+  /**
+   * Load existing tokens from persistent store.
+   *
+   * Also hydrates the in-memory expiresAt from persisted data.
+   */
+  async tokens(): Promise<OAuthTokens | undefined> {
+    const persisted = await this.tokenStore.load(this.serverUrl);
+    if (persisted?.tokens?.access_token) {
+      // Restore expiresAt from persisted data if not already set
+      if (this._expiresAt === undefined && persisted.expiresAt) {
+        this._expiresAt = persisted.expiresAt;
+      }
+      return persisted.tokens;
+    }
+    return undefined;
+  }
+
+  /**
+   * Save new tokens after authorization or refresh.
+   *
+   * Computes expiresAt from expires_in (seconds from now) and persists it
+   * alongside the tokens for dashboard display.
+   */
+  async saveTokens(tokens: OAuthTokens): Promise<void> {
+    // Compute absolute expiry timestamp from relative expires_in
+    if (tokens.expires_in !== undefined && tokens.expires_in !== null && tokens.expires_in > 0) {
+      this._expiresAt = Date.now() + tokens.expires_in * 1000;
+    } else {
+      this._expiresAt = undefined;
+    }
+
+    await this.tokenStore.saveTokens(this.serverUrl, tokens, this._expiresAt);
+    this.updateStatus("authenticated");
+    this.log("Tokens saved");
+  }
+
+  /**
+   * Redirect the user agent to the authorization URL.
+   *
+   * In the inspector's architecture, we can't directly open a browser.
+   * Instead, we store the URL and signal the callback handler to redirect
+   * the user. The dashboard polls for this URL via /oauth/status.
+   */
+  async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
+    this._pendingAuthUrl = authorizationUrl;
+    this.updateStatus("authenticating");
+    this.log(`Authorization URL ready: ${authorizationUrl.toString()}`);
+  }
+
+  /**
+   * Save the PKCE code verifier for the current flow.
+   */
+  async saveCodeVerifier(codeVerifier: string): Promise<void> {
+    this._codeVerifier = codeVerifier;
+    await this.tokenStore.saveCodeVerifier(this.serverUrl, codeVerifier);
+  }
+
+  /**
+   * Load the PKCE code verifier.
+   */
+  async codeVerifier(): Promise<string> {
+    if (this._codeVerifier) {
+      return this._codeVerifier;
+    }
+
+    // Fall back to persisted
+    const persisted = await this.tokenStore.load(this.serverUrl);
+    if (persisted?.codeVerifier) {
+      this._codeVerifier = persisted.codeVerifier;
+      return persisted.codeVerifier;
+    }
+
+    throw new Error("No PKCE code verifier available");
+  }
+
+  /**
+   * Invalidate credentials when the server indicates they're no longer valid.
+   */
+  async invalidateCredentials(scope: "all" | "client" | "tokens" | "verifier"): Promise<void> {
+    if (scope === "all") {
+      await this.tokenStore.delete(this.serverUrl);
+      this._codeVerifier = null;
+      this.updateStatus("unauthenticated");
+    } else if (scope === "tokens") {
+      // Only clear tokens, keep client info.
+      // Delete first then re-save only clientInformation, because save()
+      // uses nullish-coalescing fallback that would preserve existing tokens.
+      const existing = await this.tokenStore.load(this.serverUrl);
+      await this.tokenStore.delete(this.serverUrl);
+      if (existing?.clientInformation) {
+        await this.tokenStore.save(this.serverUrl, {
+          clientInformation: existing.clientInformation,
+        });
+      }
+      this.updateStatus("unauthenticated");
+    } else if (scope === "client") {
+      const existing = await this.tokenStore.load(this.serverUrl);
+      if (existing) {
+        await this.tokenStore.save(this.serverUrl, {
+          tokens: existing.tokens,
+          clientInformation: undefined,
+        });
+      }
+    } else if (scope === "verifier") {
+      this._codeVerifier = null;
+    }
+    this.log(`Credentials invalidated: scope=${scope}`);
+  }
+
+  // =========================================================================
+  // Inspector-specific methods
+  // =========================================================================
+
+  /**
+   * Determine the available registration method based on discovery results.
+   *
+   * @returns `"dcr"` if Dynamic Client Registration is supported,
+   *          `"cimd"` if Client ID Metadata Document is supported,
+   *          `"pre_registered"` otherwise (manual registration needed).
+   */
+  getRegistrationMethod(): RegistrationMethod {
+    if (this._discoveryResults?.supportsDCR) {
+      return "dcr";
+    }
+    if (this._discoveryResults?.supportsCIMD) {
+      return "cimd";
+    }
+    return "pre_registered";
+  }
+
+  /**
+   * Whether the user must manually register a client with the auth server.
+   *
+   * Returns true when there is no stored client information and neither
+   * DCR nor CIMD is available for automatic registration.
+   */
+  async needsManualRegistration(): Promise<boolean> {
+    // Check if we already have client info (persisted or config)
+    const persisted = await this.tokenStore.load(this.serverUrl);
+    if (persisted?.clientInformation) {
+      return false;
+    }
+    if (this.config.clientId) {
+      return false;
+    }
+
+    // No stored/config client → check if auto-registration is possible
+    const method = this.getRegistrationMethod();
+    return method === "pre_registered";
+  }
+
+  /**
+   * Get the current OAuth state for dashboard display.
+   */
+  getOAuthState(): OAuthState {
+    return {
+      status: this._status,
+      errorMessage: this._errorMessage,
+      expiresAt: this._expiresAt,
+      supportsRevocation: this._supportsRevocation,
+      ...(this._supportedScopes.length > 0 ? { supportedScopes: this._supportedScopes } : {}),
+    };
+  }
+
+  /**
+   * Get the pending authorization URL (consumed by callback handler).
+   * Returns null if no authorization is pending.
+   */
+  getPendingAuthUrl(): URL | null {
+    return this._pendingAuthUrl;
+  }
+
+  /**
+   * Clear the pending authorization URL (after it's been consumed).
+   */
+  clearPendingAuthUrl(): void {
+    this._pendingAuthUrl = null;
+  }
+
+  /**
+   * Wait for the pending authorization to complete.
+   * Returns a promise that resolves when onAuthorizationComplete is called.
+   */
+  waitForAuthorization(): Promise<void> {
+    if (!this._pendingAuthUrl) {
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this._pendingAuthResolve = null;
+        reject(new Error("Authorization timed out after 5 minutes"));
+      }, 300_000);
+
+      this._pendingAuthResolve = () => {
+        clearTimeout(timeout);
+        resolve();
+      };
+    });
+  }
+
+  /**
+   * Signal that the authorization callback has been received.
+   * Called by the callback handler after processing /oauth/callback.
+   */
+  onAuthorizationComplete(): void {
+    this._pendingAuthUrl = null;
+    if (this._pendingAuthResolve) {
+      this._pendingAuthResolve();
+      this._pendingAuthResolve = null;
+    }
+  }
+
+  /**
+   * Set the error state.
+   */
+  setError(message: string): void {
+    this._errorMessage = message;
+    this.updateStatus("error");
+  }
+
+  /**
+   * Get the server URL this provider is for.
+   */
+  getServerUrl(): string {
+    return this.serverUrl;
+  }
+
+  /**
+   * Get the underlying token store (for revocation and cleanup).
+   */
+  getTokenStore(): TokenStore {
+    return this.tokenStore;
+  }
+
+  /**
+   * Get cached supported scopes from auth server metadata.
+   * Returns an empty array if scopes haven't been discovered yet.
+   */
+  getSupportedScopes(): string[] {
+    return this._supportedScopes;
+  }
+
+  /**
+   * Discover and cache supported scopes from the auth server metadata.
+   *
+   * Fetches RFC 8414 authorization server metadata, extracting
+   * `scopes_supported`. Results are cached so subsequent calls are no-ops.
+   */
+  async discoverSupportedScopes(): Promise<string[]> {
+    if (this._supportedScopes.length > 0) {
+      return this._supportedScopes;
+    }
+
+    try {
+      const metadata = await discoverAuthorizationServerMetadata(this.serverUrl);
+      if (metadata?.scopes_supported) {
+        this._supportedScopes = [...metadata.scopes_supported];
+      }
+
+      // Also detect revocation support while we have the metadata
+      if (metadata && this._supportsRevocation === undefined) {
+        this._supportsRevocation = !!(metadata as OAuthMetadata).revocation_endpoint;
+      }
+    } catch {
+      this.log("Scope discovery failed — auth server metadata unavailable");
+    }
+
+    this.log(`Discovered ${this._supportedScopes.length} supported scopes`);
+    return this._supportedScopes;
+  }
+
+  /**
+   * Revoke tokens at the auth server's revocation endpoint (RFC 7009).
+   *
+   * Discovers the auth server metadata to find the revocation_endpoint,
+   * then POSTs the access token (and refresh token if present) for revocation.
+   *
+   * Gracefully handles failures — if the server is unreachable or doesn't
+   * support revocation, this method logs the issue but does not throw.
+   *
+   * @returns true if server-side revocation succeeded, false otherwise
+   */
+  async revokeTokens(): Promise<boolean> {
+    const currentTokens = await this.tokens();
+    if (!currentTokens?.access_token) {
+      this.log("No tokens to revoke");
+      return false;
+    }
+
+    try {
+      // Discover auth server metadata for the revocation endpoint
+      const metadata = await discoverAuthorizationServerMetadata(this.serverUrl);
+      if (!metadata) {
+        this.log("Auth server metadata not found, skipping server-side revocation");
+        this._supportsRevocation = false;
+        return false;
+      }
+
+      // revocation_endpoint is on OAuthMetadata (not all AuthorizationServerMetadata variants)
+      const revocationEndpoint = (metadata as OAuthMetadata).revocation_endpoint;
+      if (!revocationEndpoint) {
+        this.log("Auth server does not expose a revocation endpoint");
+        this._supportsRevocation = false;
+        return false;
+      }
+
+      this._supportsRevocation = true;
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-conversion -- SDK returns URL object at runtime despite string type
+      const endpointUrl = revocationEndpoint.toString();
+
+      // Build client authentication (client_id + optional client_secret)
+      const clientInfo = await this.clientInformation();
+
+      // Revoke the access token per RFC 7009
+      await this.postRevocation(
+        endpointUrl,
+        currentTokens.access_token,
+        "access_token",
+        clientInfo
+      );
+
+      // Also revoke the refresh token if present
+      if (currentTokens.refresh_token) {
+        await this.postRevocation(
+          endpointUrl,
+          currentTokens.refresh_token,
+          "refresh_token",
+          clientInfo
+        );
+      }
+
+      this.log("Server-side token revocation succeeded");
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.log(`Server-side token revocation failed: ${message}`);
+      return false;
+    }
+  }
+
+  // =========================================================================
+  // Private helpers
+  // =========================================================================
+
+  /**
+   * Auto-register with the auth server via Dynamic Client Registration (RFC 7591).
+   *
+   * Uses the SDK's `registerClient()` to POST to the auth server's
+   * registration_endpoint. On success, persists the client info and returns it.
+   * On failure, logs the error and returns undefined (graceful fallback).
+   */
+  private async autoRegisterViaDCR(): Promise<OAuthClientInformationFull | undefined> {
+    if (!this._discoveryResults?.authServerMetadata) {
+      return undefined;
+    }
+
+    try {
+      const authServerUrl = this._discoveryResults.authServerUrl ?? this.serverUrl;
+
+      this.log(`Attempting DCR auto-registration at ${authServerUrl}`);
+
+      const clientInfo = await registerClient(authServerUrl, {
+        metadata: this._discoveryResults.authServerMetadata,
+        clientMetadata: this.clientMetadata,
+      });
+
+      // Persist the registered client info for future use
+      await this.tokenStore.saveClientInformation(this.serverUrl, clientInfo);
+      this.log(`DCR auto-registration succeeded: client_id=${clientInfo.client_id}`);
+      return clientInfo;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.log(`DCR auto-registration failed: ${message}`);
+      return undefined;
+    }
+  }
+
+  /**
+   * POST a token revocation request per RFC 7009.
+   */
+  private async postRevocation(
+    endpointUrl: string,
+    token: string,
+    tokenTypeHint: string,
+    clientInfo?: OAuthClientInformationMixed
+  ): Promise<void> {
+    const params = new URLSearchParams({
+      token,
+      token_type_hint: tokenTypeHint,
+    });
+
+    // Include client_id for identification (required by many servers)
+    if (clientInfo) {
+      params.set("client_id", clientInfo.client_id);
+    }
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/x-www-form-urlencoded",
+    };
+
+    // Use HTTP Basic auth for confidential clients (client_secret_basic)
+    if (clientInfo && "client_secret" in clientInfo && clientInfo.client_secret) {
+      const credentials = Buffer.from(
+        `${clientInfo.client_id}:${clientInfo.client_secret}`
+      ).toString("base64");
+      headers["Authorization"] = `Basic ${credentials}`;
+      // Remove client_id from body when using Basic auth
+      params.delete("client_id");
+    }
+
+    const response = await fetch(endpointUrl, {
+      method: "POST",
+      headers,
+      body: params.toString(),
+    });
+
+    // RFC 7009: The server responds with HTTP 200 for both successful
+    // and invalid token revocations (the client shouldn't need to know).
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`Revocation endpoint returned ${response.status}: ${body}`);
+    }
+  }
+
+  private updateStatus(status: OAuthStatus): void {
+    this._status = status;
+    if (status !== "error") {
+      this._errorMessage = undefined;
+    }
+    this.onStatusChange?.(this.getOAuthState());
+  }
+
+  private log(message: string): void {
+    if (this._debug) {
+      // eslint-disable-next-line no-console
+      console.log(`[oauth:provider] ${message}`);
+    }
+  }
+}

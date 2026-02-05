@@ -59,6 +59,8 @@ import {
   createListConnectionsTool,
 } from "./tools";
 import type { InspectorEventType } from "./types";
+import { handleOAuthRoutes } from "./oauth/callback-handler";
+import type { InspectorOAuthProvider } from "./oauth/provider";
 
 // =============================================================================
 // VALID INSPECTOR EVENT TYPES (for validation)
@@ -192,6 +194,8 @@ export interface StandaloneInspectorServerOptions extends InspectorServerOptions
   port?: number;
   /** Maximum number of concurrent connections. Default: 20 */
   maxConnections?: number;
+  /** Pre-built OAuth provider for auto-connect mode (e.g., from CLI preset flags) */
+  oauthProvider?: InspectorOAuthProvider;
 }
 
 /**
@@ -300,6 +304,7 @@ export function createStandaloneInspectorServer(
 
   const defaultPort = options.port ?? 6274;
   const targetUrl = options.targetUrl;
+  const presetOAuthProvider = options.oauthProvider;
 
   // Create MCP app with inspector tools
   // Add reasoning field to all tools for agent view transparency
@@ -341,6 +346,12 @@ export function createStandaloneInspectorServer(
         })
       );
       return;
+    }
+
+    // OAuth routes (/oauth/callback + /api/oauth/*)
+    if (url.startsWith("/oauth/") || url.startsWith("/api/oauth/")) {
+      const handled = await handleOAuthRoutes(req, res, registry, getActiveConnectionManager);
+      if (handled) return;
     }
 
     // Health check
@@ -934,8 +945,29 @@ export function createStandaloneInspectorServer(
             // Auto-connect if targetUrl is provided
             if (targetUrl) {
               void registry
-                .createConnection({ transport: "http", url: targetUrl }, { trackHistory: true })
-                .then(() => {
+                .createConnection(
+                  { transport: "http", url: targetUrl },
+                  { trackHistory: true, authProvider: presetOAuthProvider }
+                )
+                .then(({ id, connectionManager: cm }) => {
+                  // Check if connect() silently detected auth requirement
+                  // (returns zero counts + stores discovery results for dashboard panel)
+                  // In CLI auto-connect, this should be treated as a failure
+                  // so the CLI's handleAutoAuth can trigger the browser auth flow.
+                  const discovery = cm.getDiscoveryResults();
+                  if (discovery) {
+                    // Clean up the unusable connection
+                    void registry.closeConnection(id).catch(() => {});
+                    httpServer?.close();
+                    // Use "Unauthorized" so isAuthError() in the CLI catch block matches
+                    reject(
+                      new Error(
+                        `Auto-connect to ${targetUrl} failed: Unauthorized (server requires OAuth authentication)`
+                      )
+                    );
+                    return;
+                  }
+
                   // Mark server as ready now that auto-connect succeeded
                   isReady = true;
                   if (options.debug) {

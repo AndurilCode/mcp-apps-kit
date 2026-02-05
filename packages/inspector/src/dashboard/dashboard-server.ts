@@ -106,8 +106,21 @@ export async function cleanupCDPStreamer(): Promise<void> {
  *
  * @param res - Server response to mutate.
  */
-function setCorsHeaders(res: ServerResponse): void {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+/**
+ * Restrict CORS to localhost origins only (local dev tool).
+ */
+function setCorsHeaders(req: IncomingMessage, res: ServerResponse): void {
+  const origin = req.headers.origin;
+  if (origin) {
+    try {
+      const parsed = new URL(origin);
+      if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+      }
+    } catch {
+      // Invalid origin — don't set CORS header
+    }
+  }
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
@@ -127,18 +140,33 @@ export async function handleDashboardRequest(
    * GET /dashboard/connections — list all connections.
    */
   if (pathname === "/dashboard/connections" && req.method === "GET") {
-    setCorsHeaders(res);
+    setCorsHeaders(req, res);
     if (!registry) {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ connections: [] }));
       return true;
     }
-    const connections = registry.listConnections().map((c) => ({
-      id: c.id,
-      connected: c.connected,
-      serverUrl: c.serverUrl,
-      serverInfo: c.serverInfo,
-    }));
+    const connections = registry.listConnections().map((c) => {
+      const entry: Record<string, unknown> = {
+        id: c.id,
+        connected: c.connected,
+        serverUrl: c.serverUrl,
+        serverInfo: c.serverInfo,
+      };
+      const cm = registry.getConnection(c.id);
+      // Include pending auth discovery when available
+      const discovery = cm.getDiscoveryResults();
+      if (discovery) {
+        entry.authRequired = true;
+        entry.discoveryResults = discovery;
+      }
+      // Flag connections that have an OAuth provider configured
+      const oauthState = cm.getOAuthState();
+      if (oauthState) {
+        entry.isOAuth = true;
+      }
+      return entry;
+    });
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ connections }));
     return true;
@@ -153,7 +181,7 @@ export async function handleDashboardRequest(
    *   - { url: string } (backward compat — defaults to transport: "http")
    */
   if (pathname === "/dashboard/connections" && req.method === "POST") {
-    setCorsHeaders(res);
+    setCorsHeaders(req, res);
     if (!registry) {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Registry not available" }));
@@ -168,6 +196,7 @@ export async function handleDashboardRequest(
 
       // Normalize to ConnectionParams (backward compat: { url } → { transport: "http", url })
       let params: ConnectionParams;
+      let connectOptions: import("../types").ConnectOptions | undefined;
       const transport = (body.transport as string | undefined) ?? (body.url ? "http" : undefined);
 
       if (transport === "stdio") {
@@ -213,23 +242,54 @@ export async function handleDashboardRequest(
           return true;
         }
         params = { transport: "http", url: urlStr };
+
+        // Extract optional OAuth credentials from the request body
+        const oauthClientId = body.oauthClientId as string | undefined;
+        const oauthClientSecret = body.oauthClientSecret as string | undefined;
+        const oauthScopes = body.oauthScopes as string | undefined;
+
+        if (oauthClientId) {
+          // Derive callback port from the request's Host header
+          const host = req.headers.host ?? "127.0.0.1:6274";
+          const port = host.includes(":") ? host.split(":")[1] : "6274";
+          connectOptions = {
+            oauthConfig: {
+              clientId: oauthClientId,
+              clientSecret: oauthClientSecret,
+              scopes: oauthScopes,
+              redirectUri: `http://127.0.0.1:${port}/oauth/callback`,
+            },
+          };
+        }
       } else {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Missing transport type or url" }));
         return true;
       }
 
-      const { id, connectionManager: cm } = await registry.createConnection(params);
+      const { id, connectionManager: cm } = await registry.createConnection(params, connectOptions);
       const state = cm.getState();
+      const discoveryResults = cm.getDiscoveryResults();
+      const responseBody: Record<string, unknown> = {
+        id,
+        url: state.serverUrl,
+        transport: params.transport,
+        serverInfo: state.serverInfo,
+      };
+      // Include auth discovery data when 401 auto-detection triggered
+      if (discoveryResults) {
+        responseBody.authRequired = true;
+        responseBody.discoveryResults = discoveryResults;
+      }
+      // Include pending auth URL when OAuth provider has one (pre-registration flow)
+      const provider = cm.getOAuthProvider();
+      const pendingAuthUrl = provider?.getPendingAuthUrl?.();
+      if (pendingAuthUrl && !state.connected) {
+        responseBody.authRequired = true;
+        responseBody.authorizationUrl = pendingAuthUrl.toString();
+      }
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(
-        JSON.stringify({
-          id,
-          url: state.serverUrl,
-          transport: params.transport,
-          serverInfo: state.serverInfo,
-        })
-      );
+      res.end(JSON.stringify(responseBody));
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       const isBadInput = e instanceof SyntaxError || message.includes("Invalid URL");
@@ -240,10 +300,53 @@ export async function handleDashboardRequest(
   }
 
   /**
+   * POST /dashboard/connections/:id/reconnect — reconnect after OAuth.
+   *
+   * Reconnects an existing connection using its stored params + OAuth provider.
+   * Used after the OAuth callback completes to establish the authenticated session.
+   */
+  if (pathname.match(/^\/dashboard\/connections\/[^/]+\/reconnect$/) && req.method === "POST") {
+    setCorsHeaders(req, res);
+    if (!registry) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Registry not available" }));
+      return true;
+    }
+    const connId = pathname.replace("/dashboard/connections/", "").replace("/reconnect", "");
+    try {
+      const cm = registry.getConnection(connId);
+      const params = cm.getState().connectionParams;
+      if (!params) {
+        throw new Error("No connection params stored — cannot reconnect");
+      }
+
+      // Reconnect with the same params; the OAuth provider is already
+      // configured on the connection manager from the configure step
+      await cm.connect(params, { trackHistory: true });
+
+      const state = cm.getState();
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          id: connId,
+          url: state.serverUrl,
+          connected: state.connected,
+          serverInfo: state.serverInfo,
+        })
+      );
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: message }));
+    }
+    return true;
+  }
+
+  /**
    * DELETE /dashboard/connections/:id — close connection.
    */
   if (pathname.startsWith("/dashboard/connections/") && req.method === "DELETE") {
-    setCorsHeaders(res);
+    setCorsHeaders(req, res);
     if (!registry) {
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Registry not available" }));
@@ -266,7 +369,7 @@ export async function handleDashboardRequest(
    * OPTIONS /dashboard/connections — CORS preflight for connection endpoints.
    */
   if (pathname.startsWith("/dashboard/connections") && req.method === "OPTIONS") {
-    setCorsHeaders(res);
+    setCorsHeaders(req, res);
     res.writeHead(204);
     res.end();
     return true;

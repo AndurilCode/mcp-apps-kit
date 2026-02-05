@@ -11,6 +11,7 @@ import {
   type ToolCall,
   type ConnectionParams,
 } from "@mcp-apps-kit/testing";
+import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import type {
   ConnectionState,
   ConnectOptions,
@@ -26,6 +27,9 @@ import type {
 import { getEventCategory } from "./types";
 import { WidgetSessionManager } from "./widget-session-manager";
 import { WidgetServer } from "./widget-server";
+import { InspectorOAuthProvider } from "./oauth/provider";
+import type { OAuthState } from "./oauth/types";
+import { discoverAuthRequirements, type AuthRequiredEvent } from "./oauth/discovery";
 
 /**
  * Protocol type inferred from connected server's tools
@@ -78,6 +82,8 @@ export interface ConnectionManagerEvents {
   disconnected: [previousUrl: string | null];
   /** Emitted when a session-agnostic agent event is recorded */
   agentEvent: [event: AgnosticInspectorEvent];
+  /** Emitted when a 401/auth error is detected and discovery results are available */
+  authRequired: [event: AuthRequiredEvent];
 }
 
 /**
@@ -141,6 +147,9 @@ export class ConnectionManager extends EventEmitter {
   /** Auth token for proxied requests (from OAuth flow) */
   private authToken: string | null = null;
 
+  /** OAuth client provider for authenticated connections */
+  private oauthProvider: InspectorOAuthProvider | null = null;
+
   /** Inspector URL for injected sync scripts (set when server starts) */
   private inspectorUrl: string | null = null;
 
@@ -152,6 +161,9 @@ export class ConnectionManager extends EventEmitter {
 
   /** Counter for generating unique agent event IDs */
   private agentEventIdCounter = 0;
+
+  /** Cached discovery results from 401 auto-detection */
+  private discoveryResults: AuthRequiredEvent | null = null;
 
   constructor(options: InspectorServerOptions & { id?: string } = {}) {
     super();
@@ -178,7 +190,12 @@ export class ConnectionManager extends EventEmitter {
     resourceCount: number;
     promptCount: number;
   }> {
-    const { trackHistory = true, timeout = this.defaultTimeout } = options;
+    const {
+      trackHistory = true,
+      timeout = this.defaultTimeout,
+      oauthConfig,
+      authProvider: prebuiltAuthProvider,
+    } = options;
 
     // Generate display label
     const label =
@@ -202,11 +219,19 @@ export class ConnectionManager extends EventEmitter {
     }
 
     // Disconnect existing connection if any
+    // Preserve OAuth provider across reconnects (disconnect() clears it + revokes tokens)
+    const existingProvider = this.oauthProvider;
     if (this.state.connected && this.state.client) {
       if (this.debug) {
         console.log(`[inspector] Disconnecting from previous server: ${this.state.serverUrl}`);
       }
+      // Temporarily clear provider so disconnect() doesn't revoke tokens we still need
+      this.oauthProvider = null;
       await this.disconnect();
+    }
+    // Restore provider for potential reuse in reconnect
+    if (existingProvider && !this.oauthProvider) {
+      this.oauthProvider = existingProvider;
     }
 
     if (this.debug) {
@@ -222,12 +247,128 @@ export class ConnectionManager extends EventEmitter {
           }
         : undefined;
 
-    // Create test client using @mcp-apps-kit/testing
-    const client = await createTestClient(params, {
-      trackHistory,
-      timeout,
-      onTransportClose,
-    });
+    // Set up OAuth provider for HTTP connections.
+    // Prefer pre-built provider (e.g., from CLI preset) over oauthConfig.
+    let authProvider: InspectorOAuthProvider | undefined;
+    if (params.transport === "http" && prebuiltAuthProvider) {
+      authProvider = prebuiltAuthProvider;
+
+      // Track OAuth status changes
+      const provider = authProvider;
+      provider.onStatusChange = () => {
+        if (this.debug) {
+          const state = provider.getOAuthState();
+          console.log(`[inspector] OAuth status changed: ${state.status}`);
+        }
+      };
+
+      this.oauthProvider = authProvider;
+    } else if (params.transport === "http" && !oauthConfig && this.oauthProvider) {
+      // Reconnect: reuse existing provider (e.g., configured via /api/oauth/configure)
+      // Status handler and this.oauthProvider already set from the configure step
+      authProvider = this.oauthProvider;
+    } else if (params.transport === "http" && oauthConfig) {
+      // Derive callback host + port from inspectorUrl (set via registry "created" event)
+      const inspectorParsed = this.inspectorUrl ? new URL(this.inspectorUrl) : null;
+      const port = inspectorParsed?.port ?? "6274";
+      const host = inspectorParsed?.hostname ?? "127.0.0.1";
+
+      authProvider = new InspectorOAuthProvider({
+        serverUrl: params.url,
+        config: oauthConfig,
+        callbackPort: parseInt(port, 10),
+        callbackHost: host,
+        debug: this.debug,
+      });
+
+      // Track OAuth status changes
+      const provider = authProvider;
+      provider.onStatusChange = () => {
+        if (this.debug) {
+          const state = provider.getOAuthState();
+          console.log(`[inspector] OAuth status changed: ${state.status}`);
+        }
+      };
+
+      this.oauthProvider = authProvider;
+    }
+
+    // Create test client and list capabilities.
+    // Wrapped in try/catch to detect auth-related errors (401, UnauthorizedError)
+    // and auto-trigger OAuth discovery instead of surfacing raw errors.
+    let client: TestClient;
+    try {
+      client = await createTestClient(params, {
+        trackHistory,
+        timeout,
+        onTransportClose,
+        authProvider,
+      });
+    } catch (error) {
+      // Check if this is an auth error on an HTTP connection without OAuth configured
+      if (params.transport === "http" && !authProvider && !oauthConfig && isAuthError(error)) {
+        if (this.debug) {
+          console.log(`[inspector] Auth error detected during connect, running discovery`);
+        }
+
+        // Run discovery and emit authRequired instead of throwing
+        const discovery = await discoverAuthRequirements(params.url);
+        this.discoveryResults = discovery;
+
+        // Set state to reflect pending-auth (not connected, not failed)
+        this.state = {
+          connected: false,
+          serverUrl: label,
+          serverInfo: null,
+          historyEnabled: trackHistory,
+          callCount: 0,
+          client: null,
+          connectionParams: params,
+        };
+
+        this.emit("authRequired", discovery);
+
+        return {
+          serverInfo: null,
+          toolCount: 0,
+          resourceCount: 0,
+          promptCount: 0,
+        };
+      }
+
+      // OAuth credentials provided but auth failed — check for pending auth URL
+      // (SDK built the authorization URL but we need to return it to the frontend)
+      if (params.transport === "http" && authProvider && isAuthError(error)) {
+        const pendingUrl = authProvider.getPendingAuthUrl?.();
+        if (pendingUrl || this.oauthProvider) {
+          if (this.debug) {
+            console.log(
+              `[inspector] Auth error with OAuth configured, pending auth URL: ${pendingUrl}`
+            );
+          }
+
+          this.state = {
+            connected: false,
+            serverUrl: label,
+            serverInfo: null,
+            historyEnabled: trackHistory,
+            callCount: 0,
+            client: null,
+            connectionParams: params,
+          };
+
+          return {
+            serverInfo: null,
+            toolCount: 0,
+            resourceCount: 0,
+            promptCount: 0,
+          };
+        }
+      }
+
+      // Non-auth error — rethrow
+      throw error;
+    }
 
     // Get server capabilities by listing tools, resources, prompts
     // Use try-catch for each to handle servers that don't support all capabilities
@@ -237,8 +378,44 @@ export class ConnectionManager extends EventEmitter {
 
     try {
       tools = await client.listTools();
-    } catch {
-      // Server doesn't support tools capability
+    } catch (error) {
+      if (params.transport === "http" && !authProvider && !oauthConfig && isAuthError(error)) {
+        // Auth error during capability listing (server accepted transport but rejected request)
+        if (this.debug) {
+          console.log(`[inspector] Auth error during capability listing, running discovery`);
+        }
+
+        const discovery = await discoverAuthRequirements(params.url);
+        this.discoveryResults = discovery;
+
+        this.state = {
+          connected: false,
+          serverUrl: label,
+          serverInfo: null,
+          historyEnabled: trackHistory,
+          callCount: 0,
+          client: null,
+          connectionParams: params,
+        };
+
+        // Clean up the client we created
+        try {
+          await client.disconnect();
+        } catch {
+          // Best-effort cleanup
+        }
+
+        this.emit("authRequired", discovery);
+
+        return {
+          serverInfo: null,
+          toolCount: 0,
+          resourceCount: 0,
+          promptCount: 0,
+        };
+      }
+
+      // Server doesn't support tools capability (non-auth error)
       if (this.debug) {
         console.log(`[inspector] Server doesn't support tools capability`);
       }
@@ -282,6 +459,9 @@ export class ConnectionManager extends EventEmitter {
       // Server info not available, continue without it
       serverInfo = null;
     }
+
+    // Clear discovery results on successful connection (with or without OAuth)
+    this.discoveryResults = null;
 
     // Update state
     this.state = {
@@ -373,7 +553,8 @@ export class ConnectionManager extends EventEmitter {
   }
 
   /**
-   * Disconnect from the current target server
+   * Disconnect from the current target server.
+   * Revokes OAuth tokens and deletes persisted credentials.
    */
   async disconnect(): Promise<string | null> {
     const previousUrl = this.state.serverUrl;
@@ -422,6 +603,28 @@ export class ConnectionManager extends EventEmitter {
 
     // Clear auth token
     this.authToken = null;
+
+    // Revoke tokens, delete persisted credentials, and clean up provider on disconnect
+    if (this.oauthProvider) {
+      // Server-side token revocation (fire-and-forget)
+      this.oauthProvider.revokeTokens().catch((err: unknown) => {
+        if (this.debug) {
+          console.warn(`[inspector] Token revocation during disconnect failed:`, err);
+        }
+      });
+      // Delete persisted token file so next connect requires fresh login
+      if (previousUrl) {
+        import("./oauth/token-store")
+          .then(({ TokenStore }) => {
+            const store = new TokenStore();
+            store.delete(previousUrl).catch(() => {});
+          })
+          .catch(() => {});
+      }
+    }
+
+    // Clear OAuth provider
+    this.oauthProvider = null;
 
     if (this.debug) {
       console.log(`[inspector] Disconnected from ${previousUrl}`);
@@ -874,6 +1077,45 @@ export class ConnectionManager extends EventEmitter {
   }
 
   /**
+   * Get the OAuth provider for this connection (if configured).
+   */
+  getOAuthProvider(): InspectorOAuthProvider | null {
+    return this.oauthProvider;
+  }
+
+  /**
+   * Get the current OAuth state for this connection.
+   *
+   * @returns OAuth state or undefined if no OAuth is configured
+   */
+  getOAuthState(): OAuthState | undefined {
+    return this.oauthProvider?.getOAuthState();
+  }
+
+  /**
+   * Set the OAuth provider externally (e.g., for CLI preset mode).
+   */
+  setOAuthProvider(provider: InspectorOAuthProvider): void {
+    this.oauthProvider = provider;
+    if (this.debug) {
+      console.log(`[inspector] OAuth provider set externally`);
+    }
+  }
+
+  /**
+   * Get cached discovery results from 401 auto-detection.
+   *
+   * Non-null when connect() detected an auth error and ran discovery
+   * instead of throwing. The connection is in "pending auth" state.
+   * Cleared on successful reconnect.
+   *
+   * @returns Discovery results or null if no auth detection occurred
+   */
+  getDiscoveryResults(): AuthRequiredEvent | null {
+    return this.discoveryResults;
+  }
+
+  /**
    * Record a session-agnostic agent event
    *
    * Used for tracking agent tool calls on the connected MCP server
@@ -939,4 +1181,47 @@ export class ConnectionManager extends EventEmitter {
 
     return count;
   }
+}
+
+// =============================================================================
+// AUTH ERROR DETECTION
+// =============================================================================
+
+/**
+ * Auth-related error patterns in error messages.
+ * Matched case-insensitively against error.message.
+ */
+const AUTH_ERROR_PATTERNS = [/\bunauthorized\b/i, /\b401\b/, /\binvalid_token\b/i];
+
+/**
+ * Detect whether an error is authentication-related.
+ *
+ * Checks for:
+ * - UnauthorizedError from the MCP SDK
+ * - Error messages containing "unauthorized", "401", or "invalid_token"
+ * - Wrapper errors (e.g., ConnectionError) whose cause is an auth error
+ *
+ * @param error - The caught error to inspect
+ * @returns true if the error indicates an authentication problem
+ */
+export function isAuthError(error: unknown): boolean {
+  if (error instanceof UnauthorizedError) {
+    return true;
+  }
+
+  if (error instanceof Error) {
+    const msg = error.message;
+    for (const pattern of AUTH_ERROR_PATTERNS) {
+      if (pattern.test(msg)) {
+        return true;
+      }
+    }
+
+    // Check wrapped cause (e.g., ConnectionError wrapping an auth error)
+    if ("cause" in error && error.cause) {
+      return isAuthError(error.cause);
+    }
+  }
+
+  return false;
 }

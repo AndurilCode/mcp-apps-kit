@@ -2,10 +2,13 @@
  * Toolbar Component
  *
  * Icon buttons for toggling dashboard panels (primitives, right panel).
+ * Includes per-connection OAuth status button with popover panel.
  */
 
-import React from "react";
+import React, { useState, useRef } from "react";
 import { styles } from "../styles";
+import type { UseOAuthResult } from "../hooks/useOAuth";
+import { OAuthPanel } from "./OAuthPanel";
 
 export interface ToolbarProps {
   /** Whether the MCP primitives panel is visible */
@@ -16,6 +19,8 @@ export interface ToolbarProps {
   isRightPanelVisible: boolean;
   /** Callback to toggle right panel */
   onToggleRightPanel: () => void;
+  /** OAuth hook result for the active connection (null if no OAuth) */
+  oauth?: UseOAuthResult;
 }
 
 /** Primitives panel icon - left sidebar panel (tools/resources/prompts) */
@@ -56,14 +61,87 @@ function RightPanelIcon(): React.ReactElement {
   );
 }
 
+/** Lock icon (authenticated) */
+function LockIcon(): React.ReactElement {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}
+
+const oauthButtonStyles = {
+  authenticated: {
+    color: "#20b2aa",
+    backgroundColor: "rgba(32, 178, 170, 0.15)",
+    borderColor: "rgba(32, 178, 170, 0.3)",
+  },
+  authenticating: {
+    color: "#ff9800",
+    backgroundColor: "rgba(255, 152, 0, 0.15)",
+    borderColor: "rgba(255, 152, 0, 0.3)",
+  },
+} satisfies Record<string, React.CSSProperties>;
+
 export function Toolbar({
   isPrimitivesPanelVisible,
   onTogglePrimitivesPanel,
   isRightPanelVisible,
   onToggleRightPanel,
+  oauth,
 }: ToolbarProps): React.ReactElement {
+  const [showOAuth, setShowOAuth] = useState(false);
+  const oauthButtonRef = useRef<HTMLButtonElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const oauthStatus = oauth?.oauthState?.status;
+
   return (
-    <div style={styles.toolbar}>
+    <div style={styles.toolbar} ref={toolbarRef}>
+      {/* OAuth lock button — only shown when connection has OAuth */}
+      {oauth && oauthStatus && (
+        <>
+          <button
+            ref={oauthButtonRef}
+            style={{
+              ...styles.toolbarBtn,
+              ...(showOAuth ? styles.toolbarBtnActive : {}),
+              ...(oauthStatus === "authenticated" ? oauthButtonStyles.authenticated : {}),
+              ...(oauthStatus === "authenticating" ? oauthButtonStyles.authenticating : {}),
+            }}
+            onClick={() => setShowOAuth((prev) => !prev)}
+            title={
+              oauthStatus === "authenticated"
+                ? "OAuth: Authenticated"
+                : oauthStatus === "authenticating"
+                  ? "OAuth: Authenticating..."
+                  : "OAuth Configuration"
+            }
+            aria-expanded={showOAuth}
+            aria-label="OAuth Configuration"
+            data-testid="oauth-trigger-btn"
+          >
+            <LockIcon />
+          </button>
+          <OAuthPanel
+            isOpen={showOAuth}
+            anchorRef={oauthButtonRef}
+            containerRef={toolbarRef}
+            onClose={() => setShowOAuth(false)}
+            oauth={oauth}
+          />
+        </>
+      )}
+
       {/* Primitives panel toggle */}
       <button
         style={{
