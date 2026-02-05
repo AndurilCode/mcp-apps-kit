@@ -45,6 +45,10 @@ export interface McpPrimitivesPanelProps {
   isResizing?: boolean;
 }
 
+// Font stack (matches styles.ts FONT_SANS)
+const FONT_SANS =
+  "'Inter', 'SF Pro Display', 'Segoe UI', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif";
+
 // =============================================================================
 // Local Styles
 // =============================================================================
@@ -130,9 +134,9 @@ const localStyles: Record<string, React.CSSProperties> = {
     gap: "0.375rem",
   },
   tabActive: {
-    backgroundColor: "rgba(32, 178, 170, 0.15)",
-    borderColor: "#20b2aa",
-    color: "#20b2aa",
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    borderColor: "#ffffff",
+    color: "#ffffff",
   },
   tabCount: {
     backgroundColor: "rgba(255, 255, 255, 0.1)",
@@ -142,7 +146,7 @@ const localStyles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
   },
   tabCountActive: {
-    backgroundColor: "rgba(32, 178, 170, 0.25)",
+    backgroundColor: "rgba(255, 255, 255, 0.25)",
   },
   content: {
     flex: 1,
@@ -174,7 +178,7 @@ const localStyles: Record<string, React.CSSProperties> = {
     width: "16px",
     height: "16px",
     border: "2px solid #3d4040",
-    borderTopColor: "#20b2aa",
+    borderTopColor: "#ffffff",
     borderRadius: "50%",
     animation: "spin 0.8s linear infinite",
   },
@@ -195,8 +199,7 @@ const localStyles: Record<string, React.CSSProperties> = {
     fontSize: "0.8125rem",
     fontWeight: 600,
     color: "#e8e8e8",
-    fontFamily:
-      "'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace",
+    fontFamily: FONT_SANS,
   },
   cardDescription: {
     fontSize: "0.6875rem",
@@ -217,9 +220,9 @@ const localStyles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   copyBtnSuccess: {
-    borderColor: "#20b2aa",
-    color: "#20b2aa",
-    backgroundColor: "rgba(32, 178, 170, 0.1)",
+    borderColor: "#ffffff",
+    color: "#ffffff",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
   },
   schemaSection: {
     marginTop: "0.5rem",
@@ -252,19 +255,18 @@ const localStyles: Record<string, React.CSSProperties> = {
     fontFamily:
       "'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace",
     fontSize: "0.6875rem",
-    color: "#9cdcfe",
+    color: "#ffffff",
   },
   schemaType: {
     fontFamily:
       "'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace",
     fontSize: "0.625rem",
-    color: "#b5cea8",
+    color: "#c4b5fd",
   },
   schemaRequired: {
-    fontSize: "0.5rem",
-    color: "#ff6b6b",
+    fontSize: "0.75rem",
+    color: "#ef9a9a",
     fontWeight: 600,
-    textTransform: "uppercase" as const,
   },
   schemaDesc: {
     fontSize: "0.625rem",
@@ -286,13 +288,15 @@ const localStyles: Record<string, React.CSSProperties> = {
   // Resize handle for left panel
   resizeHandle: {
     width: "6px",
-    backgroundColor: "#2d2f2f",
+    background:
+      "linear-gradient(to right, transparent 2px, #2d2f2f 2px, #2d2f2f 4px, transparent 4px)",
     cursor: "ew-resize",
     flexShrink: 0,
-    transition: "background-color 0.15s ease",
+    transition: "background 0.15s ease",
   },
   resizeHandleActive: {
-    backgroundColor: "#20b2aa",
+    background:
+      "linear-gradient(to right, transparent 2px, #ffffff 2px, #ffffff 4px, transparent 4px)",
   },
   resourceUri: {
     fontFamily:
@@ -467,7 +471,7 @@ function SchemaProperties({
           <div style={localStyles.schemaItemHeader}>
             <span style={localStyles.schemaName}>{name}</span>
             <span style={localStyles.schemaType}>{formatType(prop)}</span>
-            {required.includes(name) && <span style={localStyles.schemaRequired}>req</span>}
+            {required.includes(name) && <span style={localStyles.schemaRequired}>*</span>}
           </div>
           {prop.description && <div style={localStyles.schemaDesc}>{prop.description}</div>}
         </div>
@@ -495,7 +499,7 @@ function PromptArguments({ args }: { args: McpPromptArgument[] }): React.ReactEl
         >
           <div style={localStyles.schemaItemHeader}>
             <span style={localStyles.schemaName}>{arg.name}</span>
-            {arg.required && <span style={localStyles.schemaRequired}>req</span>}
+            {arg.required && <span style={localStyles.schemaRequired}>*</span>}
           </div>
           {arg.description && <div style={localStyles.schemaDesc}>{arg.description}</div>}
         </div>

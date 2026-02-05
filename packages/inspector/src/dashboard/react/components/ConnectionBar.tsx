@@ -73,8 +73,8 @@ const connectionBarStyles: Record<string, React.CSSProperties> = {
     transition: "border-color 0.15s ease, box-shadow 0.15s ease",
   },
   inputWrapperFocused: {
-    borderColor: "#20b2aa",
-    boxShadow: "0 0 0 2px rgba(32, 178, 170, 0.2)",
+    borderColor: "#ffffff",
+    boxShadow: "0 0 0 2px rgba(255, 255, 255, 0.2)",
   },
   inputWrapperError: {
     borderColor: "#ef4444",
@@ -94,8 +94,8 @@ const connectionBarStyles: Record<string, React.CSSProperties> = {
     whiteSpace: "nowrap",
   },
   badgeChatgptApps: {
-    backgroundColor: "rgba(32, 178, 170, 0.15)",
-    color: "#20b2aa",
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    color: "#ffffff",
   },
   badgeMcpApps: {
     backgroundColor: "rgba(59, 130, 246, 0.15)",
@@ -126,7 +126,7 @@ const connectionBarStyles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   connectButton: {
-    color: "#20b2aa",
+    color: "#ffffff",
   },
   buttonDisabled: {
     opacity: 0.5,
@@ -185,7 +185,7 @@ const connectionBarStyles: Record<string, React.CSSProperties> = {
     width: "14px",
     height: "14px",
     border: "2px solid #2d2f2f",
-    borderTopColor: "#20b2aa",
+    borderTopColor: "#ffffff",
     borderRadius: "50%",
     animation: "spin 0.8s linear infinite",
   },
@@ -225,11 +225,11 @@ const connectionBarStyles: Record<string, React.CSSProperties> = {
     paddingRight: "1rem",
   } as React.CSSProperties,
   settingsButtonActive: {
-    color: "#20b2aa",
-    backgroundColor: "rgba(32, 178, 170, 0.1)",
+    color: "#ffffff",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
   },
   oauthButtonAuthenticated: {
-    color: "#20b2aa",
+    color: "#ffffff",
   },
   oauthButtonAuthenticating: {
     color: "#ff9800",
