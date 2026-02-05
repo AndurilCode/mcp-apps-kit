@@ -4,7 +4,7 @@
  * Tabbed sidebar for Agent, Events, and Logs.
  */
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import type { LogEntry } from "../hooks/useLogStream";
 import type { InspectorEvent, AgnosticInspectorEvent } from "../../../types";
 import { styles } from "../styles";
@@ -13,8 +13,6 @@ import { EventsPanel } from "./EventsPanel";
 import { AgentPanel } from "./AgentPanel";
 
 type RightPanelTab = "agent" | "events" | "logs";
-
-const ACTIVE_TAB_STORAGE_KEY = "mcp-dashboard-right-panel-tab";
 
 export interface RightPanelProps {
   logs: LogEntry[];
@@ -28,6 +26,7 @@ export interface RightPanelProps {
   panelWidth: number;
   resizeHandleProps: React.HTMLAttributes<HTMLDivElement>;
   isResizing: boolean;
+  isStreaming: boolean;
 }
 
 export function RightPanel({
@@ -42,31 +41,10 @@ export function RightPanel({
   panelWidth,
   resizeHandleProps,
   isResizing,
+  isStreaming,
 }: RightPanelProps): React.ReactElement {
   const noop = (): void => undefined;
-  const [activeTab, setActiveTab] = useState<RightPanelTab>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const stored = window.localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
-        if (stored === "agent" || stored === "events" || stored === "logs") {
-          return stored;
-        }
-      } catch {
-        // ignore storage access errors (e.g. private browsing)
-      }
-    }
-    return "agent";
-  });
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        window.localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab);
-      } catch {
-        // ignore storage access errors
-      }
-    }
-  }, [activeTab]);
+  const [activeTab, setActiveTab] = useState<RightPanelTab>("agent");
 
   const tabs = useMemo(
     () => [
@@ -88,7 +66,7 @@ export function RightPanel({
   }
 
   const handleClear = (() => {
-    if (activeTab === "agent") {
+    if (!isStreaming || activeTab === "agent") {
       return onClearAgent ?? noop;
     }
     if (activeTab === "events") {
@@ -97,10 +75,15 @@ export function RightPanel({
     return onClearLogs ?? noop;
   })();
 
-  const isClearDisabled =
-    (activeTab === "agent" && !onClearAgent) ||
-    (activeTab === "events" && !onClearEvents) ||
-    (activeTab === "logs" && !onClearLogs);
+  const isClearDisabled = (() => {
+    if (!isStreaming || activeTab === "agent") {
+      return !onClearAgent;
+    }
+    if (activeTab === "events") {
+      return !onClearEvents;
+    }
+    return !onClearLogs;
+  })();
 
   return (
     <>
@@ -122,31 +105,52 @@ export function RightPanel({
           >
             ▶
           </button>
-          <div style={styles.rightPanelTabs}>
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
+          {isStreaming ? (
+            <div style={styles.rightPanelTabs}>
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  style={{
+                    ...styles.rightPanelTab,
+                    ...(activeTab === tab.id ? styles.rightPanelTabActive : {}),
+                  }}
+                  onClick={() => setActiveTab(tab.id)}
+                  aria-pressed={activeTab === tab.id}
+                >
+                  {tab.label}
+                  {tab.count > 0 && (
+                    <span
+                      style={{
+                        ...styles.rightPanelTabCount,
+                        ...(activeTab === tab.id ? styles.rightPanelTabCountActive : {}),
+                      }}
+                    >
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div style={styles.rightPanelTabs}>
+              <span
                 style={{
                   ...styles.rightPanelTab,
-                  ...(activeTab === tab.id ? styles.rightPanelTabActive : {}),
+                  ...styles.rightPanelTabActive,
+                  cursor: "default",
                 }}
-                onClick={() => setActiveTab(tab.id)}
-                aria-pressed={activeTab === tab.id}
               >
-                {tab.label}
-                {tab.count > 0 && (
+                Agent Logs
+                {agentEvents.length > 0 && (
                   <span
-                    style={{
-                      ...styles.rightPanelTabCount,
-                      ...(activeTab === tab.id ? styles.rightPanelTabCountActive : {}),
-                    }}
+                    style={{ ...styles.rightPanelTabCount, ...styles.rightPanelTabCountActive }}
                   >
-                    {tab.count}
+                    {agentEvents.length}
                   </span>
                 )}
-              </button>
-            ))}
-          </div>
+              </span>
+            </div>
+          )}
           <div style={styles.rightPanelActions}>
             <button
               style={styles.rightPanelClearBtn}
@@ -158,19 +162,31 @@ export function RightPanel({
           </div>
         </div>
         <div style={styles.rightPanelContent}>
-          {activeTab === "logs" && (
-            <LogsPanel logs={logs} onClearLogs={onClearLogs ?? noop} showHeader={false} />
-          )}
-          {activeTab === "events" && (
-            <EventsPanel
-              events={events}
-              onClearEvents={onClearEvents ?? noop}
-              showHeader={true}
-              showTitle={false}
-              showClearButton={false}
-            />
-          )}
-          {activeTab === "agent" && (
+          {isStreaming ? (
+            <>
+              {activeTab === "logs" && (
+                <LogsPanel logs={logs} onClearLogs={onClearLogs ?? noop} showHeader={false} />
+              )}
+              {activeTab === "events" && (
+                <EventsPanel
+                  events={events}
+                  onClearEvents={onClearEvents ?? noop}
+                  showHeader={true}
+                  showTitle={false}
+                  showClearButton={false}
+                />
+              )}
+              {activeTab === "agent" && (
+                <AgentPanel
+                  events={agentEvents}
+                  onClearEvents={onClearAgent ?? noop}
+                  showHeader={true}
+                  showTitle={false}
+                  showClearButton={false}
+                />
+              )}
+            </>
+          ) : (
             <AgentPanel
               events={agentEvents}
               onClearEvents={onClearAgent ?? noop}
