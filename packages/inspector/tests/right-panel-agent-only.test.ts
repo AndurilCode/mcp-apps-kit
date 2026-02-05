@@ -35,12 +35,6 @@ function unmount(): void {
   });
 }
 
-/** Query all text content under a selector */
-function textOf(selector: string): string {
-  const el = container.querySelector(selector);
-  return el?.textContent ?? "";
-}
-
 /** Get all matching elements */
 function queryAll(selector: string): Element[] {
   return Array.from(container.querySelectorAll(selector));
@@ -425,12 +419,7 @@ describe("AC-6: localStorage persistence removed for active tab", () => {
   });
 
   it("ACTIVE_TAB_STORAGE_KEY constant is removed from source", async () => {
-    // Read the actual source to verify the constant is gone
-    const source = await import("../src/dashboard/react/components/RightPanel?raw").then(
-      (m) => m.default,
-      () => null
-    );
-    // If raw import isn't available, just check the module doesn't export it
+    // Check the module doesn't export the old storage key constant
     const mod = await import("../src/dashboard/react/components/RightPanel");
     expect(mod).not.toHaveProperty("ACTIVE_TAB_STORAGE_KEY");
   });
