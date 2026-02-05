@@ -10,7 +10,7 @@
 
 // @vitest-environment jsdom
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createElement, act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { McpTool, McpResource, McpPrompt } from "../src/dashboard/react/types/mcp-primitives";
@@ -694,7 +694,6 @@ describe("AC-2 supplement: card name uses sans-serif font", () => {
 
     // The card name should use the sans-serif font stack
     const header = findByTestId("tool-card-header-styled_tool")!;
-    const nameSpan = header.querySelector("span") as HTMLElement;
     // Walk to the span that contains the tool name text
     const nameEl = Array.from(header.querySelectorAll("span")).find(
       (s) => s.textContent === "styled_tool"

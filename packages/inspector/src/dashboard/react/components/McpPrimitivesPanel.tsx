@@ -649,6 +649,7 @@ function AnimatedCollapse({
         setMaxHeight("0px");
       }
     }
+    return undefined;
   }, [isOpen]);
 
   return (
@@ -681,6 +682,13 @@ function ToolCard({ tool }: { tool: McpTool }): React.ReactElement {
       <div
         style={localStyles.cardHeaderClickable}
         onClick={() => setIsExpanded((prev) => !prev)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setIsExpanded((prev) => !prev);
+          }
+        }}
+        tabIndex={0}
         role="button"
         aria-expanded={isExpanded}
         data-testid={`tool-card-header-${tool.name}`}
@@ -742,6 +750,13 @@ function ResourceCard({ resource }: { resource: McpResource }): React.ReactEleme
       <div
         style={localStyles.cardHeaderClickable}
         onClick={() => setIsExpanded((prev) => !prev)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setIsExpanded((prev) => !prev);
+          }
+        }}
+        tabIndex={0}
         role="button"
         aria-expanded={isExpanded}
         data-testid={`resource-card-header-${resource.name}`}
@@ -780,6 +795,13 @@ function PromptCard({ prompt }: { prompt: McpPrompt }): React.ReactElement {
       <div
         style={localStyles.cardHeaderClickable}
         onClick={() => setIsExpanded((prev) => !prev)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setIsExpanded((prev) => !prev);
+          }
+        }}
+        tabIndex={0}
         role="button"
         aria-expanded={isExpanded}
         data-testid={`prompt-card-header-${prompt.name}`}
