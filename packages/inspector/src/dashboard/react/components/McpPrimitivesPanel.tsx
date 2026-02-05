@@ -189,7 +189,6 @@ const localStyles: Record<string, React.CSSProperties> = {
     padding: "0.5rem 0.75rem",
     marginBottom: "0.5rem",
   },
-  cardCollapsed: {},
   cardHeader: {
     display: "flex",
     alignItems: "flex-start",
@@ -607,6 +606,9 @@ function MetadataSection({
 // =============================================================================
 
 /** Smooth expand/collapse wrapper using max-height transition */
+const COLLAPSE_TRANSITION_MS = 200;
+const COLLAPSE_TRANSITION_CSS = `${COLLAPSE_TRANSITION_MS / 1000}s`;
+
 function AnimatedCollapse({
   isOpen,
   children,
@@ -621,20 +623,24 @@ function AnimatedCollapse({
   useEffect(() => {
     const el = contentRef.current;
     if (!el) return;
+
+    let rafId1: number | undefined;
+    let rafId2: number | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
     if (isOpen) {
       // Keep overflow hidden during the expand transition
       setOverflow("hidden");
       // Measure content and animate from 0 to its height
-      requestAnimationFrame(() => {
+      rafId1 = requestAnimationFrame(() => {
         const height = el.scrollHeight;
         setMaxHeight(height > 0 ? `${height}px` : "none");
       });
       // After transition completes, switch to none/visible so content can grow
-      const timer = setTimeout(() => {
+      timer = setTimeout(() => {
         setMaxHeight("none");
         setOverflow("visible");
-      }, 250);
-      return () => clearTimeout(timer);
+      }, COLLAPSE_TRANSITION_MS);
     } else {
       // Snap to current measured height, keep overflow hidden
       setOverflow("hidden");
@@ -642,14 +648,19 @@ function AnimatedCollapse({
       if (height > 0) {
         setMaxHeight(`${height}px`);
         // Double rAF ensures the browser has painted the explicit height before transitioning to 0
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => setMaxHeight("0px"));
+        rafId1 = requestAnimationFrame(() => {
+          rafId2 = requestAnimationFrame(() => setMaxHeight("0px"));
         });
       } else {
         setMaxHeight("0px");
       }
     }
-    return undefined;
+
+    return () => {
+      if (rafId1 !== undefined) cancelAnimationFrame(rafId1);
+      if (rafId2 !== undefined) cancelAnimationFrame(rafId2);
+      if (timer !== undefined) clearTimeout(timer);
+    };
   }, [isOpen]);
 
   return (
@@ -659,7 +670,7 @@ function AnimatedCollapse({
       style={{
         maxHeight,
         overflow,
-        transition: "max-height 0.2s ease-in-out",
+        transition: `max-height ${COLLAPSE_TRANSITION_CSS} ease-in-out`,
       }}
     >
       {children}
@@ -676,9 +687,7 @@ function ToolCard({ tool }: { tool: McpTool }): React.ReactElement {
   const hasUI = hasToolUI(tool);
 
   return (
-    <div
-      style={isExpanded ? localStyles.card : { ...localStyles.card, ...localStyles.cardCollapsed }}
-    >
+    <div style={localStyles.card}>
       <div
         style={localStyles.cardHeaderClickable}
         onClick={() => setIsExpanded((prev) => !prev)}
@@ -744,9 +753,7 @@ function ResourceCard({ resource }: { resource: McpResource }): React.ReactEleme
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div
-      style={isExpanded ? localStyles.card : { ...localStyles.card, ...localStyles.cardCollapsed }}
-    >
+    <div style={localStyles.card}>
       <div
         style={localStyles.cardHeaderClickable}
         onClick={() => setIsExpanded((prev) => !prev)}
@@ -789,9 +796,7 @@ function PromptCard({ prompt }: { prompt: McpPrompt }): React.ReactElement {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div
-      style={isExpanded ? localStyles.card : { ...localStyles.card, ...localStyles.cardCollapsed }}
-    >
+    <div style={localStyles.card}>
       <div
         style={localStyles.cardHeaderClickable}
         onClick={() => setIsExpanded((prev) => !prev)}
