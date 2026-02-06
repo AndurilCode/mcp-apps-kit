@@ -18,6 +18,7 @@ import { useConnections } from "./hooks/useConnections";
 import { useOAuth } from "./hooks/useOAuth";
 import { useMcpPrimitives, type McpPrimitives } from "./hooks/useMcpPrimitives";
 import type { ConnectionParams } from "@mcp-apps-kit/testing";
+import { z } from "zod";
 import { Toolbar } from "./components/Toolbar";
 import { GlobalsPanel } from "./components/GlobalsPanel";
 import {
@@ -39,24 +40,45 @@ import logoUrl from "../assets/logo.png";
 
 const STOPPED_CONNECTIONS_KEY = "mcp-dashboard-stopped-connections";
 
+/** Zod schema for ConnectionParams validation */
+const ConnectionParamsSchema = z.discriminatedUnion("transport", [
+  z.object({
+    transport: z.literal("http"),
+    url: z.string().min(1),
+  }),
+  z.object({
+    transport: z.literal("stdio"),
+    command: z.string().min(1),
+    args: z.array(z.string()).optional(),
+    env: z.record(z.string()).optional(),
+    inheritEnv: z.boolean().optional(),
+    cwd: z.string().optional(),
+  }),
+]);
+
+/** Zod schema for StoppedConnection validation */
+const StoppedConnectionSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  url: z.string().min(1),
+  params: ConnectionParamsSchema,
+});
+
 /** Load stopped connections from localStorage */
 function loadStoppedConnections(): StoppedConnection[] {
   if (typeof window === "undefined") return [];
   try {
     const stored = localStorage.getItem(STOPPED_CONNECTIONS_KEY);
     if (!stored) return [];
-    const parsed = JSON.parse(stored) as StoppedConnection[];
+    const parsed = JSON.parse(stored) as unknown;
     // Validate shape
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (item): item is StoppedConnection =>
-        typeof item === "object" &&
-        item !== null &&
-        typeof item.id === "string" &&
-        typeof item.name === "string" &&
-        typeof item.url === "string" &&
-        typeof item.params === "object"
-    );
+    return parsed
+      .map((item) => {
+        const result = StoppedConnectionSchema.safeParse(item);
+        return result.success ? result.data : null;
+      })
+      .filter((item): item is StoppedConnection => item !== null);
   } catch {
     return [];
   }
@@ -562,6 +584,8 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
       }
       // Clear cached state for this connection
       connectionCacheRef.current.delete(id);
+      // Clear primitives cache to prevent unbounded growth
+      primitivesPerConnectionRef.current.delete(id);
       setSelectedSessionByConnection((prev) => {
         if (!(id in prev)) {
           return prev;

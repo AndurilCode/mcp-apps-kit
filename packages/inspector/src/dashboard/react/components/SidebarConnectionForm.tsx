@@ -164,6 +164,7 @@ export function SidebarConnectionForm({
   const [args, setArgs] = useState("");
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [urlError, setUrlError] = useState<string | null>(null);
 
   // Refs for focus management
   const urlInputRef = useRef<HTMLInputElement>(null);
@@ -178,12 +179,27 @@ export function SidebarConnectionForm({
       setCommand("");
       setArgs("");
       setShowHistory(false);
+      setUrlError(null);
       // Focus the appropriate input after a brief delay
       setTimeout(() => {
         urlInputRef.current?.focus();
       }, 50);
     }
   }, [isOpen]);
+
+  // Validate URL format when it changes
+  useEffect(() => {
+    if (transport !== "http" || !url.trim()) {
+      setUrlError(null);
+      return;
+    }
+    try {
+      new URL(url.trim());
+      setUrlError(null);
+    } catch {
+      setUrlError("Invalid URL format");
+    }
+  }, [url, transport]);
 
   // Handle selecting a history entry
   const handleSelectHistory = useCallback((entry: ServerHistoryEntry) => {
@@ -226,13 +242,65 @@ export function SidebarConnectionForm({
   }, [transport, isOpen]);
 
   // Determine if form can be submitted
-  const canSubmit = transport === "http" ? !!url.trim() : !!command.trim();
+  const canSubmit = transport === "http" ? !!url.trim() && !urlError : !!command.trim();
+
+  /**
+   * Parse a shell-style arguments string, respecting quoted strings.
+   * Handles both single and double quotes.
+   * Example: '--file "my file.txt" --flag' → ['--file', 'my file.txt', '--flag']
+   */
+  const parseShellArgs = useCallback((argsString: string): string[] => {
+    const result: string[] = [];
+    let current = "";
+    let inQuote: '"' | "'" | null = null;
+
+    for (let i = 0; i < argsString.length; i++) {
+      const char = argsString[i];
+
+      if (inQuote) {
+        // Inside a quoted string
+        if (char === inQuote) {
+          // End of quoted section
+          inQuote = null;
+        } else {
+          current += char;
+        }
+      } else {
+        // Outside quotes
+        if (char === '"' || char === "'") {
+          // Start of quoted section
+          inQuote = char;
+        } else if (/\s/.test(char)) {
+          // Whitespace - end current token
+          if (current) {
+            result.push(current);
+            current = "";
+          }
+        } else {
+          current += char;
+        }
+      }
+    }
+
+    // Push final token if any
+    if (current) {
+      result.push(current);
+    }
+
+    return result;
+  }, []);
 
   // Build connection params from form state
   const buildParams = useCallback((): ConnectionParams | null => {
     if (transport === "http") {
       const trimmedUrl = url.trim();
       if (!trimmedUrl) return null;
+      // Validate URL format
+      try {
+        new URL(trimmedUrl);
+      } catch {
+        return null; // Invalid URL
+      }
       return { transport: "http", url: trimmedUrl };
     }
 
@@ -246,12 +314,13 @@ export function SidebarConnectionForm({
 
     const trimmedArgs = args.trim();
     if (trimmedArgs) {
-      // Split by whitespace, respecting quoted strings
-      (params as Extract<ConnectionParams, { transport: "stdio" }>).args = trimmedArgs.split(/\s+/);
+      // Parse shell-style arguments, respecting quoted strings
+      (params as Extract<ConnectionParams, { transport: "stdio" }>).args =
+        parseShellArgs(trimmedArgs);
     }
 
     return params;
-  }, [transport, url, command, args]);
+  }, [transport, url, command, args, parseShellArgs]);
 
   // Handle connect button click
   const handleConnect = useCallback(async () => {
@@ -383,7 +452,7 @@ export function SidebarConnectionForm({
             style={{
               ...formStyles.input,
               ...(focusedField === "url" ? formStyles.inputFocused : {}),
-              ...(error ? formStyles.inputError : {}),
+              ...(error || urlError ? formStyles.inputError : {}),
             }}
             value={url}
             onChange={(e) => setUrl(e.target.value)}
@@ -437,9 +506,9 @@ export function SidebarConnectionForm({
       )}
 
       {/* Error message */}
-      {error && (
+      {(error || urlError) && (
         <div style={formStyles.errorMessage} data-testid="connection-error">
-          {error}
+          {error || urlError}
         </div>
       )}
 
