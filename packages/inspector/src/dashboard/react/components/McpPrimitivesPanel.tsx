@@ -29,6 +29,27 @@ export interface ServerData {
   tools: McpTool[];
   resources: McpResource[];
   prompts: McpPrompt[];
+  /** Connection parameters including transport type */
+  params?: {
+    transport?: "stdio" | "http" | "sse" | string;
+    [key: string]: unknown;
+  };
+  /** Server info from initialization */
+  serverInfo?: {
+    version?: string;
+    name?: string;
+    [key: string]: unknown;
+  };
+  /** Server capabilities */
+  capabilities?: {
+    tools?: boolean | object;
+    resources?: boolean | object;
+    prompts?: boolean | object;
+    logging?: boolean | object;
+    sampling?: boolean | object;
+    roots?: boolean | object;
+    [key: string]: unknown;
+  };
 }
 
 /** Stopped connection stored for reconnection */
@@ -294,6 +315,38 @@ const localStyles: Record<string, React.CSSProperties> = {
     fontSize: "0.6875rem",
     color: "#4b5563",
     fontStyle: "italic" as const,
+  },
+  // Server info collapsible section
+  serverInfoToggle: {
+    paddingLeft: "1.5rem",
+    paddingRight: "0.75rem",
+    paddingTop: "0.125rem",
+    paddingBottom: "0.25rem",
+    cursor: "pointer",
+    fontSize: "0.625rem",
+    color: "#6b7280",
+    userSelect: "none" as const,
+    display: "flex",
+    alignItems: "center",
+    gap: "0.25rem",
+  },
+  serverInfoContent: {
+    paddingLeft: "2rem",
+    paddingRight: "0.75rem",
+    paddingBottom: "0.5rem",
+    fontSize: "0.625rem",
+    color: "#9ca3af",
+    lineHeight: 1.6,
+  },
+  serverInfoRow: {
+    display: "flex",
+    gap: "0.25rem",
+  },
+  serverInfoLabel: {
+    color: "#6b7280",
+  },
+  serverInfoValue: {
+    color: "#e8e8e8",
   },
   // Primitive kind section
   kindSection: {
@@ -807,6 +860,24 @@ function AnimatedCollapse({
 }
 
 // =============================================================================
+// Server Info Helpers
+// =============================================================================
+
+/**
+ * Get list of enabled capabilities from capabilities object
+ */
+function getEnabledCapabilities(capabilities: ServerData["capabilities"] | undefined): string[] {
+  if (!capabilities) return [];
+  const enabled: string[] = [];
+  for (const [key, value] of Object.entries(capabilities)) {
+    if (value) {
+      enabled.push(key);
+    }
+  }
+  return enabled;
+}
+
+// =============================================================================
 // Server Block Component
 // =============================================================================
 
@@ -826,6 +897,7 @@ function ServerBlock({
   onStart,
 }: ServerBlockProps): React.ReactElement | null {
   const [isExpanded, setIsExpanded] = useState(true);
+  const [showServerInfo, setShowServerInfo] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
   // Get primitives (only for connected servers)
@@ -906,6 +978,63 @@ function ServerBlock({
 
       {/* Server content */}
       <AnimatedCollapse isOpen={isExpanded}>
+        {/* Server info collapsible section */}
+        <div
+          style={localStyles.serverInfoToggle}
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowServerInfo(!showServerInfo);
+          }}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowServerInfo(!showServerInfo);
+            }
+          }}
+          data-testid={`server-info-toggle-${server.id}`}
+        >
+          <span>{showServerInfo ? "▾" : "▸"}</span>
+          <span>server info</span>
+        </div>
+        {showServerInfo && (
+          <div
+            style={localStyles.serverInfoContent}
+            data-testid={`server-info-content-${server.id}`}
+          >
+            <div style={localStyles.serverInfoRow}>
+              <span style={localStyles.serverInfoLabel}>Status:</span>
+              <span style={localStyles.serverInfoValue}>{isConnected ? "running" : "stopped"}</span>
+            </div>
+            <div style={localStyles.serverInfoRow}>
+              <span style={localStyles.serverInfoLabel}>Transport:</span>
+              <span style={localStyles.serverInfoValue}>
+                {"params" in server && server.params?.transport
+                  ? server.params.transport
+                  : "unknown"}
+              </span>
+            </div>
+            <div style={localStyles.serverInfoRow}>
+              <span style={localStyles.serverInfoLabel}>Version:</span>
+              <span style={localStyles.serverInfoValue}>
+                {"serverInfo" in server && server.serverInfo?.version
+                  ? server.serverInfo.version
+                  : "unknown"}
+              </span>
+            </div>
+            <div style={localStyles.serverInfoRow}>
+              <span style={localStyles.serverInfoLabel}>Capabilities:</span>
+              <span style={localStyles.serverInfoValue}>
+                {"capabilities" in server
+                  ? getEnabledCapabilities(server.capabilities).join(", ") || "none"
+                  : "unknown"}
+              </span>
+            </div>
+          </div>
+        )}
+
         {isConnected ? (
           <div style={localStyles.serverContent}>
             {/* Tools section */}
