@@ -19,8 +19,6 @@ import { useOAuth } from "./hooks/useOAuth";
 import { useMcpPrimitives, type McpPrimitives } from "./hooks/useMcpPrimitives";
 import type { ConnectionParams } from "@mcp-apps-kit/testing";
 import { Toolbar } from "./components/Toolbar";
-import { ConnectionBar } from "./components/ConnectionBar";
-import { TabBar } from "./components/TabBar";
 import { GlobalsPanel } from "./components/GlobalsPanel";
 import {
   McpPrimitivesPanel,
@@ -700,19 +698,6 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           <img src={logoUrl} alt="MCP Agent Inspector" style={styles.logo} />
           <h1 style={styles.title}>sirius-mcp inspector</h1>
         </div>
-
-        {/* Connection Bar */}
-        <ConnectionBar
-          isOpen={isConnectionFormOpen}
-          isCreating={isCreating}
-          error={connectionError}
-          onCreateConnection={handleCreateConnection}
-          onClose={() => setIsConnectionFormOpen(false)}
-          getMatchingEntries={getMatchingEntries}
-          oauth={activeConnectionId ? oauth : undefined}
-          authDiscovery={authDiscovery}
-          onDismissDiscovery={clearAuthDiscovery}
-        />
 
         <div style={styles.headerRight}>
           <div style={styles.controls}>

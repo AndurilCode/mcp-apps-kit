@@ -2,7 +2,6 @@
  * RightPanel Component
  *
  * Tabbed sidebar for Agent, Events, and Logs.
- * Also displays Primitive Detail when a primitive is selected.
  */
 
 import React, { useMemo, useState } from "react";
