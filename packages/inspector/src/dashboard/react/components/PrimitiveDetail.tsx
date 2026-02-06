@@ -278,22 +278,24 @@ function formatType(prop: JsonSchemaProperty): string {
  * Format a metadata value for display
  */
 function formatMetaValue(value: unknown): { text: string; style: React.CSSProperties } {
+  // Type assertions needed because styles is Record<string, CSSProperties>
+  // which returns CSSProperties | undefined for any key access
   if (value === null) {
-    return { text: "null", style: styles.metaValueBool };
+    return { text: "null", style: styles.metaValueBool as React.CSSProperties };
   }
   if (typeof value === "boolean") {
-    return { text: String(value), style: styles.metaValueBool };
+    return { text: String(value), style: styles.metaValueBool as React.CSSProperties };
   }
   if (typeof value === "number") {
-    return { text: String(value), style: styles.metaValueNumber };
+    return { text: String(value), style: styles.metaValueNumber as React.CSSProperties };
   }
   if (typeof value === "string") {
-    return { text: value, style: styles.metaValue };
+    return { text: value, style: styles.metaValue as React.CSSProperties };
   }
   if (Array.isArray(value) || typeof value === "object") {
-    return { text: JSON.stringify(value), style: styles.metaValue };
+    return { text: JSON.stringify(value), style: styles.metaValue as React.CSSProperties };
   }
-  return { text: String(value), style: styles.metaValue };
+  return { text: String(value), style: styles.metaValue as React.CSSProperties };
 }
 
 /**

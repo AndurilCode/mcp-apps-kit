@@ -13,11 +13,21 @@ import type {
   JsonSchemaProperty,
   McpPromptArgument,
 } from "../types/mcp-primitives";
-import type { ConnectionState } from "../../../types/connection-types";
+// ConnectionPickerItem is defined locally - no need to import ConnectionState
 
 // =============================================================================
 // Types
 // =============================================================================
+
+/**
+ * Minimal connection info needed for the connection picker.
+ * Uses optional serverInfo fields to match DashboardConnection.
+ */
+interface ConnectionPickerItem {
+  serverUrl: string;
+  serverInfo: { name?: string; version?: string } | null;
+  connected: boolean;
+}
 
 type TabType = "tools" | "resources" | "prompts";
 
@@ -51,7 +61,7 @@ export interface McpPrimitivesPanelProps {
   /** Callback when a primitive is selected/deselected */
   onSelectPrimitive?: (type: "tool" | "resource" | "prompt", id: string) => void;
   /** All available connections (picker shown only when length > 1) */
-  connections?: ConnectionState[];
+  connections?: ConnectionPickerItem[];
   /** ID of the currently active connection (typically the serverUrl) */
   activeConnectionId?: string;
   /** Callback when user switches to a different connection */
@@ -727,7 +737,7 @@ function MetadataSection({
 /**
  * Get display label for a connection (server name or URL)
  */
-function getConnectionLabel(connection: ConnectionState): string {
+function getConnectionLabel(connection: ConnectionPickerItem): string {
   if (connection.serverInfo?.name) {
     return connection.serverInfo.name;
   }
@@ -742,7 +752,7 @@ function ConnectionPicker({
   activeConnectionId,
   onSwitchConnection,
 }: {
-  connections: ConnectionState[];
+  connections: ConnectionPickerItem[];
   activeConnectionId?: string;
   onSwitchConnection?: (connectionId: string) => void;
 }): React.ReactElement | null {
@@ -753,30 +763,30 @@ function ConnectionPicker({
 
   // Close dropdown when clicking outside
   useEffect(() => {
+    if (!isOpen) return;
+
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     }
 
-    if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
   // Close dropdown on escape key
   useEffect(() => {
+    if (!isOpen) return;
+
     function handleEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setIsOpen(false);
       }
     }
 
-    if (isOpen) {
-      document.addEventListener("keydown", handleEscape);
-      return () => document.removeEventListener("keydown", handleEscape);
-    }
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
   }, [isOpen]);
 
   // Only render when there are multiple connections
