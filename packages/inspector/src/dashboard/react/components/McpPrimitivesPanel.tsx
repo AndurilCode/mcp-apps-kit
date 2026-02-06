@@ -410,8 +410,7 @@ const localStyles: Record<string, React.CSSProperties> = {
     backgroundColor: "#252525",
   },
   primitiveItemActive: {
-    backgroundColor: "#1f1f1f",
-    borderColor: "#ffffff",
+    backgroundColor: "#252525",
   },
   primitiveName: {
     flex: 1,
