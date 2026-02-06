@@ -808,7 +808,7 @@ export function createStandaloneInspectorServer(
       }
       const body = Buffer.concat(chunks);
 
-      // Track inspector tool calls for the Agent panel
+      // Track inspector tool calls and agent initialization for the Agent panel
       let inspectorToolCall: { name: string; arguments: unknown; startTime: number } | null = null;
       if (body.length > 0) {
         try {
@@ -816,6 +816,14 @@ export function createStandaloneInspectorServer(
             method?: string;
             params?: { name?: string; arguments?: unknown };
           };
+
+          const connectionManager = getActiveConnectionManager();
+
+          // Check for MCP initialize request (agent detection)
+          if (connectionManager) {
+            connectionManager.maybeRecordInitialize(parsed);
+          }
+
           // Check if this is a tools/call request (MCP JSON-RPC)
           if (parsed.method === "tools/call" && parsed.params?.name) {
             inspectorToolCall = {
@@ -824,7 +832,6 @@ export function createStandaloneInspectorServer(
               startTime: Date.now(),
             };
             // Record inspector tool call event
-            const connectionManager = getActiveConnectionManager();
             if (connectionManager) {
               const eventPayload: Record<string, unknown> = {
                 name: inspectorToolCall.name,

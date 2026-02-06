@@ -1181,6 +1181,74 @@ export class ConnectionManager extends EventEmitter {
 
     return count;
   }
+
+  /**
+   * Check if a JSON-RPC body is an MCP `initialize` request and record an agent-initialize event
+   *
+   * This intercepts the MCP initialize handshake to detect when an agent connects.
+   * The clientInfo.name field identifies the connecting agent (e.g., "claude-code", "cursor").
+   *
+   * @param jsonRpcBody - Parsed JSON-RPC request body (or unknown value to check)
+   * @returns true if an initialize event was recorded, false otherwise
+   */
+  maybeRecordInitialize(jsonRpcBody: unknown): boolean {
+    // Validate JSON-RPC structure
+    if (!jsonRpcBody || typeof jsonRpcBody !== "object") {
+      return false;
+    }
+
+    const body = jsonRpcBody as Record<string, unknown>;
+
+    // Check if this is an initialize request
+    if (body.method !== "initialize") {
+      return false;
+    }
+
+    // Extract params.clientInfo
+    const params = body.params;
+    if (!params || typeof params !== "object") {
+      if (this.debug) {
+        console.log(`[inspector] initialize request missing params`);
+      }
+      return false;
+    }
+
+    const paramsObj = params as Record<string, unknown>;
+    const clientInfo = paramsObj.clientInfo;
+
+    if (!clientInfo || typeof clientInfo !== "object") {
+      if (this.debug) {
+        console.log(`[inspector] initialize request missing clientInfo`);
+      }
+      // Still record the event, just without client name
+      this.recordAgentEvent("agent-initialize", {});
+      return true;
+    }
+
+    const clientInfoObj = clientInfo as Record<string, unknown>;
+    const clientName = typeof clientInfoObj.name === "string" ? clientInfoObj.name : undefined;
+    const clientVersion =
+      typeof clientInfoObj.version === "string" ? clientInfoObj.version : undefined;
+
+    // Build payload
+    const payload: Record<string, unknown> = {};
+    if (clientName) {
+      payload.clientName = clientName;
+    }
+    if (clientVersion) {
+      payload.clientVersion = clientVersion;
+    }
+
+    this.recordAgentEvent("agent-initialize", payload);
+
+    if (this.debug) {
+      console.log(
+        `[inspector] Agent initialize detected: ${clientName ?? "unknown"}${clientVersion ? ` v${clientVersion}` : ""}`
+      );
+    }
+
+    return true;
+  }
 }
 
 // =============================================================================
