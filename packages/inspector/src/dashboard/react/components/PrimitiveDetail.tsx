@@ -1369,19 +1369,22 @@ export function PrimitiveDetail({
           <Tag variant="mimeType">{primitive.mimeType}</Tag>
         )}
         {mode === "action" && <Tag variant="actionMode">{label.toLowerCase()} mode</Tag>}
-        {mode === "browse" && primitive.kind === "tool" && (
-          <AnnotationTags annotations={primitive.annotations} />
-        )}
-        {onClose && (
-          <button
-            style={{ ...styles.button, ...styles.buttonSecondary, marginLeft: "auto" }}
-            onClick={handleClose}
-            title="Close"
-            data-testid="close-btn"
-          >
-            ✕
-          </button>
-        )}
+        {/* Right side: annotations + close button */}
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px" }}>
+          {mode === "browse" && primitive.kind === "tool" && (
+            <AnnotationTags annotations={primitive.annotations} />
+          )}
+          {onClose && (
+            <button
+              style={{ ...styles.button, ...styles.buttonSecondary }}
+              onClick={handleClose}
+              title="Close"
+              data-testid="close-btn"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Body */}
