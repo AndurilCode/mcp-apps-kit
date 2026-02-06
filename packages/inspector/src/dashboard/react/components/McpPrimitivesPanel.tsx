@@ -130,11 +130,28 @@ const localStyles: Record<string, React.CSSProperties> = {
     borderRight: "none",
     opacity: 0,
   },
-  header: {
+  // Header row 1: collapse toggle + title
+  headerTitle: {
     display: "flex",
     alignItems: "center",
     gap: "0.5rem",
     padding: "0.75rem",
+    backgroundColor: "#0a0a0a",
+    borderBottom: "1px solid #1a1a1a",
+    flexShrink: 0,
+  },
+  headerTitleText: {
+    fontSize: "0.8125rem",
+    fontWeight: 600,
+    color: "#e8e8e8",
+    letterSpacing: "0.01em",
+  },
+  // Header row 2: search + add button
+  headerSearch: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    padding: "0.5rem 0.75rem",
     backgroundColor: "#0a0a0a",
     borderBottom: "1px solid #1a1a1a",
     flexShrink: 0,
@@ -169,10 +186,10 @@ const localStyles: Record<string, React.CSSProperties> = {
     background: "transparent",
     border: "1px solid #3d4040",
     borderRadius: "4px",
-    padding: "0.25rem 0.375rem",
+    padding: "0.25rem 0.5rem",
     cursor: "pointer",
     color: "#9ca3af",
-    fontSize: "0.625rem",
+    fontSize: "0.75rem",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -1419,8 +1436,41 @@ function ServerBlocksContent({
     ...(!isVisible || isCollapsed ? localStyles.panelCollapsed : {}),
   };
 
-  if (!isVisible || isCollapsed) {
+  // When not visible, hide completely
+  if (!isVisible) {
     return <div style={panelStyle} />;
+  }
+
+  // When collapsed, show minimal expand button
+  if (isCollapsed) {
+    return (
+      <div
+        style={{
+          ...localStyles.panel,
+          width: "40px",
+          minWidth: "40px",
+        }}
+      >
+        <div
+          style={{
+            ...localStyles.headerTitle,
+            justifyContent: "center",
+            padding: "0.75rem 0.5rem",
+          }}
+        >
+          {onToggleCollapse && (
+            <button
+              style={localStyles.collapseBtn}
+              onClick={onToggleCollapse}
+              title="Expand sidebar"
+              data-testid="sidebar-expand-btn"
+            >
+              ☰
+            </button>
+          )}
+        </div>
+      </div>
+    );
   }
 
   const hasAnyServer = servers.length > 0 || stoppedConnections.length > 0;
@@ -1429,14 +1479,30 @@ function ServerBlocksContent({
     <>
       <div style={panelStyle}>
         <KeyframeStyles />
-        {/* Header with search + add button */}
-        <div style={localStyles.header}>
+        {/* Header row 1: collapse toggle + title */}
+        <div style={localStyles.headerTitle} data-testid="sidebar-header">
+          {onToggleCollapse && (
+            <button
+              style={localStyles.collapseBtn}
+              onClick={onToggleCollapse}
+              title="Collapse sidebar"
+              data-testid="sidebar-collapse-btn"
+            >
+              ✕
+            </button>
+          )}
+          <span style={localStyles.headerTitleText}>MCP Explorer</span>
+        </div>
+
+        {/* Header row 2: search + add button */}
+        <div style={localStyles.headerSearch} data-testid="sidebar-search-row">
           <input
             type="text"
             placeholder="Search..."
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
             style={localStyles.searchInput}
+            data-testid="sidebar-search-input"
           />
           <button
             style={localStyles.addButton}
@@ -1446,15 +1512,6 @@ function ServerBlocksContent({
           >
             +
           </button>
-          {onToggleCollapse && (
-            <button
-              style={localStyles.collapseBtn}
-              onClick={onToggleCollapse}
-              title="Collapse panel"
-            >
-              ◀
-            </button>
-          )}
         </div>
 
         {/* Content */}
