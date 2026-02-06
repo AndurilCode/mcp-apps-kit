@@ -21,6 +21,8 @@ export interface ToolbarProps {
   onToggleRightPanel: () => void;
   /** OAuth hook result for the active connection (null if no OAuth) */
   oauth?: UseOAuthResult;
+  /** Callback to add a new connection */
+  onAddConnection?: () => void;
 }
 
 /** Primitives panel icon - left sidebar panel (tools/resources/prompts) */
@@ -57,6 +59,25 @@ function RightPanelIcon(): React.ReactElement {
     >
       <rect x="2" y="2" width="12" height="12" rx="2" />
       <line x1="10" y1="2" x2="10" y2="14" />
+    </svg>
+  );
+}
+
+/** Plus icon for adding connections */
+function PlusIcon(): React.ReactElement {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="8" y1="3" x2="8" y2="13" />
+      <line x1="3" y1="8" x2="13" y2="8" />
     </svg>
   );
 }
@@ -99,6 +120,7 @@ export function Toolbar({
   isRightPanelVisible,
   onToggleRightPanel,
   oauth,
+  onAddConnection,
 }: ToolbarProps): React.ReactElement {
   const [showOAuth, setShowOAuth] = useState(false);
   const oauthButtonRef = useRef<HTMLButtonElement>(null);
@@ -107,6 +129,19 @@ export function Toolbar({
 
   return (
     <div style={styles.toolbar} ref={toolbarRef}>
+      {/* Add connection button */}
+      {onAddConnection && (
+        <button
+          style={styles.toolbarBtn}
+          onClick={onAddConnection}
+          title="Add Connection"
+          aria-label="Add Connection"
+          data-testid="add-connection-btn"
+        >
+          <PlusIcon />
+        </button>
+      )}
+
       {/* OAuth lock button — only shown when connection has OAuth */}
       {oauth && oauthStatus && (
         <>

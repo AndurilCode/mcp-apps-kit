@@ -25,7 +25,10 @@ import { McpPrimitivesPanel } from "./components/McpPrimitivesPanel";
 import { RightPanel } from "./components/RightPanel";
 import { NoWidgetPlaceholder, type ConnectionState } from "./components/NoWidgetPlaceholder";
 import { OAuthDiscoveryPanel } from "./components/OAuthDiscoveryPanel";
+import { PrimitiveDetail } from "./components/PrimitiveDetail";
+import { SidebarConnectionForm } from "./components/SidebarConnectionForm";
 import { styles } from "./styles";
+import type { McpTool, McpResource, McpPrompt } from "./types/mcp-primitives";
 import logoUrl from "../assets/logo.png";
 
 // Sidebar primitive selection types
@@ -514,6 +517,53 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     };
   }, [displayGlobals?.viewport]);
 
+  // Find the selected primitive object from the arrays
+  const selectedPrimitive = useMemo((): McpTool | McpResource | McpPrompt | null => {
+    if (!selectedPrimitiveId || !selectedPrimitiveType) return null;
+
+    switch (selectedPrimitiveType) {
+      case "tool":
+        return displayTools.find((t) => t.name === selectedPrimitiveId) ?? null;
+      case "resource":
+        return displayResources.find((r) => r.uri === selectedPrimitiveId) ?? null;
+      case "prompt":
+        return displayPrompts.find((p) => p.name === selectedPrimitiveId) ?? null;
+      default:
+        return null;
+    }
+  }, [selectedPrimitiveId, selectedPrimitiveType, displayTools, displayResources, displayPrompts]);
+
+  // Map DashboardConnection[] to ConnectionState format for the picker
+  // The McpPrimitivesPanel's ConnectionPicker expects serverUrl field
+  const connectionPickerData = useMemo(() => {
+    return connections.map((conn) => ({
+      serverUrl: conn.id, // Use id as the identifier for switching
+      serverInfo: conn.serverInfo,
+      connected: conn.status === "connected",
+    }));
+  }, [connections]);
+
+  // Handler for switching connections via the picker
+  const handleSwitchConnection = useCallback(
+    (connectionId: string) => {
+      setActiveConnectionId(connectionId);
+    },
+    [setActiveConnectionId]
+  );
+
+  // Handler for sidebar connection form submission
+  const handleSidebarConnect = useCallback(
+    (params: import("@mcp-apps-kit/testing").ConnectionParams) => {
+      void handleCreateConnection(params);
+    },
+    [handleCreateConnection]
+  );
+
+  // Handler for closing sidebar connection form
+  const handleCloseSidebarForm = useCallback(() => {
+    setIsConnectionFormOpen(false);
+  }, []);
+
   const isStreaming = status === "streaming";
   const isTestingActive = isTesting && activeConnection?.status === "connected";
   const connectionStatusLabel = activeConnection
@@ -634,6 +684,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
             isRightPanelVisible={!isRightPanelCollapsed}
             onToggleRightPanel={toggleRightPanel}
             oauth={activeConnectionId ? oauth : undefined}
+            onAddConnection={handleConnect}
           />
         </div>
       </header>
@@ -651,7 +702,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
 
       {/* Content Wrapper - horizontal layout */}
       <div style={styles.contentWrapper}>
-        {/* Left Panel - MCP Primitives (always present) */}
+        {/* Left Panel - MCP Primitives Explorer with connection picker */}
         <McpPrimitivesPanel
           tools={displayTools}
           resources={displayResources}
@@ -667,7 +718,37 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           selectedPrimitiveId={selectedPrimitiveId}
           selectedPrimitiveType={selectedPrimitiveType}
           onSelectPrimitive={setSelectedPrimitive}
+          connections={connectionPickerData}
+          activeConnectionId={activeConnectionId ?? undefined}
+          onSwitchConnection={handleSwitchConnection}
         />
+
+        {/* Sidebar Extension Area - Connection Form and Detail Panel */}
+        {!isLeftPanelCollapsed && (isConnectionFormOpen || selectedPrimitive) && (
+          <div style={styles.sidebarExtension}>
+            {/* Sidebar Connection Form - shown when adding a new connection */}
+            {isConnectionFormOpen && (
+              <div style={styles.sidebarFormContainer}>
+                <SidebarConnectionForm
+                  onConnect={handleSidebarConnect}
+                  onCancel={handleCloseSidebarForm}
+                  isConnecting={isCreating}
+                />
+              </div>
+            )}
+
+            {/* Primitive Detail Panel - shown when a primitive is selected */}
+            {selectedPrimitive && selectedPrimitiveType && (
+              <div style={styles.sidebarDetailContainer}>
+                <PrimitiveDetail
+                  type={selectedPrimitiveType}
+                  primitive={selectedPrimitive}
+                  onClose={clearSelectedPrimitive}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Center Column - screencast + globals bar */}
         <div style={styles.centerColumn}>

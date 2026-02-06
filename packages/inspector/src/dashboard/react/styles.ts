@@ -253,6 +253,32 @@ export const styles: Record<string, CSSProperties> = {
     flexShrink: 0,
   },
 
+  // Sidebar Extension - appears alongside the left panel for form/detail
+  sidebarExtension: {
+    display: "flex",
+    flexDirection: "column" as const,
+    flexShrink: 0,
+    width: "320px",
+    height: "100%",
+    backgroundColor: "#0d0e0e",
+    borderRight: "1px solid #2d2f2f",
+    overflow: "hidden",
+    transition: "width 0.25s ease, opacity 0.25s ease",
+  },
+
+  // Sidebar Connection Form Container
+  sidebarFormContainer: {
+    flexShrink: 0,
+    borderBottom: "1px solid #2d2f2f",
+  },
+
+  // Sidebar Detail Container
+  sidebarDetailContainer: {
+    flex: 1,
+    minHeight: 0,
+    overflow: "hidden",
+  },
+
   // Display Container
   displayContainer: {
     backgroundColor: "#000000",
