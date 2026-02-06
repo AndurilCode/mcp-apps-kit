@@ -1,8 +1,9 @@
 /**
  * McpPrimitivesPanel Component
  *
- * Displays MCP Tools, Resources, and Prompts in a tabbed interface.
- * Each primitive type is shown as a list of cards with schema details.
+ * Displays MCP servers as collapsible blocks with their primitives grouped by kind.
+ * Each server shows: header with name + Start/Stop button, and nested TOOLS/RESOURCES/PROMPTS sections.
+ * Stopped servers appear greyed out with a "Start" button to reconnect.
  */
 
 import React, { useState, useCallback, useRef, useEffect } from "react";
@@ -13,19 +14,70 @@ import type {
   JsonSchemaProperty,
   McpPromptArgument,
 } from "../types/mcp-primitives";
+import type { ConnectionParams } from "@mcp-apps-kit/testing";
 
 // =============================================================================
 // Types
 // =============================================================================
 
-type TabType = "tools" | "resources" | "prompts";
-
-export interface McpPrimitivesPanelProps {
-  /** MCP Tools from the server */
+/** Server data for display in the sidebar */
+export interface ServerData {
+  id: string;
+  name: string;
+  url: string;
+  isConnected: boolean;
   tools: McpTool[];
-  /** MCP Resources from the server */
   resources: McpResource[];
-  /** MCP Prompts from the server */
+  prompts: McpPrompt[];
+}
+
+/** Stopped connection stored for reconnection */
+export interface StoppedConnection {
+  id: string;
+  name: string;
+  url: string;
+  params: ConnectionParams;
+}
+
+// =============================================================================
+// Props Types - Support both OLD API (tests) and NEW API (server blocks)
+// =============================================================================
+
+/** New API props for server blocks mode */
+export interface McpPrimitivesPanelNewProps {
+  /** Active server connections with their primitives */
+  servers: ServerData[];
+  /** Stopped connections that can be restarted */
+  stoppedConnections: StoppedConnection[];
+  /** Whether primitives are still loading */
+  isLoading: boolean;
+  /** Whether the panel is visible */
+  isVisible: boolean;
+  /** Whether the panel is collapsed */
+  isCollapsed?: boolean;
+  /** Callback to toggle collapsed state */
+  onToggleCollapse?: () => void;
+  /** Panel width (for resizable panel) */
+  panelWidth?: number;
+  /** Resize handle props (for resizable panel) */
+  resizeHandleProps?: React.HTMLAttributes<HTMLDivElement>;
+  /** Whether resize is active */
+  isResizing?: boolean;
+  /** Callback when Stop button is clicked */
+  onStopServer?: (serverId: string) => void;
+  /** Callback when Start button is clicked for a stopped server */
+  onStartServer?: (stoppedConnection: StoppedConnection) => void;
+  /** Callback to open connection form for new server */
+  onAddServer?: () => void;
+}
+
+/** Legacy API props for backward compatibility with tests */
+export interface McpPrimitivesPanelLegacyProps {
+  /** MCP Tools from the server (legacy) */
+  tools: McpTool[];
+  /** MCP Resources from the server (legacy) */
+  resources: McpResource[];
+  /** MCP Prompts from the server (legacy) */
   prompts: McpPrompt[];
   /** Whether primitives are still loading */
   isLoading: boolean;
@@ -35,7 +87,7 @@ export interface McpPrimitivesPanelProps {
   isCollapsed?: boolean;
   /** Callback to toggle collapsed state */
   onToggleCollapse?: () => void;
-  /** Panel position affects styling */
+  /** Panel position affects styling (legacy) */
   position: "center" | "left";
   /** Panel width (for resizable left panel) */
   panelWidth?: number;
@@ -43,6 +95,14 @@ export interface McpPrimitivesPanelProps {
   resizeHandleProps?: React.HTMLAttributes<HTMLDivElement>;
   /** Whether resize is active */
   isResizing?: boolean;
+}
+
+/** Combined props - supports both APIs */
+export type McpPrimitivesPanelProps = McpPrimitivesPanelNewProps | McpPrimitivesPanelLegacyProps;
+
+/** Type guard to check if using legacy API */
+function isLegacyProps(props: McpPrimitivesPanelProps): props is McpPrimitivesPanelLegacyProps {
+  return "position" in props && "tools" in props;
 }
 
 // Font stack (matches styles.ts FONT_SANS)
@@ -61,20 +121,9 @@ const localStyles: Record<string, React.CSSProperties> = {
     overflow: "hidden",
     transition: "width 0.25s ease, opacity 0.3s ease, transform 0.3s ease",
     height: "100%",
-  },
-  panelLeft: {
     width: "320px",
     flexShrink: 0,
     borderRight: "1px solid #2d2f2f",
-  },
-  panelCenter: {
-    width: "100%",
-    height: "100%",
-    border: "1px solid #2d2f2f",
-    borderRadius: "8px",
-  },
-  panelCenterAppear: {
-    animation: "panelAppear 0.4s ease-out forwards",
   },
   panelCollapsed: {
     width: 0,
@@ -84,18 +133,37 @@ const localStyles: Record<string, React.CSSProperties> = {
   header: {
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
-    padding: "0.75rem 1rem",
+    gap: "0.5rem",
+    padding: "0.75rem",
     backgroundColor: "#0a0a0a",
     borderBottom: "1px solid #1a1a1a",
     flexShrink: 0,
   },
-  title: {
+  searchInput: {
+    flex: 1,
+    backgroundColor: "#111111",
+    border: "1px solid #2d2f2f",
+    borderRadius: "4px",
+    color: "#e8e8e8",
+    padding: "0.375rem 0.5rem",
     fontSize: "0.75rem",
-    fontWeight: 500,
+    fontFamily: "inherit",
+    outline: "none",
+  },
+  addButton: {
+    backgroundColor: "transparent",
+    border: "1px solid #3d4040",
+    borderRadius: "4px",
+    padding: "0.375rem 0.625rem",
+    cursor: "pointer",
     color: "#9ca3af",
-    textTransform: "uppercase" as const,
-    letterSpacing: "0.05em",
+    fontSize: "0.875rem",
+    fontWeight: 500,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "all 0.15s ease",
+    flexShrink: 0,
   },
   collapseBtn: {
     background: "transparent",
@@ -109,54 +177,16 @@ const localStyles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     justifyContent: "center",
     transition: "all 0.15s ease",
-  },
-  tabs: {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.25rem",
-    padding: "0.5rem 0.75rem",
-    backgroundColor: "#0a0a0a",
-    borderBottom: "1px solid #1a1a1a",
     flexShrink: 0,
-  },
-  tab: {
-    fontFamily: "inherit",
-    backgroundColor: "transparent",
-    border: "1px solid #3d4040",
-    color: "#9ca3af",
-    padding: "0.375rem 0.75rem",
-    borderRadius: "4px",
-    fontSize: "0.6875rem",
-    cursor: "pointer",
-    transition: "all 0.15s ease",
-    display: "flex",
-    alignItems: "center",
-    gap: "0.375rem",
-  },
-  tabActive: {
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
-    borderColor: "#ffffff",
-    color: "#ffffff",
-  },
-  tabCount: {
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    padding: "0.125rem 0.375rem",
-    borderRadius: "3px",
-    fontSize: "0.5625rem",
-    fontWeight: 500,
-  },
-  tabCountActive: {
-    backgroundColor: "rgba(255, 255, 255, 0.25)",
   },
   content: {
     flex: 1,
     overflowY: "auto",
-    padding: "0.75rem",
-    fontSize: "0.75rem",
     minHeight: 0,
   },
   emptyState: {
     display: "flex",
+    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
     height: "100%",
@@ -164,6 +194,7 @@ const localStyles: Record<string, React.CSSProperties> = {
     fontSize: "0.75rem",
     padding: "2rem",
     textAlign: "center" as const,
+    gap: "0.75rem",
   },
   loadingState: {
     display: "flex",
@@ -182,6 +213,133 @@ const localStyles: Record<string, React.CSSProperties> = {
     borderRadius: "50%",
     animation: "spin 0.8s linear infinite",
   },
+  // Server block styles
+  serverBlock: {
+    borderBottom: "1px solid #1a1a1a",
+  },
+  serverBlockStopped: {
+    opacity: 0.5,
+  },
+  serverHeader: {
+    display: "flex",
+    alignItems: "center",
+    padding: "0.5rem 0.75rem",
+    gap: "0.5rem",
+    cursor: "pointer",
+    userSelect: "none" as const,
+  },
+  serverName: {
+    flex: 1,
+    fontSize: "0.6875rem",
+    fontWeight: 600,
+    color: "#9ca3af",
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.05em",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap" as const,
+  },
+  serverNameStopped: {
+    color: "#4b5563",
+  },
+  serverButton: {
+    backgroundColor: "transparent",
+    border: "1px solid #3d4040",
+    borderRadius: "3px",
+    padding: "0.125rem 0.5rem",
+    cursor: "pointer",
+    color: "#9ca3af",
+    fontSize: "0.5625rem",
+    fontWeight: 500,
+    transition: "all 0.15s ease",
+    flexShrink: 0,
+  },
+  serverButtonStart: {
+    borderColor: "#22c55e",
+    color: "#22c55e",
+  },
+  serverButtonStop: {
+    borderColor: "#ef4444",
+    color: "#ef4444",
+  },
+  expandIndicator: {
+    fontSize: "0.5rem",
+    color: "#6b7280",
+    flexShrink: 0,
+    width: "0.75rem",
+    textAlign: "center" as const,
+  },
+  serverContent: {
+    paddingBottom: "0.5rem",
+  },
+  stoppedMessage: {
+    padding: "0.5rem 0.75rem 0.5rem 1.5rem",
+    fontSize: "0.6875rem",
+    color: "#4b5563",
+    fontStyle: "italic" as const,
+  },
+  // Primitive kind section
+  kindSection: {
+    paddingLeft: "0.75rem",
+  },
+  kindHeader: {
+    padding: "0.25rem 0.5rem",
+    fontSize: "0.5625rem",
+    fontWeight: 600,
+    color: "#6b7280",
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.05em",
+  },
+  // Primitive item styles
+  primitiveItem: {
+    padding: "0.375rem 0.75rem 0.375rem 1rem",
+    cursor: "pointer",
+    fontSize: "0.75rem",
+    color: "#e8e8e8",
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    transition: "background-color 0.1s ease",
+  },
+  primitiveItemHover: {
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+  },
+  primitiveItemActive: {
+    backgroundColor: "#1a1a1a",
+    borderLeft: "2px solid #ffffff",
+    paddingLeft: "calc(1rem - 2px)",
+  },
+  primitiveName: {
+    flex: 1,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap" as const,
+  },
+  widgetBadge: {
+    fontSize: "0.5rem",
+    fontWeight: 600,
+    color: "#b39ddb",
+    backgroundColor: "rgba(179, 157, 219, 0.15)",
+    padding: "0.0625rem 0.25rem",
+    borderRadius: "2px",
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.03em",
+    flexShrink: 0,
+  },
+  // Resize handle
+  resizeHandle: {
+    width: "6px",
+    background:
+      "linear-gradient(to right, transparent 2px, #2d2f2f 2px, #2d2f2f 4px, transparent 4px)",
+    cursor: "ew-resize",
+    flexShrink: 0,
+    transition: "background 0.15s ease",
+  },
+  resizeHandleActive: {
+    background:
+      "linear-gradient(to right, transparent 2px, #ffffff 2px, #ffffff 4px, transparent 4px)",
+  },
+  // Card styles (for expanded primitive details - kept for compatibility)
   card: {
     backgroundColor: "#111111",
     border: "1px solid #2d2f2f",
@@ -202,14 +360,6 @@ const localStyles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     userSelect: "none" as const,
     gap: "0.5rem",
-  },
-  expandIndicator: {
-    fontSize: "0.5rem",
-    color: "#6b7280",
-    flexShrink: 0,
-    width: "0.75rem",
-    textAlign: "center" as const,
-    transition: "color 0.15s ease",
   },
   cardName: {
     fontSize: "0.9375rem",
@@ -290,30 +440,6 @@ const localStyles: Record<string, React.CSSProperties> = {
     lineHeight: 1.4,
     paddingLeft: "0.25rem",
   },
-  // Widget badge for tools with UI
-  widgetBadge: {
-    fontSize: "0.5rem",
-    fontWeight: 600,
-    color: "#b39ddb",
-    backgroundColor: "rgba(179, 157, 219, 0.15)",
-    padding: "0.125rem 0.375rem",
-    borderRadius: "3px",
-    textTransform: "uppercase" as const,
-    letterSpacing: "0.03em",
-  },
-  // Resize handle for left panel
-  resizeHandle: {
-    width: "6px",
-    background:
-      "linear-gradient(to right, transparent 2px, #2d2f2f 2px, #2d2f2f 4px, transparent 4px)",
-    cursor: "ew-resize",
-    flexShrink: 0,
-    transition: "background 0.15s ease",
-  },
-  resizeHandleActive: {
-    background:
-      "linear-gradient(to right, transparent 2px, #ffffff 2px, #ffffff 4px, transparent 4px)",
-  },
   resourceUri: {
     fontFamily:
       "'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace",
@@ -334,7 +460,6 @@ const localStyles: Record<string, React.CSSProperties> = {
     borderRadius: "3px",
     marginTop: "0.25rem",
   },
-  // Metadata section (annotations, _meta)
   metaSection: {
     marginTop: "0.5rem",
     padding: "0.5rem",
@@ -434,7 +559,6 @@ function CopyButton({ data }: { data: unknown }): React.ReactElement {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // Fallback for browsers that don't support clipboard API
       const textarea = document.createElement("textarea");
       textarea.value = JSON.stringify(data, null, 2);
       document.body.appendChild(textarea);
@@ -530,17 +654,10 @@ function PromptArguments({ args }: { args: McpPromptArgument[] }): React.ReactEl
 function hasToolUI(tool: McpTool): boolean {
   const meta = tool._meta;
   if (!meta) return false;
-
-  // MCP Apps format: _meta.ui.resourceUri
   const uiMeta = meta.ui as Record<string, unknown> | undefined;
   if (uiMeta?.resourceUri) return true;
-
-  // Alternative MCP format: _meta["ui/resourceUri"]
   if (meta["ui/resourceUri"]) return true;
-
-  // OpenAI format: _meta["openai/outputTemplate"]
   if (meta["openai/outputTemplate"]) return true;
-
   return false;
 }
 
@@ -605,7 +722,6 @@ function MetadataSection({
 // Animated Collapse
 // =============================================================================
 
-/** Smooth expand/collapse wrapper using max-height transition */
 const COLLAPSE_TRANSITION_MS = 200;
 const COLLAPSE_TRANSITION_CSS = `${COLLAPSE_TRANSITION_MS / 1000}s`;
 
@@ -629,25 +745,20 @@ function AnimatedCollapse({
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     if (isOpen) {
-      // Keep overflow hidden during the expand transition
       setOverflow("hidden");
-      // Measure content and animate from 0 to its height
       rafId1 = requestAnimationFrame(() => {
         const height = el.scrollHeight;
         setMaxHeight(height > 0 ? `${height}px` : "none");
       });
-      // After transition completes, switch to none/visible so content can grow
       timer = setTimeout(() => {
         setMaxHeight("none");
         setOverflow("visible");
       }, COLLAPSE_TRANSITION_MS);
     } else {
-      // Snap to current measured height, keep overflow hidden
       setOverflow("hidden");
       const height = el.scrollHeight;
       if (height > 0) {
         setMaxHeight(`${height}px`);
-        // Double rAF ensures the browser has painted the explicit height before transitioning to 0
         rafId1 = requestAnimationFrame(() => {
           rafId2 = requestAnimationFrame(() => setMaxHeight("0px"));
         });
@@ -679,7 +790,200 @@ function AnimatedCollapse({
 }
 
 // =============================================================================
-// Card Components
+// Server Block Component
+// =============================================================================
+
+interface ServerBlockProps {
+  server: ServerData | StoppedConnection;
+  isConnected: boolean;
+  searchFilter: string;
+  onStop?: () => void;
+  onStart?: () => void;
+}
+
+function ServerBlock({
+  server,
+  isConnected,
+  searchFilter,
+  onStop,
+  onStart,
+}: ServerBlockProps): React.ReactElement | null {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+
+  // Get primitives (only for connected servers)
+  const tools = "tools" in server ? server.tools : [];
+  const resources = "resources" in server ? server.resources : [];
+  const prompts = "prompts" in server ? server.prompts : [];
+
+  // Filter primitives by search
+  const q = searchFilter.toLowerCase();
+  const filteredTools = q ? tools.filter((t) => t.name.toLowerCase().includes(q)) : tools;
+  const filteredResources = q
+    ? resources.filter((r) => r.name.toLowerCase().includes(q))
+    : resources;
+  const filteredPrompts = q ? prompts.filter((p) => p.name.toLowerCase().includes(q)) : prompts;
+
+  // If searching and no matches, hide the server block
+  if (
+    q &&
+    filteredTools.length === 0 &&
+    filteredResources.length === 0 &&
+    filteredPrompts.length === 0
+  ) {
+    return null;
+  }
+
+  const handleButtonClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isConnected && onStop) {
+      onStop();
+    } else if (!isConnected && onStart) {
+      onStart();
+    }
+  };
+
+  return (
+    <div
+      style={{
+        ...localStyles.serverBlock,
+        ...(!isConnected ? localStyles.serverBlockStopped : {}),
+      }}
+    >
+      {/* Server header */}
+      <div
+        style={localStyles.serverHeader}
+        onClick={() => setIsExpanded(!isExpanded)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setIsExpanded(!isExpanded);
+          }
+        }}
+        aria-expanded={isExpanded}
+        data-testid={`server-block-header-${server.id}`}
+      >
+        <span style={localStyles.expandIndicator}>{isExpanded ? "▾" : "▸"}</span>
+        <span
+          style={{
+            ...localStyles.serverName,
+            ...(!isConnected ? localStyles.serverNameStopped : {}),
+          }}
+        >
+          {server.name || server.url}
+        </span>
+        <button
+          style={{
+            ...localStyles.serverButton,
+            ...(isConnected ? localStyles.serverButtonStop : localStyles.serverButtonStart),
+          }}
+          onClick={handleButtonClick}
+          title={isConnected ? "Stop server" : "Start server"}
+          data-testid={`server-${isConnected ? "stop" : "start"}-btn-${server.id}`}
+        >
+          {isConnected ? "Stop" : "Start"}
+        </button>
+      </div>
+
+      {/* Server content */}
+      <AnimatedCollapse isOpen={isExpanded}>
+        {isConnected ? (
+          <div style={localStyles.serverContent}>
+            {/* Tools section */}
+            {filteredTools.length > 0 && (
+              <div style={localStyles.kindSection}>
+                <div style={localStyles.kindHeader}>Tools</div>
+                {filteredTools.map((tool) => (
+                  <div
+                    key={tool.name}
+                    style={{
+                      ...localStyles.primitiveItem,
+                      ...(hoveredItem === `tool-${tool.name}`
+                        ? localStyles.primitiveItemHover
+                        : {}),
+                    }}
+                    onMouseEnter={() => setHoveredItem(`tool-${tool.name}`)}
+                    onMouseLeave={() => setHoveredItem(null)}
+                    data-testid={`tool-item-${tool.name}`}
+                  >
+                    <span style={localStyles.primitiveName}>{tool.name}</span>
+                    {hasToolUI(tool) && <span style={localStyles.widgetBadge}>Widget</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Resources section */}
+            {filteredResources.length > 0 && (
+              <div style={localStyles.kindSection}>
+                <div style={localStyles.kindHeader}>Resources</div>
+                {filteredResources.map((resource) => (
+                  <div
+                    key={resource.uri}
+                    style={{
+                      ...localStyles.primitiveItem,
+                      ...(hoveredItem === `resource-${resource.uri}`
+                        ? localStyles.primitiveItemHover
+                        : {}),
+                    }}
+                    onMouseEnter={() => setHoveredItem(`resource-${resource.uri}`)}
+                    onMouseLeave={() => setHoveredItem(null)}
+                    data-testid={`resource-item-${resource.name}`}
+                  >
+                    <span style={localStyles.primitiveName}>{resource.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Prompts section */}
+            {filteredPrompts.length > 0 && (
+              <div style={localStyles.kindSection}>
+                <div style={localStyles.kindHeader}>Prompts</div>
+                {filteredPrompts.map((prompt) => (
+                  <div
+                    key={prompt.name}
+                    style={{
+                      ...localStyles.primitiveItem,
+                      ...(hoveredItem === `prompt-${prompt.name}`
+                        ? localStyles.primitiveItemHover
+                        : {}),
+                    }}
+                    onMouseEnter={() => setHoveredItem(`prompt-${prompt.name}`)}
+                    onMouseLeave={() => setHoveredItem(null)}
+                    data-testid={`prompt-item-${prompt.name}`}
+                  >
+                    <span style={localStyles.primitiveName}>{prompt.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Empty state when server is connected but has no primitives */}
+            {filteredTools.length === 0 &&
+              filteredResources.length === 0 &&
+              filteredPrompts.length === 0 && (
+                <div style={localStyles.stoppedMessage}>No primitives available</div>
+              )}
+          </div>
+        ) : (
+          <div style={localStyles.stoppedMessage}>Server stopped</div>
+        )}
+      </AnimatedCollapse>
+    </div>
+  );
+}
+
+// =============================================================================
+// Legacy Tab Type (for backward compatibility)
+// =============================================================================
+
+type TabType = "tools" | "resources" | "prompts";
+
+// =============================================================================
+// Legacy Card Components (for backward compatibility with tests)
 // =============================================================================
 
 function ToolCard({ tool }: { tool: McpTool }): React.ReactElement {
@@ -687,7 +991,7 @@ function ToolCard({ tool }: { tool: McpTool }): React.ReactElement {
   const hasUI = hasToolUI(tool);
 
   return (
-    <div style={localStyles.card}>
+    <div style={localStyles.card} data-testid={`tool-card-${tool.name}`}>
       <div
         style={localStyles.cardHeaderClickable}
         onClick={() => setIsExpanded((prev) => !prev)}
@@ -704,7 +1008,7 @@ function ToolCard({ tool }: { tool: McpTool }): React.ReactElement {
       >
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
           <span style={localStyles.expandIndicator}>{isExpanded ? "▼" : "▶"}</span>
-          <span style={localStyles.cardName}>{tool.name}</span>
+          <span style={{ ...localStyles.cardName, fontFamily: FONT_SANS }}>{tool.name}</span>
           {hasUI && <span style={localStyles.widgetBadge}>Widget</span>}
         </div>
       </div>
@@ -753,7 +1057,7 @@ function ResourceCard({ resource }: { resource: McpResource }): React.ReactEleme
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div style={localStyles.card}>
+    <div style={localStyles.card} data-testid={`resource-card-${resource.uri}`}>
       <div
         style={localStyles.cardHeaderClickable}
         onClick={() => setIsExpanded((prev) => !prev)}
@@ -770,7 +1074,7 @@ function ResourceCard({ resource }: { resource: McpResource }): React.ReactEleme
       >
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
           <span style={localStyles.expandIndicator}>{isExpanded ? "▼" : "▶"}</span>
-          <span style={localStyles.cardName}>{resource.name}</span>
+          <span style={{ ...localStyles.cardName, fontFamily: FONT_SANS }}>{resource.name}</span>
         </div>
       </div>
       <AnimatedCollapse isOpen={isExpanded}>
@@ -796,7 +1100,7 @@ function PromptCard({ prompt }: { prompt: McpPrompt }): React.ReactElement {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div style={localStyles.card}>
+    <div style={localStyles.card} data-testid={`prompt-card-${prompt.name}`}>
       <div
         style={localStyles.cardHeaderClickable}
         onClick={() => setIsExpanded((prev) => !prev)}
@@ -813,7 +1117,7 @@ function PromptCard({ prompt }: { prompt: McpPrompt }): React.ReactElement {
       >
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
           <span style={localStyles.expandIndicator}>{isExpanded ? "▼" : "▶"}</span>
-          <span style={localStyles.cardName}>{prompt.name}</span>
+          <span style={{ ...localStyles.cardName, fontFamily: FONT_SANS }}>{prompt.name}</span>
         </div>
       </div>
       <AnimatedCollapse isOpen={isExpanded}>
@@ -831,30 +1135,100 @@ function PromptCard({ prompt }: { prompt: McpPrompt }): React.ReactElement {
 }
 
 // =============================================================================
-// Main Component
+// Legacy Panel Styles (for backward compatibility)
 // =============================================================================
 
-export function McpPrimitivesPanel({
+const legacyStyles: Record<string, React.CSSProperties> = {
+  panelCenter: {
+    width: "100%",
+    height: "100%",
+    border: "1px solid #2d2f2f",
+    borderRadius: "8px",
+  },
+  panelCenterAppear: {
+    animation: "panelAppear 0.4s ease-out forwards",
+  },
+  legacyHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "0.75rem 1rem",
+    backgroundColor: "#0a0a0a",
+    borderBottom: "1px solid #1a1a1a",
+    flexShrink: 0,
+  },
+  title: {
+    fontSize: "0.75rem",
+    fontWeight: 500,
+    color: "#9ca3af",
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.05em",
+  },
+  tabs: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.25rem",
+    padding: "0.5rem 0.75rem",
+    backgroundColor: "#0a0a0a",
+    borderBottom: "1px solid #1a1a1a",
+    flexShrink: 0,
+  },
+  tab: {
+    fontFamily: "inherit",
+    backgroundColor: "transparent",
+    border: "1px solid #3d4040",
+    color: "#9ca3af",
+    padding: "0.375rem 0.75rem",
+    borderRadius: "4px",
+    fontSize: "0.6875rem",
+    cursor: "pointer",
+    transition: "all 0.15s ease",
+    display: "flex",
+    alignItems: "center",
+    gap: "0.375rem",
+  },
+  tabActive: {
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    borderColor: "#ffffff",
+    color: "#ffffff",
+  },
+  tabCount: {
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    padding: "0.125rem 0.375rem",
+    borderRadius: "3px",
+    fontSize: "0.5625rem",
+    fontWeight: 500,
+  },
+  tabCountActive: {
+    backgroundColor: "rgba(255, 255, 255, 0.25)",
+  },
+};
+
+// =============================================================================
+// Legacy Panel Content (for backward compatibility with tests)
+// =============================================================================
+
+function LegacyPanelContent({
   tools,
   resources,
   prompts,
   isLoading,
   isVisible,
-  isCollapsed = false,
+  isCollapsed,
   onToggleCollapse,
   position,
   panelWidth,
   resizeHandleProps,
   isResizing,
-}: McpPrimitivesPanelProps): React.ReactElement {
+}: McpPrimitivesPanelLegacyProps): React.ReactElement {
   const [activeTab, setActiveTab] = useState<TabType>("tools");
 
   // Build panel styles based on position and visibility
   const panelStyle: React.CSSProperties = {
     ...localStyles.panel,
-    ...(position === "left" ? localStyles.panelLeft : localStyles.panelCenter),
+    ...(position === "left" ? {} : legacyStyles.panelCenter),
     ...(position === "left" && !isVisible ? localStyles.panelCollapsed : {}),
-    ...(position === "center" ? localStyles.panelCenterAppear : {}),
+    ...(position === "center" ? legacyStyles.panelCenterAppear : {}),
     ...(position === "left" && panelWidth ? { width: panelWidth } : {}),
   };
 
@@ -928,21 +1302,21 @@ export function McpPrimitivesPanel({
       <>
         <div style={panelStyle}>
           <KeyframeStyles />
-          <div style={localStyles.tabs}>
+          <div style={legacyStyles.tabs}>
             {tabs.map((tab) => (
               <button
                 key={tab.type}
                 style={{
-                  ...localStyles.tab,
-                  ...(activeTab === tab.type ? localStyles.tabActive : {}),
+                  ...legacyStyles.tab,
+                  ...(activeTab === tab.type ? legacyStyles.tabActive : {}),
                 }}
                 onClick={() => setActiveTab(tab.type)}
               >
                 {tab.label}
                 <span
                   style={{
-                    ...localStyles.tabCount,
-                    ...(activeTab === tab.type ? localStyles.tabCountActive : {}),
+                    ...legacyStyles.tabCount,
+                    ...(activeTab === tab.type ? legacyStyles.tabCountActive : {}),
                   }}
                 >
                   {tab.count}
@@ -977,25 +1351,25 @@ export function McpPrimitivesPanel({
     <div style={panelStyle}>
       <KeyframeStyles />
       {position === "center" && (
-        <div style={localStyles.header}>
-          <span style={localStyles.title}>MCP Primitives</span>
+        <div style={legacyStyles.legacyHeader}>
+          <span style={legacyStyles.title}>MCP Primitives</span>
         </div>
       )}
-      <div style={localStyles.tabs}>
+      <div style={legacyStyles.tabs}>
         {tabs.map((tab) => (
           <button
             key={tab.type}
             style={{
-              ...localStyles.tab,
-              ...(activeTab === tab.type ? localStyles.tabActive : {}),
+              ...legacyStyles.tab,
+              ...(activeTab === tab.type ? legacyStyles.tabActive : {}),
             }}
             onClick={() => setActiveTab(tab.type)}
           >
             {tab.label}
             <span
               style={{
-                ...localStyles.tabCount,
-                ...(activeTab === tab.type ? localStyles.tabCountActive : {}),
+                ...legacyStyles.tabCount,
+                ...(activeTab === tab.type ? legacyStyles.tabCountActive : {}),
               }}
             >
               {tab.count}
@@ -1018,4 +1392,146 @@ export function McpPrimitivesPanel({
   );
 }
 
+// =============================================================================
+// New Server Blocks Content
+// =============================================================================
+
+function ServerBlocksContent({
+  servers,
+  stoppedConnections,
+  isLoading,
+  isVisible,
+  isCollapsed,
+  onToggleCollapse,
+  panelWidth,
+  resizeHandleProps,
+  isResizing,
+  onStopServer,
+  onStartServer,
+  onAddServer,
+}: McpPrimitivesPanelNewProps): React.ReactElement {
+  const [searchFilter, setSearchFilter] = useState("");
+
+  // Build panel styles
+  const panelStyle: React.CSSProperties = {
+    ...localStyles.panel,
+    ...(panelWidth ? { width: panelWidth } : {}),
+    ...(!isVisible || isCollapsed ? localStyles.panelCollapsed : {}),
+  };
+
+  if (!isVisible || isCollapsed) {
+    return <div style={panelStyle} />;
+  }
+
+  const hasAnyServer = servers.length > 0 || stoppedConnections.length > 0;
+
+  return (
+    <>
+      <div style={panelStyle}>
+        <KeyframeStyles />
+        {/* Header with search + add button */}
+        <div style={localStyles.header}>
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchFilter}
+            onChange={(e) => setSearchFilter(e.target.value)}
+            style={localStyles.searchInput}
+          />
+          <button
+            style={localStyles.addButton}
+            onClick={onAddServer}
+            title="Add server"
+            data-testid="add-server-btn"
+          >
+            +
+          </button>
+          {onToggleCollapse && (
+            <button
+              style={localStyles.collapseBtn}
+              onClick={onToggleCollapse}
+              title="Collapse panel"
+            >
+              ◀
+            </button>
+          )}
+        </div>
+
+        {/* Content */}
+        <div style={localStyles.content}>
+          {isLoading && servers.length === 0 && stoppedConnections.length === 0 ? (
+            <div style={localStyles.loadingState}>
+              <Spinner />
+              <span>Loading...</span>
+            </div>
+          ) : !hasAnyServer ? (
+            <div style={localStyles.emptyState}>
+              <span>No servers connected</span>
+              <button
+                style={{
+                  ...localStyles.addButton,
+                  padding: "0.5rem 1rem",
+                }}
+                onClick={onAddServer}
+              >
+                + Connect Server
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Active servers */}
+              {servers.map((server) => (
+                <ServerBlock
+                  key={server.id}
+                  server={server}
+                  isConnected={true}
+                  searchFilter={searchFilter}
+                  onStop={() => onStopServer?.(server.id)}
+                />
+              ))}
+
+              {/* Stopped servers */}
+              {stoppedConnections.map((stopped) => (
+                <ServerBlock
+                  key={`stopped-${stopped.id}`}
+                  server={stopped}
+                  isConnected={false}
+                  searchFilter={searchFilter}
+                  onStart={() => onStartServer?.(stopped)}
+                />
+              ))}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Resize handle */}
+      {resizeHandleProps && (
+        <div
+          {...resizeHandleProps}
+          style={{
+            ...localStyles.resizeHandle,
+            ...(isResizing ? localStyles.resizeHandleActive : {}),
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+// =============================================================================
+// Main Component - Supports both Legacy and New APIs
+// =============================================================================
+
+export function McpPrimitivesPanel(props: McpPrimitivesPanelProps): React.ReactElement {
+  // Use type guard to determine which API is being used
+  if (isLegacyProps(props)) {
+    return <LegacyPanelContent {...props} />;
+  }
+  return <ServerBlocksContent {...props} />;
+}
+
 export default McpPrimitivesPanel;
+
+// Re-export types for backward compatibility
+export type { McpTool, McpResource, McpPrompt };

@@ -14,19 +14,63 @@ import { useAgentEventStream } from "./hooks/useAgentEventStream";
 import type { InspectorEvent, AgnosticInspectorEvent } from "../../types";
 import { useResizablePanelWidth } from "./hooks/useResizablePanelWidth";
 import { useGlobals, type GlobalsState } from "./hooks/useGlobals";
-import { useConnections } from "./hooks/useConnections";
+import { useConnections, type DashboardConnection } from "./hooks/useConnections";
 import { useOAuth } from "./hooks/useOAuth";
 import { useMcpPrimitives, type McpPrimitives } from "./hooks/useMcpPrimitives";
+import type { ConnectionParams } from "@mcp-apps-kit/testing";
 import { Toolbar } from "./components/Toolbar";
 import { ConnectionBar } from "./components/ConnectionBar";
 import { TabBar } from "./components/TabBar";
 import { GlobalsPanel } from "./components/GlobalsPanel";
-import { McpPrimitivesPanel } from "./components/McpPrimitivesPanel";
+import {
+  McpPrimitivesPanel,
+  type ServerData,
+  type StoppedConnection,
+} from "./components/McpPrimitivesPanel";
 import { RightPanel } from "./components/RightPanel";
 import { NoWidgetPlaceholder, type ConnectionState } from "./components/NoWidgetPlaceholder";
 import { OAuthDiscoveryPanel } from "./components/OAuthDiscoveryPanel";
 import { styles } from "./styles";
 import logoUrl from "../assets/logo.png";
+
+// =============================================================================
+// Stopped Connections Storage
+// =============================================================================
+
+const STOPPED_CONNECTIONS_KEY = "mcp-dashboard-stopped-connections";
+
+/** Load stopped connections from localStorage */
+function loadStoppedConnections(): StoppedConnection[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem(STOPPED_CONNECTIONS_KEY);
+    if (!stored) return [];
+    const parsed = JSON.parse(stored) as StoppedConnection[];
+    // Validate shape
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item): item is StoppedConnection =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof item.id === "string" &&
+        typeof item.name === "string" &&
+        typeof item.url === "string" &&
+        typeof item.params === "object"
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** Save stopped connections to localStorage */
+function saveStoppedConnections(connections: StoppedConnection[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STOPPED_CONNECTIONS_KEY, JSON.stringify(connections));
+  } catch {
+    // Ignore storage errors
+  }
+}
 
 export interface InspectorDashboardProps {
   /** Base URL for the inspector API (default: current origin) */
@@ -41,6 +85,12 @@ interface CachedConnectionState {
   screencastImage: string | null;
   globals: GlobalsState | null;
   primitives: McpPrimitives | null;
+}
+
+/** Per-connection primitives cache for building ServerData */
+interface ConnectionPrimitivesCache {
+  connectionId: string;
+  primitives: McpPrimitives;
 }
 
 export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): React.ReactElement {
@@ -62,6 +112,14 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
   // Per-connection state cache for instant tab switching
   const connectionCacheRef = useRef<Map<string, CachedConnectionState>>(new Map());
   const prevConnectionIdRef = useRef<string | null>(null);
+
+  // Stopped connections state (persisted to localStorage)
+  const [stoppedConnections, setStoppedConnections] = useState<StoppedConnection[]>(() =>
+    loadStoppedConnections()
+  );
+
+  // Per-connection primitives cache (for building ServerData for all connections)
+  const primitivesPerConnectionRef = useRef<Map<string, McpPrimitives>>(new Map());
 
   // Session state
   const [selectedSessionByConnection, setSelectedSessionByConnection] = useState<
@@ -211,6 +269,41 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
   const displayResources =
     resources.length > 0 ? resources : (cachedState?.primitives?.resources ?? []);
   const displayPrompts = prompts.length > 0 ? prompts : (cachedState?.primitives?.prompts ?? []);
+
+  // Update primitives cache for the active connection
+  useEffect(() => {
+    if (activeConnectionId && (tools.length > 0 || resources.length > 0 || prompts.length > 0)) {
+      primitivesPerConnectionRef.current.set(activeConnectionId, { tools, resources, prompts });
+    }
+  }, [activeConnectionId, tools, resources, prompts]);
+
+  // Persist stopped connections to localStorage
+  useEffect(() => {
+    saveStoppedConnections(stoppedConnections);
+  }, [stoppedConnections]);
+
+  // Build ServerData array from active connections + primitives cache
+  const serverDataList: ServerData[] = useMemo(() => {
+    return connections
+      .filter((conn) => conn.status === "connected")
+      .map((conn) => {
+        const cached = primitivesPerConnectionRef.current.get(conn.id);
+        // For active connection, use live data; for others, use cache
+        const prims =
+          conn.id === activeConnectionId
+            ? { tools: displayTools, resources: displayResources, prompts: displayPrompts }
+            : (cached ?? { tools: [], resources: [], prompts: [] });
+        return {
+          id: conn.id,
+          name: conn.serverInfo?.name ?? conn.url,
+          url: conn.url,
+          isConnected: true,
+          tools: prims.tools,
+          resources: prims.resources,
+          prompts: prims.prompts,
+        };
+      });
+  }, [connections, activeConnectionId, displayTools, displayResources, displayPrompts]);
 
   // Compute connection state for NoWidgetPlaceholder
   const connectionState: ConnectionState = useMemo(() => {
@@ -433,6 +526,48 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     [closeConnection]
   );
 
+  // Handler to stop a server (disconnect but keep in stopped list)
+  const handleStopServer = useCallback(
+    async (serverId: string) => {
+      const conn = connections.find((c) => c.id === serverId);
+      if (!conn) return;
+
+      // Build connection params from what we know
+      // For HTTP connections, we can reconstruct params from the URL
+      const params: ConnectionParams = { transport: "http", url: conn.url };
+
+      // Add to stopped connections
+      const stoppedConn: StoppedConnection = {
+        id: serverId,
+        name: conn.serverInfo?.name ?? conn.url,
+        url: conn.url,
+        params,
+      };
+
+      setStoppedConnections((prev) => {
+        // Don't duplicate
+        if (prev.some((s) => s.id === serverId)) return prev;
+        return [...prev, stoppedConn];
+      });
+
+      // Close the connection
+      await handleCloseConnection(serverId);
+    },
+    [connections, handleCloseConnection]
+  );
+
+  // Handler to start a stopped server (reconnect using stored params)
+  const handleStartServer = useCallback(
+    async (stoppedConn: StoppedConnection) => {
+      // Remove from stopped list first
+      setStoppedConnections((prev) => prev.filter((s) => s.id !== stoppedConn.id));
+
+      // Reconnect using stored params
+      await handleCreateConnection(stoppedConn.params);
+    },
+    [handleCreateConnection]
+  );
+
   const tabs = useMemo(
     () =>
       connections.map((connection) => ({
@@ -593,19 +728,20 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
 
       {/* Content Wrapper - horizontal layout */}
       <div style={styles.contentWrapper}>
-        {/* Left Panel - MCP Primitives (always present) */}
+        {/* Left Panel - MCP Primitives as Server Blocks */}
         <McpPrimitivesPanel
-          tools={displayTools}
-          resources={displayResources}
-          prompts={displayPrompts}
+          servers={serverDataList}
+          stoppedConnections={stoppedConnections}
           isLoading={primitivesLoading}
           isVisible={true}
           isCollapsed={isLeftPanelCollapsed}
           onToggleCollapse={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)}
-          position="left"
           panelWidth={leftPanelWidth}
           resizeHandleProps={leftResizeHandleProps}
           isResizing={isLeftResizing}
+          onStopServer={handleStopServer}
+          onStartServer={handleStartServer}
+          onAddServer={handleConnect}
         />
 
         {/* Center Column - screencast + globals bar */}
