@@ -119,7 +119,6 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
   const [selectedSessionByConnection, setSelectedSessionByConnection] = useState<
     Record<string, string | null>
   >({});
-  const [isConnectionFormOpen, setIsConnectionFormOpen] = useState(false);
   const { sessions, isLoading: sessionsLoading } = useSessions(baseUrl, activeConnectionId);
 
   const activeConnection = useMemo(
@@ -239,7 +238,6 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
       void reconnectConnection(activeConnectionId).then((connected) => {
         if (connected) {
           clearAuthDiscovery();
-          setIsConnectionFormOpen(false);
         }
       });
     }
@@ -328,11 +326,6 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     const initEvent = displayAgentEvents.find((e) => e.type === "agent-initialize");
     return (initEvent?.payload as { clientName?: string } | undefined)?.clientName;
   }, [displayAgentEvents]);
-
-  // Handler to open connection form
-  const handleConnect = useCallback(() => {
-    setIsConnectionFormOpen(true);
-  }, []);
 
   // Left panel state (MCP primitives) - persisted to localStorage
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(() => {
@@ -553,11 +546,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
   const handleCreateConnection = useCallback(
     async (params: import("@mcp-apps-kit/testing").ConnectionParams): Promise<boolean> => {
       const conn = await createConnection(params);
-      if (conn) {
-        setIsConnectionFormOpen(false);
-        return true;
-      }
-      return false;
+      return !!conn;
     },
     [createConnection]
   );
@@ -758,14 +747,6 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
         </div>
       </header>
 
-      <TabBar
-        tabs={tabs}
-        activeTabId={activeConnectionId}
-        onSelect={(id) => setActiveConnectionId(id)}
-        onClose={(id) => void handleCloseConnection(id)}
-        onAdd={() => setIsConnectionFormOpen(true)}
-      />
-
       {/* Error Banner */}
       {error && <div style={styles.errorBanner}>{error}</div>}
 
@@ -823,11 +804,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
               </div>
             ) : (
               /* Tamagotchi placeholder when no widget */
-              <NoWidgetPlaceholder
-                connectionState={connectionState}
-                clientName={agentClientName}
-                onConnect={handleConnect}
-              />
+              <NoWidgetPlaceholder connectionState={connectionState} clientName={agentClientName} />
             )}
           </main>
 
@@ -875,7 +852,6 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
             // Close on backdrop click
             if (e.target === e.currentTarget) {
               clearAuthDiscovery();
-              setIsConnectionFormOpen(false);
             }
           }}
         >
@@ -892,7 +868,6 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
                 void reconnectConnection(activeConnectionId).then((connected) => {
                   if (connected) {
                     clearAuthDiscovery();
-                    setIsConnectionFormOpen(false);
                   }
                 });
               }
@@ -900,7 +875,6 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
             }}
             onDismiss={() => {
               clearAuthDiscovery();
-              setIsConnectionFormOpen(false);
             }}
           />
         </div>
