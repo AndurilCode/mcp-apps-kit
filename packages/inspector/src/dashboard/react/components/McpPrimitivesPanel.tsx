@@ -16,6 +16,7 @@ import type {
 } from "../types/mcp-primitives";
 import type { ConnectionParams } from "@mcp-apps-kit/testing";
 import { SidebarConnectionForm } from "./SidebarConnectionForm";
+import { PrimitiveDetail, type Primitive } from "./PrimitiveDetail";
 
 // =============================================================================
 // Types
@@ -108,6 +109,10 @@ export interface McpPrimitivesPanelNewProps {
   selectedPrimitive?: SelectedPrimitive | null;
   /** Callback when a primitive is selected */
   onSelectPrimitive?: (primitive: SelectedPrimitive | null) => void;
+  /** Resolved primitive data for detail view */
+  resolvedPrimitive?: Primitive | null;
+  /** Callback to close the primitive detail */
+  onClosePrimitive?: () => void;
 }
 
 /** Legacy API props for backward compatibility with tests */
@@ -393,6 +398,7 @@ const localStyles: Record<string, React.CSSProperties> = {
     backgroundColor: "#1a1a1a",
     border: "1px solid #2d2f2f",
     borderRadius: "4px",
+    outline: "none",
   },
   primitiveItemHover: {
     backgroundColor: "#222222",
@@ -1661,6 +1667,8 @@ function ServerBlocksContent({
   connectionError,
   selectedPrimitive,
   onSelectPrimitive,
+  resolvedPrimitive,
+  onClosePrimitive,
 }: McpPrimitivesPanelNewProps): React.ReactElement {
   const [searchFilter, setSearchFilter] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -1790,7 +1798,12 @@ function ServerBlocksContent({
 
         {/* Content */}
         <div style={localStyles.content}>
-          {isLoading && servers.length === 0 && stoppedConnections.length === 0 ? (
+          {/* Show PrimitiveDetail when a primitive is selected */}
+          {resolvedPrimitive ? (
+            <div style={{ padding: "0.75rem" }}>
+              <PrimitiveDetail primitive={resolvedPrimitive} onClose={onClosePrimitive} />
+            </div>
+          ) : isLoading && servers.length === 0 && stoppedConnections.length === 0 ? (
             <div style={localStyles.loadingState}>
               <Spinner />
               <span>Loading...</span>

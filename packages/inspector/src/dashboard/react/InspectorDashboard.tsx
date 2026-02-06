@@ -28,7 +28,7 @@ import {
   type StoppedConnection,
   type SelectedPrimitive,
 } from "./components/McpPrimitivesPanel";
-import { PrimitiveDetail, type Primitive } from "./components/PrimitiveDetail";
+import type { Primitive } from "./components/PrimitiveDetail";
 import { RightPanel } from "./components/RightPanel";
 import { NoWidgetPlaceholder, type ConnectionState } from "./components/NoWidgetPlaceholder";
 import { OAuthDiscoveryPanel } from "./components/OAuthDiscoveryPanel";
@@ -540,27 +540,16 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
   }, [activeConnectionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleRightPanel = useCallback(() => {
-    setIsRightPanelCollapsed((prev) => {
-      const willExpand = prev; // true means collapsed, toggling to expand
-      if (willExpand) {
-        // When right panel opens, clear primitive selection (mutual exclusivity)
-        setSelectedPrimitive(null);
-      }
-      return !prev;
-    });
+    setIsRightPanelCollapsed((prev) => !prev);
   }, []);
 
   const toggleGlobalsBar = useCallback(() => {
     setIsGlobalsBarCollapsed((prev) => !prev);
   }, []);
 
-  // Handle primitive selection - shows detail in right panel
+  // Handle primitive selection - shows detail in left panel (sidebar)
   const handleSelectPrimitive = useCallback((primitive: SelectedPrimitive | null) => {
     setSelectedPrimitive(primitive);
-    if (primitive) {
-      // When detail view opens, expand right panel to show it
-      setIsRightPanelCollapsed(false);
-    }
   }, []);
 
   const handleCreateConnection = useCallback(
@@ -815,6 +804,8 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           connectionError={connectionError}
           selectedPrimitive={selectedPrimitive}
           onSelectPrimitive={handleSelectPrimitive}
+          resolvedPrimitive={resolvedPrimitive}
+          onClosePrimitive={() => setSelectedPrimitive(null)}
         />
 
         {/* Center Column - screencast + globals bar */}
@@ -866,7 +857,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           )}
         </div>
 
-        {/* Right Panel - Agent/Events/Logs tabs OR Primitive Detail */}
+        {/* Right Panel - Agent/Events/Logs tabs */}
         <RightPanel
           logs={displayLogs}
           events={displayEvents}
@@ -880,8 +871,6 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           resizeHandleProps={rightResizeHandleProps}
           isResizing={isRightResizing}
           isStreaming={isStreaming}
-          selectedPrimitive={resolvedPrimitive}
-          onClosePrimitive={() => setSelectedPrimitive(null)}
         />
       </div>
 
