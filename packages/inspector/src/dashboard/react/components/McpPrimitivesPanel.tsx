@@ -43,6 +43,12 @@ export interface McpPrimitivesPanelProps {
   resizeHandleProps?: React.HTMLAttributes<HTMLDivElement>;
   /** Whether resize is active */
   isResizing?: boolean;
+  /** Currently selected primitive ID (tool.name, resource.uri, or prompt.name) */
+  selectedPrimitiveId?: string | null;
+  /** Type of the currently selected primitive */
+  selectedPrimitiveType?: "tool" | "resource" | "prompt" | null;
+  /** Callback when a primitive is selected/deselected */
+  onSelectPrimitive?: (type: "tool" | "resource" | "prompt", id: string) => void;
 }
 
 // Font stack (matches styles.ts FONT_SANS)
@@ -188,6 +194,15 @@ const localStyles: Record<string, React.CSSProperties> = {
     borderRadius: "6px",
     padding: "0.5rem 0.75rem",
     marginBottom: "0.5rem",
+    cursor: "pointer",
+    transition: "border-color 0.15s ease, background-color 0.15s ease",
+  },
+  cardSelected: {
+    borderColor: "#ffffff",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+  },
+  cardHover: {
+    borderColor: "#4d5050",
   },
   cardHeader: {
     display: "flex",
@@ -682,21 +697,53 @@ function AnimatedCollapse({
 // Card Components
 // =============================================================================
 
-function ToolCard({ tool }: { tool: McpTool }): React.ReactElement {
+function ToolCard({
+  tool,
+  isSelected,
+  onSelect,
+}: {
+  tool: McpTool;
+  isSelected?: boolean;
+  onSelect?: () => void;
+}): React.ReactElement {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const hasUI = hasToolUI(tool);
 
+  const handleCardClick = useCallback(() => {
+    onSelect?.();
+  }, [onSelect]);
+
+  const handleExpandClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsExpanded((prev) => !prev);
+  }, []);
+
+  const handleExpandKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsExpanded((prev) => !prev);
+    }
+  }, []);
+
   return (
-    <div style={localStyles.card}>
+    <div
+      style={{
+        ...localStyles.card,
+        ...(isSelected ? localStyles.cardSelected : {}),
+        ...(isHovered && !isSelected ? localStyles.cardHover : {}),
+      }}
+      onClick={handleCardClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      data-testid={`tool-card-${tool.name}`}
+      data-selected={isSelected}
+    >
       <div
         style={localStyles.cardHeaderClickable}
-        onClick={() => setIsExpanded((prev) => !prev)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            setIsExpanded((prev) => !prev);
-          }
-        }}
+        onClick={handleExpandClick}
+        onKeyDown={handleExpandKeyDown}
         tabIndex={0}
         role="button"
         aria-expanded={isExpanded}
@@ -749,20 +796,52 @@ function ToolCard({ tool }: { tool: McpTool }): React.ReactElement {
   );
 }
 
-function ResourceCard({ resource }: { resource: McpResource }): React.ReactElement {
+function ResourceCard({
+  resource,
+  isSelected,
+  onSelect,
+}: {
+  resource: McpResource;
+  isSelected?: boolean;
+  onSelect?: () => void;
+}): React.ReactElement {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handleCardClick = useCallback(() => {
+    onSelect?.();
+  }, [onSelect]);
+
+  const handleExpandClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsExpanded((prev) => !prev);
+  }, []);
+
+  const handleExpandKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsExpanded((prev) => !prev);
+    }
+  }, []);
 
   return (
-    <div style={localStyles.card}>
+    <div
+      style={{
+        ...localStyles.card,
+        ...(isSelected ? localStyles.cardSelected : {}),
+        ...(isHovered && !isSelected ? localStyles.cardHover : {}),
+      }}
+      onClick={handleCardClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      data-testid={`resource-card-${resource.uri}`}
+      data-selected={isSelected}
+    >
       <div
         style={localStyles.cardHeaderClickable}
-        onClick={() => setIsExpanded((prev) => !prev)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            setIsExpanded((prev) => !prev);
-          }
-        }}
+        onClick={handleExpandClick}
+        onKeyDown={handleExpandKeyDown}
         tabIndex={0}
         role="button"
         aria-expanded={isExpanded}
@@ -792,20 +871,52 @@ function ResourceCard({ resource }: { resource: McpResource }): React.ReactEleme
   );
 }
 
-function PromptCard({ prompt }: { prompt: McpPrompt }): React.ReactElement {
+function PromptCard({
+  prompt,
+  isSelected,
+  onSelect,
+}: {
+  prompt: McpPrompt;
+  isSelected?: boolean;
+  onSelect?: () => void;
+}): React.ReactElement {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handleCardClick = useCallback(() => {
+    onSelect?.();
+  }, [onSelect]);
+
+  const handleExpandClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsExpanded((prev) => !prev);
+  }, []);
+
+  const handleExpandKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsExpanded((prev) => !prev);
+    }
+  }, []);
 
   return (
-    <div style={localStyles.card}>
+    <div
+      style={{
+        ...localStyles.card,
+        ...(isSelected ? localStyles.cardSelected : {}),
+        ...(isHovered && !isSelected ? localStyles.cardHover : {}),
+      }}
+      onClick={handleCardClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      data-testid={`prompt-card-${prompt.name}`}
+      data-selected={isSelected}
+    >
       <div
         style={localStyles.cardHeaderClickable}
-        onClick={() => setIsExpanded((prev) => !prev)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            setIsExpanded((prev) => !prev);
-          }
-        }}
+        onClick={handleExpandClick}
+        onKeyDown={handleExpandKeyDown}
         tabIndex={0}
         role="button"
         aria-expanded={isExpanded}
@@ -846,8 +957,39 @@ export function McpPrimitivesPanel({
   panelWidth,
   resizeHandleProps,
   isResizing,
+  selectedPrimitiveId,
+  selectedPrimitiveType,
+  onSelectPrimitive,
 }: McpPrimitivesPanelProps): React.ReactElement {
   const [activeTab, setActiveTab] = useState<TabType>("tools");
+
+  // Handle primitive selection with toggle behavior
+  const handleSelectTool = useCallback(
+    (toolName: string) => {
+      if (onSelectPrimitive) {
+        onSelectPrimitive("tool", toolName);
+      }
+    },
+    [onSelectPrimitive]
+  );
+
+  const handleSelectResource = useCallback(
+    (resourceUri: string) => {
+      if (onSelectPrimitive) {
+        onSelectPrimitive("resource", resourceUri);
+      }
+    },
+    [onSelectPrimitive]
+  );
+
+  const handleSelectPrompt = useCallback(
+    (promptName: string) => {
+      if (onSelectPrimitive) {
+        onSelectPrimitive("prompt", promptName);
+      }
+    },
+    [onSelectPrimitive]
+  );
 
   // Build panel styles based on position and visibility
   const panelStyle: React.CSSProperties = {
@@ -891,7 +1033,12 @@ export function McpPrimitivesPanel({
         return (
           <>
             {tools.map((tool) => (
-              <ToolCard key={tool.name} tool={tool} />
+              <ToolCard
+                key={tool.name}
+                tool={tool}
+                isSelected={selectedPrimitiveType === "tool" && selectedPrimitiveId === tool.name}
+                onSelect={() => handleSelectTool(tool.name)}
+              />
             ))}
           </>
         );
@@ -903,7 +1050,14 @@ export function McpPrimitivesPanel({
         return (
           <>
             {resources.map((resource) => (
-              <ResourceCard key={resource.uri} resource={resource} />
+              <ResourceCard
+                key={resource.uri}
+                resource={resource}
+                isSelected={
+                  selectedPrimitiveType === "resource" && selectedPrimitiveId === resource.uri
+                }
+                onSelect={() => handleSelectResource(resource.uri)}
+              />
             ))}
           </>
         );
@@ -915,7 +1069,14 @@ export function McpPrimitivesPanel({
         return (
           <>
             {prompts.map((prompt) => (
-              <PromptCard key={prompt.name} prompt={prompt} />
+              <PromptCard
+                key={prompt.name}
+                prompt={prompt}
+                isSelected={
+                  selectedPrimitiveType === "prompt" && selectedPrimitiveId === prompt.name
+                }
+                onSelect={() => handleSelectPrompt(prompt.name)}
+              />
             ))}
           </>
         );
