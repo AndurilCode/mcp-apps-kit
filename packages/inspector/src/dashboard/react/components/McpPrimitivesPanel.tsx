@@ -295,17 +295,15 @@ const localStyles: Record<string, React.CSSProperties> = {
   },
   serverName: {
     flex: 1,
-    fontSize: "0.75rem",
+    fontSize: "0.9375rem",
     fontWeight: 600,
-    color: "#9ca3af",
-    textTransform: "uppercase" as const,
-    letterSpacing: "0.05em",
+    color: "#ffffff",
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap" as const,
   },
   serverNameStopped: {
-    color: "#9ca3af",
+    color: "#6b7280",
   },
   serverButton: {
     backgroundColor: "#ffffff",
@@ -636,6 +634,16 @@ function KeyframeStyles(): React.ReactElement {
         to {
           opacity: 1;
           transform: scale(1) translateY(0);
+        }
+      }
+      @keyframes slideInFromLeft {
+        from {
+          opacity: 0;
+          transform: translateX(-12px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
         }
       }
     `}</style>
@@ -1020,7 +1028,6 @@ function ServerBlock({
         aria-expanded={isExpanded}
         data-testid={`server-block-header-${server.id}`}
       >
-        <span style={localStyles.expandIndicator}>{isExpanded ? "▾" : "▸"}</span>
         <span
           style={{
             ...localStyles.serverName,
@@ -1847,7 +1854,12 @@ function ServerBlocksContent({
         <div style={localStyles.content}>
           {/* Show PrimitiveDetail when a primitive is selected */}
           {resolvedPrimitive ? (
-            <div style={{ padding: "0.75rem" }}>
+            <div
+              style={{
+                padding: "0.75rem",
+                animation: "slideInFromLeft 0.2s ease-out",
+              }}
+            >
               <PrimitiveDetail primitive={resolvedPrimitive} onClose={onClosePrimitive} />
             </div>
           ) : isLoading && servers.length === 0 && stoppedConnections.length === 0 ? (
