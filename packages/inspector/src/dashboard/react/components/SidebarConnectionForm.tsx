@@ -255,7 +255,7 @@ export function SidebarConnectionForm({
     let inQuote: '"' | "'" | null = null;
 
     for (let i = 0; i < argsString.length; i++) {
-      const char = argsString[i];
+      const char = argsString[i]!; // Safe: bounded by argsString.length
 
       if (inQuote) {
         // Inside a quoted string

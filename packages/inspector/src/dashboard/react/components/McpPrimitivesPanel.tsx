@@ -693,6 +693,7 @@ function SlideOverDetail({
           setShow(true);
         });
       });
+      return; // No cleanup needed for enter animation
     } else {
       setShow(false);
       // Wait for slide-out animation

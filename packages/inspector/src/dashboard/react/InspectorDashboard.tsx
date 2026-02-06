@@ -41,7 +41,7 @@ import logoUrl from "../assets/logo.png";
 const STOPPED_CONNECTIONS_KEY = "mcp-dashboard-stopped-connections";
 
 /** Zod schema for ConnectionParams validation */
-const ConnectionParamsSchema = z.discriminatedUnion("transport", [
+const ConnectionParamsSchema = z.union([
   z.object({
     transport: z.literal("http"),
     url: z.string().min(1),
@@ -50,7 +50,7 @@ const ConnectionParamsSchema = z.discriminatedUnion("transport", [
     transport: z.literal("stdio"),
     command: z.string().min(1),
     args: z.array(z.string()).optional(),
-    env: z.record(z.string()).optional(),
+    env: z.record(z.string(), z.string()).optional(),
     inheritEnv: z.boolean().optional(),
     cwd: z.string().optional(),
   }),
@@ -114,13 +114,11 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
   const {
     connections,
     activeConnectionId,
-    setActiveConnectionId,
     isCreating,
     error: connectionError,
     createConnection,
     reconnectConnection,
     closeConnection,
-    getMatchingEntries,
     authDiscovery,
     clearAuthDiscovery,
   } = useConnections(baseUrl);
@@ -659,18 +657,6 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
       setStoppedConnections((prev) => prev.filter((s) => s.id !== serverId));
     },
     [closeConnection]
-  );
-
-  const tabs = useMemo(
-    () =>
-      connections.map((connection) => ({
-        id: connection.id,
-        url: connection.url,
-        serverInfo: connection.serverInfo,
-        status: connection.status,
-        isOAuth: connection.isOAuth,
-      })),
-    [connections]
   );
 
   // Compute screencast container aspect ratio from globals viewport

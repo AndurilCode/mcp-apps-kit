@@ -638,42 +638,6 @@ function Tag({
   );
 }
 
-/** Collapsible description section */
-function CollapsibleDescription({ description }: { description: string }): React.ReactElement {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const paragraphs = description.split("\n\n").filter((p) => p.trim());
-
-  return (
-    <div>
-      <button
-        style={styles.collapsibleToggle}
-        onClick={() => setIsOpen(!isOpen)}
-        aria-expanded={isOpen}
-        data-testid="description-toggle"
-      >
-        <span style={styles.collapsibleIcon}>{isOpen ? "▾" : "▸"}</span>
-        <span>Description</span>
-      </button>
-      {isOpen && (
-        <div style={styles.descriptionContent}>
-          {paragraphs.map((paragraph, index) => (
-            <p
-              key={index}
-              style={{
-                ...styles.descriptionText,
-                ...(index > 0 ? styles.descriptionParagraph : {}),
-              }}
-            >
-              {paragraph}
-            </p>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 /** Parameters section for tools (browse mode) */
 function ParametersSection({
   properties,
@@ -1322,7 +1286,7 @@ function PromptUseForm({
  */
 export function PrimitiveDetail({
   primitive,
-  onAction,
+  // onAction - reserved for future use when action buttons are enabled
   onExecute,
   onClose,
 }: PrimitiveDetailProps): React.ReactElement {
@@ -1345,15 +1309,6 @@ export function PrimitiveDetail({
   // Extract data without the kind field for JSON export
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { kind, ...primitiveData } = primitive;
-
-  const handleActionClick = useCallback(() => {
-    // If external handler wants to manage mode, call it
-    if (onAction) {
-      onAction(primitive);
-    }
-    // Switch to action mode
-    setMode("action");
-  }, [onAction, primitive]);
 
   const handleBack = useCallback(() => {
     setMode("browse");
