@@ -429,7 +429,15 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
   }, [activeConnectionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleRightPanel = useCallback(() => {
-    setIsRightPanelCollapsed((prev) => !prev);
+    setIsRightPanelCollapsed((prev) => {
+      const willOpen = prev; // currently collapsed, will open
+      if (willOpen) {
+        // Mutual exclusivity: clear primitive selection when opening right panel
+        setSelectedPrimitiveType(null);
+        setSelectedPrimitiveId(null);
+      }
+      return !prev;
+    });
   }, []);
 
   const toggleGlobalsBar = useCallback(() => {
@@ -437,10 +445,13 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
   }, []);
 
   // Sidebar primitive selection handlers
+  // When a primitive is selected, auto-collapse the right panel (mutual exclusivity)
   const setSelectedPrimitive = useCallback((type: PrimitiveType, id: string) => {
     setSelectedPrimitiveType(type);
     setSelectedPrimitiveId(id);
     setIsDetailExpanded(true);
+    // Mutual exclusivity: collapse right panel when detail opens
+    setIsRightPanelCollapsed(true);
   }, []);
 
   const clearSelectedPrimitive = useCallback(() => {
@@ -653,6 +664,9 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           panelWidth={leftPanelWidth}
           resizeHandleProps={leftResizeHandleProps}
           isResizing={isLeftResizing}
+          selectedPrimitiveId={selectedPrimitiveId}
+          selectedPrimitiveType={selectedPrimitiveType}
+          onSelectPrimitive={setSelectedPrimitive}
         />
 
         {/* Center Column - screencast + globals bar */}
