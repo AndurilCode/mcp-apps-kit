@@ -1920,60 +1920,62 @@ function ServerBlocksContent({
         {/* Content */}
         <div style={localStyles.content}>
           {/* Show PrimitiveDetail when a primitive is selected */}
+          {/* Server list - always rendered, detail slides over it */}
+          {isLoading && servers.length === 0 && stoppedConnections.length === 0 ? (
+            <div style={localStyles.loadingState}>
+              <Spinner />
+              <span>Loading...</span>
+            </div>
+          ) : !hasAnyServer && !isFormOpen ? (
+            <div style={localStyles.emptyState}>
+              <span>No servers connected</span>
+              <button
+                style={{
+                  ...localStyles.addButton,
+                  padding: "0.5rem 1rem",
+                }}
+                onClick={handleAddClick}
+              >
+                + Connect Server
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Active servers */}
+              {servers.map((server) => (
+                <ServerBlock
+                  key={server.id}
+                  server={server}
+                  isConnected={true}
+                  searchFilter={searchFilter}
+                  onStop={() => onStopServer?.(server.id)}
+                  onDelete={() => onDeleteServer?.(server.id, true)}
+                  selectedPrimitive={selectedPrimitive}
+                  onSelectPrimitive={onSelectPrimitive}
+                />
+              ))}
+
+              {/* Stopped servers */}
+              {stoppedConnections.map((stopped) => (
+                <ServerBlock
+                  key={`stopped-${stopped.id}`}
+                  server={stopped}
+                  isConnected={false}
+                  isReconnecting={reconnectingServerId === stopped.id}
+                  searchFilter={searchFilter}
+                  onStart={() => onStartServer?.(stopped)}
+                  onDelete={() => onDeleteServer?.(stopped.id, false)}
+                />
+              ))}
+            </>
+          )}
+
+          {/* Slide-over detail panel */}
           <SlideOverDetail isVisible={!!resolvedPrimitive}>
             {resolvedPrimitive && (
               <PrimitiveDetail primitive={resolvedPrimitive} onClose={onClosePrimitive} />
             )}
           </SlideOverDetail>
-          {!resolvedPrimitive &&
-            (isLoading && servers.length === 0 && stoppedConnections.length === 0 ? (
-              <div style={localStyles.loadingState}>
-                <Spinner />
-                <span>Loading...</span>
-              </div>
-            ) : !hasAnyServer && !isFormOpen ? (
-              <div style={localStyles.emptyState}>
-                <span>No servers connected</span>
-                <button
-                  style={{
-                    ...localStyles.addButton,
-                    padding: "0.5rem 1rem",
-                  }}
-                  onClick={handleAddClick}
-                >
-                  + Connect Server
-                </button>
-              </div>
-            ) : (
-              <>
-                {/* Active servers */}
-                {servers.map((server) => (
-                  <ServerBlock
-                    key={server.id}
-                    server={server}
-                    isConnected={true}
-                    searchFilter={searchFilter}
-                    onStop={() => onStopServer?.(server.id)}
-                    onDelete={() => onDeleteServer?.(server.id, true)}
-                    selectedPrimitive={selectedPrimitive}
-                    onSelectPrimitive={onSelectPrimitive}
-                  />
-                ))}
-
-                {/* Stopped servers */}
-                {stoppedConnections.map((stopped) => (
-                  <ServerBlock
-                    key={`stopped-${stopped.id}`}
-                    server={stopped}
-                    isConnected={false}
-                    isReconnecting={reconnectingServerId === stopped.id}
-                    searchFilter={searchFilter}
-                    onStart={() => onStartServer?.(stopped)}
-                    onDelete={() => onDeleteServer?.(stopped.id, false)}
-                  />
-                ))}
-              </>
-            ))}
         </div>
       </div>
 
