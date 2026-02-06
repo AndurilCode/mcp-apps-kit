@@ -28,6 +28,14 @@ import { OAuthDiscoveryPanel } from "./components/OAuthDiscoveryPanel";
 import { styles } from "./styles";
 import logoUrl from "../assets/logo.png";
 
+// Sidebar primitive selection types
+export type PrimitiveType = "tool" | "resource" | "prompt";
+
+export interface SelectedPrimitive {
+  type: PrimitiveType;
+  id: string; // tool name, resource URI, or prompt name
+}
+
 export interface InspectorDashboardProps {
   /** Base URL for the inspector API (default: current origin) */
   baseUrl?: string;
@@ -241,6 +249,22 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
   // Left panel state (MCP primitives)
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
 
+  // Sidebar primitive selection state (not persisted - resets on page load)
+  const [selectedPrimitiveId, setSelectedPrimitiveId] = useState<string | null>(null);
+  const [selectedPrimitiveType, setSelectedPrimitiveType] = useState<PrimitiveType | null>(null);
+
+  // Sidebar detail panel expansion state (persisted)
+  const [isDetailExpanded, setIsDetailExpanded] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        return localStorage.getItem("mcp-dashboard-detail-expanded") === "true";
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  });
+
   // Right panel state (persisted)
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(() => {
     if (typeof window !== "undefined") {
@@ -349,6 +373,17 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     }
   }, [isGlobalsBarCollapsed]);
 
+  // Save detail panel expanded state
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("mcp-dashboard-detail-expanded", String(isDetailExpanded));
+      } catch {
+        // ignore storage access errors
+      }
+    }
+  }, [isDetailExpanded]);
+
   const handleSessionChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       const value = e.target.value;
@@ -399,6 +434,18 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
 
   const toggleGlobalsBar = useCallback(() => {
     setIsGlobalsBarCollapsed((prev) => !prev);
+  }, []);
+
+  // Sidebar primitive selection handlers
+  const setSelectedPrimitive = useCallback((type: PrimitiveType, id: string) => {
+    setSelectedPrimitiveType(type);
+    setSelectedPrimitiveId(id);
+    setIsDetailExpanded(true);
+  }, []);
+
+  const clearSelectedPrimitive = useCallback(() => {
+    setSelectedPrimitiveType(null);
+    setSelectedPrimitiveId(null);
   }, []);
 
   const handleCreateConnection = useCallback(
