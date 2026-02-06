@@ -847,7 +847,8 @@ export function createStandaloneInspectorServer(
             }
           }
         } catch {
-          // Not valid JSON or not a tool call, ignore
+          // Parse failures handled silently — non-JSON bodies on MCP endpoints are expected
+          // (e.g., SSE connections, partial uploads). Debug logging omitted to avoid noise.
         }
       }
 

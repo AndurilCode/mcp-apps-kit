@@ -5,6 +5,7 @@
  */
 
 import { EventEmitter } from "node:events";
+import { z } from "zod";
 import {
   createTestClient,
   type TestClient,
@@ -1183,6 +1184,24 @@ export class ConnectionManager extends EventEmitter {
   }
 
   /**
+   * Zod schema for validating MCP initialize requests.
+   * Used by maybeRecordInitialize to safely extract clientInfo.
+   */
+  private static readonly InitializeRequestSchema = z.object({
+    method: z.literal("initialize"),
+    params: z
+      .object({
+        clientInfo: z
+          .object({
+            name: z.string().optional(),
+            version: z.string().optional(),
+          })
+          .optional(),
+      })
+      .optional(),
+  });
+
+  /**
    * Check if a JSON-RPC body is an MCP `initialize` request and record an agent-initialize event
    *
    * This intercepts the MCP initialize handshake to detect when an agent connects.
@@ -1192,58 +1211,31 @@ export class ConnectionManager extends EventEmitter {
    * @returns true if an initialize event was recorded, false otherwise
    */
   maybeRecordInitialize(jsonRpcBody: unknown): boolean {
-    // Validate JSON-RPC structure
-    if (!jsonRpcBody || typeof jsonRpcBody !== "object") {
+    // Use Zod to safely validate and extract the initialize request structure
+    const parseResult = ConnectionManager.InitializeRequestSchema.safeParse(jsonRpcBody);
+
+    if (!parseResult.success) {
+      // Not a valid initialize request structure
       return false;
     }
 
-    const body = jsonRpcBody as Record<string, unknown>;
+    const { params } = parseResult.data;
+    const clientInfo = params?.clientInfo;
 
-    // Check if this is an initialize request
-    if (body.method !== "initialize") {
-      return false;
-    }
-
-    // Extract params.clientInfo
-    const params = body.params;
-    if (!params || typeof params !== "object") {
-      if (this.debug) {
-        console.log(`[inspector] initialize request missing params`);
-      }
-      return false;
-    }
-
-    const paramsObj = params as Record<string, unknown>;
-    const clientInfo = paramsObj.clientInfo;
-
-    if (!clientInfo || typeof clientInfo !== "object") {
-      if (this.debug) {
-        console.log(`[inspector] initialize request missing clientInfo`);
-      }
-      // Still record the event, just without client name
-      this.recordAgentEvent("agent-initialize", {});
-      return true;
-    }
-
-    const clientInfoObj = clientInfo as Record<string, unknown>;
-    const clientName = typeof clientInfoObj.name === "string" ? clientInfoObj.name : undefined;
-    const clientVersion =
-      typeof clientInfoObj.version === "string" ? clientInfoObj.version : undefined;
-
-    // Build payload
+    // Build payload from validated data
     const payload: Record<string, unknown> = {};
-    if (clientName) {
-      payload.clientName = clientName;
+    if (clientInfo?.name) {
+      payload.clientName = clientInfo.name;
     }
-    if (clientVersion) {
-      payload.clientVersion = clientVersion;
+    if (clientInfo?.version) {
+      payload.clientVersion = clientInfo.version;
     }
 
     this.recordAgentEvent("agent-initialize", payload);
 
     if (this.debug) {
       console.log(
-        `[inspector] Agent initialize detected: ${clientName ?? "unknown"}${clientVersion ? ` v${clientVersion}` : ""}`
+        `[inspector] Agent initialize detected: ${clientInfo?.name ?? "unknown"}${clientInfo?.version ? ` v${clientInfo.version}` : ""}`
       );
     }
 

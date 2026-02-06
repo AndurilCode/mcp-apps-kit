@@ -24,6 +24,20 @@ export interface NoWidgetPlaceholderProps {
   onConnect: () => void;
 }
 
+/**
+ * Module-level button hover handlers.
+ * Extracted from inline handlers for memoization — these don't depend on component state.
+ */
+const handleButtonHover = (e: React.MouseEvent<HTMLButtonElement>) => {
+  e.currentTarget.style.opacity = "0.9";
+  e.currentTarget.style.transform = "scale(1.02)";
+};
+
+const handleButtonLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
+  e.currentTarget.style.opacity = "1";
+  e.currentTarget.style.transform = "scale(1)";
+};
+
 /** Local styles for the stepped tutorial layout */
 const localStyles: Record<string, CSSProperties> = {
   tagline: {
@@ -93,16 +107,11 @@ export function NoWidgetPlaceholder({
             <h2 style={localStyles.heading}>Connect the server you want to inspect</h2>
             <button
               type="button"
+              aria-label="Connect to MCP server"
               style={localStyles.connectButton}
               onClick={onConnect}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.opacity = "0.9";
-                e.currentTarget.style.transform = "scale(1.02)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = "1";
-                e.currentTarget.style.transform = "scale(1)";
-              }}
+              onMouseEnter={handleButtonHover}
+              onMouseLeave={handleButtonLeave}
             >
               Connect Server
             </button>

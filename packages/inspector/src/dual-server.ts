@@ -725,7 +725,8 @@ export function createDualInspectorServer(
           cm.maybeRecordInitialize(parsed);
         }
       } catch {
-        // Not valid JSON, ignore
+        // Parse failures handled silently — non-JSON bodies on MCP endpoints are expected
+        // (e.g., SSE connections, partial uploads). Debug logging omitted to avoid noise.
       }
     }
 
