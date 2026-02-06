@@ -643,7 +643,7 @@ function KeyframeStyles(): React.ReactElement {
       @keyframes slideInFromRight {
         from {
           opacity: 0;
-          transform: translateX(16px);
+          transform: translateX(8px);
         }
         to {
           opacity: 1;
@@ -657,7 +657,7 @@ function KeyframeStyles(): React.ReactElement {
         }
         to {
           opacity: 0;
-          transform: translateX(-16px);
+          transform: translateX(-8px);
         }
       }
     `}</style>
@@ -681,38 +681,42 @@ function AnimatedDetailWrapper({
   children: React.ReactNode;
   isVisible: boolean;
 }): React.ReactElement | null {
-  const [shouldRender, setShouldRender] = useState(isVisible);
-  const [animationClass, setAnimationClass] = useState<"enter" | "exit" | null>(
-    isVisible ? "enter" : null
+  const [renderState, setRenderState] = useState<"hidden" | "entering" | "visible" | "exiting">(
+    isVisible ? "visible" : "hidden"
   );
+  const prevVisibleRef = useRef(isVisible);
 
   useEffect(() => {
-    if (isVisible) {
-      setShouldRender(true);
-      setAnimationClass("enter");
-    } else if (shouldRender) {
-      setAnimationClass("exit");
-      // Wait for exit animation to complete before unmounting
-      const timer = setTimeout(() => {
-        setShouldRender(false);
-        setAnimationClass(null);
-      }, 200);
+    const wasVisible = prevVisibleRef.current;
+    prevVisibleRef.current = isVisible;
+
+    if (isVisible && !wasVisible) {
+      // Opening: show and animate in
+      setRenderState("entering");
+      const timer = setTimeout(() => setRenderState("visible"), 200);
+      return () => clearTimeout(timer);
+    } else if (!isVisible && wasVisible) {
+      // Closing: animate out then hide
+      setRenderState("exiting");
+      const timer = setTimeout(() => setRenderState("hidden"), 200);
       return () => clearTimeout(timer);
     }
-  }, [isVisible, shouldRender]);
+  }, [isVisible]);
 
-  if (!shouldRender) return null;
+  if (renderState === "hidden") return null;
+
+  const animation =
+    renderState === "entering"
+      ? "slideInFromRight 0.2s ease-out forwards"
+      : renderState === "exiting"
+        ? "slideOutToLeft 0.2s ease-out forwards"
+        : undefined;
 
   return (
     <div
       style={{
         padding: "0.75rem",
-        animation:
-          animationClass === "enter"
-            ? "slideInFromRight 0.2s ease-out"
-            : animationClass === "exit"
-              ? "slideOutToLeft 0.2s ease-out forwards"
-              : undefined,
+        animation,
       }}
     >
       {children}
