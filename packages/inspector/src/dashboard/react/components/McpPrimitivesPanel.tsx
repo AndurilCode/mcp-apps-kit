@@ -386,19 +386,9 @@ const localStyles: Record<string, React.CSSProperties> = {
     textTransform: "uppercase" as const,
     letterSpacing: "0.05em",
   },
-  // Primitive card styles - collapsible cards
-  primitiveCard: {
+  // Primitive item styles - clickable items that open detail view
+  primitiveItem: {
     margin: "0.25rem 0.5rem",
-    backgroundColor: "#1a1a1a",
-    border: "1px solid #2d2f2f",
-    borderRadius: "6px",
-    overflow: "hidden",
-    transition: "border-color 0.15s ease",
-  },
-  primitiveCardExpanded: {
-    borderColor: "#3d4040",
-  },
-  primitiveCardHeader: {
     padding: "0.5rem 0.75rem",
     cursor: "pointer",
     fontSize: "0.875rem",
@@ -407,24 +397,18 @@ const localStyles: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     gap: "0.5rem",
-    transition: "background-color 0.15s ease",
+    transition: "all 0.15s ease",
+    backgroundColor: "#1a1a1a",
+    border: "1px solid #2d2f2f",
+    borderRadius: "6px",
     outline: "none",
   },
-  primitiveCardHeaderHover: {
-    backgroundColor: "#222222",
+  primitiveItemHover: {
+    backgroundColor: "#252525",
   },
-  primitiveCardContent: {
-    padding: "0 0.75rem 0.75rem",
-    fontSize: "0.75rem",
-    color: "#9ca3af",
-    lineHeight: 1.5,
-    borderTop: "1px solid #2d2f2f",
-  },
-  primitiveExpandIcon: {
-    fontSize: "0.625rem",
-    color: "#6b7280",
-    transition: "transform 0.15s ease",
-    flexShrink: 0,
+  primitiveItemActive: {
+    backgroundColor: "#1f1f1f",
+    borderColor: "#ffffff",
   },
   primitiveName: {
     flex: 1,
@@ -954,20 +938,6 @@ function ServerBlock({
 }: ServerBlockProps): React.ReactElement | null {
   const [isExpanded, setIsExpanded] = useState(true);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
-  const [expandedPrimitives, setExpandedPrimitives] = useState<Set<string>>(new Set());
-
-  // Toggle primitive expansion
-  const togglePrimitiveExpanded = useCallback((key: string) => {
-    setExpandedPrimitives((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-  }, []);
 
   // Helper to check if a primitive is selected
   const isPrimitiveSelected = useCallback(
@@ -1170,51 +1140,34 @@ function ServerBlock({
               <div style={localStyles.kindSection}>
                 <div style={localStyles.kindHeader}>Tools</div>
                 {filteredTools.map((tool) => {
-                  const toolKey = `tool-${tool.name}`;
-                  const isToolExpanded = expandedPrimitives.has(toolKey);
+                  const isSelected = isPrimitiveSelected("tool", tool.name);
                   return (
                     <div
                       key={tool.name}
                       style={{
-                        ...localStyles.primitiveCard,
-                        ...(isToolExpanded ? localStyles.primitiveCardExpanded : {}),
+                        ...localStyles.primitiveItem,
+                        ...(isSelected
+                          ? localStyles.primitiveItemActive
+                          : hoveredItem === `tool-${tool.name}`
+                            ? localStyles.primitiveItemHover
+                            : {}),
                       }}
-                      data-testid={`tool-card-${tool.name}`}
+                      onClick={() => handlePrimitiveClick("tool", tool.name)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handlePrimitiveClick("tool", tool.name);
+                        }
+                      }}
+                      onMouseEnter={() => setHoveredItem(`tool-${tool.name}`)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      role="button"
+                      tabIndex={0}
+                      aria-selected={isSelected}
+                      data-testid={`tool-item-${tool.name}`}
                     >
-                      <div
-                        style={{
-                          ...localStyles.primitiveCardHeader,
-                          ...(hoveredItem === toolKey ? localStyles.primitiveCardHeaderHover : {}),
-                        }}
-                        onClick={() => togglePrimitiveExpanded(toolKey)}
-                        onMouseEnter={() => setHoveredItem(toolKey)}
-                        onMouseLeave={() => setHoveredItem(null)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            togglePrimitiveExpanded(toolKey);
-                          }
-                        }}
-                        aria-expanded={isToolExpanded}
-                      >
-                        <span
-                          style={{
-                            ...localStyles.primitiveExpandIcon,
-                            transform: isToolExpanded ? "rotate(90deg)" : "rotate(0deg)",
-                          }}
-                        >
-                          ▸
-                        </span>
-                        <span style={localStyles.primitiveName}>{tool.name}</span>
-                        {hasToolUI(tool) && <span style={localStyles.widgetBadge}>Widget</span>}
-                      </div>
-                      <AnimatedCollapse isOpen={isToolExpanded}>
-                        <div style={localStyles.primitiveCardContent}>
-                          {tool.description || "No description available."}
-                        </div>
-                      </AnimatedCollapse>
+                      <span style={localStyles.primitiveName}>{tool.name}</span>
+                      {hasToolUI(tool) && <span style={localStyles.widgetBadge}>Widget</span>}
                     </div>
                   );
                 })}
@@ -1226,52 +1179,33 @@ function ServerBlock({
               <div style={localStyles.kindSection}>
                 <div style={localStyles.kindHeader}>Resources</div>
                 {filteredResources.map((resource) => {
-                  const resourceKey = `resource-${resource.uri}`;
-                  const isResourceExpanded = expandedPrimitives.has(resourceKey);
+                  const isSelected = isPrimitiveSelected("resource", resource.name);
                   return (
                     <div
                       key={resource.uri}
                       style={{
-                        ...localStyles.primitiveCard,
-                        ...(isResourceExpanded ? localStyles.primitiveCardExpanded : {}),
-                      }}
-                      data-testid={`resource-card-${resource.name}`}
-                    >
-                      <div
-                        style={{
-                          ...localStyles.primitiveCardHeader,
-                          ...(hoveredItem === resourceKey
-                            ? localStyles.primitiveCardHeaderHover
+                        ...localStyles.primitiveItem,
+                        ...(isSelected
+                          ? localStyles.primitiveItemActive
+                          : hoveredItem === `resource-${resource.uri}`
+                            ? localStyles.primitiveItemHover
                             : {}),
-                        }}
-                        onClick={() => togglePrimitiveExpanded(resourceKey)}
-                        onMouseEnter={() => setHoveredItem(resourceKey)}
-                        onMouseLeave={() => setHoveredItem(null)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            togglePrimitiveExpanded(resourceKey);
-                          }
-                        }}
-                        aria-expanded={isResourceExpanded}
-                      >
-                        <span
-                          style={{
-                            ...localStyles.primitiveExpandIcon,
-                            transform: isResourceExpanded ? "rotate(90deg)" : "rotate(0deg)",
-                          }}
-                        >
-                          ▸
-                        </span>
-                        <span style={localStyles.primitiveName}>{resource.name}</span>
-                      </div>
-                      <AnimatedCollapse isOpen={isResourceExpanded}>
-                        <div style={localStyles.primitiveCardContent}>
-                          {resource.description || resource.uri}
-                        </div>
-                      </AnimatedCollapse>
+                      }}
+                      onClick={() => handlePrimitiveClick("resource", resource.name)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handlePrimitiveClick("resource", resource.name);
+                        }
+                      }}
+                      onMouseEnter={() => setHoveredItem(`resource-${resource.uri}`)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      role="button"
+                      tabIndex={0}
+                      aria-selected={isSelected}
+                      data-testid={`resource-item-${resource.name}`}
+                    >
+                      <span style={localStyles.primitiveName}>{resource.name}</span>
                     </div>
                   );
                 })}
@@ -1283,52 +1217,33 @@ function ServerBlock({
               <div style={localStyles.kindSection}>
                 <div style={localStyles.kindHeader}>Prompts</div>
                 {filteredPrompts.map((prompt) => {
-                  const promptKey = `prompt-${prompt.name}`;
-                  const isPromptExpanded = expandedPrimitives.has(promptKey);
+                  const isSelected = isPrimitiveSelected("prompt", prompt.name);
                   return (
                     <div
                       key={prompt.name}
                       style={{
-                        ...localStyles.primitiveCard,
-                        ...(isPromptExpanded ? localStyles.primitiveCardExpanded : {}),
-                      }}
-                      data-testid={`prompt-card-${prompt.name}`}
-                    >
-                      <div
-                        style={{
-                          ...localStyles.primitiveCardHeader,
-                          ...(hoveredItem === promptKey
-                            ? localStyles.primitiveCardHeaderHover
+                        ...localStyles.primitiveItem,
+                        ...(isSelected
+                          ? localStyles.primitiveItemActive
+                          : hoveredItem === `prompt-${prompt.name}`
+                            ? localStyles.primitiveItemHover
                             : {}),
-                        }}
-                        onClick={() => togglePrimitiveExpanded(promptKey)}
-                        onMouseEnter={() => setHoveredItem(promptKey)}
-                        onMouseLeave={() => setHoveredItem(null)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            togglePrimitiveExpanded(promptKey);
-                          }
-                        }}
-                        aria-expanded={isPromptExpanded}
-                      >
-                        <span
-                          style={{
-                            ...localStyles.primitiveExpandIcon,
-                            transform: isPromptExpanded ? "rotate(90deg)" : "rotate(0deg)",
-                          }}
-                        >
-                          ▸
-                        </span>
-                        <span style={localStyles.primitiveName}>{prompt.name}</span>
-                      </div>
-                      <AnimatedCollapse isOpen={isPromptExpanded}>
-                        <div style={localStyles.primitiveCardContent}>
-                          {prompt.description || "No description available."}
-                        </div>
-                      </AnimatedCollapse>
+                      }}
+                      onClick={() => handlePrimitiveClick("prompt", prompt.name)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handlePrimitiveClick("prompt", prompt.name);
+                        }
+                      }}
+                      onMouseEnter={() => setHoveredItem(`prompt-${prompt.name}`)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      role="button"
+                      tabIndex={0}
+                      aria-selected={isSelected}
+                      data-testid={`prompt-item-${prompt.name}`}
+                    >
+                      <span style={localStyles.primitiveName}>{prompt.name}</span>
                     </div>
                   );
                 })}
