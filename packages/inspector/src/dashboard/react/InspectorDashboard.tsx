@@ -297,6 +297,15 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           tools: prims.tools,
           resources: prims.resources,
           prompts: prims.prompts,
+          // Pass connection params for server info display
+          params: { transport: "http" }, // Dashboard only supports HTTP transport
+          serverInfo: conn.serverInfo ?? undefined,
+          // Capabilities determined from available primitives
+          capabilities: {
+            tools: prims.tools.length > 0,
+            resources: prims.resources.length > 0,
+            prompts: prims.prompts.length > 0,
+          },
         };
       });
   }, [connections, activeConnectionId, displayTools, displayResources, displayPrompts]);
@@ -545,12 +554,12 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     setIsGlobalsBarCollapsed((prev) => !prev);
   }, []);
 
-  // Handle primitive selection with mutual exclusivity
+  // Handle primitive selection - shows detail in right panel
   const handleSelectPrimitive = useCallback((primitive: SelectedPrimitive | null) => {
     setSelectedPrimitive(primitive);
     if (primitive) {
-      // When detail view opens, collapse right panel (mutual exclusivity)
-      setIsRightPanelCollapsed(true);
+      // When detail view opens, expand right panel to show it
+      setIsRightPanelCollapsed(false);
     }
   }, []);
 
@@ -808,18 +817,10 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           onSelectPrimitive={handleSelectPrimitive}
         />
 
-        {/* Center Column - screencast + globals bar OR primitive detail */}
+        {/* Center Column - screencast + globals bar */}
         <div style={styles.centerColumn}>
           <main style={styles.main}>
-            {resolvedPrimitive ? (
-              /* Primitive detail view */
-              <div style={{ padding: "1rem", maxWidth: "800px", margin: "0 auto", width: "100%" }}>
-                <PrimitiveDetail
-                  primitive={resolvedPrimitive}
-                  onClose={() => setSelectedPrimitive(null)}
-                />
-              </div>
-            ) : isStreaming ? (
+            {isStreaming ? (
               /* Screencast when streaming */
               <div
                 style={{
@@ -854,8 +855,8 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
             )}
           </main>
 
-          {/* Globals bar - below screencast, only when streaming and no primitive detail */}
-          {isStreaming && !resolvedPrimitive && (
+          {/* Globals bar - below screencast, only when streaming */}
+          {isStreaming && (
             <GlobalsPanel
               globals={displayGlobals}
               isVisible={true}
@@ -865,7 +866,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           )}
         </div>
 
-        {/* Right Panel - Agent/Events/Logs tabs */}
+        {/* Right Panel - Agent/Events/Logs tabs OR Primitive Detail */}
         <RightPanel
           logs={displayLogs}
           events={displayEvents}
@@ -879,6 +880,8 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           resizeHandleProps={rightResizeHandleProps}
           isResizing={isRightResizing}
           isStreaming={isStreaming}
+          selectedPrimitive={resolvedPrimitive}
+          onClosePrimitive={() => setSelectedPrimitive(null)}
         />
       </div>
 

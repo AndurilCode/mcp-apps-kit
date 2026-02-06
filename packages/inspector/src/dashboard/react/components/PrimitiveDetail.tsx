@@ -1443,8 +1443,9 @@ export function PrimitiveDetail({
         <div style={styles.footer} data-testid="primitive-detail-footer">
           <CopyJsonButton data={primitiveData} />
           <button
-            style={{ ...styles.button, ...styles.buttonPrimary }}
-            onClick={handleActionClick}
+            style={{ ...styles.button, ...styles.buttonDisabled }}
+            disabled
+            title="Coming soon"
             data-testid="action-btn"
           >
             {icon} {label}

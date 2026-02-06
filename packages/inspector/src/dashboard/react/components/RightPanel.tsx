@@ -2,6 +2,7 @@
  * RightPanel Component
  *
  * Tabbed sidebar for Agent, Events, and Logs.
+ * Also displays Primitive Detail when a primitive is selected.
  */
 
 import React, { useMemo, useState } from "react";
@@ -11,6 +12,7 @@ import { styles } from "../styles";
 import { LogsPanel } from "./LogsPanel";
 import { EventsPanel } from "./EventsPanel";
 import { AgentPanel } from "./AgentPanel";
+import { PrimitiveDetail, type Primitive } from "./PrimitiveDetail";
 
 type RightPanelTab = "agent" | "events" | "logs";
 
@@ -27,6 +29,10 @@ export interface RightPanelProps {
   resizeHandleProps: React.HTMLAttributes<HTMLDivElement>;
   isResizing: boolean;
   isStreaming: boolean;
+  /** Selected primitive to display in detail view */
+  selectedPrimitive?: Primitive | null;
+  /** Callback to close the primitive detail */
+  onClosePrimitive?: () => void;
 }
 
 export function RightPanel({
@@ -42,9 +48,14 @@ export function RightPanel({
   resizeHandleProps,
   isResizing,
   isStreaming,
+  selectedPrimitive,
+  onClosePrimitive,
 }: RightPanelProps): React.ReactElement {
   const noop = (): void => undefined;
   const [activeTab, setActiveTab] = useState<RightPanelTab>("agent");
+
+  // When a primitive is selected, show primitive detail view
+  const showPrimitiveDetail = selectedPrimitive !== undefined && selectedPrimitive !== null;
 
   const tabs = useMemo(
     () => [
@@ -96,87 +107,128 @@ export function RightPanel({
         }}
       />
       <div style={panelStyle}>
-        <div style={styles.rightPanelHeader}>
-          <button
-            style={styles.rightPanelCollapseBtn}
-            onClick={onToggleCollapse}
-            title="Collapse panel"
-            aria-label="Collapse panel"
-          >
-            ▶
-          </button>
-          {isStreaming ? (
-            <div style={styles.rightPanelTabs}>
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
+        {showPrimitiveDetail ? (
+          /* Primitive Detail View */
+          <>
+            <div style={styles.rightPanelHeader}>
+              <button
+                style={styles.rightPanelCollapseBtn}
+                onClick={onToggleCollapse}
+                title="Collapse panel"
+                aria-label="Collapse panel"
+              >
+                ▶
+              </button>
+              <div style={styles.rightPanelTabs}>
+                <span
                   style={{
                     ...styles.rightPanelTab,
-                    ...(activeTab === tab.id ? styles.rightPanelTabActive : {}),
+                    ...styles.rightPanelTabActive,
+                    cursor: "default",
                   }}
-                  onClick={() => setActiveTab(tab.id)}
-                  aria-pressed={activeTab === tab.id}
                 >
-                  {tab.label}
-                  {tab.count > 0 && (
-                    <span
-                      style={{
-                        ...styles.rightPanelTabCount,
-                        ...(activeTab === tab.id ? styles.rightPanelTabCountActive : {}),
-                      }}
-                    >
-                      {tab.count}
-                    </span>
-                  )}
-                </button>
-              ))}
+                  Primitive Detail
+                </span>
+              </div>
             </div>
-          ) : (
-            <div style={styles.rightPanelTabs}>
-              <span
-                style={{
-                  ...styles.rightPanelTab,
-                  ...styles.rightPanelTabActive,
-                  cursor: "default",
-                }}
+            <div style={{ ...styles.rightPanelContent, padding: "0.75rem" }}>
+              <PrimitiveDetail primitive={selectedPrimitive} onClose={onClosePrimitive} />
+            </div>
+          </>
+        ) : (
+          /* Normal Agent/Events/Logs tabs */
+          <>
+            <div style={styles.rightPanelHeader}>
+              <button
+                style={styles.rightPanelCollapseBtn}
+                onClick={onToggleCollapse}
+                title="Collapse panel"
+                aria-label="Collapse panel"
               >
-                Agent Logs
-                {agentEvents.length > 0 && (
+                ▶
+              </button>
+              {isStreaming ? (
+                <div style={styles.rightPanelTabs}>
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      style={{
+                        ...styles.rightPanelTab,
+                        ...(activeTab === tab.id ? styles.rightPanelTabActive : {}),
+                      }}
+                      onClick={() => setActiveTab(tab.id)}
+                      aria-pressed={activeTab === tab.id}
+                    >
+                      {tab.label}
+                      {tab.count > 0 && (
+                        <span
+                          style={{
+                            ...styles.rightPanelTabCount,
+                            ...(activeTab === tab.id ? styles.rightPanelTabCountActive : {}),
+                          }}
+                        >
+                          {tab.count}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div style={styles.rightPanelTabs}>
                   <span
-                    style={{ ...styles.rightPanelTabCount, ...styles.rightPanelTabCountActive }}
+                    style={{
+                      ...styles.rightPanelTab,
+                      ...styles.rightPanelTabActive,
+                      cursor: "default",
+                    }}
                   >
-                    {agentEvents.length}
+                    Agent Logs
+                    {agentEvents.length > 0 && (
+                      <span
+                        style={{ ...styles.rightPanelTabCount, ...styles.rightPanelTabCountActive }}
+                      >
+                        {agentEvents.length}
+                      </span>
+                    )}
                   </span>
-                )}
-              </span>
+                </div>
+              )}
+              <div style={styles.rightPanelActions}>
+                <button
+                  style={styles.rightPanelClearBtn}
+                  onClick={handleClear}
+                  disabled={isClearDisabled}
+                >
+                  Clear
+                </button>
+              </div>
             </div>
-          )}
-          <div style={styles.rightPanelActions}>
-            <button
-              style={styles.rightPanelClearBtn}
-              onClick={handleClear}
-              disabled={isClearDisabled}
-            >
-              Clear
-            </button>
-          </div>
-        </div>
-        <div style={styles.rightPanelContent}>
-          {isStreaming ? (
-            <>
-              {activeTab === "logs" && (
-                <LogsPanel logs={logs} onClearLogs={onClearLogs ?? noop} showHeader={false} />
-              )}
-              {activeTab === "events" && (
-                <EventsPanel
-                  events={events}
-                  onClearEvents={onClearEvents ?? noop}
-                  showHeader={true}
-                  showTitle={false}
-                  showClearButton={false}
-                />
-              )}
-              {activeTab === "agent" && (
+            <div style={styles.rightPanelContent}>
+              {isStreaming ? (
+                <>
+                  {activeTab === "logs" && (
+                    <LogsPanel logs={logs} onClearLogs={onClearLogs ?? noop} showHeader={false} />
+                  )}
+                  {activeTab === "events" && (
+                    <EventsPanel
+                      events={events}
+                      onClearEvents={onClearEvents ?? noop}
+                      showHeader={true}
+                      showTitle={false}
+                      showClearButton={false}
+                    />
+                  )}
+                  {activeTab === "agent" && (
+                    <AgentPanel
+                      events={agentEvents}
+                      onClearEvents={onClearAgent ?? noop}
+                      showHeader={true}
+                      showTitle={false}
+                      showClearButton={false}
+                    />
+                  )}
+                </>
+              ) : (
                 <AgentPanel
                   events={agentEvents}
                   onClearEvents={onClearAgent ?? noop}
@@ -185,17 +237,9 @@ export function RightPanel({
                   showClearButton={false}
                 />
               )}
-            </>
-          ) : (
-            <AgentPanel
-              events={agentEvents}
-              onClearEvents={onClearAgent ?? noop}
-              showHeader={true}
-              showTitle={false}
-              showClearButton={false}
-            />
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </div>
     </>
   );
