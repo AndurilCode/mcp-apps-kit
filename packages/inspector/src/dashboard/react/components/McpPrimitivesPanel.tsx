@@ -13,6 +13,7 @@ import type {
   JsonSchemaProperty,
   McpPromptArgument,
 } from "../types/mcp-primitives";
+import type { ConnectionState } from "../../../types/connection-types";
 
 // =============================================================================
 // Types
@@ -49,6 +50,12 @@ export interface McpPrimitivesPanelProps {
   selectedPrimitiveType?: "tool" | "resource" | "prompt" | null;
   /** Callback when a primitive is selected/deselected */
   onSelectPrimitive?: (type: "tool" | "resource" | "prompt", id: string) => void;
+  /** All available connections (picker shown only when length > 1) */
+  connections?: ConnectionState[];
+  /** ID of the currently active connection (typically the serverUrl) */
+  activeConnectionId?: string;
+  /** Callback when user switches to a different connection */
+  onSwitchConnection?: (connectionId: string) => void;
 }
 
 // Font stack (matches styles.ts FONT_SANS)
@@ -328,6 +335,103 @@ const localStyles: Record<string, React.CSSProperties> = {
   resizeHandleActive: {
     background:
       "linear-gradient(to right, transparent 2px, #ffffff 2px, #ffffff 4px, transparent 4px)",
+  },
+  // Connection picker styles
+  connectionPicker: {
+    position: "relative" as const,
+    padding: "0.5rem 0.75rem",
+    backgroundColor: "#0a0a0a",
+    borderBottom: "1px solid #1a1a1a",
+    flexShrink: 0,
+  },
+  connectionPickerButton: {
+    width: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "0.5rem",
+    padding: "0.5rem 0.75rem",
+    backgroundColor: "#111111",
+    border: "1px solid #2d2f2f",
+    borderRadius: "4px",
+    cursor: "pointer",
+    transition: "border-color 0.15s ease, background-color 0.15s ease",
+    fontFamily: "inherit",
+    fontSize: "0.75rem",
+    color: "#e8e8e8",
+    textAlign: "left" as const,
+  },
+  connectionPickerButtonHover: {
+    borderColor: "#4d5050",
+    backgroundColor: "#161616",
+  },
+  connectionPickerButtonOpen: {
+    borderColor: "#ffffff",
+  },
+  connectionPickerLabel: {
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap" as const,
+    flex: 1,
+    minWidth: 0,
+  },
+  connectionPickerArrow: {
+    fontSize: "0.5rem",
+    color: "#6b7280",
+    flexShrink: 0,
+    transition: "transform 0.15s ease",
+  },
+  connectionPickerArrowOpen: {
+    transform: "rotate(180deg)",
+  },
+  connectionPickerDropdown: {
+    position: "absolute" as const,
+    top: "100%",
+    left: "0.75rem",
+    right: "0.75rem",
+    backgroundColor: "#111111",
+    border: "1px solid #3d4040",
+    borderRadius: "4px",
+    marginTop: "0.25rem",
+    zIndex: 100,
+    maxHeight: "200px",
+    overflowY: "auto" as const,
+    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.4)",
+  },
+  connectionPickerItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    padding: "0.5rem 0.75rem",
+    cursor: "pointer",
+    fontSize: "0.75rem",
+    color: "#9ca3af",
+    transition: "background-color 0.15s ease, color 0.15s ease",
+    borderBottom: "1px solid #1a1a1a",
+  },
+  connectionPickerItemLast: {
+    borderBottom: "none",
+  },
+  connectionPickerItemHover: {
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    color: "#e8e8e8",
+  },
+  connectionPickerItemActive: {
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    color: "#ffffff",
+  },
+  connectionPickerCheckmark: {
+    fontSize: "0.625rem",
+    color: "#ffffff",
+    width: "1rem",
+    textAlign: "center" as const,
+  },
+  connectionPickerItemLabel: {
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap" as const,
+    flex: 1,
+    minWidth: 0,
   },
   resourceUri: {
     fontFamily:
@@ -612,6 +716,145 @@ function MetadataSection({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// =============================================================================
+// Connection Picker
+// =============================================================================
+
+/**
+ * Get display label for a connection (server name or URL)
+ */
+function getConnectionLabel(connection: ConnectionState): string {
+  if (connection.serverInfo?.name) {
+    return connection.serverInfo.name;
+  }
+  return connection.serverUrl || "Unknown";
+}
+
+/**
+ * Connection picker dropdown for switching between multiple connections
+ */
+function ConnectionPicker({
+  connections,
+  activeConnectionId,
+  onSwitchConnection,
+}: {
+  connections: ConnectionState[];
+  activeConnectionId?: string;
+  onSwitchConnection?: (connectionId: string) => void;
+}): React.ReactElement | null {
+  const [isOpen, setIsOpen] = useState(false);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [isButtonHovered, setIsButtonHovered] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isOpen]);
+
+  // Close dropdown on escape key
+  useEffect(() => {
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener("keydown", handleEscape);
+      return () => document.removeEventListener("keydown", handleEscape);
+    }
+  }, [isOpen]);
+
+  // Only render when there are multiple connections
+  if (!connections || connections.length <= 1) {
+    return null;
+  }
+
+  const activeConnection = connections.find((c) => c.serverUrl === activeConnectionId);
+  const activeLabel = activeConnection ? getConnectionLabel(activeConnection) : "Select connection";
+
+  const handleItemClick = (connectionId: string) => {
+    onSwitchConnection?.(connectionId);
+    setIsOpen(false);
+  };
+
+  return (
+    <div style={localStyles.connectionPicker} ref={dropdownRef}>
+      <button
+        style={{
+          ...localStyles.connectionPickerButton,
+          ...(isButtonHovered && !isOpen ? localStyles.connectionPickerButtonHover : {}),
+          ...(isOpen ? localStyles.connectionPickerButtonOpen : {}),
+        }}
+        onClick={() => setIsOpen(!isOpen)}
+        onMouseEnter={() => setIsButtonHovered(true)}
+        onMouseLeave={() => setIsButtonHovered(false)}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        data-testid="connection-picker-button"
+      >
+        <span style={localStyles.connectionPickerLabel}>{activeLabel}</span>
+        <span
+          style={{
+            ...localStyles.connectionPickerArrow,
+            ...(isOpen ? localStyles.connectionPickerArrowOpen : {}),
+          }}
+        >
+          ▼
+        </span>
+      </button>
+
+      {isOpen && (
+        <div
+          style={localStyles.connectionPickerDropdown}
+          role="listbox"
+          data-testid="connection-picker-dropdown"
+        >
+          {connections.map((connection, index) => {
+            const connectionId = connection.serverUrl || "";
+            const isActive = connectionId === activeConnectionId;
+            const isHovered = hoveredIndex === index;
+            const isLast = index === connections.length - 1;
+
+            return (
+              <div
+                key={connectionId || index}
+                style={{
+                  ...localStyles.connectionPickerItem,
+                  ...(isLast ? localStyles.connectionPickerItemLast : {}),
+                  ...(isHovered ? localStyles.connectionPickerItemHover : {}),
+                  ...(isActive ? localStyles.connectionPickerItemActive : {}),
+                }}
+                onClick={() => handleItemClick(connectionId)}
+                onMouseEnter={() => setHoveredIndex(index)}
+                onMouseLeave={() => setHoveredIndex(null)}
+                role="option"
+                aria-selected={isActive}
+                data-testid={`connection-picker-item-${index}`}
+              >
+                <span style={localStyles.connectionPickerCheckmark}>{isActive ? "✓" : ""}</span>
+                <span style={localStyles.connectionPickerItemLabel}>
+                  {getConnectionLabel(connection)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -960,6 +1203,9 @@ export function McpPrimitivesPanel({
   selectedPrimitiveId,
   selectedPrimitiveType,
   onSelectPrimitive,
+  connections,
+  activeConnectionId,
+  onSwitchConnection,
 }: McpPrimitivesPanelProps): React.ReactElement {
   const [activeTab, setActiveTab] = useState<TabType>("tools");
 
@@ -1083,12 +1329,22 @@ export function McpPrimitivesPanel({
     }
   };
 
+  // Check if connection picker should be shown
+  const showConnectionPicker = connections && connections.length > 1;
+
   // Wrapper for left position with resize handle
   if (position === "left" && resizeHandleProps) {
     return (
       <>
         <div style={panelStyle}>
           <KeyframeStyles />
+          {showConnectionPicker && (
+            <ConnectionPicker
+              connections={connections}
+              activeConnectionId={activeConnectionId}
+              onSwitchConnection={onSwitchConnection}
+            />
+          )}
           <div style={localStyles.tabs}>
             {tabs.map((tab) => (
               <button
@@ -1141,6 +1397,13 @@ export function McpPrimitivesPanel({
         <div style={localStyles.header}>
           <span style={localStyles.title}>MCP Primitives</span>
         </div>
+      )}
+      {showConnectionPicker && (
+        <ConnectionPicker
+          connections={connections}
+          activeConnectionId={activeConnectionId}
+          onSwitchConnection={onSwitchConnection}
+        />
       )}
       <div style={localStyles.tabs}>
         {tabs.map((tab) => (
