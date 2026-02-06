@@ -15,6 +15,14 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import type { ConnectionParams } from "@mcp-apps-kit/testing";
 
+/** Entry in server history */
+export interface ServerHistoryEntry {
+  /** Display name (URL or command) */
+  name: string;
+  /** Connection params to restore */
+  params: ConnectionParams;
+}
+
 export interface SidebarConnectionFormProps {
   /** Whether the form is visible */
   isOpen: boolean;
@@ -26,6 +34,8 @@ export interface SidebarConnectionFormProps {
   onConnect: (params: ConnectionParams) => Promise<boolean>;
   /** Callback when Cancel button is clicked */
   onCancel: () => void;
+  /** Previously connected servers for history dropdown */
+  serverHistory?: ServerHistoryEntry[];
 }
 
 // Styles for the inline connection form
@@ -145,6 +155,7 @@ export function SidebarConnectionForm({
   error,
   onConnect,
   onCancel,
+  serverHistory = [],
 }: SidebarConnectionFormProps): React.ReactElement | null {
   // Form state
   const [transport, setTransport] = useState<"http" | "stdio">("http");
@@ -152,10 +163,12 @@ export function SidebarConnectionForm({
   const [command, setCommand] = useState("");
   const [args, setArgs] = useState("");
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Refs for focus management
   const urlInputRef = useRef<HTMLInputElement>(null);
   const commandInputRef = useRef<HTMLInputElement>(null);
+  const historyDropdownRef = useRef<HTMLDivElement>(null);
 
   // Reset form when opened
   useEffect(() => {
@@ -164,12 +177,44 @@ export function SidebarConnectionForm({
       setUrl("");
       setCommand("");
       setArgs("");
+      setShowHistory(false);
       // Focus the appropriate input after a brief delay
       setTimeout(() => {
         urlInputRef.current?.focus();
       }, 50);
     }
   }, [isOpen]);
+
+  // Handle selecting a history entry
+  const handleSelectHistory = useCallback((entry: ServerHistoryEntry) => {
+    const params = entry.params;
+    if (params.transport === "http") {
+      setTransport("http");
+      setUrl(params.url);
+      setCommand("");
+      setArgs("");
+    } else if (params.transport === "stdio") {
+      setTransport("stdio");
+      setUrl("");
+      setCommand(params.command);
+      setArgs(params.args?.join(" ") ?? "");
+    }
+    setShowHistory(false);
+  }, []);
+
+  // Close history dropdown when clicking outside
+  useEffect(() => {
+    if (!showHistory) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (historyDropdownRef.current && !historyDropdownRef.current.contains(e.target as Node)) {
+        setShowHistory(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showHistory]);
 
   // Focus command input when switching to stdio
   useEffect(() => {
@@ -248,6 +293,70 @@ export function SidebarConnectionForm({
     <div style={formStyles.container} data-testid="sidebar-connection-form">
       {/* Inject keyframe animation for spinner */}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+      {/* Server history dropdown */}
+      {serverHistory.length > 0 && (
+        <div style={{ ...formStyles.row, position: "relative" }} ref={historyDropdownRef}>
+          <label style={formStyles.label}>Recent Servers</label>
+          <div
+            style={{
+              ...formStyles.select,
+              cursor: "pointer",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+            onClick={() => setShowHistory(!showHistory)}
+            data-testid="server-history-trigger"
+          >
+            <span style={{ color: "#6b7280" }}>Select from history...</span>
+            <span style={{ fontSize: "0.625rem" }}>{showHistory ? "▴" : "▾"}</span>
+          </div>
+          {showHistory && (
+            <div
+              style={{
+                position: "absolute",
+                top: "100%",
+                left: 0,
+                right: 0,
+                backgroundColor: "#111111",
+                border: "1px solid #2d2f2f",
+                borderRadius: "4px",
+                marginTop: "0.25rem",
+                maxHeight: "150px",
+                overflowY: "auto",
+                zIndex: 100,
+              }}
+            >
+              {serverHistory.map((entry, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    padding: "0.5rem",
+                    fontSize: "0.75rem",
+                    color: "#e8e8e8",
+                    cursor: "pointer",
+                    borderBottom: idx < serverHistory.length - 1 ? "1px solid #1a1a1a" : "none",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#1a1a1a";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                  onClick={() => handleSelectHistory(entry)}
+                  data-testid={`server-history-item-${idx}`}
+                >
+                  <div style={{ fontWeight: 500 }}>{entry.name}</div>
+                  <div style={{ fontSize: "0.625rem", color: "#6b7280", marginTop: "0.125rem" }}>
+                    {entry.params.transport}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Transport selector */}
       <div style={formStyles.row}>

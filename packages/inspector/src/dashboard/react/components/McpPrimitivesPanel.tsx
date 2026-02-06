@@ -79,6 +79,8 @@ export interface McpPrimitivesPanelNewProps {
   servers: ServerData[];
   /** Stopped connections that can be restarted */
   stoppedConnections: StoppedConnection[];
+  /** ID of server currently reconnecting (shows loading state) */
+  reconnectingServerId?: string | null;
   /** Whether primitives are still loading */
   isLoading: boolean;
   /** Whether the panel is visible */
@@ -251,7 +253,7 @@ const localStyles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     justifyContent: "center",
     height: "100%",
-    color: "#4b5563",
+    color: "#9ca3af",
     fontSize: "0.75rem",
     padding: "2rem",
     textAlign: "center" as const,
@@ -301,27 +303,25 @@ const localStyles: Record<string, React.CSSProperties> = {
     whiteSpace: "nowrap" as const,
   },
   serverNameStopped: {
-    color: "#4b5563",
+    color: "#9ca3af",
   },
   serverButton: {
     backgroundColor: "transparent",
-    border: "1px solid #3d4040",
+    border: "none",
     borderRadius: "3px",
-    padding: "0.125rem 0.5rem",
+    padding: "0.25rem",
     cursor: "pointer",
-    color: "#9ca3af",
-    fontSize: "0.5625rem",
-    fontWeight: 500,
-    transition: "all 0.15s ease",
+    color: "#ffffff",
+    fontSize: "0.875rem",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "opacity 0.15s ease",
     flexShrink: 0,
+    opacity: 0.8,
   },
-  serverButtonStart: {
-    borderColor: "#22c55e",
-    color: "#22c55e",
-  },
-  serverButtonStop: {
-    borderColor: "#ef4444",
-    color: "#ef4444",
+  serverButtonHover: {
+    opacity: 1,
   },
   expandIndicator: {
     fontSize: "0.5rem",
@@ -336,23 +336,10 @@ const localStyles: Record<string, React.CSSProperties> = {
   stoppedMessage: {
     padding: "0.5rem 0.75rem 0.5rem 1.5rem",
     fontSize: "0.6875rem",
-    color: "#4b5563",
+    color: "#9ca3af",
     fontStyle: "italic" as const,
   },
-  // Server info collapsible section
-  serverInfoToggle: {
-    paddingLeft: "1.5rem",
-    paddingRight: "0.75rem",
-    paddingTop: "0.125rem",
-    paddingBottom: "0.25rem",
-    cursor: "pointer",
-    fontSize: "0.6875rem",
-    color: "#6b7280",
-    userSelect: "none" as const,
-    display: "flex",
-    alignItems: "center",
-    gap: "0.25rem",
-  },
+  // Server info section
   serverInfoContent: {
     paddingLeft: "2rem",
     paddingRight: "0.75rem",
@@ -401,8 +388,7 @@ const localStyles: Record<string, React.CSSProperties> = {
     outline: "none",
   },
   primitiveItemHover: {
-    backgroundColor: "#222222",
-    borderColor: "#3d4040",
+    backgroundColor: "#252525",
   },
   primitiveItemActive: {
     backgroundColor: "#1f1f1f",
@@ -915,6 +901,7 @@ function getEnabledCapabilities(capabilities: ServerData["capabilities"] | undef
 interface ServerBlockProps {
   server: ServerData | StoppedConnection;
   isConnected: boolean;
+  isReconnecting?: boolean;
   searchFilter: string;
   onStop?: () => void;
   onStart?: () => void;
@@ -925,6 +912,7 @@ interface ServerBlockProps {
 function ServerBlock({
   server,
   isConnected,
+  isReconnecting = false,
   searchFilter,
   onStop,
   onStart,
@@ -932,7 +920,6 @@ function ServerBlock({
   onSelectPrimitive,
 }: ServerBlockProps): React.ReactElement | null {
   const [isExpanded, setIsExpanded] = useState(true);
-  const [showServerInfo, setShowServerInfo] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
   // Helper to check if a primitive is selected
@@ -1028,74 +1015,77 @@ function ServerBlock({
         <button
           style={{
             ...localStyles.serverButton,
-            ...(isConnected ? localStyles.serverButtonStop : localStyles.serverButtonStart),
+            ...(isReconnecting ? { cursor: "default", opacity: 0.6 } : {}),
           }}
           onClick={handleButtonClick}
-          title={isConnected ? "Stop server" : "Start server"}
+          onMouseEnter={(e) => {
+            if (!isReconnecting) e.currentTarget.style.opacity = "1";
+          }}
+          onMouseLeave={(e) => {
+            if (!isReconnecting) e.currentTarget.style.opacity = "0.8";
+          }}
+          disabled={isReconnecting}
+          title={isReconnecting ? "Connecting..." : isConnected ? "Stop server" : "Start server"}
           data-testid={`server-${isConnected ? "stop" : "start"}-btn-${server.id}`}
         >
-          {isConnected ? "Stop" : "Start"}
+          {isReconnecting ? (
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              style={{ animation: "spin 1s linear infinite" }}
+            >
+              <circle cx="12" cy="12" r="10" opacity="0.25" />
+              <path d="M12 2a10 10 0 0 1 10 10" />
+            </svg>
+          ) : isConnected ? (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="6" width="12" height="12" rx="1" />
+            </svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="8,5 19,12 8,19" />
+            </svg>
+          )}
         </button>
       </div>
 
       {/* Server content */}
       <AnimatedCollapse isOpen={isExpanded}>
-        {/* Server info collapsible section */}
-        <div
-          style={localStyles.serverInfoToggle}
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowServerInfo(!showServerInfo);
-          }}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              e.stopPropagation();
-              setShowServerInfo(!showServerInfo);
-            }
-          }}
-          data-testid={`server-info-toggle-${server.id}`}
-        >
-          <span>{showServerInfo ? "▾" : "▸"}</span>
-          <span>server info</span>
-        </div>
-        {showServerInfo && (
-          <div
-            style={localStyles.serverInfoContent}
-            data-testid={`server-info-content-${server.id}`}
-          >
-            <div style={localStyles.serverInfoRow}>
-              <span style={localStyles.serverInfoLabel}>Status:</span>
-              <span style={localStyles.serverInfoValue}>{isConnected ? "running" : "stopped"}</span>
-            </div>
-            <div style={localStyles.serverInfoRow}>
-              <span style={localStyles.serverInfoLabel}>Transport:</span>
-              <span style={localStyles.serverInfoValue}>
-                {"params" in server && server.params?.transport
-                  ? server.params.transport
-                  : "unknown"}
-              </span>
-            </div>
-            <div style={localStyles.serverInfoRow}>
-              <span style={localStyles.serverInfoLabel}>Version:</span>
-              <span style={localStyles.serverInfoValue}>
-                {"serverInfo" in server && server.serverInfo?.version
-                  ? server.serverInfo.version
-                  : "unknown"}
-              </span>
-            </div>
-            <div style={localStyles.serverInfoRow}>
-              <span style={localStyles.serverInfoLabel}>Capabilities:</span>
-              <span style={localStyles.serverInfoValue}>
-                {"capabilities" in server
-                  ? getEnabledCapabilities(server.capabilities).join(", ") || "none"
-                  : "unknown"}
-              </span>
-            </div>
+        {/* Server info - always visible */}
+        <div style={localStyles.serverInfoContent} data-testid={`server-info-content-${server.id}`}>
+          <div style={localStyles.serverInfoRow}>
+            <span style={localStyles.serverInfoLabel}>Status:</span>
+            <span style={localStyles.serverInfoValue}>
+              {isConnected ? "running" : isReconnecting ? "connecting..." : "stopped"}
+            </span>
           </div>
-        )}
+          <div style={localStyles.serverInfoRow}>
+            <span style={localStyles.serverInfoLabel}>Transport:</span>
+            <span style={localStyles.serverInfoValue}>
+              {"params" in server && server.params?.transport ? server.params.transport : "unknown"}
+            </span>
+          </div>
+          <div style={localStyles.serverInfoRow}>
+            <span style={localStyles.serverInfoLabel}>Version:</span>
+            <span style={localStyles.serverInfoValue}>
+              {"serverInfo" in server && server.serverInfo?.version
+                ? server.serverInfo.version
+                : "unknown"}
+            </span>
+          </div>
+          <div style={localStyles.serverInfoRow}>
+            <span style={localStyles.serverInfoLabel}>Capabilities:</span>
+            <span style={localStyles.serverInfoValue}>
+              {"capabilities" in server
+                ? getEnabledCapabilities(server.capabilities).join(", ") || "none"
+                : "unknown"}
+            </span>
+          </div>
+        </div>
 
         {isConnected ? (
           <div style={localStyles.serverContent}>
@@ -1652,6 +1642,7 @@ function LegacyPanelContent({
 function ServerBlocksContent({
   servers,
   stoppedConnections,
+  reconnectingServerId,
   isLoading,
   isVisible,
   isCollapsed,
@@ -1701,6 +1692,14 @@ function ServerBlocksContent({
   const handleFormCancel = useCallback(() => {
     setIsFormOpen(false);
   }, []);
+
+  // Build server history from stopped connections
+  const serverHistory = useMemo(() => {
+    return stoppedConnections.map((stopped) => ({
+      name: stopped.name || stopped.url,
+      params: stopped.params,
+    }));
+  }, [stoppedConnections]);
 
   // Build panel styles
   const panelStyle: React.CSSProperties = {
@@ -1794,6 +1793,7 @@ function ServerBlocksContent({
           error={connectionError}
           onConnect={handleFormConnect}
           onCancel={handleFormCancel}
+          serverHistory={serverHistory}
         />
 
         {/* Content */}
@@ -1842,6 +1842,7 @@ function ServerBlocksContent({
                   key={`stopped-${stopped.id}`}
                   server={stopped}
                   isConnected={false}
+                  isReconnecting={reconnectingServerId === stopped.id}
                   searchFilter={searchFilter}
                   onStart={() => onStartServer?.(stopped)}
                 />

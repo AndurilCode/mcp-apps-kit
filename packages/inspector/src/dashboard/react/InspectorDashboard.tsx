@@ -112,6 +112,9 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     loadStoppedConnections()
   );
 
+  // Track which server is currently reconnecting (shows loading state)
+  const [reconnectingServerId, setReconnectingServerId] = useState<string | null>(null);
+
   // Per-connection primitives cache (for building ServerData for all connections)
   const primitivesPerConnectionRef = useRef<Map<string, McpPrimitives>>(new Map());
 
@@ -604,11 +607,19 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
   // Handler to start a stopped server (reconnect using stored params)
   const handleStartServer = useCallback(
     async (stoppedConn: StoppedConnection) => {
-      // Remove from stopped list first
-      setStoppedConnections((prev) => prev.filter((s) => s.id !== stoppedConn.id));
+      // Show loading state
+      setReconnectingServerId(stoppedConn.id);
 
-      // Reconnect using stored params
-      await handleCreateConnection(stoppedConn.params);
+      try {
+        // Reconnect using stored params
+        const success = await handleCreateConnection(stoppedConn.params);
+        if (success) {
+          // Only remove from stopped list after successful connection
+          setStoppedConnections((prev) => prev.filter((s) => s.id !== stoppedConn.id));
+        }
+      } finally {
+        setReconnectingServerId(null);
+      }
     },
     [handleCreateConnection]
   );
@@ -756,6 +767,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
         <McpPrimitivesPanel
           servers={serverDataList}
           stoppedConnections={stoppedConnections}
+          reconnectingServerId={reconnectingServerId}
           isLoading={primitivesLoading}
           isVisible={true}
           isCollapsed={isLeftPanelCollapsed}
