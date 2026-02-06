@@ -15,6 +15,7 @@ import type {
   McpPromptArgument,
 } from "../types/mcp-primitives";
 import type { ConnectionParams } from "@mcp-apps-kit/testing";
+import { SidebarConnectionForm } from "./SidebarConnectionForm";
 
 // =============================================================================
 // Types
@@ -88,8 +89,14 @@ export interface McpPrimitivesPanelNewProps {
   onStopServer?: (serverId: string) => void;
   /** Callback when Start button is clicked for a stopped server */
   onStartServer?: (stoppedConnection: StoppedConnection) => void;
-  /** Callback to open connection form for new server */
+  /** Callback to open connection form for new server (legacy - opens header form) */
   onAddServer?: () => void;
+  /** Callback to connect to a new server with params (inline form) */
+  onConnect?: (params: ConnectionParams) => Promise<boolean>;
+  /** Whether a connection is currently being created */
+  isCreating?: boolean;
+  /** Connection error message */
+  connectionError?: string | null;
 }
 
 /** Legacy API props for backward compatibility with tests */
@@ -1555,8 +1562,41 @@ function ServerBlocksContent({
   onStopServer,
   onStartServer,
   onAddServer,
+  onConnect,
+  isCreating,
+  connectionError,
 }: McpPrimitivesPanelNewProps): React.ReactElement {
   const [searchFilter, setSearchFilter] = useState("");
+  const [isFormOpen, setIsFormOpen] = useState(false);
+
+  // Handle "+" button click - toggle inline form
+  const handleAddClick = useCallback(() => {
+    if (onConnect) {
+      // Use inline form
+      setIsFormOpen((prev) => !prev);
+    } else if (onAddServer) {
+      // Fall back to legacy behavior (opens header form)
+      onAddServer();
+    }
+  }, [onConnect, onAddServer]);
+
+  // Handle connection from inline form
+  const handleFormConnect = useCallback(
+    async (params: ConnectionParams): Promise<boolean> => {
+      if (!onConnect) return false;
+      const success = await onConnect(params);
+      if (success) {
+        setIsFormOpen(false);
+      }
+      return success;
+    },
+    [onConnect]
+  );
+
+  // Handle cancel from inline form
+  const handleFormCancel = useCallback(() => {
+    setIsFormOpen(false);
+  }, []);
 
   // Build panel styles
   const panelStyle: React.CSSProperties = {
@@ -1635,13 +1675,22 @@ function ServerBlocksContent({
           />
           <button
             style={localStyles.addButton}
-            onClick={onAddServer}
+            onClick={handleAddClick}
             title="Add server"
             data-testid="add-server-btn"
           >
             +
           </button>
         </div>
+
+        {/* Inline connection form (shown when "+" is clicked) */}
+        <SidebarConnectionForm
+          isOpen={isFormOpen}
+          isCreating={isCreating}
+          error={connectionError}
+          onConnect={handleFormConnect}
+          onCancel={handleFormCancel}
+        />
 
         {/* Content */}
         <div style={localStyles.content}>
@@ -1650,7 +1699,7 @@ function ServerBlocksContent({
               <Spinner />
               <span>Loading...</span>
             </div>
-          ) : !hasAnyServer ? (
+          ) : !hasAnyServer && !isFormOpen ? (
             <div style={localStyles.emptyState}>
               <span>No servers connected</span>
               <button
@@ -1658,7 +1707,7 @@ function ServerBlocksContent({
                   ...localStyles.addButton,
                   padding: "0.5rem 1rem",
                 }}
-                onClick={onAddServer}
+                onClick={handleAddClick}
               >
                 + Connect Server
               </button>

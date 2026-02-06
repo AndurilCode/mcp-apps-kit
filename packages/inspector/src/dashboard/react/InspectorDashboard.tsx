@@ -741,7 +741,9 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           isResizing={isLeftResizing}
           onStopServer={handleStopServer}
           onStartServer={handleStartServer}
-          onAddServer={handleConnect}
+          onConnect={handleCreateConnection}
+          isCreating={isCreating}
+          connectionError={connectionError}
         />
 
         {/* Center Column - screencast + globals bar */}
