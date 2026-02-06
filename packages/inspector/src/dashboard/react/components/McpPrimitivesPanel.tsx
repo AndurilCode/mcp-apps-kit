@@ -681,42 +681,35 @@ function AnimatedDetailWrapper({
   children: React.ReactNode;
   isVisible: boolean;
 }): React.ReactElement | null {
-  const [renderState, setRenderState] = useState<"hidden" | "entering" | "visible" | "exiting">(
-    isVisible ? "visible" : "hidden"
-  );
-  const prevVisibleRef = useRef(isVisible);
+  const [show, setShow] = useState(false);
+  const [render, setRender] = useState(isVisible);
 
   useEffect(() => {
-    const wasVisible = prevVisibleRef.current;
-    prevVisibleRef.current = isVisible;
-
-    if (isVisible && !wasVisible) {
-      // Opening: show and animate in
-      setRenderState("entering");
-      const timer = setTimeout(() => setRenderState("visible"), 200);
-      return () => clearTimeout(timer);
-    } else if (!isVisible && wasVisible) {
-      // Closing: animate out then hide
-      setRenderState("exiting");
-      const timer = setTimeout(() => setRenderState("hidden"), 200);
+    if (isVisible) {
+      setRender(true);
+      // Trigger animation after mount
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setShow(true);
+        });
+      });
+    } else {
+      setShow(false);
+      // Wait for exit animation
+      const timer = setTimeout(() => setRender(false), 200);
       return () => clearTimeout(timer);
     }
   }, [isVisible]);
 
-  if (renderState === "hidden") return null;
-
-  const animation =
-    renderState === "entering"
-      ? "slideInFromRight 0.2s ease-out forwards"
-      : renderState === "exiting"
-        ? "slideOutToLeft 0.2s ease-out forwards"
-        : undefined;
+  if (!render) return null;
 
   return (
     <div
       style={{
         padding: "0.75rem",
-        animation,
+        opacity: show ? 1 : 0,
+        transform: show ? "translateX(0)" : isVisible ? "translateX(10px)" : "translateX(-10px)",
+        transition: "opacity 0.2s ease-out, transform 0.2s ease-out",
       }}
     >
       {children}
