@@ -353,18 +353,22 @@ const localStyles: Record<string, React.CSSProperties> = {
     color: "#9ca3af",
     fontStyle: "italic" as const,
   },
-  // Server info section
+  // Server info section - horizontal chips
   serverInfoContent: {
-    paddingLeft: "2rem",
-    paddingRight: "0.75rem",
-    paddingBottom: "0.5rem",
-    fontSize: "0.6875rem",
-    color: "#9ca3af",
-    lineHeight: 1.6,
-  },
-  serverInfoRow: {
+    padding: "0.375rem 0.75rem 0.5rem",
     display: "flex",
+    flexWrap: "wrap" as const,
+    gap: "0.375rem",
+  },
+  serverInfoChip: {
+    display: "inline-flex",
+    alignItems: "center",
     gap: "0.25rem",
+    backgroundColor: "#1f1f1f",
+    border: "1px solid #2d2f2f",
+    borderRadius: "12px",
+    padding: "0.125rem 0.5rem",
+    fontSize: "0.625rem",
   },
   serverInfoLabel: {
     color: "#6b7280",
@@ -636,14 +640,24 @@ function KeyframeStyles(): React.ReactElement {
           transform: scale(1) translateY(0);
         }
       }
-      @keyframes slideInFromLeft {
+      @keyframes slideInFromRight {
         from {
           opacity: 0;
-          transform: translateX(-12px);
+          transform: translateX(16px);
         }
         to {
           opacity: 1;
           transform: translateX(0);
+        }
+      }
+      @keyframes slideOutToLeft {
+        from {
+          opacity: 1;
+          transform: translateX(0);
+        }
+        to {
+          opacity: 0;
+          transform: translateX(-16px);
         }
       }
     `}</style>
@@ -655,6 +669,55 @@ function KeyframeStyles(): React.ReactElement {
  */
 function Spinner(): React.ReactElement {
   return <div style={localStyles.spinner} />;
+}
+
+/**
+ * Animated wrapper for detail view - handles enter/exit animations
+ */
+function AnimatedDetailWrapper({
+  children,
+  isVisible,
+}: {
+  children: React.ReactNode;
+  isVisible: boolean;
+}): React.ReactElement | null {
+  const [shouldRender, setShouldRender] = useState(isVisible);
+  const [animationClass, setAnimationClass] = useState<"enter" | "exit" | null>(
+    isVisible ? "enter" : null
+  );
+
+  useEffect(() => {
+    if (isVisible) {
+      setShouldRender(true);
+      setAnimationClass("enter");
+    } else if (shouldRender) {
+      setAnimationClass("exit");
+      // Wait for exit animation to complete before unmounting
+      const timer = setTimeout(() => {
+        setShouldRender(false);
+        setAnimationClass(null);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isVisible, shouldRender]);
+
+  if (!shouldRender) return null;
+
+  return (
+    <div
+      style={{
+        padding: "0.75rem",
+        animation:
+          animationClass === "enter"
+            ? "slideInFromRight 0.2s ease-out"
+            : animationClass === "exit"
+              ? "slideOutToLeft 0.2s ease-out forwards"
+              : undefined,
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
 /**
@@ -1108,36 +1171,34 @@ function ServerBlock({
 
       {/* Server content */}
       <AnimatedCollapse isOpen={isExpanded}>
-        {/* Server info - always visible */}
+        {/* Server info - horizontal chips */}
         <div style={localStyles.serverInfoContent} data-testid={`server-info-content-${server.id}`}>
-          <div style={localStyles.serverInfoRow}>
-            <span style={localStyles.serverInfoLabel}>Status:</span>
+          <span style={localStyles.serverInfoChip}>
+            <span style={localStyles.serverInfoLabel}>status</span>
             <span style={localStyles.serverInfoValue}>
-              {isConnected ? "running" : isReconnecting ? "connecting..." : "stopped"}
+              {isConnected ? "running" : isReconnecting ? "connecting" : "stopped"}
             </span>
-          </div>
-          <div style={localStyles.serverInfoRow}>
-            <span style={localStyles.serverInfoLabel}>Transport:</span>
+          </span>
+          <span style={localStyles.serverInfoChip}>
+            <span style={localStyles.serverInfoLabel}>transport</span>
             <span style={localStyles.serverInfoValue}>
-              {"params" in server && server.params?.transport ? server.params.transport : "unknown"}
+              {"params" in server && server.params?.transport ? server.params.transport : "—"}
             </span>
-          </div>
-          <div style={localStyles.serverInfoRow}>
-            <span style={localStyles.serverInfoLabel}>Version:</span>
-            <span style={localStyles.serverInfoValue}>
-              {"serverInfo" in server && server.serverInfo?.version
-                ? server.serverInfo.version
-                : "unknown"}
+          </span>
+          {"serverInfo" in server && server.serverInfo?.version && (
+            <span style={localStyles.serverInfoChip}>
+              <span style={localStyles.serverInfoLabel}>v</span>
+              <span style={localStyles.serverInfoValue}>{server.serverInfo.version}</span>
             </span>
-          </div>
-          <div style={localStyles.serverInfoRow}>
-            <span style={localStyles.serverInfoLabel}>Capabilities:</span>
-            <span style={localStyles.serverInfoValue}>
-              {"capabilities" in server
-                ? getEnabledCapabilities(server.capabilities).join(", ") || "none"
-                : "unknown"}
+          )}
+          {"capabilities" in server && getEnabledCapabilities(server.capabilities).length > 0 && (
+            <span style={localStyles.serverInfoChip}>
+              <span style={localStyles.serverInfoLabel}>caps</span>
+              <span style={localStyles.serverInfoValue}>
+                {getEnabledCapabilities(server.capabilities).join(", ")}
+              </span>
             </span>
-          </div>
+          )}
         </div>
 
         {isConnected ? (
@@ -1853,63 +1914,60 @@ function ServerBlocksContent({
         {/* Content */}
         <div style={localStyles.content}>
           {/* Show PrimitiveDetail when a primitive is selected */}
-          {resolvedPrimitive ? (
-            <div
-              style={{
-                padding: "0.75rem",
-                animation: "slideInFromLeft 0.2s ease-out",
-              }}
-            >
+          <AnimatedDetailWrapper isVisible={!!resolvedPrimitive}>
+            {resolvedPrimitive && (
               <PrimitiveDetail primitive={resolvedPrimitive} onClose={onClosePrimitive} />
-            </div>
-          ) : isLoading && servers.length === 0 && stoppedConnections.length === 0 ? (
-            <div style={localStyles.loadingState}>
-              <Spinner />
-              <span>Loading...</span>
-            </div>
-          ) : !hasAnyServer && !isFormOpen ? (
-            <div style={localStyles.emptyState}>
-              <span>No servers connected</span>
-              <button
-                style={{
-                  ...localStyles.addButton,
-                  padding: "0.5rem 1rem",
-                }}
-                onClick={handleAddClick}
-              >
-                + Connect Server
-              </button>
-            </div>
-          ) : (
-            <>
-              {/* Active servers */}
-              {servers.map((server) => (
-                <ServerBlock
-                  key={server.id}
-                  server={server}
-                  isConnected={true}
-                  searchFilter={searchFilter}
-                  onStop={() => onStopServer?.(server.id)}
-                  onDelete={() => onDeleteServer?.(server.id, true)}
-                  selectedPrimitive={selectedPrimitive}
-                  onSelectPrimitive={onSelectPrimitive}
-                />
-              ))}
+            )}
+          </AnimatedDetailWrapper>
+          {!resolvedPrimitive &&
+            (isLoading && servers.length === 0 && stoppedConnections.length === 0 ? (
+              <div style={localStyles.loadingState}>
+                <Spinner />
+                <span>Loading...</span>
+              </div>
+            ) : !hasAnyServer && !isFormOpen ? (
+              <div style={localStyles.emptyState}>
+                <span>No servers connected</span>
+                <button
+                  style={{
+                    ...localStyles.addButton,
+                    padding: "0.5rem 1rem",
+                  }}
+                  onClick={handleAddClick}
+                >
+                  + Connect Server
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* Active servers */}
+                {servers.map((server) => (
+                  <ServerBlock
+                    key={server.id}
+                    server={server}
+                    isConnected={true}
+                    searchFilter={searchFilter}
+                    onStop={() => onStopServer?.(server.id)}
+                    onDelete={() => onDeleteServer?.(server.id, true)}
+                    selectedPrimitive={selectedPrimitive}
+                    onSelectPrimitive={onSelectPrimitive}
+                  />
+                ))}
 
-              {/* Stopped servers */}
-              {stoppedConnections.map((stopped) => (
-                <ServerBlock
-                  key={`stopped-${stopped.id}`}
-                  server={stopped}
-                  isConnected={false}
-                  isReconnecting={reconnectingServerId === stopped.id}
-                  searchFilter={searchFilter}
-                  onStart={() => onStartServer?.(stopped)}
-                  onDelete={() => onDeleteServer?.(stopped.id, false)}
-                />
-              ))}
-            </>
-          )}
+                {/* Stopped servers */}
+                {stoppedConnections.map((stopped) => (
+                  <ServerBlock
+                    key={`stopped-${stopped.id}`}
+                    server={stopped}
+                    isConnected={false}
+                    isReconnecting={reconnectingServerId === stopped.id}
+                    searchFilter={searchFilter}
+                    onStart={() => onStartServer?.(stopped)}
+                    onDelete={() => onDeleteServer?.(stopped.id, false)}
+                  />
+                ))}
+              </>
+            ))}
         </div>
       </div>
 
