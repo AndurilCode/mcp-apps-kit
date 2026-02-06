@@ -251,4 +251,81 @@ describe("AC: 60-second idle timer behavior", () => {
 
     clearTimeout(timer);
   });
+
+  it("multiple rapid resets keep deferring the callback", () => {
+    const callback = vi.fn();
+    let timer = setTimeout(callback, 60_000);
+
+    // Simulate 5 rapid events, each 10s apart — each resets the 60s timer
+    for (let i = 0; i < 5; i++) {
+      vi.advanceTimersByTime(10_000);
+      clearTimeout(timer);
+      timer = setTimeout(callback, 60_000);
+    }
+
+    // 50s elapsed from start, but timer was last reset at t=50s
+    // So at t=109s it should NOT have fired
+    vi.advanceTimersByTime(59_000);
+    expect(callback).not.toHaveBeenCalled();
+
+    // At t=110s (60s after last reset at t=50s) it fires
+    vi.advanceTimersByTime(1_000);
+    expect(callback).toHaveBeenCalledTimes(1);
+
+    clearTimeout(timer);
+  });
+});
+
+// ==========================================================================
+// Edge cases: source-level verification of guards and cleanup
+// ==========================================================================
+
+describe("Edge: testing activation guards and cleanup", () => {
+  const dashboardSrc = readSource("src/dashboard/react/InspectorDashboard.tsx");
+
+  it("requires curLen > 0 to prevent activation on empty arrays", () => {
+    // The condition is `curLen > prevLen && curLen > 0`
+    // This prevents false activation when both are 0 (initial mount)
+    expect(dashboardSrc).toContain("curLen > prevLen && curLen > 0");
+  });
+
+  it("uses agentEvents.length as the useEffect dependency", () => {
+    // The effect watching for new events depends on agentEvents.length
+    expect(dashboardSrc).toMatch(/\}, \[agentEvents\.length\]\);/);
+  });
+
+  it("timer callback nullifies the ref after firing", () => {
+    // After setIsTesting(false), the callback also sets ref to null
+    expect(dashboardSrc).toMatch(/setIsTesting\(false\);\s*\n\s*testingTimerRef\.current = null;/);
+  });
+
+  it("connection reset effect nullifies the timer ref", () => {
+    // When activeConnectionId changes, timer ref is set to null
+    expect(dashboardSrc).toMatch(
+      /clearTimeout\(testingTimerRef\.current\);\s*\n\s*testingTimerRef\.current = null;\s*\n\s*\}\s*\n\s*\}, \[activeConnectionId\]\)/
+    );
+  });
+
+  it("isTestingActive requires both isTesting AND connected status", () => {
+    // Verify the exact boolean expression
+    expect(dashboardSrc).toMatch(
+      /const isTestingActive = isTesting && activeConnection\?\.status === "connected"/
+    );
+  });
+});
+
+// ==========================================================================
+// Edge: statusDotTesting animation includes ease-in-out timing
+// ==========================================================================
+
+describe("Edge: statusDotTesting animation timing function", () => {
+  it("uses ease-in-out timing function", () => {
+    const animation = styles.statusDotTesting.animation as string;
+    expect(animation).toContain("ease-in-out");
+  });
+
+  it("full animation shorthand is correct", () => {
+    const animation = styles.statusDotTesting.animation as string;
+    expect(animation).toBe("pulse 1.5s ease-in-out infinite");
+  });
 });
