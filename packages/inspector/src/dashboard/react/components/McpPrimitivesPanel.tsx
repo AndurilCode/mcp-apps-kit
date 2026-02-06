@@ -6,7 +6,7 @@
  * Stopped servers appear greyed out with a "Start" button to reconnect.
  */
 
-import React, { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import type {
   McpTool,
   McpResource,
