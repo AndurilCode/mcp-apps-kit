@@ -23,7 +23,7 @@ import { TabBar } from "./components/TabBar";
 import { GlobalsPanel } from "./components/GlobalsPanel";
 import { McpPrimitivesPanel } from "./components/McpPrimitivesPanel";
 import { RightPanel } from "./components/RightPanel";
-import { NoWidgetPlaceholder } from "./components/NoWidgetPlaceholder";
+import { NoWidgetPlaceholder, type ConnectionState } from "./components/NoWidgetPlaceholder";
 import { OAuthDiscoveryPanel } from "./components/OAuthDiscoveryPanel";
 import { styles } from "./styles";
 import logoUrl from "../assets/logo.png";
@@ -211,6 +211,32 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
   const displayResources =
     resources.length > 0 ? resources : (cachedState?.primitives?.resources ?? []);
   const displayPrompts = prompts.length > 0 ? prompts : (cachedState?.primitives?.prompts ?? []);
+
+  // Compute connection state for NoWidgetPlaceholder
+  const connectionState: ConnectionState = useMemo(() => {
+    // No server connected
+    if (!activeConnection || connections.length === 0) {
+      return "no-server";
+    }
+    // Server connected - check for agent-initialize event
+    if (activeConnection.status === "connected") {
+      const hasAgentInit = displayAgentEvents.some((e) => e.type === "agent-initialize");
+      return hasAgentInit ? "agent-connected" : "server-connected";
+    }
+    // Connecting or error state - treat as no server
+    return "no-server";
+  }, [activeConnection, connections.length, displayAgentEvents]);
+
+  // Extract client name from agent-initialize event
+  const agentClientName = useMemo(() => {
+    const initEvent = displayAgentEvents.find((e) => e.type === "agent-initialize");
+    return (initEvent?.payload as { clientName?: string } | undefined)?.clientName;
+  }, [displayAgentEvents]);
+
+  // Handler to open connection form
+  const handleConnect = useCallback(() => {
+    setIsConnectionFormOpen(true);
+  }, []);
 
   // Left panel state (MCP primitives)
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
@@ -612,7 +638,11 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
               </div>
             ) : (
               /* Tamagotchi placeholder when no widget */
-              <NoWidgetPlaceholder />
+              <NoWidgetPlaceholder
+                connectionState={connectionState}
+                clientName={agentClientName}
+                onConnect={handleConnect}
+              />
             )}
           </main>
 
