@@ -99,6 +99,8 @@ export interface McpPrimitivesPanelNewProps {
   onStopServer?: (serverId: string) => void;
   /** Callback when Start button is clicked for a stopped server */
   onStartServer?: (stoppedConnection: StoppedConnection) => void;
+  /** Callback when Delete button is clicked for a server */
+  onDeleteServer?: (serverId: string, isConnected: boolean) => void;
   /** Callback to open connection form for new server (legacy - opens header form) */
   onAddServer?: () => void;
   /** Callback to connect to a new server with params (inline form) */
@@ -306,22 +308,36 @@ const localStyles: Record<string, React.CSSProperties> = {
     color: "#9ca3af",
   },
   serverButton: {
-    backgroundColor: "transparent",
+    backgroundColor: "#ffffff",
     border: "none",
-    borderRadius: "3px",
+    borderRadius: "4px",
     padding: "0.25rem",
     cursor: "pointer",
-    color: "#ffffff",
+    color: "#000000",
     fontSize: "0.875rem",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     transition: "opacity 0.15s ease",
     flexShrink: 0,
-    opacity: 0.8,
+    opacity: 0.9,
   },
   serverButtonHover: {
     opacity: 1,
+  },
+  deleteButton: {
+    backgroundColor: "transparent",
+    border: "none",
+    borderRadius: "4px",
+    padding: "0.25rem",
+    cursor: "pointer",
+    color: "#6b7280",
+    fontSize: "0.875rem",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "color 0.15s ease",
+    flexShrink: 0,
   },
   expandIndicator: {
     fontSize: "0.5rem",
@@ -370,9 +386,19 @@ const localStyles: Record<string, React.CSSProperties> = {
     textTransform: "uppercase" as const,
     letterSpacing: "0.05em",
   },
-  // Primitive item styles - card-like buttons
-  primitiveItem: {
+  // Primitive card styles - collapsible cards
+  primitiveCard: {
     margin: "0.25rem 0.5rem",
+    backgroundColor: "#1a1a1a",
+    border: "1px solid #2d2f2f",
+    borderRadius: "6px",
+    overflow: "hidden",
+    transition: "border-color 0.15s ease",
+  },
+  primitiveCardExpanded: {
+    borderColor: "#3d4040",
+  },
+  primitiveCardHeader: {
     padding: "0.5rem 0.75rem",
     cursor: "pointer",
     fontSize: "0.875rem",
@@ -381,19 +407,24 @@ const localStyles: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     gap: "0.5rem",
-    transition: "all 0.15s ease",
-    backgroundColor: "#1a1a1a",
-    border: "1px solid #2d2f2f",
-    borderRadius: "4px",
+    transition: "background-color 0.15s ease",
     outline: "none",
   },
-  primitiveItemHover: {
-    backgroundColor: "#252525",
+  primitiveCardHeaderHover: {
+    backgroundColor: "#222222",
   },
-  primitiveItemActive: {
-    backgroundColor: "#1f1f1f",
-    borderColor: "#ffffff",
-    borderWidth: "1px",
+  primitiveCardContent: {
+    padding: "0 0.75rem 0.75rem",
+    fontSize: "0.75rem",
+    color: "#9ca3af",
+    lineHeight: 1.5,
+    borderTop: "1px solid #2d2f2f",
+  },
+  primitiveExpandIcon: {
+    fontSize: "0.625rem",
+    color: "#6b7280",
+    transition: "transform 0.15s ease",
+    flexShrink: 0,
   },
   primitiveName: {
     flex: 1,
@@ -905,6 +936,7 @@ interface ServerBlockProps {
   searchFilter: string;
   onStop?: () => void;
   onStart?: () => void;
+  onDelete?: () => void;
   selectedPrimitive?: SelectedPrimitive | null;
   onSelectPrimitive?: (primitive: SelectedPrimitive | null) => void;
 }
@@ -916,11 +948,26 @@ function ServerBlock({
   searchFilter,
   onStop,
   onStart,
+  onDelete,
   selectedPrimitive,
   onSelectPrimitive,
 }: ServerBlockProps): React.ReactElement | null {
   const [isExpanded, setIsExpanded] = useState(true);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const [expandedPrimitives, setExpandedPrimitives] = useState<Set<string>>(new Set());
+
+  // Toggle primitive expansion
+  const togglePrimitiveExpanded = useCallback((key: string) => {
+    setExpandedPrimitives((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
 
   // Helper to check if a primitive is selected
   const isPrimitiveSelected = useCallback(
@@ -1051,6 +1098,35 @@ function ServerBlock({
             </svg>
           )}
         </button>
+        {onDelete && (
+          <button
+            style={localStyles.deleteButton}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "#ef4444";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "#6b7280";
+            }}
+            title="Remove server"
+            data-testid={`server-delete-btn-${server.id}`}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Server content */}
@@ -1094,34 +1170,51 @@ function ServerBlock({
               <div style={localStyles.kindSection}>
                 <div style={localStyles.kindHeader}>Tools</div>
                 {filteredTools.map((tool) => {
-                  const isSelected = isPrimitiveSelected("tool", tool.name);
+                  const toolKey = `tool-${tool.name}`;
+                  const isToolExpanded = expandedPrimitives.has(toolKey);
                   return (
                     <div
                       key={tool.name}
                       style={{
-                        ...localStyles.primitiveItem,
-                        ...(isSelected
-                          ? localStyles.primitiveItemActive
-                          : hoveredItem === `tool-${tool.name}`
-                            ? localStyles.primitiveItemHover
-                            : {}),
+                        ...localStyles.primitiveCard,
+                        ...(isToolExpanded ? localStyles.primitiveCardExpanded : {}),
                       }}
-                      onClick={() => handlePrimitiveClick("tool", tool.name)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          handlePrimitiveClick("tool", tool.name);
-                        }
-                      }}
-                      onMouseEnter={() => setHoveredItem(`tool-${tool.name}`)}
-                      onMouseLeave={() => setHoveredItem(null)}
-                      role="button"
-                      tabIndex={0}
-                      aria-selected={isSelected}
-                      data-testid={`tool-item-${tool.name}`}
+                      data-testid={`tool-card-${tool.name}`}
                     >
-                      <span style={localStyles.primitiveName}>{tool.name}</span>
-                      {hasToolUI(tool) && <span style={localStyles.widgetBadge}>Widget</span>}
+                      <div
+                        style={{
+                          ...localStyles.primitiveCardHeader,
+                          ...(hoveredItem === toolKey ? localStyles.primitiveCardHeaderHover : {}),
+                        }}
+                        onClick={() => togglePrimitiveExpanded(toolKey)}
+                        onMouseEnter={() => setHoveredItem(toolKey)}
+                        onMouseLeave={() => setHoveredItem(null)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            togglePrimitiveExpanded(toolKey);
+                          }
+                        }}
+                        aria-expanded={isToolExpanded}
+                      >
+                        <span
+                          style={{
+                            ...localStyles.primitiveExpandIcon,
+                            transform: isToolExpanded ? "rotate(90deg)" : "rotate(0deg)",
+                          }}
+                        >
+                          ▸
+                        </span>
+                        <span style={localStyles.primitiveName}>{tool.name}</span>
+                        {hasToolUI(tool) && <span style={localStyles.widgetBadge}>Widget</span>}
+                      </div>
+                      <AnimatedCollapse isOpen={isToolExpanded}>
+                        <div style={localStyles.primitiveCardContent}>
+                          {tool.description || "No description available."}
+                        </div>
+                      </AnimatedCollapse>
                     </div>
                   );
                 })}
@@ -1133,33 +1226,52 @@ function ServerBlock({
               <div style={localStyles.kindSection}>
                 <div style={localStyles.kindHeader}>Resources</div>
                 {filteredResources.map((resource) => {
-                  const isSelected = isPrimitiveSelected("resource", resource.name);
+                  const resourceKey = `resource-${resource.uri}`;
+                  const isResourceExpanded = expandedPrimitives.has(resourceKey);
                   return (
                     <div
                       key={resource.uri}
                       style={{
-                        ...localStyles.primitiveItem,
-                        ...(isSelected
-                          ? localStyles.primitiveItemActive
-                          : hoveredItem === `resource-${resource.uri}`
-                            ? localStyles.primitiveItemHover
-                            : {}),
+                        ...localStyles.primitiveCard,
+                        ...(isResourceExpanded ? localStyles.primitiveCardExpanded : {}),
                       }}
-                      onClick={() => handlePrimitiveClick("resource", resource.name)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          handlePrimitiveClick("resource", resource.name);
-                        }
-                      }}
-                      onMouseEnter={() => setHoveredItem(`resource-${resource.uri}`)}
-                      onMouseLeave={() => setHoveredItem(null)}
-                      role="button"
-                      tabIndex={0}
-                      aria-selected={isSelected}
-                      data-testid={`resource-item-${resource.name}`}
+                      data-testid={`resource-card-${resource.name}`}
                     >
-                      <span style={localStyles.primitiveName}>{resource.name}</span>
+                      <div
+                        style={{
+                          ...localStyles.primitiveCardHeader,
+                          ...(hoveredItem === resourceKey
+                            ? localStyles.primitiveCardHeaderHover
+                            : {}),
+                        }}
+                        onClick={() => togglePrimitiveExpanded(resourceKey)}
+                        onMouseEnter={() => setHoveredItem(resourceKey)}
+                        onMouseLeave={() => setHoveredItem(null)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            togglePrimitiveExpanded(resourceKey);
+                          }
+                        }}
+                        aria-expanded={isResourceExpanded}
+                      >
+                        <span
+                          style={{
+                            ...localStyles.primitiveExpandIcon,
+                            transform: isResourceExpanded ? "rotate(90deg)" : "rotate(0deg)",
+                          }}
+                        >
+                          ▸
+                        </span>
+                        <span style={localStyles.primitiveName}>{resource.name}</span>
+                      </div>
+                      <AnimatedCollapse isOpen={isResourceExpanded}>
+                        <div style={localStyles.primitiveCardContent}>
+                          {resource.description || resource.uri}
+                        </div>
+                      </AnimatedCollapse>
                     </div>
                   );
                 })}
@@ -1171,33 +1283,52 @@ function ServerBlock({
               <div style={localStyles.kindSection}>
                 <div style={localStyles.kindHeader}>Prompts</div>
                 {filteredPrompts.map((prompt) => {
-                  const isSelected = isPrimitiveSelected("prompt", prompt.name);
+                  const promptKey = `prompt-${prompt.name}`;
+                  const isPromptExpanded = expandedPrimitives.has(promptKey);
                   return (
                     <div
                       key={prompt.name}
                       style={{
-                        ...localStyles.primitiveItem,
-                        ...(isSelected
-                          ? localStyles.primitiveItemActive
-                          : hoveredItem === `prompt-${prompt.name}`
-                            ? localStyles.primitiveItemHover
-                            : {}),
+                        ...localStyles.primitiveCard,
+                        ...(isPromptExpanded ? localStyles.primitiveCardExpanded : {}),
                       }}
-                      onClick={() => handlePrimitiveClick("prompt", prompt.name)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          handlePrimitiveClick("prompt", prompt.name);
-                        }
-                      }}
-                      onMouseEnter={() => setHoveredItem(`prompt-${prompt.name}`)}
-                      onMouseLeave={() => setHoveredItem(null)}
-                      role="button"
-                      tabIndex={0}
-                      aria-selected={isSelected}
-                      data-testid={`prompt-item-${prompt.name}`}
+                      data-testid={`prompt-card-${prompt.name}`}
                     >
-                      <span style={localStyles.primitiveName}>{prompt.name}</span>
+                      <div
+                        style={{
+                          ...localStyles.primitiveCardHeader,
+                          ...(hoveredItem === promptKey
+                            ? localStyles.primitiveCardHeaderHover
+                            : {}),
+                        }}
+                        onClick={() => togglePrimitiveExpanded(promptKey)}
+                        onMouseEnter={() => setHoveredItem(promptKey)}
+                        onMouseLeave={() => setHoveredItem(null)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            togglePrimitiveExpanded(promptKey);
+                          }
+                        }}
+                        aria-expanded={isPromptExpanded}
+                      >
+                        <span
+                          style={{
+                            ...localStyles.primitiveExpandIcon,
+                            transform: isPromptExpanded ? "rotate(90deg)" : "rotate(0deg)",
+                          }}
+                        >
+                          ▸
+                        </span>
+                        <span style={localStyles.primitiveName}>{prompt.name}</span>
+                      </div>
+                      <AnimatedCollapse isOpen={isPromptExpanded}>
+                        <div style={localStyles.primitiveCardContent}>
+                          {prompt.description || "No description available."}
+                        </div>
+                      </AnimatedCollapse>
                     </div>
                   );
                 })}
@@ -1652,6 +1783,7 @@ function ServerBlocksContent({
   isResizing,
   onStopServer,
   onStartServer,
+  onDeleteServer,
   onAddServer,
   onConnect,
   isCreating,
@@ -1831,6 +1963,7 @@ function ServerBlocksContent({
                   isConnected={true}
                   searchFilter={searchFilter}
                   onStop={() => onStopServer?.(server.id)}
+                  onDelete={() => onDeleteServer?.(server.id, true)}
                   selectedPrimitive={selectedPrimitive}
                   onSelectPrimitive={onSelectPrimitive}
                 />
@@ -1845,6 +1978,7 @@ function ServerBlocksContent({
                   isReconnecting={reconnectingServerId === stopped.id}
                   searchFilter={searchFilter}
                   onStart={() => onStartServer?.(stopped)}
+                  onDelete={() => onDeleteServer?.(stopped.id, false)}
                 />
               ))}
             </>

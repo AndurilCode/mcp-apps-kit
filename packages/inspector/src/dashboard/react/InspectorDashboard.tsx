@@ -624,6 +624,19 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     [handleCreateConnection]
   );
 
+  // Handler to delete a server (connected or stopped)
+  const handleDeleteServer = useCallback(
+    async (serverId: string, isConnected: boolean) => {
+      if (isConnected) {
+        // Close the connection and don't add to stopped list
+        await closeConnection(serverId);
+      }
+      // Remove from stopped list if present
+      setStoppedConnections((prev) => prev.filter((s) => s.id !== serverId));
+    },
+    [closeConnection]
+  );
+
   const tabs = useMemo(
     () =>
       connections.map((connection) => ({
@@ -777,6 +790,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           isResizing={isLeftResizing}
           onStopServer={handleStopServer}
           onStartServer={handleStartServer}
+          onDeleteServer={handleDeleteServer}
           onConnect={handleCreateConnection}
           isCreating={isCreating}
           connectionError={connectionError}
