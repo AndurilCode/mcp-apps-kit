@@ -248,6 +248,7 @@ const localStyles: Record<string, React.CSSProperties> = {
     flex: 1,
     overflowY: "auto",
     minHeight: 0,
+    position: "relative" as const,
   },
   emptyState: {
     display: "flex",
@@ -672,9 +673,9 @@ function Spinner(): React.ReactElement {
 }
 
 /**
- * Animated wrapper for detail view - handles enter/exit animations
+ * Slide-over panel for detail view - slides on top of content
  */
-function AnimatedDetailWrapper({
+function SlideOverDetail({
   children,
   isVisible,
 }: {
@@ -687,7 +688,7 @@ function AnimatedDetailWrapper({
   useEffect(() => {
     if (isVisible) {
       setRender(true);
-      // Trigger animation after mount
+      // Trigger slide-in after mount
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           setShow(true);
@@ -695,8 +696,8 @@ function AnimatedDetailWrapper({
       });
     } else {
       setShow(false);
-      // Wait for exit animation
-      const timer = setTimeout(() => setRender(false), 200);
+      // Wait for slide-out animation
+      const timer = setTimeout(() => setRender(false), 250);
       return () => clearTimeout(timer);
     }
   }, [isVisible]);
@@ -706,10 +707,18 @@ function AnimatedDetailWrapper({
   return (
     <div
       style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "#0d0d0d",
         padding: "0.75rem",
+        overflowY: "auto",
         opacity: show ? 1 : 0,
-        transform: show ? "translateX(0)" : isVisible ? "translateX(10px)" : "translateX(-10px)",
-        transition: "opacity 0.2s ease-out, transform 0.2s ease-out",
+        transform: show ? "translateX(0)" : "translateX(100%)",
+        transition: "opacity 0.25s ease-out, transform 0.25s ease-out",
+        zIndex: 10,
       }}
     >
       {children}
@@ -1911,11 +1920,11 @@ function ServerBlocksContent({
         {/* Content */}
         <div style={localStyles.content}>
           {/* Show PrimitiveDetail when a primitive is selected */}
-          <AnimatedDetailWrapper isVisible={!!resolvedPrimitive}>
+          <SlideOverDetail isVisible={!!resolvedPrimitive}>
             {resolvedPrimitive && (
               <PrimitiveDetail primitive={resolvedPrimitive} onClose={onClosePrimitive} />
             )}
-          </AnimatedDetailWrapper>
+          </SlideOverDetail>
           {!resolvedPrimitive &&
             (isLoading && servers.length === 0 && stoppedConnections.length === 0 ? (
               <div style={localStyles.loadingState}>
