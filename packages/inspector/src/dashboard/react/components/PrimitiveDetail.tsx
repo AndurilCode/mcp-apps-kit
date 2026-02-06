@@ -1389,13 +1389,8 @@ export function PrimitiveDetail({
         {/* Browse Mode */}
         {mode === "browse" && (
           <>
-            {/* Summary (always visible) */}
+            {/* Summary/Description */}
             {summary && <p style={styles.summary}>{summary}</p>}
-
-            {/* Collapsible description - only if has more detail */}
-            {primitive.description && primitive.description.includes("\n") && (
-              <CollapsibleDescription description={primitive.description} />
-            )}
 
             {/* URI (resources only) */}
             {primitive.kind === "resource" && (
