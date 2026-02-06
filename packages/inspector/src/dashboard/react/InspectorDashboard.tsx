@@ -14,7 +14,7 @@ import { useAgentEventStream } from "./hooks/useAgentEventStream";
 import type { InspectorEvent, AgnosticInspectorEvent } from "../../types";
 import { useResizablePanelWidth } from "./hooks/useResizablePanelWidth";
 import { useGlobals, type GlobalsState } from "./hooks/useGlobals";
-import { useConnections, type DashboardConnection } from "./hooks/useConnections";
+import { useConnections } from "./hooks/useConnections";
 import { useOAuth } from "./hooks/useOAuth";
 import { useMcpPrimitives, type McpPrimitives } from "./hooks/useMcpPrimitives";
 import type { ConnectionParams } from "@mcp-apps-kit/testing";
@@ -26,7 +26,9 @@ import {
   McpPrimitivesPanel,
   type ServerData,
   type StoppedConnection,
+  type SelectedPrimitive,
 } from "./components/McpPrimitivesPanel";
+import { PrimitiveDetail, type Primitive } from "./components/PrimitiveDetail";
 import { RightPanel } from "./components/RightPanel";
 import { NoWidgetPlaceholder, type ConnectionState } from "./components/NoWidgetPlaceholder";
 import { OAuthDiscoveryPanel } from "./components/OAuthDiscoveryPanel";
@@ -85,12 +87,6 @@ interface CachedConnectionState {
   screencastImage: string | null;
   globals: GlobalsState | null;
   primitives: McpPrimitives | null;
-}
-
-/** Per-connection primitives cache for building ServerData */
-interface ConnectionPrimitivesCache {
-  connectionId: string;
-  primitives: McpPrimitives;
 }
 
 export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): React.ReactElement {
@@ -331,8 +327,17 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     setIsConnectionFormOpen(true);
   }, []);
 
-  // Left panel state (MCP primitives)
-  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
+  // Left panel state (MCP primitives) - persisted to localStorage
+  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        return localStorage.getItem("mcp-dashboard-left-collapsed") === "true";
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  });
 
   // Right panel state (persisted)
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(() => {
@@ -345,6 +350,34 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     }
     return false;
   });
+
+  // Selected primitive state (for detail view)
+  const [selectedPrimitive, setSelectedPrimitive] = useState<SelectedPrimitive | null>(null);
+
+  // Resolve selected primitive to its full data for PrimitiveDetail
+  const resolvedPrimitive: Primitive | null = useMemo(() => {
+    if (!selectedPrimitive) return null;
+
+    const server = serverDataList.find((s) => s.id === selectedPrimitive.serverId);
+    if (!server) return null;
+
+    switch (selectedPrimitive.kind) {
+      case "tool": {
+        const tool = server.tools.find((t) => t.name === selectedPrimitive.name);
+        return tool ? { ...tool, kind: "tool" as const } : null;
+      }
+      case "resource": {
+        const resource = server.resources.find((r) => r.name === selectedPrimitive.name);
+        return resource ? { ...resource, kind: "resource" as const } : null;
+      }
+      case "prompt": {
+        const prompt = server.prompts.find((p) => p.name === selectedPrimitive.name);
+        return prompt ? { ...prompt, kind: "prompt" as const } : null;
+      }
+      default:
+        return null;
+    }
+  }, [selectedPrimitive, serverDataList]);
 
   // Globals bar state (persisted)
   const [isGlobalsBarCollapsed, setIsGlobalsBarCollapsed] = useState(() => {
@@ -431,6 +464,17 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     }
   }, [isRightPanelCollapsed]);
 
+  // Save left panel collapsed state
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("mcp-dashboard-left-collapsed", String(isLeftPanelCollapsed));
+      } catch {
+        // ignore storage access errors
+      }
+    }
+  }, [isLeftPanelCollapsed]);
+
   // Save globals bar collapsed state
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -487,11 +531,27 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
   }, [activeConnectionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleRightPanel = useCallback(() => {
-    setIsRightPanelCollapsed((prev) => !prev);
+    setIsRightPanelCollapsed((prev) => {
+      const willExpand = prev; // true means collapsed, toggling to expand
+      if (willExpand) {
+        // When right panel opens, clear primitive selection (mutual exclusivity)
+        setSelectedPrimitive(null);
+      }
+      return !prev;
+    });
   }, []);
 
   const toggleGlobalsBar = useCallback(() => {
     setIsGlobalsBarCollapsed((prev) => !prev);
+  }, []);
+
+  // Handle primitive selection with mutual exclusivity
+  const handleSelectPrimitive = useCallback((primitive: SelectedPrimitive | null) => {
+    setSelectedPrimitive(primitive);
+    if (primitive) {
+      // When detail view opens, collapse right panel (mutual exclusivity)
+      setIsRightPanelCollapsed(true);
+    }
   }, []);
 
   const handleCreateConnection = useCallback(
@@ -744,12 +804,22 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           onConnect={handleCreateConnection}
           isCreating={isCreating}
           connectionError={connectionError}
+          selectedPrimitive={selectedPrimitive}
+          onSelectPrimitive={handleSelectPrimitive}
         />
 
-        {/* Center Column - screencast + globals bar */}
+        {/* Center Column - screencast + globals bar OR primitive detail */}
         <div style={styles.centerColumn}>
           <main style={styles.main}>
-            {isStreaming ? (
+            {resolvedPrimitive ? (
+              /* Primitive detail view */
+              <div style={{ padding: "1rem", maxWidth: "800px", margin: "0 auto", width: "100%" }}>
+                <PrimitiveDetail
+                  primitive={resolvedPrimitive}
+                  onClose={() => setSelectedPrimitive(null)}
+                />
+              </div>
+            ) : isStreaming ? (
               /* Screencast when streaming */
               <div
                 style={{
@@ -784,8 +854,8 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
             )}
           </main>
 
-          {/* Globals bar - below screencast, only when streaming */}
-          {isStreaming && (
+          {/* Globals bar - below screencast, only when streaming and no primitive detail */}
+          {isStreaming && !resolvedPrimitive && (
             <GlobalsPanel
               globals={displayGlobals}
               isVisible={true}

@@ -65,6 +65,13 @@ export interface StoppedConnection {
 // Props Types - Support both OLD API (tests) and NEW API (server blocks)
 // =============================================================================
 
+/** Selected primitive identifier */
+export interface SelectedPrimitive {
+  serverId: string;
+  kind: "tool" | "resource" | "prompt";
+  name: string;
+}
+
 /** New API props for server blocks mode */
 export interface McpPrimitivesPanelNewProps {
   /** Active server connections with their primitives */
@@ -97,6 +104,10 @@ export interface McpPrimitivesPanelNewProps {
   isCreating?: boolean;
   /** Connection error message */
   connectionError?: string | null;
+  /** Currently selected primitive */
+  selectedPrimitive?: SelectedPrimitive | null;
+  /** Callback when a primitive is selected */
+  onSelectPrimitive?: (primitive: SelectedPrimitive | null) => void;
 }
 
 /** Legacy API props for backward compatibility with tests */
@@ -894,6 +905,8 @@ interface ServerBlockProps {
   searchFilter: string;
   onStop?: () => void;
   onStart?: () => void;
+  selectedPrimitive?: SelectedPrimitive | null;
+  onSelectPrimitive?: (primitive: SelectedPrimitive | null) => void;
 }
 
 function ServerBlock({
@@ -902,10 +915,39 @@ function ServerBlock({
   searchFilter,
   onStop,
   onStart,
+  selectedPrimitive,
+  onSelectPrimitive,
 }: ServerBlockProps): React.ReactElement | null {
   const [isExpanded, setIsExpanded] = useState(true);
   const [showServerInfo, setShowServerInfo] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+
+  // Helper to check if a primitive is selected
+  const isPrimitiveSelected = useCallback(
+    (kind: "tool" | "resource" | "prompt", name: string): boolean => {
+      return (
+        selectedPrimitive?.serverId === server.id &&
+        selectedPrimitive?.kind === kind &&
+        selectedPrimitive?.name === name
+      );
+    },
+    [selectedPrimitive, server.id]
+  );
+
+  // Handler for primitive clicks
+  const handlePrimitiveClick = useCallback(
+    (kind: "tool" | "resource" | "prompt", name: string) => {
+      if (onSelectPrimitive) {
+        // Toggle selection - if already selected, deselect
+        if (isPrimitiveSelected(kind, name)) {
+          onSelectPrimitive(null);
+        } else {
+          onSelectPrimitive({ serverId: server.id, kind, name });
+        }
+      }
+    },
+    [onSelectPrimitive, server.id, isPrimitiveSelected]
+  );
 
   // Get primitives (only for connected servers)
   const tools = "tools" in server ? server.tools : [];
@@ -1048,23 +1090,38 @@ function ServerBlock({
             {filteredTools.length > 0 && (
               <div style={localStyles.kindSection}>
                 <div style={localStyles.kindHeader}>Tools</div>
-                {filteredTools.map((tool) => (
-                  <div
-                    key={tool.name}
-                    style={{
-                      ...localStyles.primitiveItem,
-                      ...(hoveredItem === `tool-${tool.name}`
-                        ? localStyles.primitiveItemHover
-                        : {}),
-                    }}
-                    onMouseEnter={() => setHoveredItem(`tool-${tool.name}`)}
-                    onMouseLeave={() => setHoveredItem(null)}
-                    data-testid={`tool-item-${tool.name}`}
-                  >
-                    <span style={localStyles.primitiveName}>{tool.name}</span>
-                    {hasToolUI(tool) && <span style={localStyles.widgetBadge}>Widget</span>}
-                  </div>
-                ))}
+                {filteredTools.map((tool) => {
+                  const isSelected = isPrimitiveSelected("tool", tool.name);
+                  return (
+                    <div
+                      key={tool.name}
+                      style={{
+                        ...localStyles.primitiveItem,
+                        ...(isSelected
+                          ? localStyles.primitiveItemActive
+                          : hoveredItem === `tool-${tool.name}`
+                            ? localStyles.primitiveItemHover
+                            : {}),
+                      }}
+                      onClick={() => handlePrimitiveClick("tool", tool.name)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handlePrimitiveClick("tool", tool.name);
+                        }
+                      }}
+                      onMouseEnter={() => setHoveredItem(`tool-${tool.name}`)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      role="button"
+                      tabIndex={0}
+                      aria-selected={isSelected}
+                      data-testid={`tool-item-${tool.name}`}
+                    >
+                      <span style={localStyles.primitiveName}>{tool.name}</span>
+                      {hasToolUI(tool) && <span style={localStyles.widgetBadge}>Widget</span>}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -1072,22 +1129,37 @@ function ServerBlock({
             {filteredResources.length > 0 && (
               <div style={localStyles.kindSection}>
                 <div style={localStyles.kindHeader}>Resources</div>
-                {filteredResources.map((resource) => (
-                  <div
-                    key={resource.uri}
-                    style={{
-                      ...localStyles.primitiveItem,
-                      ...(hoveredItem === `resource-${resource.uri}`
-                        ? localStyles.primitiveItemHover
-                        : {}),
-                    }}
-                    onMouseEnter={() => setHoveredItem(`resource-${resource.uri}`)}
-                    onMouseLeave={() => setHoveredItem(null)}
-                    data-testid={`resource-item-${resource.name}`}
-                  >
-                    <span style={localStyles.primitiveName}>{resource.name}</span>
-                  </div>
-                ))}
+                {filteredResources.map((resource) => {
+                  const isSelected = isPrimitiveSelected("resource", resource.name);
+                  return (
+                    <div
+                      key={resource.uri}
+                      style={{
+                        ...localStyles.primitiveItem,
+                        ...(isSelected
+                          ? localStyles.primitiveItemActive
+                          : hoveredItem === `resource-${resource.uri}`
+                            ? localStyles.primitiveItemHover
+                            : {}),
+                      }}
+                      onClick={() => handlePrimitiveClick("resource", resource.name)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handlePrimitiveClick("resource", resource.name);
+                        }
+                      }}
+                      onMouseEnter={() => setHoveredItem(`resource-${resource.uri}`)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      role="button"
+                      tabIndex={0}
+                      aria-selected={isSelected}
+                      data-testid={`resource-item-${resource.name}`}
+                    >
+                      <span style={localStyles.primitiveName}>{resource.name}</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -1095,22 +1167,37 @@ function ServerBlock({
             {filteredPrompts.length > 0 && (
               <div style={localStyles.kindSection}>
                 <div style={localStyles.kindHeader}>Prompts</div>
-                {filteredPrompts.map((prompt) => (
-                  <div
-                    key={prompt.name}
-                    style={{
-                      ...localStyles.primitiveItem,
-                      ...(hoveredItem === `prompt-${prompt.name}`
-                        ? localStyles.primitiveItemHover
-                        : {}),
-                    }}
-                    onMouseEnter={() => setHoveredItem(`prompt-${prompt.name}`)}
-                    onMouseLeave={() => setHoveredItem(null)}
-                    data-testid={`prompt-item-${prompt.name}`}
-                  >
-                    <span style={localStyles.primitiveName}>{prompt.name}</span>
-                  </div>
-                ))}
+                {filteredPrompts.map((prompt) => {
+                  const isSelected = isPrimitiveSelected("prompt", prompt.name);
+                  return (
+                    <div
+                      key={prompt.name}
+                      style={{
+                        ...localStyles.primitiveItem,
+                        ...(isSelected
+                          ? localStyles.primitiveItemActive
+                          : hoveredItem === `prompt-${prompt.name}`
+                            ? localStyles.primitiveItemHover
+                            : {}),
+                      }}
+                      onClick={() => handlePrimitiveClick("prompt", prompt.name)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handlePrimitiveClick("prompt", prompt.name);
+                        }
+                      }}
+                      onMouseEnter={() => setHoveredItem(`prompt-${prompt.name}`)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      role="button"
+                      tabIndex={0}
+                      aria-selected={isSelected}
+                      data-testid={`prompt-item-${prompt.name}`}
+                    >
+                      <span style={localStyles.primitiveName}>{prompt.name}</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -1565,6 +1652,8 @@ function ServerBlocksContent({
   onConnect,
   isCreating,
   connectionError,
+  selectedPrimitive,
+  onSelectPrimitive,
 }: McpPrimitivesPanelNewProps): React.ReactElement {
   const [searchFilter, setSearchFilter] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -1722,6 +1811,8 @@ function ServerBlocksContent({
                   isConnected={true}
                   searchFilter={searchFilter}
                   onStop={() => onStopServer?.(server.id)}
+                  selectedPrimitive={selectedPrimitive}
+                  onSelectPrimitive={onSelectPrimitive}
                 />
               ))}
 

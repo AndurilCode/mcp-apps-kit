@@ -625,12 +625,12 @@ function Tag({
   variant?: "kind" | "readOnly" | "idempotent" | "destructive" | "mimeType" | "actionMode";
 }): React.ReactElement {
   const variantStyles: Record<string, React.CSSProperties> = {
-    kind: styles.tagKind,
-    readOnly: styles.tagReadOnly,
-    idempotent: styles.tagIdempotent,
-    destructive: styles.tagDestructive,
-    mimeType: styles.tagMimeType,
-    actionMode: styles.tagActionMode,
+    kind: styles.tagKind!,
+    readOnly: styles.tagReadOnly!,
+    idempotent: styles.tagIdempotent!,
+    destructive: styles.tagDestructive!,
+    mimeType: styles.tagMimeType!,
+    actionMode: styles.tagActionMode!,
   };
 
   return (
@@ -876,9 +876,9 @@ function ResponseSection({
 
 /** Response panel showing execution results */
 function ResponsePanel({ result }: { result: ExecutionResult }): React.ReactElement {
-  const hasContent = result.content || result.contents || result.messages;
-  const hasStructured = result.structuredContent;
-  const hasMeta = result._meta;
+  const hasContent = !!(result.content || result.contents || result.messages);
+  const hasStructured = result.structuredContent !== undefined;
+  const hasMeta = result._meta !== undefined;
 
   return (
     <div style={styles.responsePanel} data-testid="response-panel">
@@ -894,14 +894,14 @@ function ResponsePanel({ result }: { result: ExecutionResult }): React.ReactElem
           />
           <span style={styles.statusText}>{result.ok ? "Success" : "Error"}</span>
           {result._meta?.duration_ms !== undefined && (
-            <span style={styles.durationText}>{result._meta.duration_ms}ms</span>
+            <span style={styles.durationText}>{result._meta.duration_ms as number}ms</span>
           )}
         </div>
 
         {/* Error message */}
-        {!result.ok && result.error && (
+        {result.error !== undefined && !result.ok && (
           <div style={{ padding: "8px 12px", color: "#ef4444", fontSize: "0.75rem" }}>
-            {result.error}
+            {String(result.error)}
           </div>
         )}
 
@@ -949,12 +949,14 @@ function ResponsePanel({ result }: { result: ExecutionResult }): React.ReactElem
         )}
 
         {/* Meta section */}
-        {hasMeta && (
+        {hasMeta && result._meta && (
           <ResponseSection label="_meta" defaultOpen={false}>
             {Object.entries(result._meta).map(([key, value]) => (
               <div key={key} style={styles.metaRow}>
                 <span style={styles.metaKey}>{key}</span>
-                <span>{typeof value === "object" ? JSON.stringify(value) : String(value)}</span>
+                <span>
+                  {typeof value === "object" ? JSON.stringify(value) : String(value as string)}
+                </span>
               </div>
             ))}
           </ResponseSection>
@@ -1326,6 +1328,12 @@ export function PrimitiveDetail({
 }: PrimitiveDetailProps): React.ReactElement {
   const [mode, setMode] = useState<"browse" | "action">("browse");
 
+  const handleClose = useCallback(() => {
+    if (onClose) {
+      onClose();
+    }
+  }, [onClose]);
+
   // Reset mode when primitive changes
   useEffect(() => {
     setMode("browse");
@@ -1363,6 +1371,16 @@ export function PrimitiveDetail({
         {mode === "action" && <Tag variant="actionMode">{label.toLowerCase()} mode</Tag>}
         {mode === "browse" && primitive.kind === "tool" && (
           <AnnotationTags annotations={primitive.annotations} />
+        )}
+        {onClose && (
+          <button
+            style={{ ...styles.button, ...styles.buttonSecondary, marginLeft: "auto" }}
+            onClick={handleClose}
+            title="Close"
+            data-testid="close-btn"
+          >
+            ✕
+          </button>
         )}
       </div>
 
