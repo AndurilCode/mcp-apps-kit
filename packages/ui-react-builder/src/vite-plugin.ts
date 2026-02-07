@@ -1183,5 +1183,3 @@ if (rootElement) {
 }
 
 export type { DevServerOptions };
-
-export default mcpReactUI;
