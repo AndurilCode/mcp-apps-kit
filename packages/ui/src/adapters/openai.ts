@@ -898,8 +898,9 @@ export class OpenAIAdapter implements ProtocolAdapter {
     // ChatGPT doesn't support partial/streaming tool input
     // Return a no-op unsubscribe function
     this.log("debug", "onToolInputPartial is not supported on ChatGPT");
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    return () => {};
+    return () => {
+      /* noop — ChatGPT doesn't support partial tool input */
+    };
   }
 
   // === Bidirectional Tool Support ===
