@@ -61,7 +61,8 @@ export type InspectorEventType =
   | "dialog"
   // Agent events (session-agnostic tool calls from the inspector)
   | "agent-tool-call"
-  | "agent-tool-result";
+  | "agent-tool-result"
+  | "agent-initialize";
 
 /**
  * Inspector event record
@@ -158,6 +159,7 @@ export function getEventCategory(type: InspectorEventType): EventCategory {
 
     case "agent-tool-call":
     case "agent-tool-result":
+    case "agent-initialize":
       return "agent";
   }
 }
@@ -269,6 +271,11 @@ export function getEventSummary(event: InspectorEvent | AgnosticInspectorEvent):
         payload && typeof payload === "object" && "isError" in payload && payload.isError;
       const toolName = getStr(payload, "name") ?? getStr(payload, "toolName") ?? "unknown";
       return isError ? `Agent Error: ${toolName}` : `Agent Result: ${toolName}`;
+    }
+
+    case "agent-initialize": {
+      const clientName = getStr(payload, "clientName") ?? getStr(payload, "name");
+      return clientName ? `Agent Connected: ${clientName}` : "Agent Connected";
     }
   }
 }

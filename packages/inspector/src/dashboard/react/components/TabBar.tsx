@@ -136,7 +136,11 @@ export function TabBar({
   onSelect,
   onClose,
   onAdd,
-}: TabBarProps): React.ReactElement {
+}: TabBarProps): React.ReactElement | null {
+  if (tabs.length === 0) {
+    return null;
+  }
+
   return (
     <div style={tabBarStyles.container}>
       <div style={tabBarStyles.tabs}>

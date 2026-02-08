@@ -5,6 +5,7 @@
  */
 
 import { EventEmitter } from "node:events";
+import { z } from "zod";
 import {
   createTestClient,
   type TestClient,
@@ -1180,6 +1181,65 @@ export class ConnectionManager extends EventEmitter {
     }
 
     return count;
+  }
+
+  /**
+   * Zod schema for validating MCP initialize requests.
+   * Used by maybeRecordInitialize to safely extract clientInfo.
+   */
+  private static readonly InitializeRequestSchema = z.object({
+    method: z.literal("initialize"),
+    params: z
+      .object({
+        clientInfo: z
+          .object({
+            name: z.string().optional(),
+            version: z.string().optional(),
+          })
+          .optional(),
+      })
+      .optional(),
+  });
+
+  /**
+   * Check if a JSON-RPC body is an MCP `initialize` request and record an agent-initialize event
+   *
+   * This intercepts the MCP initialize handshake to detect when an agent connects.
+   * The clientInfo.name field identifies the connecting agent (e.g., "claude-code", "cursor").
+   *
+   * @param jsonRpcBody - Parsed JSON-RPC request body (or unknown value to check)
+   * @returns true if an initialize event was recorded, false otherwise
+   */
+  maybeRecordInitialize(jsonRpcBody: unknown): boolean {
+    // Use Zod to safely validate and extract the initialize request structure
+    const parseResult = ConnectionManager.InitializeRequestSchema.safeParse(jsonRpcBody);
+
+    if (!parseResult.success) {
+      // Not a valid initialize request structure
+      return false;
+    }
+
+    const { params } = parseResult.data;
+    const clientInfo = params?.clientInfo;
+
+    // Build payload from validated data
+    const payload: Record<string, unknown> = {};
+    if (clientInfo?.name) {
+      payload.clientName = clientInfo.name;
+    }
+    if (clientInfo?.version) {
+      payload.clientVersion = clientInfo.version;
+    }
+
+    this.recordAgentEvent("agent-initialize", payload);
+
+    if (this.debug) {
+      console.log(
+        `[inspector] Agent initialize detected: ${clientInfo?.name ?? "unknown"}${clientInfo?.version ? ` v${clientInfo.version}` : ""}`
+      );
+    }
+
+    return true;
   }
 }
 

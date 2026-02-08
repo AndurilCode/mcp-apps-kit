@@ -519,13 +519,11 @@ export function ConnectionBar({
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter" && showDropdown && hoveredIndex >= 0) {
-        if (isCreating) return;
         e.preventDefault();
         const entry = filteredHistory[hoveredIndex];
         if (entry) {
-          const params = applyHistoryEntry(entry);
+          applyHistoryEntry(entry);
           setShowDropdown(false);
-          void onCreateConnection(params);
         }
       } else if (e.key === "Enter") {
         void handleCreate();
@@ -540,25 +538,16 @@ export function ConnectionBar({
         setHoveredIndex((prev) => Math.max(prev - 1, 0));
       }
     },
-    [
-      handleCreate,
-      showDropdown,
-      hoveredIndex,
-      filteredHistory,
-      onCreateConnection,
-      applyHistoryEntry,
-      isCreating,
-    ]
+    [handleCreate, showDropdown, hoveredIndex, filteredHistory, applyHistoryEntry]
   );
 
   const handleSelectHistory = useCallback(
     (entry: ServerHistoryEntry) => {
       if (isCreating) return;
-      const params = applyHistoryEntry(entry);
+      applyHistoryEntry(entry);
       setShowDropdown(false);
-      void onCreateConnection(params);
     },
-    [onCreateConnection, applyHistoryEntry, isCreating]
+    [applyHistoryEntry, isCreating]
   );
 
   if (!isOpen) {

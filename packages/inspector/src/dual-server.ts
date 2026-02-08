@@ -716,6 +716,20 @@ export function createDualInspectorServer(
     }
     const body = Buffer.concat(chunks);
 
+    // Intercept MCP initialize requests on both endpoints for agent detection
+    if (body.length > 0 && (url.startsWith("/agent/mcp") || url.startsWith("/apps/mcp"))) {
+      try {
+        const parsed = JSON.parse(body.toString("utf-8")) as unknown;
+        const cm = getActiveConnectionManager();
+        if (cm) {
+          cm.maybeRecordInitialize(parsed);
+        }
+      } catch {
+        // Parse failures handled silently — non-JSON bodies on MCP endpoints are expected
+        // (e.g., SSE connections, partial uploads). Debug logging omitted to avoid noise.
+      }
+    }
+
     const webRequest = new Request(requestUrl, {
       method: req.method ?? "GET",
       headers: Object.entries(req.headers)

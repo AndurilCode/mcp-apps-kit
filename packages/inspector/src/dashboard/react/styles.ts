@@ -188,6 +188,11 @@ export const styles: Record<string, CSSProperties> = {
     boxShadow: "0 0 8px rgba(32, 178, 170, 0.5)",
   },
 
+  statusDotTesting: {
+    backgroundColor: "#ffffff",
+    animation: "pulse 1.5s ease-in-out infinite",
+  },
+
   statusDotDisconnected: {
     backgroundColor: "#ef4444",
   },

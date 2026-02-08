@@ -132,4 +132,83 @@ describe("ConnectionManager", () => {
       expect(count).toBe(0);
     });
   });
+
+  describe("maybeRecordInitialize", () => {
+    it("should record event for valid initialize request with clientInfo", () => {
+      const jsonRpcBody = {
+        method: "initialize",
+        params: {
+          clientInfo: {
+            name: "claude-code",
+            version: "1.0.0",
+          },
+        },
+      };
+
+      const result = manager.maybeRecordInitialize(jsonRpcBody);
+
+      expect(result).toBe(true);
+      const events = manager.getAgentEvents();
+      expect(events).toHaveLength(1);
+      expect(events[0].type).toBe("agent-initialize");
+      expect(events[0].payload).toEqual({
+        clientName: "claude-code",
+        clientVersion: "1.0.0",
+      });
+    });
+
+    it("should record event with undefined name when clientInfo is missing", () => {
+      const jsonRpcBody = {
+        method: "initialize",
+        params: {},
+      };
+
+      const result = manager.maybeRecordInitialize(jsonRpcBody);
+
+      expect(result).toBe(true);
+      const events = manager.getAgentEvents();
+      expect(events).toHaveLength(1);
+      expect(events[0].type).toBe("agent-initialize");
+      expect(events[0].payload).toEqual({});
+    });
+
+    it("should return false for invalid JSON-RPC structure (no method)", () => {
+      const jsonRpcBody = {
+        params: {
+          clientInfo: { name: "test" },
+        },
+      };
+
+      const result = manager.maybeRecordInitialize(jsonRpcBody);
+
+      expect(result).toBe(false);
+      expect(manager.getAgentEvents()).toHaveLength(0);
+    });
+
+    it("should return false for non-initialize method", () => {
+      const jsonRpcBody = {
+        method: "tools/list",
+        params: {},
+      };
+
+      const result = manager.maybeRecordInitialize(jsonRpcBody);
+
+      expect(result).toBe(false);
+      expect(manager.getAgentEvents()).toHaveLength(0);
+    });
+
+    it("should record event with undefined clientInfo when params is missing", () => {
+      const jsonRpcBody = {
+        method: "initialize",
+      };
+
+      const result = manager.maybeRecordInitialize(jsonRpcBody);
+
+      expect(result).toBe(true);
+      const events = manager.getAgentEvents();
+      expect(events).toHaveLength(1);
+      expect(events[0].type).toBe("agent-initialize");
+      expect(events[0].payload).toEqual({});
+    });
+  });
 });
