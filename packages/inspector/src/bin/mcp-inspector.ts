@@ -4,6 +4,8 @@
  * Start the MCP Inspector Server for testing and debugging MCP servers.
  */
 
+/* eslint-disable no-console -- CLI entry point, console output is intentional */
+
 import { createStandaloneInspectorServer } from "../standalone-server";
 import { createDualInspectorServer } from "../dual-server";
 import {
