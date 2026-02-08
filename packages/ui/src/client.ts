@@ -223,8 +223,9 @@ export function createAppsClient<T extends ToolDefs = ToolDefs>(
     setupSizeChangedNotifications(): () => void {
       // Only run in browser environments
       if (typeof window === "undefined" || typeof ResizeObserver === "undefined") {
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        return () => {};
+        return () => {
+          /* noop — no ResizeObserver in non-browser env */
+        };
       }
 
       const observer = new ResizeObserver((entries) => {
