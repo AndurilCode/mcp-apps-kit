@@ -841,6 +841,13 @@ export class ConnectionManager extends EventEmitter {
   }
 
   /**
+   * Set the dashboard notifier on the widget session manager for SSE lifecycle events.
+   */
+  setDashboardNotifier(notifier: import("./dashboard/dashboard-notifier").DashboardNotifier): void {
+    this.widgetSessionManager.setNotifier(notifier);
+  }
+
+  /**
    * Get the shared widget server (creates if needed)
    *
    * The WidgetServer is shared across all tool calls to ensure consistent

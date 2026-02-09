@@ -81,6 +81,7 @@ export class WidgetSessionManager extends EventEmitter {
   private store: SessionStore;
   private readonly debug: boolean;
   private eventIdCounter: number = 0;
+  private notifier?: import("./dashboard/dashboard-notifier").DashboardNotifier;
 
   constructor(options: WidgetSessionManagerOptions = {}) {
     super();
@@ -91,6 +92,14 @@ export class WidgetSessionManager extends EventEmitter {
       ttl: options.ttl,
       debug: options.debug,
     });
+  }
+
+  /**
+   * Set the dashboard notifier for SSE session lifecycle events.
+   * Called by the server after both the manager and notifier are created.
+   */
+  setNotifier(notifier: import("./dashboard/dashboard-notifier").DashboardNotifier): void {
+    this.notifier = notifier;
   }
 
   /**
@@ -234,6 +243,11 @@ export class WidgetSessionManager extends EventEmitter {
 
     if (this.debug) {
       console.log(`[WidgetSessionManager] Created session ${sessionId} for tool ${toolName}`);
+    }
+
+    // Notify dashboard SSE clients about the new session
+    if (this.notifier) {
+      this.notifier.emitSessionCreated(sessionId, `/host/${sessionId}/`);
     }
 
     return session;
@@ -1056,6 +1070,11 @@ export class WidgetSessionManager extends EventEmitter {
 
     if (this.debug && result) {
       console.log(`[WidgetSessionManager] Closed session ${sessionId}`);
+    }
+
+    // Notify dashboard SSE clients about the closed session
+    if (this.notifier && result) {
+      this.notifier.emitSessionClosed(sessionId);
     }
 
     return result;

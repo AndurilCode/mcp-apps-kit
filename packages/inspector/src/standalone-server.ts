@@ -301,6 +301,8 @@ export function createStandaloneInspectorServer(
   let connectionManager: ConnectionManager | null = null;
   registry.on("created", (_id: string, cm: ConnectionManager) => {
     connectionManager = cm;
+    // Wire dashboard SSE notifier for session lifecycle events
+    cm.setDashboardNotifier(dashboardNotifier);
   });
 
   /** Get the active connection manager, or null if none */
