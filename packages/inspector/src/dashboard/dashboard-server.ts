@@ -154,8 +154,15 @@ export async function handleDashboardRequest(
 
   // ===== Widget server proxy routes =====
   // Proxy /host/* and /widget/* to the WidgetServer's ephemeral port
-  if ((pathname.startsWith("/host/") || pathname.startsWith("/widget/")) && options?.widgetPort) {
-    proxyToWidgetServer(req, res, options.widgetPort);
+  if (pathname.startsWith("/host/") || pathname.startsWith("/widget/")) {
+    if (options?.widgetPort) {
+      proxyToWidgetServer(req, res, options.widgetPort);
+      return true;
+    }
+    // Widget server not yet started — return 503 so client can retry
+    console.warn(`[Dashboard] Widget proxy: no widgetPort available for ${pathname}`);
+    res.writeHead(503, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Widget server not ready" }));
     return true;
   }
 
