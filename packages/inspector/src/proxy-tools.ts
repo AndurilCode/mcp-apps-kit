@@ -192,11 +192,20 @@ export function registerProxyToolsDirectly(
                   true // isDualMode - wait for synced responses from external widget
                 );
 
-                // In dual mode, renderInBrowser always returns BrowserRenderResult (not WidgetFrameHandle)
-                if (!("page" in renderResult)) {
-                  throw new Error("Unexpected WidgetFrameHandle in dual mode proxy");
+                // In dual mode, renderInBrowser returns BrowserRenderResult (headless)
+                // Interactive mode returns WidgetFrameHandle — handle both
+                if ("frame" in renderResult) {
+                  // Interactive mode in dual server — not expected but handle gracefully
+                  console.warn(
+                    "[proxy] WidgetFrameHandle returned in dual mode — interactive mode not fully supported in proxy path"
+                  );
                 }
-                const { page } = renderResult;
+                const page =
+                  "page" in renderResult
+                    ? (renderResult as { page: import("playwright").Page }).page
+                    : (
+                        renderResult as import("./types/widget-frame-handle").WidgetFrameHandle
+                      ).frame.page();
 
                 // Extract widget session ID from URL
                 const pageUrl = page.url();

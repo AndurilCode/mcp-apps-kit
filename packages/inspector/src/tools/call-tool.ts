@@ -146,50 +146,77 @@ export function createCallToolTool(registry: ConnectionRegistry) {
                 inspectorUrl ?? undefined
               );
 
-              // In standalone mode without interactive flag, renderInBrowser returns BrowserRenderResult
-              if (!("page" in renderResult)) {
-                throw new Error("Unexpected WidgetFrameHandle in call-tool context");
-              }
-              const { page } = renderResult;
+              // Interactive mode: renderInBrowser returns WidgetFrameHandle
+              // Headless mode: renderInBrowser returns BrowserRenderResult { page, errors }
+              if ("frame" in renderResult) {
+                // Interactive mode — WidgetFrameHandle
+                const handle =
+                  renderResult as import("../types/widget-frame-handle").WidgetFrameHandle;
+                const widgetSessionId = handle.sessionId;
 
-              // Get widget session ID from renderResult (from WidgetServer)
-              // The session ID is in the URL path
-              const pageUrl = page.url();
-              const urlMatch = pageUrl.match(/\/host\/([a-f0-9-]+)/);
-              const widgetSessionId = urlMatch?.[1];
-
-              if (!widgetSessionId) {
-                console.warn(
-                  `[call_tool] Failed to extract widgetSessionId from page URL: ${pageUrl}`
+                const widgetServerTouch = uiHostManager.createSessionTouchCallback(widgetSessionId);
+                const sessionManager = connectionManager.getWidgetSessionManager();
+                // eslint-disable-next-line no-console
+                console.log(
+                  `[call_tool] Creating interactive session for ${input.name}, widgetSessionId: ${widgetSessionId}`
                 );
-                // Widget session ID extraction failed, return result without session
-                return baseResponse;
+                // In interactive mode we need the dashboard page for the session store
+                const dashboardPage = handle.frame.page();
+                const session = await sessionManager.createSession(
+                  input.name,
+                  input.arguments,
+                  toolResult,
+                  dashboardPage,
+                  widgetSessionId,
+                  uiResource.protocol,
+                  "agent", // source
+                  undefined, // proxyMetadata
+                  widgetServerTouch,
+                  handle
+                );
+                sessionId = session.id;
+                // eslint-disable-next-line no-console
+                console.log(`[call_tool] Interactive session created: ${sessionId}`);
+              } else {
+                // Headless mode — BrowserRenderResult { page, errors }
+                const { page } = renderResult as {
+                  page: import("playwright").Page;
+                  errors: string[];
+                };
+
+                // Get widget session ID from the page URL
+                const pageUrl = page.url();
+                const urlMatch = pageUrl.match(/\/host\/([a-f0-9-]+)/);
+                const widgetSessionId = urlMatch?.[1];
+
+                if (!widgetSessionId) {
+                  console.warn(
+                    `[call_tool] Failed to extract widgetSessionId from page URL: ${pageUrl}`
+                  );
+                  return baseResponse;
+                }
+
+                const widgetServerTouch = uiHostManager.createSessionTouchCallback(widgetSessionId);
+                const sessionManager = connectionManager.getWidgetSessionManager();
+                // eslint-disable-next-line no-console
+                console.log(
+                  `[call_tool] Creating session for ${input.name}, widgetSessionId: ${widgetSessionId}, hostUrl: ${pageUrl}`
+                );
+                const session = await sessionManager.createSession(
+                  input.name,
+                  input.arguments,
+                  toolResult,
+                  page,
+                  widgetSessionId,
+                  uiResource.protocol,
+                  "agent", // source
+                  undefined, // proxyMetadata
+                  widgetServerTouch
+                );
+                sessionId = session.id;
+                // eslint-disable-next-line no-console
+                console.log(`[call_tool] Session created: ${sessionId}`);
               }
-
-              // Create touch callback to keep WidgetServer session alive
-              const widgetServerTouch = uiHostManager.createSessionTouchCallback(widgetSessionId);
-
-              // Create widget session in session manager
-              const sessionManager = connectionManager.getWidgetSessionManager();
-              // eslint-disable-next-line no-console
-              console.log(
-                `[call_tool] Creating session for ${input.name}, widgetSessionId: ${widgetSessionId}, hostUrl: ${pageUrl}`
-              );
-              const session = await sessionManager.createSession(
-                input.name,
-                input.arguments,
-                toolResult,
-                page,
-                widgetSessionId,
-                uiResource.protocol,
-                "agent", // source
-                undefined, // proxyMetadata
-                widgetServerTouch
-              );
-
-              sessionId = session.id;
-              // eslint-disable-next-line no-console
-              console.log(`[call_tool] Session created: ${sessionId}`);
             }
           }
         } catch (error) {
