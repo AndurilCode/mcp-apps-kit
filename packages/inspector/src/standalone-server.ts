@@ -672,13 +672,20 @@ export function createStandaloneInspectorServer(
             }
           })();
 
+          let timer: ReturnType<typeof setTimeout> | undefined;
           const timeoutPromise = new Promise<never>((_resolve, reject) => {
-            setTimeout(() => {
+            timer = setTimeout(() => {
               reject(new Error(`Execution timed out after ${timeoutMs}ms`));
             }, timeoutMs);
           });
 
-          data = await Promise.race([executePromise, timeoutPromise]);
+          try {
+            data = await Promise.race([executePromise, timeoutPromise]);
+          } finally {
+            if (timer !== undefined) {
+              clearTimeout(timer);
+            }
+          }
 
           const duration = Date.now() - startTime;
 
