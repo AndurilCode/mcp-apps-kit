@@ -1151,7 +1151,13 @@ function ServerBlock({
             style={localStyles.deleteButton}
             onClick={(e) => {
               e.stopPropagation();
-              onDelete();
+              if (
+                window.confirm(
+                  `Remove server "${server.name || server.url}"? This deletes it from servers.json.`
+                )
+              ) {
+                onDelete();
+              }
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.color = "#ef4444";
