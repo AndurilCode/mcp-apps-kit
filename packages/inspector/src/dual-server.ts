@@ -28,6 +28,7 @@ import { registerProxyToolsDirectly } from "./proxy-tools";
 import { registerProxyResources } from "./proxy-resources";
 import { handleDashboardRequest } from "./dashboard/dashboard-server";
 import { handleOAuthRoutes } from "./oauth/callback-handler";
+import { ServerStore, type LocalStorageMigrationPayload } from "./persistence/server-store";
 import { createWellKnownProxy } from "./oauth/wellknown-proxy";
 import type { WellKnownProxyContext } from "./oauth/wellknown-proxy";
 import {
@@ -155,9 +156,11 @@ function createAgentTools(registry: ConnectionRegistry): ToolDefs {
 export function createDualInspectorServer(
   options: DualInspectorServerOptions = {}
 ): DualInspectorServer {
+  const serverStore = new ServerStore();
   const registry = new ConnectionRegistry({
     connectionManagerOptions: options,
     maxConnections: options.maxConnections ?? 20,
+    serverStore,
   });
   let connectionManager: ConnectionManager | null = null;
   registry.on("created", (_id: string, cm: ConnectionManager) => {
@@ -684,6 +687,104 @@ export function createDualInspectorServer(
         } catch {
           res.writeHead(400, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: "Invalid payload" }));
+        }
+        return;
+      }
+
+      res.writeHead(405, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Method not allowed" }));
+      return;
+    }
+
+    // Server persistence routes (/api/servers)
+    if (url === "/api/servers" || url.startsWith("/api/servers/")) {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+      if (req.method === "OPTIONS") {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+
+      // GET /api/servers — list all persisted servers
+      if (url === "/api/servers" && req.method === "GET") {
+        try {
+          const servers = await serverStore.listAll();
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true, servers }));
+        } catch {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: false, error: "Failed to load servers" }));
+        }
+        return;
+      }
+
+      // POST /api/servers/migrate — migrate from localStorage
+      if (url === "/api/servers/migrate" && req.method === "POST") {
+        try {
+          const chunks: Buffer[] = [];
+          for await (const chunk of req) {
+            chunks.push(chunk as Buffer);
+          }
+          const body = JSON.parse(
+            Buffer.concat(chunks).toString("utf-8")
+          ) as LocalStorageMigrationPayload;
+          const count = await serverStore.migrate(body);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true, imported: count }));
+        } catch {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: false, error: "Invalid migration payload" }));
+        }
+        return;
+      }
+
+      // POST /api/servers — save a server
+      if (url === "/api/servers" && req.method === "POST") {
+        try {
+          const chunks: Buffer[] = [];
+          for await (const chunk of req) {
+            chunks.push(chunk as Buffer);
+          }
+          const parsed = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as unknown;
+          const entry = ServerStore.validateEntry(parsed);
+          if (!entry) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                success: false,
+                error: "Invalid server entry: missing required fields",
+              })
+            );
+            return;
+          }
+          await serverStore.save(entry);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true }));
+        } catch {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: false, error: "Invalid server entry" }));
+        }
+        return;
+      }
+
+      // DELETE /api/servers/:id
+      if (url.startsWith("/api/servers/") && req.method === "DELETE") {
+        const id = decodeURIComponent(url.slice("/api/servers/".length));
+        if (!id || id === "migrate") {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: false, error: "Missing server ID" }));
+          return;
+        }
+        try {
+          const deleted = await serverStore.delete(id);
+          res.writeHead(deleted ? 200 : 404, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true, deleted }));
+        } catch {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: false, error: "Failed to delete server" }));
         }
         return;
       }

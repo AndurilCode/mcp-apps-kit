@@ -11,6 +11,11 @@ import { ConnectionManager } from "./connection";
 import type { ConnectOptions, ConnectionStatusOutput, InspectorServerOptions } from "./types";
 import type { OAuthState } from "./oauth/types";
 import type { AuthRequiredEvent } from "./oauth/discovery";
+import type {
+  ServerStore,
+  PersistedServerEntry,
+  ServerTransport,
+} from "./persistence/server-store";
 
 /**
  * Event map emitted by the connection registry.
@@ -34,6 +39,8 @@ export interface ConnectionRegistryOptions {
   maxConnections?: number;
   /** Base options for each ConnectionManager instance. */
   connectionManagerOptions?: InspectorServerOptions;
+  /** Optional server store for persisting server configurations. */
+  serverStore?: ServerStore;
 }
 
 /**
@@ -53,6 +60,7 @@ export class ConnectionRegistry extends EventEmitter {
   private activeConnectionId: string | null = null;
   private readonly maxConnections: number;
   private readonly connectionManagerOptions: InspectorServerOptions;
+  private readonly serverStore: ServerStore | null;
 
   /**
    * Create a ConnectionRegistry instance.
@@ -63,6 +71,7 @@ export class ConnectionRegistry extends EventEmitter {
     super();
     this.maxConnections = options.maxConnections ?? 20;
     this.connectionManagerOptions = options.connectionManagerOptions ?? {};
+    this.serverStore = options.serverStore ?? null;
   }
 
   /**
@@ -109,6 +118,33 @@ export class ConnectionRegistry extends EventEmitter {
       throw error;
     }
     this.setActive(id);
+
+    // Persist server if not ephemeral, store is available, and serverInfo exists
+    if (this.serverStore && !options?.ephemeral) {
+      const state = connectionManager.getState();
+      if (state.serverInfo) {
+        const transport: ServerTransport = params.transport === "stdio" ? "stdio" : "http";
+        const url =
+          params.transport === "http"
+            ? params.url
+            : `${params.command}${params.args?.length ? " " + params.args.join(" ") : ""}`;
+
+        const entry: PersistedServerEntry = {
+          id,
+          name: state.serverInfo.name,
+          url,
+          transport,
+          params,
+          hasOAuth: false,
+          addedAt: Date.now(),
+        };
+
+        // Fire-and-forget — don't block connection on persistence
+        this.serverStore.save(entry).catch(() => {
+          // Best-effort persistence
+        });
+      }
+    }
 
     return { id, connectionManager };
   }
@@ -241,6 +277,21 @@ export class ConnectionRegistry extends EventEmitter {
    */
   getDiscoveryResults(connectionId: string): AuthRequiredEvent | null {
     return this.getConnection(connectionId).getDiscoveryResults();
+  }
+
+  /**
+   * Delete a server from persistent storage.
+   *
+   * Does NOT disconnect any active connection — only removes persisted data.
+   *
+   * @param id - Server ID to remove from storage.
+   * @returns true if the server was deleted, false if not found or no store configured.
+   */
+  async deleteServer(id: string): Promise<boolean> {
+    if (!this.serverStore) {
+      return false;
+    }
+    return this.serverStore.delete(id);
   }
 
   /**
