@@ -241,7 +241,8 @@ export class ServerStore {
       return false;
     }
 
-    delete data.servers[id];
+    const { [id]: _, ...rest } = data.servers;
+    data.servers = rest;
     await this.writeRaw(data);
     return true;
   }
@@ -297,7 +298,7 @@ export class ServerStore {
         url: server.url,
         transport: server.transport,
         params: server.params,
-        hasOAuth: Boolean(server.hasOAuth),
+        hasOAuth: server.hasOAuth,
         addedAt: server.addedAt ?? Date.now(),
       };
       count++;

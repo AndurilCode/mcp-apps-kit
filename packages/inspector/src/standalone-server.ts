@@ -18,7 +18,11 @@ import { ConnectionManager, inferProtocolType, type ProtocolType } from "./conne
 import { ConnectionRegistry } from "./connection-registry";
 import type { InspectorServerOptions } from "./types";
 import { handleDashboardRequest } from "./dashboard/dashboard-server";
-import { ServerStore } from "./persistence/server-store";
+import {
+  ServerStore,
+  type LocalStorageMigrationPayload,
+  type PersistedServerEntry,
+} from "./persistence/server-store";
 import {
   createConnectTool,
   createDisconnectTool,
@@ -1190,7 +1194,9 @@ export function createStandaloneInspectorServer(
           for await (const chunk of req) {
             chunks.push(chunk as Buffer);
           }
-          const body = JSON.parse(Buffer.concat(chunks).toString("utf-8"));
+          const body = JSON.parse(
+            Buffer.concat(chunks).toString("utf-8")
+          ) as LocalStorageMigrationPayload;
           const count = await serverStore.migrate(body);
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: true, imported: count }));
@@ -1207,7 +1213,7 @@ export function createStandaloneInspectorServer(
           for await (const chunk of req) {
             chunks.push(chunk as Buffer);
           }
-          const entry = JSON.parse(Buffer.concat(chunks).toString("utf-8"));
+          const entry = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as PersistedServerEntry;
           await serverStore.save(entry);
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: true }));

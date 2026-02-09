@@ -1153,7 +1153,7 @@ function ServerBlock({
               e.stopPropagation();
               if (
                 window.confirm(
-                  `Remove server "${server.name || server.url}"? This deletes it from servers.json.`
+                  `Remove server "${server.name || server.url}"? This action cannot be undone.`
                 )
               ) {
                 onDelete();

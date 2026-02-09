@@ -28,7 +28,11 @@ import { registerProxyToolsDirectly } from "./proxy-tools";
 import { registerProxyResources } from "./proxy-resources";
 import { handleDashboardRequest } from "./dashboard/dashboard-server";
 import { handleOAuthRoutes } from "./oauth/callback-handler";
-import { ServerStore } from "./persistence/server-store";
+import {
+  ServerStore,
+  type LocalStorageMigrationPayload,
+  type PersistedServerEntry,
+} from "./persistence/server-store";
 import { createWellKnownProxy } from "./oauth/wellknown-proxy";
 import type { WellKnownProxyContext } from "./oauth/wellknown-proxy";
 import {
@@ -714,7 +718,7 @@ export function createDualInspectorServer(
           const servers = await serverStore.listAll();
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: true, servers }));
-        } catch (err) {
+        } catch {
           res.writeHead(500, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: false, error: "Failed to load servers" }));
         }
@@ -728,11 +732,13 @@ export function createDualInspectorServer(
           for await (const chunk of req) {
             chunks.push(chunk as Buffer);
           }
-          const body = JSON.parse(Buffer.concat(chunks).toString("utf-8"));
+          const body = JSON.parse(
+            Buffer.concat(chunks).toString("utf-8")
+          ) as LocalStorageMigrationPayload;
           const count = await serverStore.migrate(body);
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: true, imported: count }));
-        } catch (err) {
+        } catch {
           res.writeHead(400, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: false, error: "Invalid migration payload" }));
         }
@@ -746,11 +752,11 @@ export function createDualInspectorServer(
           for await (const chunk of req) {
             chunks.push(chunk as Buffer);
           }
-          const entry = JSON.parse(Buffer.concat(chunks).toString("utf-8"));
+          const entry = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as PersistedServerEntry;
           await serverStore.save(entry);
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: true }));
-        } catch (err) {
+        } catch {
           res.writeHead(400, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: false, error: "Invalid server entry" }));
         }
@@ -769,7 +775,7 @@ export function createDualInspectorServer(
           const deleted = await serverStore.delete(id);
           res.writeHead(deleted ? 200 : 404, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: true, deleted }));
-        } catch (err) {
+        } catch {
           res.writeHead(500, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: false, error: "Failed to delete server" }));
         }
