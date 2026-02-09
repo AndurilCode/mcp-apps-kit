@@ -18,7 +18,6 @@ import { useConnections } from "./hooks/useConnections";
 import { useOAuth } from "./hooks/useOAuth";
 import { useMcpPrimitives, type McpPrimitives } from "./hooks/useMcpPrimitives";
 import type { ConnectionParams } from "@mcp-apps-kit/testing";
-import { z } from "zod";
 import { Toolbar } from "./components/Toolbar";
 import { GlobalsPanel } from "./components/GlobalsPanel";
 import {
@@ -36,63 +35,121 @@ import { styles } from "./styles";
 import logoUrl from "../assets/logo.png";
 
 // =============================================================================
-// Stopped Connections Storage
+// Server Persistence API
 // =============================================================================
 
 const STOPPED_CONNECTIONS_KEY = "mcp-dashboard-stopped-connections";
 
-/** Zod schema for ConnectionParams validation */
-const ConnectionParamsSchema = z.union([
-  z.object({
-    transport: z.literal("http"),
-    url: z.string().min(1),
-  }),
-  z.object({
-    transport: z.literal("stdio"),
-    command: z.string().min(1),
-    args: z.array(z.string()).optional(),
-    env: z.record(z.string(), z.string()).optional(),
-    inheritEnv: z.boolean().optional(),
-    cwd: z.string().optional(),
-  }),
-]);
+/** Shape of a persisted server entry from the backend API */
+interface PersistedServerEntry {
+  id: string;
+  name: string;
+  url: string;
+  transport: "http" | "stdio";
+  params: ConnectionParams;
+  hasOAuth: boolean;
+  addedAt: number;
+}
 
-/** Zod schema for StoppedConnection validation */
-const StoppedConnectionSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  url: z.string().min(1),
-  params: ConnectionParamsSchema,
-});
+/** API response wrapper */
+interface ApiResponse<T = undefined> {
+  success: boolean;
+  error?: string;
+  servers?: PersistedServerEntry[];
+  imported?: number;
+  data?: T;
+}
 
-/** Load stopped connections from localStorage */
-function loadStoppedConnections(): StoppedConnection[] {
-  if (typeof window === "undefined") return [];
+/** Fetch persisted servers from backend */
+async function fetchPersistedServers(): Promise<PersistedServerEntry[]> {
   try {
-    const stored = localStorage.getItem(STOPPED_CONNECTIONS_KEY);
-    if (!stored) return [];
-    const parsed = JSON.parse(stored) as unknown;
-    // Validate shape
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map((item) => {
-        const result = StoppedConnectionSchema.safeParse(item);
-        return result.success ? result.data : null;
-      })
-      .filter((item): item is StoppedConnection => item !== null);
+    const res = await fetch("/api/servers");
+    const data = (await res.json()) as ApiResponse;
+    if (data.success && data.servers) {
+      return data.servers;
+    }
+    return [];
   } catch {
     return [];
   }
 }
 
-/** Save stopped connections to localStorage */
-function saveStoppedConnections(connections: StoppedConnection[]): void {
-  if (typeof window === "undefined") return;
+/** Save a server to backend persistence */
+async function persistServer(entry: PersistedServerEntry): Promise<boolean> {
   try {
-    localStorage.setItem(STOPPED_CONNECTIONS_KEY, JSON.stringify(connections));
+    const res = await fetch("/api/servers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(entry),
+    });
+    const data = (await res.json()) as ApiResponse;
+    return data.success;
   } catch {
-    // Ignore storage errors
+    return false;
   }
+}
+
+/** Delete a server from backend persistence */
+async function deletePersistedServer(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/servers/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+    const data = (await res.json()) as ApiResponse;
+    return data.success;
+  } catch {
+    return false;
+  }
+}
+
+/** Migrate localStorage data to backend */
+async function migrateFromLocalStorage(servers: PersistedServerEntry[]): Promise<boolean> {
+  try {
+    const res = await fetch("/api/servers/migrate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ servers }),
+    });
+    const data = (await res.json()) as ApiResponse;
+    return data.success;
+  } catch {
+    return false;
+  }
+}
+
+/** Load stopped connections from localStorage (for migration check only) */
+function loadStoppedConnectionsFromLocalStorage(): StoppedConnection[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem(STOPPED_CONNECTIONS_KEY);
+    if (!stored) return [];
+    const parsed = JSON.parse(stored) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    // Basic shape validation — entries need id, name, url, params
+    return (parsed as StoppedConnection[]).filter(
+      (item) =>
+        item &&
+        typeof item.id === "string" &&
+        typeof item.name === "string" &&
+        typeof item.url === "string" &&
+        item.params
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** Convert a StoppedConnection to a PersistedServerEntry */
+function toPersistedEntry(conn: StoppedConnection): PersistedServerEntry {
+  return {
+    id: conn.id,
+    name: conn.name,
+    url: conn.url,
+    transport: conn.params.transport === "stdio" ? "stdio" : "http",
+    params: conn.params,
+    hasOAuth: false,
+    addedAt: Date.now(),
+  };
 }
 
 export interface InspectorDashboardProps {
@@ -128,10 +185,44 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
   const connectionCacheRef = useRef<Map<string, CachedConnectionState>>(new Map());
   const prevConnectionIdRef = useRef<string | null>(null);
 
-  // Stopped connections state (persisted to localStorage)
-  const [stoppedConnections, setStoppedConnections] = useState<StoppedConnection[]>(() =>
-    loadStoppedConnections()
-  );
+  // Stopped connections state (loaded from backend API on mount)
+  const [stoppedConnections, setStoppedConnections] = useState<StoppedConnection[]>([]);
+
+  // Load persisted servers from backend on mount, with localStorage migration
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const persisted = await fetchPersistedServers();
+      if (cancelled) return;
+
+      if (persisted.length > 0) {
+        // Backend has data — use it
+        setStoppedConnections(
+          persisted.map((entry) => ({
+            id: entry.id,
+            name: entry.name,
+            url: entry.url,
+            params: entry.params,
+          }))
+        );
+      } else {
+        // Backend empty — check localStorage for migration
+        const localData = loadStoppedConnectionsFromLocalStorage();
+        if (localData.length > 0) {
+          const migrationEntries = localData.map(toPersistedEntry);
+          const success = await migrateFromLocalStorage(migrationEntries);
+          if (cancelled) return;
+          if (success) {
+            localStorage.removeItem(STOPPED_CONNECTIONS_KEY);
+            setStoppedConnections(localData);
+          }
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Track which server is currently reconnecting (shows loading state)
   const [reconnectingServerId, setReconnectingServerId] = useState<string | null>(null);
@@ -292,11 +383,6 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
       primitivesPerConnectionRef.current.set(activeConnectionId, { tools, resources, prompts });
     }
   }, [activeConnectionId, tools, resources, prompts]);
-
-  // Persist stopped connections to localStorage
-  useEffect(() => {
-    saveStoppedConnections(stoppedConnections);
-  }, [stoppedConnections]);
 
   // Build ServerData array from active connections + primitives cache
   const serverDataList: ServerData[] = useMemo(() => {
@@ -621,6 +707,9 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
         params,
       };
 
+      // Persist to backend
+      await persistServer(toPersistedEntry(stoppedConn));
+
       setStoppedConnections((prev) => {
         // Don't duplicate
         if (prev.some((s) => s.id === serverId)) return prev;
@@ -643,7 +732,8 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
         // Reconnect using stored params
         const success = await handleCreateConnection(stoppedConn.params);
         if (success) {
-          // Only remove from stopped list after successful connection
+          // Remove from backend persistence and local state
+          await deletePersistedServer(stoppedConn.id);
           setStoppedConnections((prev) => prev.filter((s) => s.id !== stoppedConn.id));
         }
       } finally {
@@ -660,7 +750,8 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
         // Close the connection and don't add to stopped list
         await closeConnection(serverId);
       }
-      // Remove from stopped list if present
+      // Remove from backend persistence and local state
+      await deletePersistedServer(serverId);
       setStoppedConnections((prev) => prev.filter((s) => s.id !== serverId));
     },
     [closeConnection]
