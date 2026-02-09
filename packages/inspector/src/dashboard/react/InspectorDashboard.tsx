@@ -868,7 +868,6 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           panelWidth={rightPanelWidth}
           resizeHandleProps={rightResizeHandleProps}
           isResizing={isRightResizing}
-          isStreaming={isStreaming}
         />
       </div>
 
