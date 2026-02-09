@@ -173,3 +173,7 @@ export type {
 } from "./inspector-event-types";
 
 export { getEventCategory, getEventSummary } from "./inspector-event-types";
+
+// Widget frame handle (interactive mode)
+export type { WidgetFrameHandle } from "./widget-frame-handle";
+export { WidgetFrameHandleImpl, createWidgetFrameHandle } from "./widget-frame-handle";

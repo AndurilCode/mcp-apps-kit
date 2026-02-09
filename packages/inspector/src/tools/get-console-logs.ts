@@ -262,7 +262,7 @@ export function createGetConsoleLogsTool(registry: ConnectionRegistry) {
         errors.push(...renderResult.errors);
 
         // Set up console message listener BEFORE reload
-        page.on("console", (msg) => {
+        page.on("console", (msg: import("playwright").ConsoleMessage) => {
           const location = msg.location();
           logs.push({
             level: mapConsoleTypeToLogLevel(msg.type()),
@@ -275,7 +275,7 @@ export function createGetConsoleLogsTool(registry: ConnectionRegistry) {
         });
 
         // Set up page error listener (uncaught exceptions)
-        page.on("pageerror", (err) => {
+        page.on("pageerror", (err: Error) => {
           pageErrors.push(err.message);
         });
 

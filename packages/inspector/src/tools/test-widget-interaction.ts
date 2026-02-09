@@ -489,7 +489,7 @@ export function createTestWidgetInteractionTool(registry: ConnectionRegistry) {
                   if (position) {
                     // Scroll element to specific position
                     await frame.locator(selector).evaluate(
-                      (el, { x, y }: { x: number; y: number }) => {
+                      (el: Element, { x, y }: { x: number; y: number }) => {
                         el.scrollTo(x, y);
                       },
                       { x: position.x, y: position.y }

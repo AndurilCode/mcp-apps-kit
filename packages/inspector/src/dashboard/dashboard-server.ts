@@ -13,6 +13,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "http";
+import http from "node:http";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,6 +22,7 @@ import type { ConnectionManager } from "../connection";
 import type { ConnectionRegistry } from "../connection-registry";
 import type { InspectorEvent, AgnosticInspectorEvent } from "../types";
 import { CDPStreamer } from "./cdp-streamer";
+export { DashboardNotifier } from "./dashboard-notifier";
 
 /**
  * Resolve a ConnectionManager from an optional connection ID.
@@ -125,14 +127,81 @@ function setCorsHeaders(req: IncomingMessage, res: ServerResponse): void {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
+/**
+ * Proxy an HTTP request to a target port on 127.0.0.1.
+ *
+ * Forwards the request method, headers, and body. Pipes the response back.
+ * Returns true if the proxy attempt was made (even if it errored).
+ */
+function proxyToWidgetServer(
+  req: IncomingMessage,
+  res: ServerResponse,
+  widgetPort: number
+): boolean {
+  const targetUrl = `http://127.0.0.1:${widgetPort}${req.url ?? "/"}`;
+
+  const parsed = new URL(targetUrl);
+  const proxyReq = http.request(
+    {
+      hostname: parsed.hostname,
+      port: parsed.port,
+      path: parsed.pathname + parsed.search,
+      method: req.method,
+      headers: {
+        ...req.headers,
+        host: `127.0.0.1:${widgetPort}`,
+      },
+    },
+    (proxyRes) => {
+      res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
+      proxyRes.pipe(res, { end: true });
+    }
+  );
+
+  proxyReq.on("error", (err) => {
+    if (!res.headersSent) {
+      res.writeHead(502, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Widget server proxy error", message: err.message }));
+    }
+  });
+
+  req.pipe(proxyReq, { end: true });
+  return true;
+}
+
 export async function handleDashboardRequest(
   req: IncomingMessage,
   res: ServerResponse,
   connectionManager: ConnectionManager | null,
-  registry?: ConnectionRegistry
+  registry?: ConnectionRegistry,
+  options?: { widgetPort?: number; notifier?: import("./dashboard-notifier").DashboardNotifier }
 ): Promise<boolean> {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
   const pathname = url.pathname;
+
+  // ===== Widget server proxy routes =====
+  // Proxy /host/* and /widget/* to the WidgetServer's ephemeral port
+  if ((pathname.startsWith("/host/") || pathname.startsWith("/widget/")) && options?.widgetPort) {
+    proxyToWidgetServer(req, res, options.widgetPort);
+    return true;
+  }
+
+  // ===== SSE session lifecycle stream =====
+  if (pathname === "/dashboard/sessions/stream" && req.method === "GET") {
+    if (options?.notifier) {
+      options.notifier.addClient(res);
+    } else {
+      // No notifier available — send headers and keepalive, then stay open
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+      });
+      res.write(":keepalive\n\n");
+    }
+    return true;
+  }
 
   // ===== Connection management endpoints =====
 

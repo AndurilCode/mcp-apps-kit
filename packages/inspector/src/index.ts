@@ -124,6 +124,9 @@ export {
 // Proxy tool generation (for advanced usage)
 export { hasTargetSchema, registerProxyToolsDirectly } from "./proxy-tools";
 
+// Dashboard notifier (for session lifecycle SSE)
+export { DashboardNotifier } from "./dashboard/dashboard-notifier";
+
 // Proxy resource generation (for advanced usage)
 export { registerProxyResources, hasUIResources, type ProxyResourceInfo } from "./proxy-resources";
 

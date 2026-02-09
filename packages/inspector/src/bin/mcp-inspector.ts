@@ -35,6 +35,7 @@ interface CLIOptions {
   oauthConfig: string | null;
   oauthAutoRegister: boolean;
   noAutoAuth: boolean;
+  interactive: boolean;
 }
 
 function parseArgs(): CLIOptions {
@@ -51,6 +52,7 @@ function parseArgs(): CLIOptions {
     oauthConfig: null,
     oauthAutoRegister: false,
     noAutoAuth: false,
+    interactive: !process.env.CI,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -142,6 +144,10 @@ function parseArgs(): CLIOptions {
       options.oauthAutoRegister = true;
     } else if (arg === "--no-auto-auth") {
       options.noAutoAuth = true;
+    } else if (arg === "--interactive") {
+      options.interactive = true;
+    } else if (arg === "--no-interactive") {
+      options.interactive = false;
     } else if (arg === "--help" || arg === "-h") {
       printHelp();
       process.exit(0);
@@ -196,6 +202,8 @@ Options:
   --dual                   Enable dual-endpoint mode for real ChatGPT testing
   --max-history <number>   Maximum call history entries (default: 1000)
   --ttl <ms>               Session TTL in milliseconds (default: 300000 = 5 min)
+  --interactive            Launch visible Chromium with dashboard (default: true unless CI)
+  --no-interactive         Force headless mode
   -h, --help               Show this help message
   -v, --version            Show version number
 
@@ -498,6 +506,11 @@ async function main(): Promise<void> {
         console.log(`OAuth: preset auth configured (non-interactive)`);
       }
       console.log(`\nPress Ctrl+C to stop`);
+
+      // Interactive mode: launch visible browser with dashboard
+      if (options.interactive) {
+        await launchInteractiveBrowser(options.port);
+      }
     } catch (error) {
       // Check if this is an auth error on auto-connect that we can handle
       if (options.url && isAuthError(error) && !hasPresetFlags(oauthFlags) && !options.noAutoAuth) {
@@ -545,6 +558,38 @@ async function main(): Promise<void> {
         process.exit(1);
       }
     }
+  }
+}
+
+/**
+ * Launch a visible Chromium browser pointing at the dashboard.
+ * Includes session recovery on browser disconnect.
+ */
+async function launchInteractiveBrowser(port: number): Promise<void> {
+  try {
+    const { chromium } = await import("playwright");
+
+    async function launch() {
+      const browser = await chromium.launch({ headless: false });
+      const page = await browser.newPage();
+      await page.goto(`http://localhost:${port}/dashboard`);
+      console.log(`[interactive] Dashboard opened in Chromium`);
+
+      // Session recovery: relaunch browser if it disconnects
+      browser.on("disconnected", () => {
+        console.log(`[interactive] Browser disconnected, relaunching...`);
+        launch().catch((err: unknown) => {
+          console.error(`[interactive] Failed to relaunch browser:`, err);
+        });
+      });
+
+      return page;
+    }
+
+    await launch();
+  } catch (err) {
+    console.error(`[interactive] Failed to launch browser (is playwright installed?):`, err);
+    console.log(`[interactive] Continuing in headless mode`);
   }
 }
 

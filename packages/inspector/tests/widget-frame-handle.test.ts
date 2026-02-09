@@ -1,14 +1,18 @@
 import { describe, it, expect, vi } from "vitest";
-import { createWidgetFrameHandle } from "../src/types/widget-frame-handle";
-import type { Frame, Page, ElementHandle } from "playwright";
+import { createWidgetFrameHandle, WidgetFrameHandleImpl } from "../src/types/widget-frame-handle";
+import type { Frame, Page, Locator } from "playwright";
 
 // Mock helpers
 function createMockFrame(sessionId: string): Frame {
+  const mockScreenshot = vi.fn().mockResolvedValue(Buffer.from("png-data"));
+  const mockLocator = { screenshot: mockScreenshot } as unknown as Locator;
   const frame = {
     url: () => `http://localhost:9999/widget/${sessionId}/`,
-    $: vi.fn(),
+    locator: vi.fn().mockReturnValue(mockLocator),
     evaluate: vi.fn(),
     waitForLoadState: vi.fn().mockResolvedValue(undefined),
+    _mockScreenshot: mockScreenshot,
+    _mockLocator: mockLocator,
   } as unknown as Frame;
   return frame;
 }
@@ -33,40 +37,29 @@ describe("WidgetFrameHandle", () => {
     expect(handle.sessionId).toBe(sessionId);
   });
 
-  it("screenshot delegates to frame body element", async () => {
+  it("screenshot delegates to frame.locator('body').screenshot()", async () => {
     const frame = createMockFrame(sessionId);
     const page = createMockPage();
-    const mockBuffer = Buffer.from("png-data");
-    const mockBody = { screenshot: vi.fn().mockResolvedValue(mockBuffer) };
-    (frame.$ as ReturnType<typeof vi.fn>).mockResolvedValue(mockBody);
 
     const handle = createWidgetFrameHandle(frame, sessionId, page);
     const result = await handle.screenshot({ type: "png" });
 
-    expect(frame.$).toHaveBeenCalledWith("body");
-    expect(mockBody.screenshot).toHaveBeenCalledWith({ type: "png" });
-    expect(result).toBe(mockBuffer);
+    expect(
+      (frame as unknown as { locator: ReturnType<typeof vi.fn> }).locator
+    ).toHaveBeenCalledWith("body");
+    expect(result).toEqual(Buffer.from("png-data"));
   });
 
   it("screenshot with quality passes it through", async () => {
     const frame = createMockFrame(sessionId);
     const page = createMockPage();
-    const mockBody = { screenshot: vi.fn().mockResolvedValue(Buffer.from("")) };
-    (frame.$ as ReturnType<typeof vi.fn>).mockResolvedValue(mockBody);
+    const mockScreenshot = (frame as unknown as { _mockScreenshot: ReturnType<typeof vi.fn> })
+      ._mockScreenshot;
 
     const handle = createWidgetFrameHandle(frame, sessionId, page);
     await handle.screenshot({ type: "jpeg", quality: 80 });
 
-    expect(mockBody.screenshot).toHaveBeenCalledWith({ type: "jpeg", quality: 80 });
-  });
-
-  it("screenshot throws when body not found", async () => {
-    const frame = createMockFrame(sessionId);
-    const page = createMockPage();
-    (frame.$ as ReturnType<typeof vi.fn>).mockResolvedValue(null);
-
-    const handle = createWidgetFrameHandle(frame, sessionId, page);
-    await expect(handle.screenshot()).rejects.toThrow("frame body not found");
+    expect(mockScreenshot).toHaveBeenCalledWith({ type: "jpeg", quality: 80 });
   });
 
   it("resize evaluates CSS change on dashboard page", async () => {
@@ -88,7 +81,6 @@ describe("WidgetFrameHandle", () => {
     const page = createMockPage();
 
     const handle = createWidgetFrameHandle(frame, sessionId, page);
-    // Should resolve without error and not close the page
     await expect(handle.dispose()).resolves.toBeUndefined();
     expect(page.isClosed()).toBe(false);
   });
@@ -109,7 +101,7 @@ describe("WidgetFrameHandle", () => {
     expect(handle.isAlive()).toBe(false);
   });
 
-  it("postMessage uses frame.evaluate with window.postMessage (MIG-POSTMSG)", async () => {
+  it("postMessage uses frame.evaluate with window.postMessage", async () => {
     const frame = createMockFrame(sessionId);
     const page = createMockPage();
 
@@ -118,5 +110,23 @@ describe("WidgetFrameHandle", () => {
     await handle.postMessage(data);
 
     expect(frame.evaluate).toHaveBeenCalledWith(expect.any(Function), data);
+  });
+
+  it("WidgetFrameHandleImpl class works directly", () => {
+    const frame = createMockFrame(sessionId);
+    const page = createMockPage();
+
+    const handle = new WidgetFrameHandleImpl(page, frame, sessionId);
+    expect(handle.frame).toBe(frame);
+    expect(handle.sessionId).toBe(sessionId);
+    expect(handle.isAlive()).toBe(true);
+  });
+
+  it("factory function creates WidgetFrameHandleImpl instance", () => {
+    const frame = createMockFrame(sessionId);
+    const page = createMockPage();
+
+    const handle = createWidgetFrameHandle(frame, sessionId, page);
+    expect(handle).toBeInstanceOf(WidgetFrameHandleImpl);
   });
 });

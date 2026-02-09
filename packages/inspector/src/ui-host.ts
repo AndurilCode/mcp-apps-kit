@@ -25,7 +25,8 @@ import {
   type OpenAIEnvironmentSettings,
 } from "./hosts/openai-host";
 import { WidgetServer } from "./widget-server";
-import type { ElementInfo, EnvironmentState } from "./types";
+import type { ElementInfo, EnvironmentState, WidgetFrameHandle } from "./types";
+import { WidgetFrameHandleImpl } from "./types/widget-frame-handle";
 
 // Playwright types - use dynamic import since it's optional
 type Browser = Awaited<ReturnType<(typeof import("playwright"))["chromium"]["launch"]>>;
@@ -88,6 +89,8 @@ export class UIHostManager {
   private widgetServer?: WidgetServer;
   private sharedWidgetServer?: WidgetServer;
   private options: Required<Omit<UIHostManagerOptions, "sharedWidgetServer">>;
+  private dashboardPage: Page | null = null;
+  private interactive = false;
 
   constructor(client: TestClient, options: UIHostManagerOptions = {}) {
     this.client = client;
@@ -96,6 +99,20 @@ export class UIHostManager {
       timeout: options.timeout ?? 30000,
       debug: options.debug ?? false,
     };
+  }
+
+  /**
+   * Set the shared dashboard page for interactive mode.
+   * When set, renderInBrowser() returns WidgetFrameHandle instead of opening new pages.
+   */
+  setDashboardPage(page: Page): void {
+    this.dashboardPage = page;
+    this.interactive = true;
+  }
+
+  /** Whether interactive mode is active (dashboard page set) */
+  get isInteractive(): boolean {
+    return this.interactive;
   }
 
   /**
@@ -448,7 +465,22 @@ export class UIHostManager {
     externalHostContext?: Record<string, unknown>,
     inspectorUrl?: string,
     isDualMode?: boolean
-  ): Promise<BrowserRenderResult> {
+  ): Promise<BrowserRenderResult | WidgetFrameHandle> {
+    // Interactive mode: use dashboard page + frame handle instead of new page
+    if (this.interactive && this.dashboardPage && !this.dashboardPage.isClosed()) {
+      return this.renderInDashboard(
+        html,
+        protocol,
+        toolResult,
+        toolName,
+        toolArgs,
+        environmentState,
+        externalHostContext,
+        inspectorUrl,
+        isDualMode
+      );
+    }
+
     const errors: string[] = [];
     const browser = await this.getBrowser();
     const page = await browser.newPage();
@@ -502,6 +534,56 @@ export class UIHostManager {
       page,
       errors,
     };
+  }
+
+  /**
+   * Render widget inside the shared dashboard page (interactive mode).
+   * Returns a WidgetFrameHandle instead of a raw Page.
+   *
+   * MIG-PAGE: Dashboard page is NEVER closed.
+   * MIG-FRAME: Frame lookup uses session-scoped regex.
+   */
+  private async renderInDashboard(
+    html: string,
+    protocol: DetectedProtocol,
+    toolResult: unknown,
+    toolName: string,
+    toolArgs: Record<string, unknown>,
+    environmentState?: EnvironmentState,
+    externalHostContext?: Record<string, unknown>,
+    inspectorUrl?: string,
+    isDualMode?: boolean
+  ): Promise<WidgetFrameHandle> {
+    const server = await this.getWidgetServer();
+    const { sessionId } = server.createSession(
+      html,
+      toolResult,
+      toolName,
+      toolArgs,
+      protocol,
+      environmentState,
+      externalHostContext,
+      inspectorUrl,
+      isDualMode
+    );
+
+    const dashboardPage = this.dashboardPage!;
+
+    // MIG-FRAME: Wait for session-scoped frame to appear (poll with 10s timeout)
+    const frameUrlRegex = new RegExp(`/widget/${sessionId}/`);
+    const startTime = Date.now();
+    let frame = dashboardPage.frames().find((f) => frameUrlRegex.test(f.url()));
+
+    while (!frame && Date.now() - startTime < 10000) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      frame = dashboardPage.frames().find((f) => frameUrlRegex.test(f.url()));
+    }
+
+    if (!frame) {
+      throw new Error(`Timed out waiting for widget frame for session ${sessionId} (10s)`);
+    }
+
+    return new WidgetFrameHandleImpl(dashboardPage, frame, sessionId);
   }
 
   /**
