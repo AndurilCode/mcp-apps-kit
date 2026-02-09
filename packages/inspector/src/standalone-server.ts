@@ -18,11 +18,7 @@ import { ConnectionManager, inferProtocolType, type ProtocolType } from "./conne
 import { ConnectionRegistry } from "./connection-registry";
 import type { InspectorServerOptions } from "./types";
 import { handleDashboardRequest } from "./dashboard/dashboard-server";
-import {
-  ServerStore,
-  type LocalStorageMigrationPayload,
-  type PersistedServerEntry,
-} from "./persistence/server-store";
+import { ServerStore, type LocalStorageMigrationPayload } from "./persistence/server-store";
 import {
   createConnectTool,
   createDisconnectTool,
@@ -1213,7 +1209,18 @@ export function createStandaloneInspectorServer(
           for await (const chunk of req) {
             chunks.push(chunk as Buffer);
           }
-          const entry = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as PersistedServerEntry;
+          const parsed = JSON.parse(Buffer.concat(chunks).toString("utf-8")) as unknown;
+          const entry = ServerStore.validateEntry(parsed);
+          if (!entry) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                success: false,
+                error: "Invalid server entry: missing required fields",
+              })
+            );
+            return;
+          }
           await serverStore.save(entry);
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: true }));

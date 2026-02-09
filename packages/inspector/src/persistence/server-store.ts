@@ -267,6 +267,40 @@ export class ServerStore {
    * @param payload - Migration payload containing servers from localStorage
    * @returns Number of servers imported
    */
+  /**
+   * Validate and normalize a server entry from untrusted input.
+   *
+   * @returns Normalized entry or null if invalid
+   */
+  static validateEntry(input: unknown): PersistedServerEntry | null {
+    if (typeof input !== "object" || input === null) return null;
+    const server = input as Record<string, unknown>;
+
+    if (
+      typeof server.id !== "string" ||
+      typeof server.name !== "string" ||
+      typeof server.url !== "string" ||
+      typeof server.transport !== "string" ||
+      !server.params
+    ) {
+      return null;
+    }
+
+    if (server.transport !== "http" && server.transport !== "stdio") {
+      return null;
+    }
+
+    return {
+      id: server.id,
+      name: server.name,
+      url: server.url,
+      transport: server.transport as ServerTransport,
+      params: server.params as PersistedServerEntry["params"],
+      hasOAuth: typeof server.hasOAuth === "boolean" ? server.hasOAuth : false,
+      addedAt: typeof server.addedAt === "number" ? server.addedAt : Date.now(),
+    };
+  }
+
   async migrate(payload: LocalStorageMigrationPayload): Promise<number> {
     if (!Array.isArray(payload.servers)) {
       return 0;
@@ -298,7 +332,7 @@ export class ServerStore {
         url: server.url,
         transport: server.transport,
         params: server.params,
-        hasOAuth: server.hasOAuth,
+        hasOAuth: server.hasOAuth ?? false,
         addedAt: server.addedAt ?? Date.now(),
       };
       count++;
