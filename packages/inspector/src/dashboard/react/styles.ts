@@ -831,6 +831,20 @@ export const styles: Record<string, CSSProperties> = {
     color: "#ff9800",
   },
 
+  // Manual event badge (for source === "manual")
+  eventBadgeManual: {
+    fontSize: "0.5rem",
+    padding: "0.0625rem 0.25rem",
+    borderRadius: "2px",
+    textTransform: "uppercase",
+    fontWeight: 600,
+    letterSpacing: "0.02em",
+    flexShrink: 0,
+    backgroundColor: "rgba(168, 85, 247, 0.15)",
+    color: "#a855f7",
+    border: "1px solid rgba(168, 85, 247, 0.3)",
+  },
+
   eventType: {
     fontSize: "0.625rem",
     color: "#6b7280",
