@@ -99,6 +99,13 @@ const VALID_INSPECTOR_EVENT_TYPES: ReadonlySet<string> = new Set([
   "dialog",
   "agent-tool-call",
   "agent-tool-result",
+  "agent-initialize",
+  "manual_tool_call",
+  "manual_tool_result",
+  "manual_resource_read",
+  "manual_resource_result",
+  "manual_prompt_get",
+  "manual_prompt_result",
 ]);
 
 /**
@@ -482,6 +489,238 @@ export function createStandaloneInspectorServer(
           const message = error instanceof Error ? error.message : String(error);
           res.writeHead(500, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: false, error: message }));
+        }
+        return;
+      }
+
+      res.writeHead(405, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Method not allowed" }));
+      return;
+    }
+
+    // Execute primitive endpoint - for manual (browse-mode) execution from the dashboard
+    if (url === "/api/execute-primitive") {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+      if (req.method === "OPTIONS") {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+
+      if (req.method === "POST") {
+        const DEFAULT_TIMEOUT_MS = 30_000;
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) {
+          chunks.push(chunk as Buffer);
+        }
+        const bodyData = Buffer.concat(chunks);
+
+        let kind: "tool" | "resource" | "prompt";
+        let name: string;
+        let params: Record<string, unknown>;
+        let timeoutMs: number;
+        let connectionId: string | undefined;
+
+        try {
+          const parsed = JSON.parse(bodyData.toString("utf-8")) as {
+            connectionId?: string;
+            kind?: string;
+            name?: string;
+            params?: Record<string, unknown>;
+            timeout?: number;
+          };
+
+          if (!parsed.kind || !["tool", "resource", "prompt"].includes(parsed.kind)) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                ok: false,
+                kind: parsed.kind ?? null,
+                data: null,
+                error: 'Invalid or missing "kind". Must be "tool", "resource", or "prompt".',
+                duration_ms: 0,
+              })
+            );
+            return;
+          }
+
+          if (!parsed.name || typeof parsed.name !== "string") {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                ok: false,
+                kind: parsed.kind,
+                data: null,
+                error: 'Missing or invalid "name".',
+                duration_ms: 0,
+              })
+            );
+            return;
+          }
+
+          kind = parsed.kind as "tool" | "resource" | "prompt";
+          name = parsed.name;
+          params = parsed.params ?? {};
+          timeoutMs =
+            typeof parsed.timeout === "number" && parsed.timeout > 0
+              ? parsed.timeout
+              : DEFAULT_TIMEOUT_MS;
+          connectionId = parsed.connectionId;
+        } catch {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              ok: false,
+              kind: null,
+              data: null,
+              error: "Invalid JSON body",
+              duration_ms: 0,
+            })
+          );
+          return;
+        }
+
+        // Resolve the connection manager
+        let cm: ConnectionManager | null = null;
+        try {
+          if (connectionId) {
+            cm = registry.getConnection(connectionId);
+          } else {
+            cm = getActiveConnectionManager();
+          }
+        } catch {
+          // getConnection throws if not found — treat as null
+          cm = null;
+        }
+
+        if (!cm) {
+          res.writeHead(503, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              ok: false,
+              kind,
+              data: null,
+              error: connectionId
+                ? `Connection not found: ${connectionId}`
+                : "No active connection",
+              duration_ms: 0,
+            })
+          );
+          return;
+        }
+
+        const state = cm.getState();
+        if (!state.connected) {
+          res.writeHead(503, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              ok: false,
+              kind,
+              data: null,
+              error: "Not connected to server",
+              duration_ms: 0,
+            })
+          );
+          return;
+        }
+
+        // Determine event types for before/after recording
+        const eventTypes: Record<string, { call: InspectorEventType; result: InspectorEventType }> =
+          {
+            tool: { call: "manual_tool_call", result: "manual_tool_result" },
+            resource: { call: "manual_resource_read", result: "manual_resource_result" },
+            prompt: { call: "manual_prompt_get", result: "manual_prompt_result" },
+          };
+        const eventType = eventTypes[kind];
+        if (!eventType) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: false, error: `Unknown kind: ${kind}` }));
+          return;
+        }
+
+        // Record the "call" event before execution
+        cm.recordAgentEvent(eventType.call, { name, params }, undefined, "manual");
+
+        const startTime = Date.now();
+
+        try {
+          const client = cm.getClient();
+          let data: unknown;
+
+          const executePromise = (async (): Promise<unknown> => {
+            switch (kind) {
+              case "tool": {
+                const result = await client.callTool(name, params);
+                return result;
+              }
+              case "resource": {
+                const uri = typeof params.uri === "string" ? params.uri : name;
+                const result = await client.readResource(uri);
+                return result;
+              }
+              case "prompt": {
+                const stringParams: Record<string, string> = {};
+                for (const [k, v] of Object.entries(params)) {
+                  stringParams[k] = String(v);
+                }
+                const result = await client.getPrompt(name, stringParams);
+                return result;
+              }
+            }
+          })();
+
+          const timeoutPromise = new Promise<never>((_resolve, reject) => {
+            setTimeout(() => {
+              reject(new Error(`Execution timed out after ${timeoutMs}ms`));
+            }, timeoutMs);
+          });
+
+          data = await Promise.race([executePromise, timeoutPromise]);
+
+          const duration = Date.now() - startTime;
+
+          // Record the "result" event after execution
+          cm.recordAgentEvent(
+            eventType.result,
+            { name, isError: false, duration, result: data },
+            undefined,
+            "manual"
+          );
+
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              ok: true,
+              kind,
+              data,
+              duration_ms: duration,
+            })
+          );
+        } catch (error) {
+          const duration = Date.now() - startTime;
+          const message = error instanceof Error ? error.message : String(error);
+
+          // Record the error "result" event
+          cm.recordAgentEvent(
+            eventType.result,
+            { name, isError: true, duration, error: message },
+            undefined,
+            "manual"
+          );
+
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              ok: false,
+              kind,
+              data: null,
+              error: message,
+              duration_ms: duration,
+            })
+          );
         }
         return;
       }

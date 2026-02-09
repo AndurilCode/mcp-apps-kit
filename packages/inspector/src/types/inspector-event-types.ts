@@ -62,7 +62,14 @@ export type InspectorEventType =
   // Agent events (session-agnostic tool calls from the inspector)
   | "agent-tool-call"
   | "agent-tool-result"
-  | "agent-initialize";
+  | "agent-initialize"
+  // Manual execution events (browse-mode primitive execution from the dashboard)
+  | "manual_tool_call"
+  | "manual_tool_result"
+  | "manual_resource_read"
+  | "manual_resource_result"
+  | "manual_prompt_get"
+  | "manual_prompt_result";
 
 /**
  * Inspector event record
@@ -106,7 +113,7 @@ export interface AgnosticInspectorEvent {
   /** Event payload (type-dependent) */
   payload: unknown;
   /** Source of the event */
-  source: "widget" | "host" | "server" | "agent";
+  source: "widget" | "host" | "server" | "agent" | "manual";
   /** Protocol used (mcp or openai) */
   protocol?: "mcp" | "openai";
 }
@@ -160,6 +167,12 @@ export function getEventCategory(type: InspectorEventType): EventCategory {
     case "agent-tool-call":
     case "agent-tool-result":
     case "agent-initialize":
+    case "manual_tool_call":
+    case "manual_tool_result":
+    case "manual_resource_read":
+    case "manual_resource_result":
+    case "manual_prompt_get":
+    case "manual_prompt_result":
       return "agent";
   }
 }
@@ -276,6 +289,42 @@ export function getEventSummary(event: InspectorEvent | AgnosticInspectorEvent):
     case "agent-initialize": {
       const clientName = getStr(payload, "clientName") ?? getStr(payload, "name");
       return clientName ? `Agent Connected: ${clientName}` : "Agent Connected";
+    }
+
+    case "manual_tool_call":
+      return `Manual Call: ${getStr(payload, "name") ?? "unknown"}`;
+
+    case "manual_tool_result": {
+      const manualToolError =
+        payload && typeof payload === "object" && "isError" in payload && payload.isError;
+      const manualToolName = getStr(payload, "name") ?? "unknown";
+      return manualToolError
+        ? `Manual Error: ${manualToolName}`
+        : `Manual Result: ${manualToolName}`;
+    }
+
+    case "manual_resource_read":
+      return `Manual Read: ${getStr(payload, "name") ?? getStr(payload, "uri") ?? "unknown"}`;
+
+    case "manual_resource_result": {
+      const manualResError =
+        payload && typeof payload === "object" && "isError" in payload && payload.isError;
+      const manualResName = getStr(payload, "name") ?? getStr(payload, "uri") ?? "unknown";
+      return manualResError
+        ? `Manual Read Error: ${manualResName}`
+        : `Manual Read Result: ${manualResName}`;
+    }
+
+    case "manual_prompt_get":
+      return `Manual Prompt: ${getStr(payload, "name") ?? "unknown"}`;
+
+    case "manual_prompt_result": {
+      const manualPromptError =
+        payload && typeof payload === "object" && "isError" in payload && payload.isError;
+      const manualPromptName = getStr(payload, "name") ?? "unknown";
+      return manualPromptError
+        ? `Manual Prompt Error: ${manualPromptName}`
+        : `Manual Prompt Result: ${manualPromptName}`;
     }
   }
 }

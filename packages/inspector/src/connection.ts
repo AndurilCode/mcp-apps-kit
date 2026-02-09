@@ -1129,7 +1129,8 @@ export class ConnectionManager extends EventEmitter {
   recordAgentEvent(
     type: InspectorEventType,
     payload: unknown,
-    protocol?: "mcp" | "openai"
+    protocol?: "mcp" | "openai",
+    source?: AgnosticInspectorEvent["source"]
   ): AgnosticInspectorEvent {
     const event: AgnosticInspectorEvent = {
       id: `agent-${++this.agentEventIdCounter}`,
@@ -1137,7 +1138,7 @@ export class ConnectionManager extends EventEmitter {
       type,
       timestamp: Date.now(),
       payload,
-      source: "agent",
+      source: source ?? "agent",
       protocol,
     };
 
