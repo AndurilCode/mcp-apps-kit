@@ -280,7 +280,7 @@ describe("executePrimitive", () => {
       json: () => Promise.resolve(mockResponse),
     });
 
-    const result = await executePrimitive("conn-1", toolPrimitive, { query: "hello" });
+    const result = await executePrimitive("", "conn-1", toolPrimitive, { query: "hello" });
 
     expect(result.ok).toBe(true);
     expect(result.content).toHaveLength(1);
@@ -316,7 +316,7 @@ describe("executePrimitive", () => {
       json: () => Promise.resolve(mockResponse),
     });
 
-    const result = await executePrimitive("conn-1", resourcePrimitive, {
+    const result = await executePrimitive("", "conn-1", resourcePrimitive, {
       uri: "file:///test.md",
     });
 
@@ -342,7 +342,7 @@ describe("executePrimitive", () => {
       json: () => Promise.resolve(mockResponse),
     });
 
-    const result = await executePrimitive("conn-1", promptPrimitive, {});
+    const result = await executePrimitive("", "conn-1", promptPrimitive, {});
 
     expect(result.ok).toBe(true);
     expect(result.messages).toHaveLength(1);
@@ -353,7 +353,7 @@ describe("executePrimitive", () => {
   it("handles network errors gracefully", async () => {
     globalThis.fetch = vi.fn().mockRejectedValue(new Error("Failed to fetch"));
 
-    const result = await executePrimitive("conn-1", toolPrimitive, {});
+    const result = await executePrimitive("", "conn-1", toolPrimitive, {});
 
     expect(result.ok).toBe(false);
     expect(result.error).toBe("Network error: Failed to fetch");
@@ -374,7 +374,7 @@ describe("executePrimitive", () => {
       json: () => Promise.resolve(mockResponse),
     });
 
-    const result = await executePrimitive("conn-1", toolPrimitive, {});
+    const result = await executePrimitive("", "conn-1", toolPrimitive, {});
 
     expect(result.ok).toBe(false);
     expect(result.error).toBe("Execution timed out after 30000ms");
@@ -388,7 +388,7 @@ describe("executePrimitive", () => {
       json: () => Promise.reject(new SyntaxError("Unexpected end of JSON")),
     });
 
-    const result = await executePrimitive("conn-1", toolPrimitive, {});
+    const result = await executePrimitive("", "conn-1", toolPrimitive, {});
 
     expect(result.ok).toBe(false);
     expect(result.error).toContain("Invalid response");
@@ -409,7 +409,7 @@ describe("executePrimitive", () => {
       json: () => Promise.resolve(mockResponse),
     });
 
-    const result = await executePrimitive("conn-1", toolPrimitive, {});
+    const result = await executePrimitive("", "conn-1", toolPrimitive, {});
 
     expect(result.ok).toBe(false);
     expect(result.error).toBe("Tool not found: unknown-tool");

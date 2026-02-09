@@ -193,13 +193,14 @@ interface BackendResponse {
  * Execute a primitive via POST /api/execute-primitive and return an ExecutionResult.
  */
 export async function executePrimitive(
+  baseUrl: string,
   connectionId: string,
   primitive: Primitive,
   params: Record<string, unknown>
 ): Promise<ExecutionResult> {
   let response: Response;
   try {
-    response = await fetch("/api/execute-primitive", {
+    response = await fetch(`${baseUrl}/api/execute-primitive`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -262,7 +263,7 @@ export async function executePrimitive(
  * Create an ExecuteFn bound to a specific connectionId.
  * This is the function passed as `onExecute` prop to PrimitiveDetail.
  */
-export function createExecuteFn(connectionId: string): ExecuteFn {
+export function createExecuteFn(baseUrl: string, connectionId: string): ExecuteFn {
   return (primitive: Primitive, params: Record<string, unknown>) =>
-    executePrimitive(connectionId, primitive, params);
+    executePrimitive(baseUrl, connectionId, primitive, params);
 }

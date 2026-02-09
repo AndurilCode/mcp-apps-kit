@@ -570,8 +570,8 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
   // Create an ExecuteFn bound to the selected primitive's server (connectionId)
   const handleExecutePrimitive: ExecuteFn | undefined = useMemo(() => {
     if (!selectedPrimitive) return undefined;
-    return createExecuteFn(selectedPrimitive.serverId);
-  }, [selectedPrimitive]);
+    return createExecuteFn(baseUrl, selectedPrimitive.serverId);
+  }, [baseUrl, selectedPrimitive]);
 
   const handleCreateConnection = useCallback(
     async (params: import("@mcp-apps-kit/testing").ConnectionParams): Promise<boolean> => {
