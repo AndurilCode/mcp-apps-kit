@@ -16,7 +16,7 @@ import type {
 } from "../types/mcp-primitives";
 import type { ConnectionParams } from "@mcp-apps-kit/testing";
 import { SidebarConnectionForm } from "./SidebarConnectionForm";
-import { PrimitiveDetail, type Primitive } from "./PrimitiveDetail";
+import { PrimitiveDetail, type Primitive, type ExecuteFn } from "./PrimitiveDetail";
 
 // =============================================================================
 // Types
@@ -117,6 +117,8 @@ export interface McpPrimitivesPanelNewProps {
   resolvedPrimitive?: Primitive | null;
   /** Callback to close the primitive detail */
   onClosePrimitive?: () => void;
+  /** Execute function for primitive execution (passed to PrimitiveDetail) */
+  onExecute?: ExecuteFn;
 }
 
 /** Legacy API props for backward compatibility with tests */
@@ -1781,6 +1783,7 @@ function ServerBlocksContent({
   onSelectPrimitive,
   resolvedPrimitive,
   onClosePrimitive,
+  onExecute,
 }: McpPrimitivesPanelNewProps): React.ReactElement {
   const [searchFilter, setSearchFilter] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -1973,7 +1976,11 @@ function ServerBlocksContent({
           {/* Slide-over detail panel */}
           <SlideOverDetail isVisible={!!resolvedPrimitive}>
             {resolvedPrimitive && (
-              <PrimitiveDetail primitive={resolvedPrimitive} onClose={onClosePrimitive} />
+              <PrimitiveDetail
+                primitive={resolvedPrimitive}
+                onClose={onClosePrimitive}
+                onExecute={onExecute}
+              />
             )}
           </SlideOverDetail>
         </div>

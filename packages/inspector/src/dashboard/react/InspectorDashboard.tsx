@@ -27,7 +27,8 @@ import {
   type StoppedConnection,
   type SelectedPrimitive,
 } from "./components/McpPrimitivesPanel";
-import type { Primitive } from "./components/PrimitiveDetail";
+import type { Primitive, ExecuteFn } from "./components/PrimitiveDetail";
+import { createExecuteFn } from "./utils/executePrimitive";
 import { RightPanel } from "./components/RightPanel";
 import { NoWidgetPlaceholder, type ConnectionState } from "./components/NoWidgetPlaceholder";
 import { OAuthDiscoveryPanel } from "./components/OAuthDiscoveryPanel";
@@ -566,6 +567,12 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     setSelectedPrimitive(primitive);
   }, []);
 
+  // Create an ExecuteFn bound to the selected primitive's server (connectionId)
+  const handleExecutePrimitive: ExecuteFn | undefined = useMemo(() => {
+    if (!selectedPrimitive) return undefined;
+    return createExecuteFn(selectedPrimitive.serverId);
+  }, [selectedPrimitive]);
+
   const handleCreateConnection = useCallback(
     async (params: import("@mcp-apps-kit/testing").ConnectionParams): Promise<boolean> => {
       const conn = await createConnection(params);
@@ -808,6 +815,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           onSelectPrimitive={handleSelectPrimitive}
           resolvedPrimitive={resolvedPrimitive}
           onClosePrimitive={() => setSelectedPrimitive(null)}
+          onExecute={handleExecutePrimitive}
         />
 
         {/* Center Column - screencast + globals bar */}
