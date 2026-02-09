@@ -57,3 +57,4 @@ specs/
 .agent/
 ralph.yml
 PROMPT.md
+/board/
