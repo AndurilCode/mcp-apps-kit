@@ -172,14 +172,14 @@ describe("AC: Status badge rendering", () => {
   it("suppresses streaming gradient wrapper when testing is active", () => {
     // The wrapper should NOT apply statusWrapperStreaming when testing
     expect(dashboardSrc).toMatch(
-      /isStreaming\s*&&\s*!isTestingActive\s*\?\s*styles\.statusWrapperStreaming/
+      /hasWidgetSessions\s*&&\s*!isTestingActive\s*\?\s*styles\.statusWrapperStreaming/
     );
   });
 
-  it("Testing takes priority over Streaming label", () => {
+  it("Testing takes priority over Live label", () => {
     // In the label ternary, isTestingActive comes first
     const labelMatch = dashboardSrc.match(
-      /\{isTestingActive\s*\?\s*"Testing"\s*:\s*status\s*===\s*"streaming"\s*\?\s*"Streaming"/
+      /\{isTestingActive\s*\?\s*"Testing"\s*:\s*hasWidgetSessions\s*\?\s*"Live"/
     );
     expect(labelMatch).not.toBeNull();
   });
@@ -187,7 +187,7 @@ describe("AC: Status badge rendering", () => {
   it("Testing dot takes priority over streaming dot", () => {
     // In the dot style ternary, isTestingActive comes first
     const dotMatch = dashboardSrc.match(
-      /isTestingActive\s*\?\s*styles\.statusDotTesting\s*:\s*status\s*===\s*"streaming"/
+      /isTestingActive\s*\?\s*styles\.statusDotTesting\s*:\s*hasWidgetSessions/
     );
     expect(dotMatch).not.toBeNull();
   });

@@ -4,7 +4,6 @@
  * HTTP route handlers for the real-time browser dashboard.
  * Routes:
  * - GET /dashboard - Serve dashboard HTML
- * - GET /dashboard/stream?sessionId={id}&connectionId={id} - SSE screencast stream
  * - GET /dashboard/logs?sessionId={id}&connectionId={id} - SSE log stream
  * - GET /dashboard/events?sessionId={id}&connectionId={id} - SSE event stream
  * - GET /dashboard/sessions?connectionId={id} - List active sessions (JSON)
@@ -21,7 +20,6 @@ import type { ConnectionParams } from "@mcp-apps-kit/testing";
 import type { ConnectionManager } from "../connection";
 import type { ConnectionRegistry } from "../connection-registry";
 import type { InspectorEvent, AgnosticInspectorEvent } from "../types";
-import { CDPStreamer } from "./cdp-streamer";
 export { DashboardNotifier } from "./dashboard-notifier";
 
 /**
@@ -69,31 +67,6 @@ const DASHBOARD_HTML_PATH = findDashboardHtml();
 
 // Cached dashboard HTML content
 let cachedDashboardHtml: string | null = null;
-
-// Singleton CDP streamer (shared across all requests)
-let cdpStreamer: CDPStreamer | null = null;
-
-/**
- * Get or create the CDP streamer
- */
-function getCDPStreamer(debug: boolean): CDPStreamer {
-  cdpStreamer ??= new CDPStreamer({ debug });
-  return cdpStreamer;
-}
-
-/**
- * Clean up the CDP streamer singleton
- *
- * Should be called during server shutdown to properly stop all active
- * screencasts and release resources. After cleanup, a new streamer will
- * be created on the next getCDPStreamer call.
- */
-export async function cleanupCDPStreamer(): Promise<void> {
-  if (cdpStreamer) {
-    await cdpStreamer.stopAll();
-    cdpStreamer = null;
-  }
-}
 
 /**
  * Handle dashboard requests
@@ -462,24 +435,6 @@ export async function handleDashboardRequest(
     return true;
   }
 
-  // GET /dashboard/stream?sessionId={id}&connectionId={id} - SSE screencast stream
-  if (pathname === "/dashboard/stream" && req.method === "GET") {
-    const sessionId = url.searchParams.get("sessionId");
-    if (!sessionId) {
-      res.writeHead(400, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Missing sessionId parameter" }));
-      return true;
-    }
-    const connId = url.searchParams.get("connectionId");
-    const cm = resolveConnectionManager(connId, connectionManager, registry);
-    if (!cm) {
-      writeNoSessionStream(res, "No active connection");
-      return true;
-    }
-    await startScreencastStream(req, res, cm, sessionId);
-    return true;
-  }
-
   // GET /dashboard/logs?sessionId={id}&connectionId={id} - SSE log stream
   if (pathname === "/dashboard/logs" && req.method === "GET") {
     const sessionId = url.searchParams.get("sessionId");
@@ -691,91 +646,6 @@ function serveSessionList(res: ServerResponse, connectionManager: ConnectionMana
     "Access-Control-Allow-Origin": "*",
   });
   res.end(JSON.stringify({ sessions: sessionList }));
-}
-
-/**
- * Start SSE screencast stream for a session
- */
-async function startScreencastStream(
-  req: IncomingMessage,
-  res: ServerResponse,
-  connectionManager: ConnectionManager,
-  sessionId: string
-): Promise<void> {
-  const sessionManager = connectionManager.getWidgetSessionManager();
-  const page = sessionManager.getPageForStreaming(sessionId);
-
-  // Set up SSE headers
-  res.writeHead(200, {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
-    Connection: "keep-alive",
-    "Access-Control-Allow-Origin": "*",
-  });
-
-  // If no session or page, send noSession event and close after a short delay
-  if (!page) {
-    res.write(
-      `event: noSession\ndata: ${JSON.stringify({ message: "Session not found or closed" })}\n\n`
-    );
-    // Close connection after a brief delay to allow the event to be sent
-    setTimeout(() => {
-      if (!res.writableEnded) {
-        res.end();
-      }
-    }, 100);
-    return;
-  }
-
-  // Get the CDP streamer
-  const streamer = getCDPStreamer(false);
-
-  // Create a unique stream ID for this connection (session + timestamp)
-  const streamId = `${sessionId}-${Date.now()}`;
-
-  // Set up cleanup handler
-  const cleanup = (): void => {
-    void streamer.stopScreencast(streamId);
-  };
-
-  req.on("close", cleanup);
-  req.on("error", cleanup);
-
-  try {
-    // Start screencast
-    await streamer.startScreencast(
-      streamId,
-      page,
-      // On frame
-      (frame) => {
-        if (!res.writableEnded) {
-          const data = JSON.stringify({
-            timestamp: frame.timestamp,
-            image: `data:image/jpeg;base64,${frame.data}`,
-          });
-          res.write(`event: frame\ndata: ${data}\n\n`);
-        }
-      },
-      // On error
-      (error) => {
-        if (!res.writableEnded) {
-          res.write(
-            `event: error\ndata: ${JSON.stringify({ message: `Screencast error: ${error.message}` })}\n\n`
-          );
-        }
-        cleanup();
-      },
-      // On touch (keep session alive)
-      () => {
-        sessionManager.touchSession(sessionId);
-      }
-    );
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    res.write(
-      `event: error\ndata: ${JSON.stringify({ message: `Failed to start screencast: ${message}` })}\n\n`
-    );
-  }
 }
 
 /**

@@ -23,13 +23,13 @@ export { styles } from "./styles";
 // Re-export hooks for custom implementations
 export {
   useSessions,
-  useScreencast,
+  useSessionStream,
   useLogStream,
   useResizablePanel,
   type SessionInfo,
   type UseSessionsResult,
-  type ScreencastStatus,
-  type UseScreencastResult,
+  type SessionEntry,
+  type UseSessionStreamResult,
   type LogEntry,
   type UseLogStreamResult,
   type UseResizablePanelOptions,

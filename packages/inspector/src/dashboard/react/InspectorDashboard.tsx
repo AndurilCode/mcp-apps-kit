@@ -7,7 +7,8 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSessions, type SessionInfo } from "./hooks/useSessions";
-import { useScreencast } from "./hooks/useScreencast";
+import { useSessionStream } from "./hooks/useSessionStream";
+import { WidgetTabs } from "./components/WidgetTabs";
 import { useLogStream, type LogEntry } from "./hooks/useLogStream";
 import { useEventStream } from "./hooks/useEventStream";
 import { useAgentEventStream } from "./hooks/useAgentEventStream";
@@ -162,7 +163,6 @@ interface CachedConnectionState {
   events: InspectorEvent[];
   logs: LogEntry[];
   agentEvents: AgnosticInspectorEvent[];
-  screencastImage: string | null;
   globals: GlobalsState | null;
   primitives: McpPrimitives | null;
 }
@@ -250,12 +250,8 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     ? (selectedSessionByConnection[activeConnectionId] ?? null)
     : null;
 
-  // Screencast state
-  const { imageData, status, error } = useScreencast(
-    baseUrl,
-    selectedSessionId,
-    activeConnectionId
-  );
+  // Widget session stream (SSE-driven iframe tabs)
+  const { sessions: widgetSessions } = useSessionStream(baseUrl);
 
   // Log stream state
   const { logs, clearLogs } = useLogStream(baseUrl, selectedSessionId, activeConnectionId);
@@ -370,7 +366,6 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
   const displayLogs = logs.length > 0 ? logs : (cachedState?.logs ?? []);
   const displayAgentEvents =
     agentEvents.length > 0 ? agentEvents : (cachedState?.agentEvents ?? []);
-  const displayImageData = imageData ?? cachedState?.screencastImage ?? null;
   const displayGlobals = globals ?? cachedState?.globals ?? null;
   const displayTools = tools.length > 0 ? tools : (cachedState?.primitives?.tools ?? []);
   const displayResources =
@@ -623,7 +618,6 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
         events,
         logs,
         agentEvents,
-        screencastImage: imageData,
         globals,
         primitives:
           tools.length > 0 || resources.length > 0 || prompts.length > 0
@@ -757,18 +751,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     [closeConnection]
   );
 
-  // Compute screencast container aspect ratio from globals viewport
-  const screencastAspectStyle = useMemo((): React.CSSProperties => {
-    const viewport = displayGlobals?.viewport;
-    if (!viewport || !viewport.width || !viewport.height) {
-      return {};
-    }
-    return {
-      aspectRatio: `${viewport.width} / ${viewport.height}`,
-    };
-  }, [displayGlobals?.viewport]);
-
-  const isStreaming = status === "streaming";
+  const hasWidgetSessions = widgetSessions.length > 0;
   const isTestingActive = isTesting && activeConnection?.status === "connected";
   const connectionStatusLabel = activeConnection
     ? activeConnection.status === "connected"
@@ -843,7 +826,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
             <div
               style={{
                 ...styles.statusWrapper,
-                ...(isStreaming && !isTestingActive ? styles.statusWrapperStreaming : {}),
+                ...(hasWidgetSessions && !isTestingActive ? styles.statusWrapperStreaming : {}),
               }}
             >
               <div style={styles.statusInner}>
@@ -852,7 +835,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
                     ...styles.statusDot,
                     ...(isTestingActive
                       ? styles.statusDotTesting
-                      : status === "streaming"
+                      : hasWidgetSessions
                         ? styles.statusDotStreaming
                         : activeConnection?.status === "connected"
                           ? styles.statusDotConnected
@@ -860,11 +843,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
                   }}
                 />
                 <span>
-                  {isTestingActive
-                    ? "Testing"
-                    : status === "streaming"
-                      ? "Streaming"
-                      : connectionStatusLabel}
+                  {isTestingActive ? "Testing" : hasWidgetSessions ? "Live" : connectionStatusLabel}
                 </span>
               </div>
             </div>
@@ -878,9 +857,6 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           />
         </div>
       </header>
-
-      {/* Error Banner */}
-      {error && <div style={styles.errorBanner}>{error}</div>}
 
       {/* Content Wrapper - horizontal layout */}
       <div style={styles.contentWrapper}>
@@ -909,42 +885,20 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           onExecute={handleExecutePrimitive}
         />
 
-        {/* Center Column - screencast + globals bar */}
+        {/* Center Column - widget iframes + globals bar */}
         <div style={styles.centerColumn}>
           <main style={styles.main}>
-            {isStreaming ? (
-              /* Screencast when streaming */
-              <div
-                style={{
-                  ...styles.displayContainer,
-                  ...styles.displayContainerStreaming,
-                  ...screencastAspectStyle,
-                }}
-              >
-                <img
-                  src={displayImageData ?? ""}
-                  alt="Live browser view"
-                  style={styles.streamImage}
-                />
-                {isGlobalsBarCollapsed && (
-                  <button
-                    style={styles.globalsCollapsedToggle}
-                    onClick={toggleGlobalsBar}
-                    aria-label="Show Globals"
-                    title="Show Globals"
-                  >
-                    Show Globals
-                  </button>
-                )}
-              </div>
+            {hasWidgetSessions ? (
+              /* Live widget iframes via SSE-driven tabs */
+              <WidgetTabs sessions={widgetSessions} />
             ) : (
               /* Tamagotchi placeholder when no widget */
               <NoWidgetPlaceholder connectionState={connectionState} clientName={agentClientName} />
             )}
           </main>
 
-          {/* Globals bar - below screencast, only when streaming */}
-          {isStreaming && (
+          {/* Globals bar - below widget area, only when sessions active */}
+          {hasWidgetSessions && (
             <GlobalsPanel
               globals={displayGlobals}
               isVisible={true}
