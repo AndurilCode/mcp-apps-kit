@@ -1395,14 +1395,25 @@ export function PrimitiveDetail({
       {mode === "browse" && (
         <div style={styles.footer} data-testid="primitive-detail-footer">
           <CopyJsonButton data={primitiveData} />
-          <button
-            style={{ ...styles.button, ...styles.buttonDisabled }}
-            disabled
-            title="Coming soon"
-            data-testid="action-btn"
-          >
-            {icon} {label}
-          </button>
+          {onExecute ? (
+            <button
+              style={{ ...styles.button, ...styles.buttonPrimary }}
+              onClick={() => setMode("action")}
+              title={`${label} this ${primitive.kind}`}
+              data-testid="action-btn"
+            >
+              {icon} {label}
+            </button>
+          ) : (
+            <button
+              style={{ ...styles.button, ...styles.buttonDisabled }}
+              disabled
+              title="Coming soon"
+              data-testid="action-btn"
+            >
+              {icon} {label}
+            </button>
+          )}
         </div>
       )}
     </div>

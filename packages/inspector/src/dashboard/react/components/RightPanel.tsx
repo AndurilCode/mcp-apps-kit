@@ -26,7 +26,6 @@ export interface RightPanelProps {
   panelWidth: number;
   resizeHandleProps: React.HTMLAttributes<HTMLDivElement>;
   isResizing: boolean;
-  isStreaming: boolean;
 }
 
 export function RightPanel({
@@ -41,7 +40,6 @@ export function RightPanel({
   panelWidth,
   resizeHandleProps,
   isResizing,
-  isStreaming,
 }: RightPanelProps): React.ReactElement {
   const noop = (): void => undefined;
   const [activeTab, setActiveTab] = useState<RightPanelTab>("agent");
@@ -65,24 +63,26 @@ export function RightPanel({
     return <div style={panelStyle} />;
   }
 
-  const handleClear = (() => {
-    if (!isStreaming || activeTab === "agent") {
-      return onClearAgent ?? noop;
+  const handleClear = ((): (() => void) => {
+    switch (activeTab) {
+      case "agent":
+        return onClearAgent ?? noop;
+      case "events":
+        return onClearEvents ?? noop;
+      case "logs":
+        return onClearLogs ?? noop;
     }
-    if (activeTab === "events") {
-      return onClearEvents ?? noop;
-    }
-    return onClearLogs ?? noop;
   })();
 
-  const isClearDisabled = (() => {
-    if (!isStreaming || activeTab === "agent") {
-      return !onClearAgent;
+  const isClearDisabled = ((): boolean => {
+    switch (activeTab) {
+      case "agent":
+        return !onClearAgent;
+      case "events":
+        return !onClearEvents;
+      case "logs":
+        return !onClearLogs;
     }
-    if (activeTab === "events") {
-      return !onClearEvents;
-    }
-    return !onClearLogs;
   })();
 
   return (
@@ -105,52 +105,31 @@ export function RightPanel({
           >
             ▶
           </button>
-          {isStreaming ? (
-            <div style={styles.rightPanelTabs}>
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  style={{
-                    ...styles.rightPanelTab,
-                    ...(activeTab === tab.id ? styles.rightPanelTabActive : {}),
-                  }}
-                  onClick={() => setActiveTab(tab.id)}
-                  aria-pressed={activeTab === tab.id}
-                >
-                  {tab.label}
-                  {tab.count > 0 && (
-                    <span
-                      style={{
-                        ...styles.rightPanelTabCount,
-                        ...(activeTab === tab.id ? styles.rightPanelTabCountActive : {}),
-                      }}
-                    >
-                      {tab.count}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div style={styles.rightPanelTabs}>
-              <span
+          <div style={styles.rightPanelTabs}>
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
                 style={{
                   ...styles.rightPanelTab,
-                  ...styles.rightPanelTabActive,
-                  cursor: "default",
+                  ...(activeTab === tab.id ? styles.rightPanelTabActive : {}),
                 }}
+                onClick={() => setActiveTab(tab.id)}
+                aria-pressed={activeTab === tab.id}
               >
-                Agent Logs
-                {agentEvents.length > 0 && (
+                {tab.label}
+                {tab.count > 0 && (
                   <span
-                    style={{ ...styles.rightPanelTabCount, ...styles.rightPanelTabCountActive }}
+                    style={{
+                      ...styles.rightPanelTabCount,
+                      ...(activeTab === tab.id ? styles.rightPanelTabCountActive : {}),
+                    }}
                   >
-                    {agentEvents.length}
+                    {tab.count}
                   </span>
                 )}
-              </span>
-            </div>
-          )}
+              </button>
+            ))}
+          </div>
           <div style={styles.rightPanelActions}>
             <button
               style={styles.rightPanelClearBtn}
@@ -162,31 +141,19 @@ export function RightPanel({
           </div>
         </div>
         <div style={styles.rightPanelContent}>
-          {isStreaming ? (
-            <>
-              {activeTab === "logs" && (
-                <LogsPanel logs={logs} onClearLogs={onClearLogs ?? noop} showHeader={false} />
-              )}
-              {activeTab === "events" && (
-                <EventsPanel
-                  events={events}
-                  onClearEvents={onClearEvents ?? noop}
-                  showHeader={true}
-                  showTitle={false}
-                  showClearButton={false}
-                />
-              )}
-              {activeTab === "agent" && (
-                <AgentPanel
-                  events={agentEvents}
-                  onClearEvents={onClearAgent ?? noop}
-                  showHeader={true}
-                  showTitle={false}
-                  showClearButton={false}
-                />
-              )}
-            </>
-          ) : (
+          {activeTab === "logs" && (
+            <LogsPanel logs={logs} onClearLogs={onClearLogs ?? noop} showHeader={false} />
+          )}
+          {activeTab === "events" && (
+            <EventsPanel
+              events={events}
+              onClearEvents={onClearEvents ?? noop}
+              showHeader={true}
+              showTitle={false}
+              showClearButton={false}
+            />
+          )}
+          {activeTab === "agent" && (
             <AgentPanel
               events={agentEvents}
               onClearEvents={onClearAgent ?? noop}

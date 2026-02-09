@@ -184,6 +184,9 @@ export function EventRow({ event, isAgentView = false }: EventRowProps): React.R
   const isAgentOutput = event.type === "agent-tool-result";
   const isAgentEvent = isAgentInput || isAgentOutput;
 
+  // Determine if this is a manual event (source === "manual")
+  const isManualEvent = "source" in event && event.source === "manual";
+
   // Extract reasoning (only for agent-tool-call)
   const reasoning = isAgentInput ? getPayloadReasoning(event.payload) : undefined;
 
@@ -230,6 +233,9 @@ export function EventRow({ event, isAgentView = false }: EventRowProps): React.R
           <span style={{ ...(styles.eventBadge as React.CSSProperties), ...badgeStyle }}>
             {event.category}
           </span>
+        )}
+        {isManualEvent && (
+          <span style={styles.eventBadgeManual as React.CSSProperties}>manual</span>
         )}
         {isAgentEvent && (
           <span

@@ -1,11 +1,13 @@
 /**
- * TASK-014: Right Panel — Agent Logs Only
+ * RightPanel — Always-Visible Tabs
  *
- * Behavioral tests for the dual-mode RightPanel:
- * - Non-streaming mode: static "Agent Logs" heading, AgentPanel only
- * - Streaming mode: three-tab view (Agent, Events, Logs) unchanged
+ * Behavioral tests for the RightPanel:
+ * - Always shows three tabs (Agent, Events, Logs) regardless of streaming state
+ * - Clear button dispatches based on activeTab via switch
+ * - Collapsed panel renders empty div
  *
- * Also covers AgentPanel filter removal and localStorage cleanup.
+ * Updated from the previous dual-mode (streaming/non-streaming) design.
+ * The `isStreaming` prop has been removed; all three tabs are always visible.
  */
 
 // @vitest-environment jsdom
@@ -85,7 +87,7 @@ function makeLogEntry(id: string): LogEntry {
   };
 }
 
-// Default props shared across tests
+// Default props shared across tests (isStreaming removed)
 function defaultRightPanelProps(overrides: Record<string, unknown> = {}) {
   return {
     logs: [] as LogEntry[],
@@ -99,7 +101,6 @@ function defaultRightPanelProps(overrides: Record<string, unknown> = {}) {
     panelWidth: 400,
     resizeHandleProps: {},
     isResizing: false,
-    isStreaming: false,
     ...overrides,
   };
 }
@@ -122,61 +123,13 @@ afterEach(() => {
 });
 
 // =============================================================================
-// IMPORT COMPONENTS (dynamic to run after jsdom env is set up)
+// AC-1: Three tabs always visible
 // =============================================================================
 
-// We import dynamically inside tests to ensure jsdom environment is ready.
-// Vitest hoists these properly with the environment pragma above.
-
-// RightPanel is the main component under test
-// AgentPanel is tested for filter removal
-
-// =============================================================================
-// AC-1: Non-streaming — static "Agent Logs" heading replaces three-tab system
-// =============================================================================
-
-describe("AC-1: Non-streaming mode shows static Agent Logs heading", () => {
-  it("renders 'Agent Logs' text instead of tab buttons", async () => {
-    const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
-    const props = defaultRightPanelProps({ isStreaming: false });
-    mount(createElement(RightPanel, props));
-
-    // Should show "Agent Logs" heading
-    expect(container.textContent).toContain("Agent Logs");
-
-    // Should NOT show individual tab labels for Events or Logs
-    const buttons = queryAll("button");
-    const tabButtons = buttons.filter(
-      (b) => b.getAttribute("aria-pressed") === "true" || b.getAttribute("aria-pressed") === "false"
-    );
-    expect(tabButtons.length).toBe(0);
-  });
-
-  it("renders heading as a non-interactive span (not a button)", async () => {
-    const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
-    const props = defaultRightPanelProps({ isStreaming: false });
-    mount(createElement(RightPanel, props));
-
-    // The "Agent Logs" text should be in a span, not a button
-    const spans = queryAll("span");
-    const agentLogsSpan = spans.find((s) => s.textContent?.includes("Agent Logs"));
-    expect(agentLogsSpan).toBeDefined();
-    expect(agentLogsSpan!.tagName).toBe("SPAN");
-
-    // Verify cursor is "default" (non-clickable)
-    const style = (agentLogsSpan as HTMLElement).style;
-    expect(style.cursor).toBe("default");
-  });
-});
-
-// =============================================================================
-// AC-2: Streaming mode — three-tab view (Agent, Events, Logs) unchanged
-// =============================================================================
-
-describe("AC-2: Streaming mode preserves three-tab system", () => {
+describe("AC-1: Three tabs always visible (Agent, Events, Logs)", () => {
   it("renders Agent, Events, and Logs tab buttons", async () => {
     const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
-    const props = defaultRightPanelProps({ isStreaming: true });
+    const props = defaultRightPanelProps();
     mount(createElement(RightPanel, props));
 
     const buttons = queryAll("button");
@@ -196,12 +149,7 @@ describe("AC-2: Streaming mode preserves three-tab system", () => {
     const events = [makeInspectorEvent("e1")];
     const agentEvents = [makeAgentEvent("a1")];
     const logs = [makeLogEntry("l1")];
-    const props = defaultRightPanelProps({
-      isStreaming: true,
-      events,
-      agentEvents,
-      logs,
-    });
+    const props = defaultRightPanelProps({ events, agentEvents, logs });
     mount(createElement(RightPanel, props));
 
     // Agent tab active by default
@@ -234,81 +182,31 @@ describe("AC-2: Streaming mode preserves three-tab system", () => {
 });
 
 // =============================================================================
-// AC-3: Conditional logic based on isStreaming prop
+// AC-2: isStreaming prop removed from RightPanelProps
 // =============================================================================
 
-describe("AC-3: isStreaming prop controls rendering mode", () => {
-  it("isStreaming=false → agent-only mode", async () => {
+describe("AC-2: isStreaming prop removed from interface", () => {
+  it("RightPanelProps does NOT include isStreaming", async () => {
+    // Type-level: the component accepts props without isStreaming.
+    // If isStreaming were still required, omitting it would cause a type error.
     const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
-    const props = defaultRightPanelProps({ isStreaming: false });
-    mount(createElement(RightPanel, props));
-
-    expect(container.textContent).toContain("Agent Logs");
-    // No tab buttons with aria-pressed
-    const tabButtons = queryAll("button").filter((b) => b.getAttribute("aria-pressed") !== null);
-    expect(tabButtons.length).toBe(0);
-  });
-
-  it("isStreaming=true → tabbed mode", async () => {
-    const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
-    const props = defaultRightPanelProps({ isStreaming: true });
-    mount(createElement(RightPanel, props));
-
-    const tabButtons = queryAll("button").filter((b) => b.getAttribute("aria-pressed") !== null);
-    expect(tabButtons.length).toBe(3);
-  });
-
-  it("RightPanelProps interface includes isStreaming", async () => {
-    // Type-level test: compilation proves the prop exists.
-    // This test ensures isStreaming is required (not optional).
-    const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
-    const props = defaultRightPanelProps({ isStreaming: true });
-    // If isStreaming were removed from the interface, this would fail to compile.
+    const props = defaultRightPanelProps();
     mount(createElement(RightPanel, props));
     expect(container.innerHTML).not.toBe("");
   });
 });
 
 // =============================================================================
-// AC-4: Only AgentPanel in agent-only mode; all three panels in streaming mode
+// AC-3: All three panels accessible via tabs
 // =============================================================================
 
-describe("AC-4: Panel rendering based on mode", () => {
-  it("non-streaming: renders AgentPanel content only", async () => {
-    const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
-    const agentEvents = [makeAgentEvent("a1"), makeAgentEvent("a2")];
-    const events = [makeInspectorEvent("e1")];
-    const logs = [makeLogEntry("l1")];
-    const props = defaultRightPanelProps({
-      isStreaming: false,
-      agentEvents,
-      events,
-      logs,
-    });
-    mount(createElement(RightPanel, props));
-
-    // AgentPanel shows its events
-    expect(container.textContent).toContain("Agent");
-
-    // Events and Logs panels should NOT render their content.
-    // EventsPanel would show "No events yet" or event data — neither should appear.
-    // LogsPanel content markers should be absent.
-    // There should be no way to switch to events/logs tabs.
-    const tabButtons = queryAll("button").filter((b) => b.getAttribute("aria-pressed") !== null);
-    expect(tabButtons.length).toBe(0);
-  });
-
-  it("streaming: all three panels accessible via tabs", async () => {
+describe("AC-3: All three panels accessible via tabs", () => {
+  it("all three panels are accessible", async () => {
     const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
     const agentEvents = [makeAgentEvent("a1")];
     const events = [makeInspectorEvent("e1")];
     const logs = [makeLogEntry("l1")];
-    const props = defaultRightPanelProps({
-      isStreaming: true,
-      agentEvents,
-      events,
-      logs,
-    });
+    const props = defaultRightPanelProps({ agentEvents, events, logs });
     mount(createElement(RightPanel, props));
 
     const tabButtons = queryAll("button").filter((b) => b.getAttribute("aria-pressed") !== null);
@@ -332,10 +230,10 @@ describe("AC-4: Panel rendering based on mode", () => {
 });
 
 // =============================================================================
-// AC-5: Category filter dropdown removed from AgentPanel
+// AC-4: Category filter dropdown removed from AgentPanel
 // =============================================================================
 
-describe("AC-5: AgentPanel has no category filter dropdown", () => {
+describe("AC-4: AgentPanel has no category filter dropdown", () => {
   it("does not render a <select> element", async () => {
     const { AgentPanel } = await import("../src/dashboard/react/components/AgentPanel");
     const events = [makeAgentEvent("a1"), makeAgentEvent("a2")];
@@ -381,16 +279,16 @@ describe("AC-5: AgentPanel has no category filter dropdown", () => {
 });
 
 // =============================================================================
-// AC-6: No localStorage persistence for ACTIVE_TAB_STORAGE_KEY
+// AC-5: No localStorage persistence for ACTIVE_TAB_STORAGE_KEY
 // =============================================================================
 
-describe("AC-6: localStorage persistence removed for active tab", () => {
+describe("AC-5: localStorage persistence removed for active tab", () => {
   it("does not read from localStorage on mount", async () => {
     const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
     // Pre-set a value that the OLD code would have read
     window.localStorage.setItem("mcp-dashboard-right-panel-tab", "logs");
 
-    const props = defaultRightPanelProps({ isStreaming: true });
+    const props = defaultRightPanelProps();
     mount(createElement(RightPanel, props));
 
     // Should default to "agent" tab, NOT "logs" (ignoring localStorage)
@@ -403,7 +301,7 @@ describe("AC-6: localStorage persistence removed for active tab", () => {
     const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
     const spy = vi.spyOn(window.localStorage, "setItem");
 
-    const props = defaultRightPanelProps({ isStreaming: true });
+    const props = defaultRightPanelProps();
     mount(createElement(RightPanel, props));
 
     // Switch to Events tab
@@ -426,49 +324,14 @@ describe("AC-6: localStorage persistence removed for active tab", () => {
 });
 
 // =============================================================================
-// AC-7: Count badge shows agentEvents.length in both modes
+// AC-6: Count badge shows counts on all tabs
 // =============================================================================
 
-describe("AC-7: Count badge shows agentEvents.length", () => {
-  it("non-streaming: shows count badge next to Agent Logs heading", async () => {
-    const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
-    const agentEvents = [makeAgentEvent("a1"), makeAgentEvent("a2"), makeAgentEvent("a3")];
-    const props = defaultRightPanelProps({
-      isStreaming: false,
-      agentEvents,
-    });
-    mount(createElement(RightPanel, props));
-
-    // The heading should contain the count
-    expect(container.textContent).toContain("Agent Logs");
-    expect(container.textContent).toContain("3");
-  });
-
-  it("non-streaming: hides badge when agentEvents is empty", async () => {
-    const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
-    const props = defaultRightPanelProps({
-      isStreaming: false,
-      agentEvents: [],
-    });
-    mount(createElement(RightPanel, props));
-
-    // The heading "Agent Logs" should exist, but no count span
-    const spans = queryAll("span");
-    const headingSpan = spans.find((s) => s.textContent?.includes("Agent Logs"));
-    expect(headingSpan).toBeDefined();
-
-    // Should NOT show "0" — badge is hidden when empty
-    const innerSpans = headingSpan!.querySelectorAll("span");
-    expect(innerSpans.length).toBe(0);
-  });
-
-  it("streaming: shows count badge on Agent tab", async () => {
+describe("AC-6: Count badge shows counts on tabs", () => {
+  it("shows count badge on Agent tab", async () => {
     const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
     const agentEvents = [makeAgentEvent("a1"), makeAgentEvent("a2")];
-    const props = defaultRightPanelProps({
-      isStreaming: true,
-      agentEvents,
-    });
+    const props = defaultRightPanelProps({ agentEvents });
     mount(createElement(RightPanel, props));
 
     const tabButtons = queryAll("button").filter((b) => b.getAttribute("aria-pressed") !== null);
@@ -478,15 +341,11 @@ describe("AC-7: Count badge shows agentEvents.length", () => {
     expect(agentTab!.textContent).toContain("2");
   });
 
-  it("streaming: shows count badges on Events and Logs tabs too", async () => {
+  it("shows count badges on Events and Logs tabs", async () => {
     const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
     const events = [makeInspectorEvent("e1"), makeInspectorEvent("e2")];
     const logs = [makeLogEntry("l1")];
-    const props = defaultRightPanelProps({
-      isStreaming: true,
-      events,
-      logs,
-    });
+    const props = defaultRightPanelProps({ events, logs });
     mount(createElement(RightPanel, props));
 
     const tabButtons = queryAll("button").filter((b) => b.getAttribute("aria-pressed") !== null);
@@ -499,47 +358,14 @@ describe("AC-7: Count badge shows agentEvents.length", () => {
 });
 
 // =============================================================================
-// AC-8: Clear button remains functional
+// AC-7: Clear button dispatches based on activeTab via switch
 // =============================================================================
 
-describe("AC-8: Clear button works in both modes", () => {
-  it("non-streaming: Clear calls onClearAgent", async () => {
+describe("AC-7: Clear button works based on activeTab", () => {
+  it("Clear on agent tab calls onClearAgent", async () => {
     const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
     const onClearAgent = vi.fn();
-    const agentEvents = [makeAgentEvent("a1")];
-    const props = defaultRightPanelProps({
-      isStreaming: false,
-      agentEvents,
-      onClearAgent,
-    });
-    mount(createElement(RightPanel, props));
-
-    const clearBtn = queryAll("button").find((b) => b.textContent === "Clear");
-    expect(clearBtn).toBeDefined();
-    click(clearBtn!);
-    expect(onClearAgent).toHaveBeenCalledTimes(1);
-  });
-
-  it("non-streaming: Clear is disabled when onClearAgent is undefined", async () => {
-    const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
-    const props = defaultRightPanelProps({
-      isStreaming: false,
-      onClearAgent: undefined,
-    });
-    mount(createElement(RightPanel, props));
-
-    const clearBtn = queryAll("button").find((b) => b.textContent === "Clear") as HTMLButtonElement;
-    expect(clearBtn).toBeDefined();
-    expect(clearBtn!.disabled).toBe(true);
-  });
-
-  it("streaming: Clear on agent tab calls onClearAgent", async () => {
-    const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
-    const onClearAgent = vi.fn();
-    const props = defaultRightPanelProps({
-      isStreaming: true,
-      onClearAgent,
-    });
+    const props = defaultRightPanelProps({ onClearAgent });
     mount(createElement(RightPanel, props));
 
     // Default tab is agent
@@ -548,13 +374,10 @@ describe("AC-8: Clear button works in both modes", () => {
     expect(onClearAgent).toHaveBeenCalledTimes(1);
   });
 
-  it("streaming: Clear on events tab calls onClearEvents", async () => {
+  it("Clear on events tab calls onClearEvents", async () => {
     const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
     const onClearEvents = vi.fn();
-    const props = defaultRightPanelProps({
-      isStreaming: true,
-      onClearEvents,
-    });
+    const props = defaultRightPanelProps({ onClearEvents });
     mount(createElement(RightPanel, props));
 
     // Switch to events tab
@@ -567,13 +390,10 @@ describe("AC-8: Clear button works in both modes", () => {
     expect(onClearEvents).toHaveBeenCalledTimes(1);
   });
 
-  it("streaming: Clear on logs tab calls onClearLogs", async () => {
+  it("Clear on logs tab calls onClearLogs", async () => {
     const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
     const onClearLogs = vi.fn();
-    const props = defaultRightPanelProps({
-      isStreaming: true,
-      onClearLogs,
-    });
+    const props = defaultRightPanelProps({ onClearLogs });
     mount(createElement(RightPanel, props));
 
     // Switch to logs tab
@@ -585,6 +405,16 @@ describe("AC-8: Clear button works in both modes", () => {
     click(clearBtn!);
     expect(onClearLogs).toHaveBeenCalledTimes(1);
   });
+
+  it("Clear is disabled when handler for active tab is undefined", async () => {
+    const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
+    const props = defaultRightPanelProps({ onClearAgent: undefined });
+    mount(createElement(RightPanel, props));
+
+    const clearBtn = queryAll("button").find((b) => b.textContent === "Clear") as HTMLButtonElement;
+    expect(clearBtn).toBeDefined();
+    expect(clearBtn!.disabled).toBe(true);
+  });
 });
 
 // =============================================================================
@@ -592,18 +422,11 @@ describe("AC-8: Clear button works in both modes", () => {
 // =============================================================================
 
 describe("Edge cases", () => {
-  it("collapsed panel renders empty div regardless of isStreaming", async () => {
+  it("collapsed panel renders empty div", async () => {
     const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
 
-    // Non-streaming collapsed
-    const props1 = defaultRightPanelProps({ isStreaming: false, isCollapsed: true });
-    mount(createElement(RightPanel, props1));
-    expect(container.textContent).toBe("");
-    expect(queryAll("button").length).toBe(0);
-
-    // Streaming collapsed
-    const props2 = defaultRightPanelProps({ isStreaming: true, isCollapsed: true });
-    mount(createElement(RightPanel, props2));
+    const props = defaultRightPanelProps({ isCollapsed: true });
+    mount(createElement(RightPanel, props));
     expect(container.textContent).toBe("");
     expect(queryAll("button").length).toBe(0);
   });
@@ -612,43 +435,5 @@ describe("Edge cases", () => {
     const { AgentPanel } = await import("../src/dashboard/react/components/AgentPanel");
     mount(createElement(AgentPanel, { events: [], onClearEvents: vi.fn() }));
     expect(container.textContent).toContain("No agent events yet");
-  });
-
-  it("non-streaming: Clear always targets agent events even if stale activeTab was set", async () => {
-    // Altair noted: stale activeTab on streaming→non-streaming is harmless
-    // because non-streaming branch ignores activeTab. Verify that.
-    const { RightPanel } = await import("../src/dashboard/react/components/RightPanel");
-    const onClearAgent = vi.fn();
-    const onClearEvents = vi.fn();
-    const onClearLogs = vi.fn();
-
-    // First mount streaming, switch to events tab
-    const streamingProps = defaultRightPanelProps({
-      isStreaming: true,
-      onClearAgent,
-      onClearEvents,
-      onClearLogs,
-    });
-    mount(createElement(RightPanel, streamingProps));
-
-    const tabButtons = queryAll("button").filter((b) => b.getAttribute("aria-pressed") !== null);
-    const eventsTab = tabButtons.find((b) => b.textContent?.includes("Events"));
-    click(eventsTab!);
-
-    // Now re-render as non-streaming (simulates streaming→non-streaming transition)
-    const nonStreamingProps = defaultRightPanelProps({
-      isStreaming: false,
-      onClearAgent,
-      onClearEvents,
-      onClearLogs,
-    });
-    mount(createElement(RightPanel, nonStreamingProps));
-
-    // Clear should call onClearAgent, NOT onClearEvents
-    const clearBtn = queryAll("button").find((b) => b.textContent === "Clear");
-    click(clearBtn!);
-    expect(onClearAgent).toHaveBeenCalled();
-    expect(onClearEvents).not.toHaveBeenCalled();
-    expect(onClearLogs).not.toHaveBeenCalled();
   });
 });
