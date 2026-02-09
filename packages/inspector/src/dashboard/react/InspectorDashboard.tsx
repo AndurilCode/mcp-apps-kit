@@ -17,16 +17,82 @@ import { useGlobals, type GlobalsState } from "./hooks/useGlobals";
 import { useConnections } from "./hooks/useConnections";
 import { useOAuth } from "./hooks/useOAuth";
 import { useMcpPrimitives, type McpPrimitives } from "./hooks/useMcpPrimitives";
+import type { ConnectionParams } from "@mcp-apps-kit/testing";
+import { z } from "zod";
 import { Toolbar } from "./components/Toolbar";
-import { ConnectionBar } from "./components/ConnectionBar";
-import { TabBar } from "./components/TabBar";
 import { GlobalsPanel } from "./components/GlobalsPanel";
-import { McpPrimitivesPanel } from "./components/McpPrimitivesPanel";
+import {
+  McpPrimitivesPanel,
+  type ServerData,
+  type StoppedConnection,
+  type SelectedPrimitive,
+} from "./components/McpPrimitivesPanel";
+import type { Primitive } from "./components/PrimitiveDetail";
 import { RightPanel } from "./components/RightPanel";
 import { NoWidgetPlaceholder, type ConnectionState } from "./components/NoWidgetPlaceholder";
 import { OAuthDiscoveryPanel } from "./components/OAuthDiscoveryPanel";
 import { styles } from "./styles";
 import logoUrl from "../assets/logo.png";
+
+// =============================================================================
+// Stopped Connections Storage
+// =============================================================================
+
+const STOPPED_CONNECTIONS_KEY = "mcp-dashboard-stopped-connections";
+
+/** Zod schema for ConnectionParams validation */
+const ConnectionParamsSchema = z.union([
+  z.object({
+    transport: z.literal("http"),
+    url: z.string().min(1),
+  }),
+  z.object({
+    transport: z.literal("stdio"),
+    command: z.string().min(1),
+    args: z.array(z.string()).optional(),
+    env: z.record(z.string(), z.string()).optional(),
+    inheritEnv: z.boolean().optional(),
+    cwd: z.string().optional(),
+  }),
+]);
+
+/** Zod schema for StoppedConnection validation */
+const StoppedConnectionSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  url: z.string().min(1),
+  params: ConnectionParamsSchema,
+});
+
+/** Load stopped connections from localStorage */
+function loadStoppedConnections(): StoppedConnection[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem(STOPPED_CONNECTIONS_KEY);
+    if (!stored) return [];
+    const parsed = JSON.parse(stored) as unknown;
+    // Validate shape
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item) => {
+        const result = StoppedConnectionSchema.safeParse(item);
+        return result.success ? result.data : null;
+      })
+      .filter((item): item is StoppedConnection => item !== null);
+  } catch {
+    return [];
+  }
+}
+
+/** Save stopped connections to localStorage */
+function saveStoppedConnections(connections: StoppedConnection[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STOPPED_CONNECTIONS_KEY, JSON.stringify(connections));
+  } catch {
+    // Ignore storage errors
+  }
+}
 
 export interface InspectorDashboardProps {
   /** Base URL for the inspector API (default: current origin) */
@@ -48,13 +114,11 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
   const {
     connections,
     activeConnectionId,
-    setActiveConnectionId,
     isCreating,
     error: connectionError,
     createConnection,
     reconnectConnection,
     closeConnection,
-    getMatchingEntries,
     authDiscovery,
     clearAuthDiscovery,
   } = useConnections(baseUrl);
@@ -63,11 +127,21 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
   const connectionCacheRef = useRef<Map<string, CachedConnectionState>>(new Map());
   const prevConnectionIdRef = useRef<string | null>(null);
 
+  // Stopped connections state (persisted to localStorage)
+  const [stoppedConnections, setStoppedConnections] = useState<StoppedConnection[]>(() =>
+    loadStoppedConnections()
+  );
+
+  // Track which server is currently reconnecting (shows loading state)
+  const [reconnectingServerId, setReconnectingServerId] = useState<string | null>(null);
+
+  // Per-connection primitives cache (for building ServerData for all connections)
+  const primitivesPerConnectionRef = useRef<Map<string, McpPrimitives>>(new Map());
+
   // Session state
   const [selectedSessionByConnection, setSelectedSessionByConnection] = useState<
     Record<string, string | null>
   >({});
-  const [isConnectionFormOpen, setIsConnectionFormOpen] = useState(false);
   const { sessions, isLoading: sessionsLoading } = useSessions(baseUrl, activeConnectionId);
 
   const activeConnection = useMemo(
@@ -187,7 +261,6 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
       void reconnectConnection(activeConnectionId).then((connected) => {
         if (connected) {
           clearAuthDiscovery();
-          setIsConnectionFormOpen(false);
         }
       });
     }
@@ -212,6 +285,50 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     resources.length > 0 ? resources : (cachedState?.primitives?.resources ?? []);
   const displayPrompts = prompts.length > 0 ? prompts : (cachedState?.primitives?.prompts ?? []);
 
+  // Update primitives cache for the active connection
+  useEffect(() => {
+    if (activeConnectionId && (tools.length > 0 || resources.length > 0 || prompts.length > 0)) {
+      primitivesPerConnectionRef.current.set(activeConnectionId, { tools, resources, prompts });
+    }
+  }, [activeConnectionId, tools, resources, prompts]);
+
+  // Persist stopped connections to localStorage
+  useEffect(() => {
+    saveStoppedConnections(stoppedConnections);
+  }, [stoppedConnections]);
+
+  // Build ServerData array from active connections + primitives cache
+  const serverDataList: ServerData[] = useMemo(() => {
+    return connections
+      .filter((conn) => conn.status === "connected")
+      .map((conn) => {
+        const cached = primitivesPerConnectionRef.current.get(conn.id);
+        // For active connection, use live data; for others, use cache
+        const prims =
+          conn.id === activeConnectionId
+            ? { tools: displayTools, resources: displayResources, prompts: displayPrompts }
+            : (cached ?? { tools: [], resources: [], prompts: [] });
+        return {
+          id: conn.id,
+          name: conn.serverInfo?.name ?? conn.url,
+          url: conn.url,
+          isConnected: true,
+          tools: prims.tools,
+          resources: prims.resources,
+          prompts: prims.prompts,
+          // Pass connection params for server info display
+          params: { transport: "http" }, // Dashboard only supports HTTP transport
+          serverInfo: conn.serverInfo ?? undefined,
+          // Capabilities determined from available primitives
+          capabilities: {
+            tools: prims.tools.length > 0,
+            resources: prims.resources.length > 0,
+            prompts: prims.prompts.length > 0,
+          },
+        };
+      });
+  }, [connections, activeConnectionId, displayTools, displayResources, displayPrompts]);
+
   // Compute connection state for NoWidgetPlaceholder
   const connectionState: ConnectionState = useMemo(() => {
     // No server connected
@@ -233,13 +350,17 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     return (initEvent?.payload as { clientName?: string } | undefined)?.clientName;
   }, [displayAgentEvents]);
 
-  // Handler to open connection form
-  const handleConnect = useCallback(() => {
-    setIsConnectionFormOpen(true);
-  }, []);
-
-  // Left panel state (MCP primitives)
-  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
+  // Left panel state (MCP primitives) - persisted to localStorage
+  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        return localStorage.getItem("mcp-dashboard-left-collapsed") === "true";
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  });
 
   // Right panel state (persisted)
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(() => {
@@ -252,6 +373,34 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     }
     return false;
   });
+
+  // Selected primitive state (for detail view)
+  const [selectedPrimitive, setSelectedPrimitive] = useState<SelectedPrimitive | null>(null);
+
+  // Resolve selected primitive to its full data for PrimitiveDetail
+  const resolvedPrimitive: Primitive | null = useMemo(() => {
+    if (!selectedPrimitive) return null;
+
+    const server = serverDataList.find((s) => s.id === selectedPrimitive.serverId);
+    if (!server) return null;
+
+    switch (selectedPrimitive.kind) {
+      case "tool": {
+        const tool = server.tools.find((t) => t.name === selectedPrimitive.name);
+        return tool ? { ...tool, kind: "tool" as const } : null;
+      }
+      case "resource": {
+        const resource = server.resources.find((r) => r.name === selectedPrimitive.name);
+        return resource ? { ...resource, kind: "resource" as const } : null;
+      }
+      case "prompt": {
+        const prompt = server.prompts.find((p) => p.name === selectedPrimitive.name);
+        return prompt ? { ...prompt, kind: "prompt" as const } : null;
+      }
+      default:
+        return null;
+    }
+  }, [selectedPrimitive, serverDataList]);
 
   // Globals bar state (persisted)
   const [isGlobalsBarCollapsed, setIsGlobalsBarCollapsed] = useState(() => {
@@ -338,6 +487,17 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     }
   }, [isRightPanelCollapsed]);
 
+  // Save left panel collapsed state
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("mcp-dashboard-left-collapsed", String(isLeftPanelCollapsed));
+      } catch {
+        // ignore storage access errors
+      }
+    }
+  }, [isLeftPanelCollapsed]);
+
   // Save globals bar collapsed state
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -401,14 +561,15 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     setIsGlobalsBarCollapsed((prev) => !prev);
   }, []);
 
+  // Handle primitive selection - shows detail in left panel (sidebar)
+  const handleSelectPrimitive = useCallback((primitive: SelectedPrimitive | null) => {
+    setSelectedPrimitive(primitive);
+  }, []);
+
   const handleCreateConnection = useCallback(
     async (params: import("@mcp-apps-kit/testing").ConnectionParams): Promise<boolean> => {
       const conn = await createConnection(params);
-      if (conn) {
-        setIsConnectionFormOpen(false);
-        return true;
-      }
-      return false;
+      return !!conn;
     },
     [createConnection]
   );
@@ -421,6 +582,8 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
       }
       // Clear cached state for this connection
       connectionCacheRef.current.delete(id);
+      // Clear primitives cache to prevent unbounded growth
+      primitivesPerConnectionRef.current.delete(id);
       setSelectedSessionByConnection((prev) => {
         if (!(id in prev)) {
           return prev;
@@ -433,16 +596,67 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
     [closeConnection]
   );
 
-  const tabs = useMemo(
-    () =>
-      connections.map((connection) => ({
-        id: connection.id,
-        url: connection.url,
-        serverInfo: connection.serverInfo,
-        status: connection.status,
-        isOAuth: connection.isOAuth,
-      })),
-    [connections]
+  // Handler to stop a server (disconnect but keep in stopped list)
+  const handleStopServer = useCallback(
+    async (serverId: string) => {
+      const conn = connections.find((c) => c.id === serverId);
+      if (!conn) return;
+
+      // Build connection params from what we know
+      // For HTTP connections, we can reconstruct params from the URL
+      const params: ConnectionParams = { transport: "http", url: conn.url };
+
+      // Add to stopped connections
+      const stoppedConn: StoppedConnection = {
+        id: serverId,
+        name: conn.serverInfo?.name ?? conn.url,
+        url: conn.url,
+        params,
+      };
+
+      setStoppedConnections((prev) => {
+        // Don't duplicate
+        if (prev.some((s) => s.id === serverId)) return prev;
+        return [...prev, stoppedConn];
+      });
+
+      // Close the connection
+      await handleCloseConnection(serverId);
+    },
+    [connections, handleCloseConnection]
+  );
+
+  // Handler to start a stopped server (reconnect using stored params)
+  const handleStartServer = useCallback(
+    async (stoppedConn: StoppedConnection) => {
+      // Show loading state
+      setReconnectingServerId(stoppedConn.id);
+
+      try {
+        // Reconnect using stored params
+        const success = await handleCreateConnection(stoppedConn.params);
+        if (success) {
+          // Only remove from stopped list after successful connection
+          setStoppedConnections((prev) => prev.filter((s) => s.id !== stoppedConn.id));
+        }
+      } finally {
+        setReconnectingServerId(null);
+      }
+    },
+    [handleCreateConnection]
+  );
+
+  // Handler to delete a server (connected or stopped)
+  const handleDeleteServer = useCallback(
+    async (serverId: string, isConnected: boolean) => {
+      if (isConnected) {
+        // Close the connection and don't add to stopped list
+        await closeConnection(serverId);
+      }
+      // Remove from stopped list if present
+      setStoppedConnections((prev) => prev.filter((s) => s.id !== serverId));
+    },
+    [closeConnection]
   );
 
   // Compute screencast container aspect ratio from globals viewport
@@ -508,19 +722,6 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
           <h1 style={styles.title}>sirius-mcp inspector</h1>
         </div>
 
-        {/* Connection Bar */}
-        <ConnectionBar
-          isOpen={isConnectionFormOpen}
-          isCreating={isCreating}
-          error={connectionError}
-          onCreateConnection={handleCreateConnection}
-          onClose={() => setIsConnectionFormOpen(false)}
-          getMatchingEntries={getMatchingEntries}
-          oauth={activeConnectionId ? oauth : undefined}
-          authDiscovery={authDiscovery}
-          onDismissDiscovery={clearAuthDiscovery}
-        />
-
         <div style={styles.headerRight}>
           <div style={styles.controls}>
             {displaySessions.length > 0 && (
@@ -580,32 +781,33 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
         </div>
       </header>
 
-      <TabBar
-        tabs={tabs}
-        activeTabId={activeConnectionId}
-        onSelect={(id) => setActiveConnectionId(id)}
-        onClose={(id) => void handleCloseConnection(id)}
-        onAdd={() => setIsConnectionFormOpen(true)}
-      />
-
       {/* Error Banner */}
       {error && <div style={styles.errorBanner}>{error}</div>}
 
       {/* Content Wrapper - horizontal layout */}
       <div style={styles.contentWrapper}>
-        {/* Left Panel - MCP Primitives (always present) */}
+        {/* Left Panel - MCP Primitives as Server Blocks */}
         <McpPrimitivesPanel
-          tools={displayTools}
-          resources={displayResources}
-          prompts={displayPrompts}
+          servers={serverDataList}
+          stoppedConnections={stoppedConnections}
+          reconnectingServerId={reconnectingServerId}
           isLoading={primitivesLoading}
           isVisible={true}
           isCollapsed={isLeftPanelCollapsed}
           onToggleCollapse={() => setIsLeftPanelCollapsed(!isLeftPanelCollapsed)}
-          position="left"
           panelWidth={leftPanelWidth}
           resizeHandleProps={leftResizeHandleProps}
           isResizing={isLeftResizing}
+          onStopServer={handleStopServer}
+          onStartServer={handleStartServer}
+          onDeleteServer={handleDeleteServer}
+          onConnect={handleCreateConnection}
+          isCreating={isCreating}
+          connectionError={connectionError}
+          selectedPrimitive={selectedPrimitive}
+          onSelectPrimitive={handleSelectPrimitive}
+          resolvedPrimitive={resolvedPrimitive}
+          onClosePrimitive={() => setSelectedPrimitive(null)}
         />
 
         {/* Center Column - screencast + globals bar */}
@@ -638,11 +840,7 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
               </div>
             ) : (
               /* Tamagotchi placeholder when no widget */
-              <NoWidgetPlaceholder
-                connectionState={connectionState}
-                clientName={agentClientName}
-                onConnect={handleConnect}
-              />
+              <NoWidgetPlaceholder connectionState={connectionState} clientName={agentClientName} />
             )}
           </main>
 
@@ -690,7 +888,6 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
             // Close on backdrop click
             if (e.target === e.currentTarget) {
               clearAuthDiscovery();
-              setIsConnectionFormOpen(false);
             }
           }}
         >
@@ -707,7 +904,6 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
                 void reconnectConnection(activeConnectionId).then((connected) => {
                   if (connected) {
                     clearAuthDiscovery();
-                    setIsConnectionFormOpen(false);
                   }
                 });
               }
@@ -715,7 +911,6 @@ export function InspectorDashboard({ baseUrl = "" }: InspectorDashboardProps): R
             }}
             onDismiss={() => {
               clearAuthDiscovery();
-              setIsConnectionFormOpen(false);
             }}
           />
         </div>

@@ -20,23 +20,7 @@ export interface NoWidgetPlaceholderProps {
   connectionState: ConnectionState;
   /** Name of connected agent client (only set when agent-connected) */
   clientName?: string;
-  /** Callback when user clicks Connect Server button */
-  onConnect: () => void;
 }
-
-/**
- * Module-level button hover handlers.
- * Extracted from inline handlers for memoization — these don't depend on component state.
- */
-const handleButtonHover = (e: React.MouseEvent<HTMLButtonElement>) => {
-  e.currentTarget.style.opacity = "0.9";
-  e.currentTarget.style.transform = "scale(1.02)";
-};
-
-const handleButtonLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
-  e.currentTarget.style.opacity = "1";
-  e.currentTarget.style.transform = "scale(1)";
-};
 
 /** Local styles for the stepped tutorial layout */
 const localStyles: Record<string, CSSProperties> = {
@@ -66,18 +50,6 @@ const localStyles: Record<string, CSSProperties> = {
     color: "#e8e8e8",
     fontWeight: 600,
   },
-  connectButton: {
-    backgroundColor: "#ffffff",
-    color: "#000000",
-    border: "none",
-    borderRadius: "8px",
-    padding: "0.625rem 1.25rem",
-    fontSize: "0.875rem",
-    fontWeight: 500,
-    fontFamily: "inherit",
-    cursor: "pointer",
-    transition: "opacity 0.15s ease, transform 0.15s ease",
-  },
   stateContent: {
     display: "flex",
     flexDirection: "column" as const,
@@ -90,7 +62,6 @@ const localStyles: Record<string, CSSProperties> = {
 export function NoWidgetPlaceholder({
   connectionState,
   clientName,
-  onConnect,
 }: NoWidgetPlaceholderProps): React.ReactElement {
   return (
     <div style={styles.noWidgetWrapper}>
@@ -105,16 +76,10 @@ export function NoWidgetPlaceholder({
         {connectionState === "no-server" && (
           <>
             <h2 style={localStyles.heading}>Connect the server you want to inspect</h2>
-            <button
-              type="button"
-              aria-label="Connect to MCP server"
-              style={localStyles.connectButton}
-              onClick={onConnect}
-              onMouseEnter={handleButtonHover}
-              onMouseLeave={handleButtonLeave}
-            >
-              Connect Server
-            </button>
+            <p style={localStyles.subtext}>
+              Use the <strong style={{ color: "#e8e8e8" }}>+</strong> button in the sidebar to add a
+              connection
+            </p>
           </>
         )}
 
