@@ -212,6 +212,8 @@ export interface StandaloneInspectorServerOptions extends InspectorServerOptions
 export interface StandaloneInspectorServer {
   /** Start the server */
   start: (port?: number) => Promise<void>;
+  /** Set the shared dashboard page for interactive mode */
+  setDashboardPage: (page: import("playwright").Page) => void;
   /** Stop the server */
   stop: () => Promise<void>;
   /** Get the connection manager (active connection) */
@@ -1372,6 +1374,21 @@ export function createStandaloneInspectorServer(
         } catch (error: unknown) {
           reject(error instanceof Error ? error : new Error(String(error)));
         }
+      });
+    },
+
+    /**
+     * Set the shared dashboard page for interactive mode.
+     * All future ConnectionManagers will use this page for iframe rendering.
+     */
+    setDashboardPage: (page: import("playwright").Page) => {
+      // Set on current connection if any
+      if (connectionManager) {
+        connectionManager.setDashboardPage(page);
+      }
+      // Set on future connections
+      registry.on("created", (_id: string, cm: ConnectionManager) => {
+        cm.setDashboardPage(page);
       });
     },
 

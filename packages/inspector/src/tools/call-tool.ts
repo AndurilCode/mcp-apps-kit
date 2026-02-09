@@ -130,6 +130,11 @@ export function createCallToolTool(registry: ConnectionRegistry) {
               const uiHostManager = new UIHostManager(client, {
                 sharedWidgetServer,
               });
+              // Wire dashboard page for interactive mode
+              const dashboardPage = connectionManager.getDashboardPage();
+              if (dashboardPage && !dashboardPage.isClosed()) {
+                uiHostManager.setDashboardPage(dashboardPage);
+              }
               const environmentState = connectionManager.getEnvironmentState();
               const viewport = environmentState.viewport;
               const inspectorUrl = connectionManager.getInspectorUrl();

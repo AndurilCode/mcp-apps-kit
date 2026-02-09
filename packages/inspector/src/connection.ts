@@ -142,6 +142,10 @@ export class ConnectionManager extends EventEmitter {
   private widgetSessionManager: WidgetSessionManager;
   private widgetServer: WidgetServer | null = null;
 
+  /** Dashboard page for interactive mode (shared across all UIHostManagers) */
+  private dashboardPage: import("playwright").Page | null = null;
+  private interactiveMode = false;
+
   /** Cached target server schema for proxy tool generation */
   private targetSchema: TargetServerSchema | null = null;
 
@@ -845,6 +849,25 @@ export class ConnectionManager extends EventEmitter {
    */
   setDashboardNotifier(notifier: import("./dashboard/dashboard-notifier").DashboardNotifier): void {
     this.widgetSessionManager.setNotifier(notifier);
+  }
+
+  /**
+   * Set the shared dashboard page for interactive mode.
+   * UIHostManagers created for tool calls will use this page for iframe rendering.
+   */
+  setDashboardPage(page: import("playwright").Page): void {
+    this.dashboardPage = page;
+    this.interactiveMode = true;
+  }
+
+  /** Get the shared dashboard page (null in headless mode) */
+  getDashboardPage(): import("playwright").Page | null {
+    return this.dashboardPage;
+  }
+
+  /** Whether interactive mode is active */
+  isInteractive(): boolean {
+    return this.interactiveMode;
   }
 
   /**

@@ -508,8 +508,13 @@ async function main(): Promise<void> {
       console.log(`\nPress Ctrl+C to stop`);
 
       // Interactive mode: launch visible browser with dashboard
-      if (options.interactive) {
-        await launchInteractiveBrowser(options.port);
+      if (options.interactive && server) {
+        const dashboardPage = await launchInteractiveBrowser(options.port);
+        if (dashboardPage && "setDashboardPage" in server) {
+          (server as { setDashboardPage: (p: import("playwright").Page) => void }).setDashboardPage(
+            dashboardPage
+          );
+        }
       }
     } catch (error) {
       // Check if this is an auth error on auto-connect that we can handle
@@ -573,7 +578,7 @@ async function main(): Promise<void> {
  * `renderInDashboard()` via `uiHostManager.setDashboardPage()`, not by
  * this browser launch.
  */
-async function launchInteractiveBrowser(port: number): Promise<void> {
+async function launchInteractiveBrowser(port: number): Promise<import("playwright").Page | null> {
   const MAX_RETRIES = 5;
 
   try {
@@ -612,10 +617,11 @@ async function launchInteractiveBrowser(port: number): Promise<void> {
       return page;
     }
 
-    await launch();
+    return await launch();
   } catch (err) {
     console.error(`[interactive] Failed to launch browser (is playwright installed?):`, err);
     console.log(`[interactive] Continuing in headless mode`);
+    return null;
   }
 }
 
