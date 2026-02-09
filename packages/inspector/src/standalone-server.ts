@@ -1044,7 +1044,9 @@ export function createStandaloneInspectorServer(
 
     // Widget proxy routes (/host/*, /widget/*)
     if (url.startsWith("/host/") || url.startsWith("/widget/")) {
-      const dashOpts = { widgetPort: getWidgetPort(), notifier: dashboardNotifier };
+      const wp = getWidgetPort();
+      console.log(`[inspector] Widget proxy: ${url} → widgetPort=${wp ?? "NONE"}`);
+      const dashOpts = { widgetPort: wp, notifier: dashboardNotifier };
       const handled = await handleDashboardRequest(
         req,
         res,
