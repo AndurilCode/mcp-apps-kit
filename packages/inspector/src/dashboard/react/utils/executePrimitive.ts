@@ -82,7 +82,7 @@ export function mapToolResponse(data: unknown): ExecutionResult {
     ok: !isError,
     error: errorMsg,
     content,
-    structuredContent: structuredContent !== undefined ? structuredContent : undefined,
+    structuredContent,
     _meta: meta,
   };
 }
@@ -243,6 +243,11 @@ export async function executePrimitive(
     case "prompt":
       result = mapPromptResponse(body.data, primitive.name);
       break;
+    default:
+      return {
+        ok: false,
+        error: `Unknown primitive kind: ${(primitive as { kind: string }).kind}`,
+      };
   }
 
   // Attach duration from backend response

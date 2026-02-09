@@ -1125,6 +1125,7 @@ export class ConnectionManager extends EventEmitter {
    * @param type - Event type (agent-tool-call or agent-tool-result)
    * @param payload - Event payload (tool name, args, result, etc.)
    * @param protocol - Protocol used (mcp or openai)
+   * @param source - Event source: "agent" (default) for proxy/agent calls, "manual" for user-initiated executions
    */
   recordAgentEvent(
     type: InspectorEventType,
