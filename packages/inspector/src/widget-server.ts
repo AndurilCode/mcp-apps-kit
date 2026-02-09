@@ -274,7 +274,7 @@ export class WidgetServer {
     // Route based on pathname
     if (pathname.startsWith("/host/")) {
       try {
-        const sessionId = decodeURIComponent(pathname.slice(6)); // Remove "/host/" and decode
+        const sessionId = decodeURIComponent(pathname.slice(6)).replace(/\/$/, ""); // Remove "/host/" prefix, trailing slash, and decode
         this.serveHost(sessionId, res);
       } catch (err) {
         this.log(`Failed to decode host session ID: ${err}`);
@@ -283,7 +283,7 @@ export class WidgetServer {
       }
     } else if (pathname.startsWith("/widget/")) {
       try {
-        const sessionId = decodeURIComponent(pathname.slice(8)); // Remove "/widget/" and decode
+        const sessionId = decodeURIComponent(pathname.slice(8)).replace(/\/$/, ""); // Remove "/widget/" prefix, trailing slash, and decode
         this.serveWidget(sessionId, res);
       } catch (err) {
         this.log(`Failed to decode widget session ID: ${err}`);
