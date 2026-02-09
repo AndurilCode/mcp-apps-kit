@@ -565,9 +565,21 @@ async function main(): Promise<void> {
  * Launch a visible Chromium browser pointing at the dashboard.
  * Includes session recovery on browser disconnect.
  */
+/**
+ * Launch an interactive Chromium browser pointing at the dashboard viewer.
+ *
+ * NOTE: This opens a browser for *viewing* the dashboard UI. The actual
+ * WidgetFrameHandles (the sandboxed tool-UI iframes) are created by
+ * `renderInDashboard()` via `uiHostManager.setDashboardPage()`, not by
+ * this browser launch.
+ */
 async function launchInteractiveBrowser(port: number): Promise<void> {
+  const MAX_RETRIES = 5;
+
   try {
     const { chromium } = await import("playwright");
+
+    let retryCount = 0;
 
     async function launch() {
       const browser = await chromium.launch({ headless: false });
@@ -575,13 +587,27 @@ async function launchInteractiveBrowser(port: number): Promise<void> {
       await page.goto(`http://localhost:${port}/dashboard`);
       console.log(`[interactive] Dashboard opened in Chromium`);
 
-      // Session recovery: relaunch browser if it disconnects
+      // Session recovery: relaunch browser if it disconnects (with backoff)
       browser.on("disconnected", () => {
-        console.log(`[interactive] Browser disconnected, relaunching...`);
-        launch().catch((err: unknown) => {
-          console.error(`[interactive] Failed to relaunch browser:`, err);
-        });
+        retryCount++;
+        if (retryCount > MAX_RETRIES) {
+          console.error(`[interactive] Browser disconnected ${MAX_RETRIES} times, giving up.`);
+          process.exit(1);
+        }
+        const delayMs = Math.min(1000 * Math.pow(2, retryCount - 1), 30_000);
+        console.log(
+          `[interactive] Browser disconnected, retrying in ${delayMs}ms (attempt ${retryCount}/${MAX_RETRIES})...`
+        );
+        setTimeout(() => {
+          launch().catch((err: unknown) => {
+            console.error(`[interactive] Failed to relaunch browser:`, err);
+            process.exit(1);
+          });
+        }, delayMs);
       });
+
+      // Reset retry count on successful reconnect
+      retryCount = 0;
 
       return page;
     }

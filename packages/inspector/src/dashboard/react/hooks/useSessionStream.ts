@@ -35,6 +35,9 @@ export function useSessionStream(baseUrl: string): UseSessionStreamResult {
     eventSourceRef.current = es;
 
     es.onopen = () => {
+      // Clear stale sessions on reconnect — we may have missed events
+      // while disconnected, so start fresh to avoid phantom entries.
+      setSessions([]);
       setConnected(true);
     };
 

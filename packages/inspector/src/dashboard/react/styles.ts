@@ -253,32 +253,6 @@ export const styles: Record<string, CSSProperties> = {
     flexShrink: 0,
   },
 
-  // Display Container
-  displayContainer: {
-    backgroundColor: "#000000",
-    borderRadius: "12px",
-    border: "1px solid #2d2f2f",
-    overflow: "hidden",
-    maxWidth: "100%",
-    maxHeight: "100%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-    boxShadow: "0 4px 24px rgba(0, 0, 0, 0.3)",
-  },
-
-  displayContainerStreaming: {
-    width: "100%",
-  },
-
-  streamImage: {
-    display: "block",
-    width: "100%",
-    height: "100%",
-    objectFit: "contain",
-  },
-
   globalsCollapsedToggle: {
     position: "absolute",
     bottom: "0.5rem",
