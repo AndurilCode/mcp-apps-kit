@@ -34,6 +34,12 @@ export interface ConnectOptions {
    * When provided, takes precedence over oauthConfig.
    */
   authProvider?: InspectorOAuthProvider;
+
+  /**
+   * If true, the connection will not be persisted to servers.json.
+   * Useful for one-off or temporary connections.
+   */
+  ephemeral?: boolean;
 }
 
 /**
