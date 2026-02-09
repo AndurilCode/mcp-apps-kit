@@ -177,7 +177,8 @@ export class WidgetSessionManager extends EventEmitter {
     protocol: DetectedProtocol,
     source: SessionSource = "agent",
     proxyMetadata?: ProxyMetadata,
-    onTouch?: () => void
+    onTouch?: () => void,
+    handle?: import("./types/widget-frame-handle").WidgetFrameHandle
   ): Promise<ActiveWidgetSession> {
     // Create session in store
     const session = this.store.create({
@@ -190,6 +191,7 @@ export class WidgetSessionManager extends EventEmitter {
       source,
       proxyMetadata,
       onTouch,
+      handle,
     });
 
     // Set up page listeners using the session-renderer module
@@ -340,7 +342,7 @@ export class WidgetSessionManager extends EventEmitter {
 
     try {
       const page = session.page;
-      if (page.isClosed()) {
+      if (session.handle ? !session.handle.isAlive() : page.isClosed()) {
         return false;
       }
 
@@ -364,14 +366,16 @@ export class WidgetSessionManager extends EventEmitter {
         viewport = { width: modeSizing.width, height: clampedHeight };
       }
 
-      // Resize the Playwright page viewport to match the computed sizing
-      // This is the key step - the CDP screencast captures the page at this size
-      // The host page CSS (100% width/height) will automatically fill the new viewport
-      await page.setViewportSize(viewport);
+      // Resize: interactive mode uses iframe CSS, headless uses page viewport
+      if (session.handle) {
+        await session.handle.resize(viewport.width, viewport.height);
+      } else {
+        await page.setViewportSize(viewport);
+      }
 
       if (this.debug) {
         console.log(
-          `[WidgetSessionManager] Resized page viewport to ${viewport.width}x${viewport.height}`
+          `[WidgetSessionManager] Resized ${session.handle ? "iframe" : "page viewport"} to ${viewport.width}x${viewport.height}`
         );
       }
 
@@ -394,23 +398,29 @@ export class WidgetSessionManager extends EventEmitter {
                 : "desktop",
         };
 
-        /* eslint-disable no-undef */
-        await page.evaluate((ctx: typeof hostContext) => {
-          const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
-          if (iframe?.contentWindow) {
-            // Use the correct MCP Apps protocol method name
-            // Wrap context in hostContext to match ext-apps SDK format
-            const message = {
-              jsonrpc: "2.0",
-              method: "ui/notifications/host-context-changed",
-              params: { hostContext: ctx },
-            };
-            iframe.contentWindow.postMessage(message, "*");
-            // eslint-disable-next-line no-console
-            console.log("[MCP Host] Sent ui/notifications/host-context-changed", ctx);
-          }
-        }, hostContext);
-        /* eslint-enable no-undef */
+        if (session.handle) {
+          await session.handle.postMessage({
+            jsonrpc: "2.0",
+            method: "ui/notifications/host-context-changed",
+            params: { hostContext },
+          });
+        } else {
+          /* eslint-disable no-undef */
+          await page.evaluate((ctx: typeof hostContext) => {
+            const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
+            if (iframe?.contentWindow) {
+              const message = {
+                jsonrpc: "2.0",
+                method: "ui/notifications/host-context-changed",
+                params: { hostContext: ctx },
+              };
+              iframe.contentWindow.postMessage(message, "*");
+              // eslint-disable-next-line no-console
+              console.log("[MCP Host] Sent ui/notifications/host-context-changed", ctx);
+            }
+          }, hostContext);
+          /* eslint-enable no-undef */
+        }
       } else {
         // OpenAI protocol: send via inspector_sync message from host to iframe
         // This ensures event.source === window.parent (required by SDK security)
@@ -432,16 +442,20 @@ export class WidgetSessionManager extends EventEmitter {
           data: globals,
         };
 
-        /* eslint-disable no-undef */
-        await page.evaluate((message: typeof syncMessage) => {
-          const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
-          if (iframe?.contentWindow) {
-            iframe.contentWindow.postMessage(message, "*");
-            // eslint-disable-next-line no-console
-            console.log("[OpenAI Host] Sent globals sync:", message.data);
-          }
-        }, syncMessage);
-        /* eslint-enable no-undef */
+        if (session.handle) {
+          await session.handle.postMessage(syncMessage);
+        } else {
+          /* eslint-disable no-undef */
+          await page.evaluate((message: typeof syncMessage) => {
+            const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
+            if (iframe?.contentWindow) {
+              iframe.contentWindow.postMessage(message, "*");
+              // eslint-disable-next-line no-console
+              console.log("[OpenAI Host] Sent globals sync:", message.data);
+            }
+          }, syncMessage);
+          /* eslint-enable no-undef */
+        }
       }
 
       // Record globals event for the dashboard events panel
@@ -524,7 +538,7 @@ export class WidgetSessionManager extends EventEmitter {
     // If sessionId specified, sync to that session only
     if (sessionId) {
       const session = this.store.peek(sessionId);
-      if (session && !session.page.isClosed()) {
+      if (session && !(session.handle ? !session.handle.isAlive() : session.page.isClosed())) {
         await this.deliverEvent(session, type, data, protocol);
         // Touch session to reset TTL
         this.store.touch(sessionId);
@@ -535,7 +549,10 @@ export class WidgetSessionManager extends EventEmitter {
     // Broadcast to all sessions matching protocol
     const promises: Promise<void>[] = [];
     for (const session of this.store.values()) {
-      if (session.protocol === protocol && !session.page.isClosed()) {
+      if (
+        session.protocol === protocol &&
+        !(session.handle ? !session.handle.isAlive() : session.page.isClosed())
+      ) {
         promises.push(
           this.deliverEvent(session, type, data, protocol).then(() => {
             // Touch session to reset TTL
@@ -575,13 +592,16 @@ export class WidgetSessionManager extends EventEmitter {
     const sessionsToUpdate: ActiveWidgetSession[] = [];
     if (sessionId) {
       const session = this.store.peek(sessionId);
-      if (session && !session.page.isClosed()) {
+      if (session && !(session.handle ? !session.handle.isAlive() : session.page.isClosed())) {
         sessionsToUpdate.push(session);
       }
     } else {
       // All sessions matching protocol
       for (const session of this.store.values()) {
-        if (session.protocol === protocol && !session.page.isClosed()) {
+        if (
+          session.protocol === protocol &&
+          !(session.handle ? !session.handle.isAlive() : session.page.isClosed())
+        ) {
           sessionsToUpdate.push(session);
         }
       }
@@ -601,10 +621,14 @@ export class WidgetSessionManager extends EventEmitter {
         }
 
         if (newViewport) {
-          await session.page.setViewportSize(newViewport);
+          if (session.handle) {
+            await session.handle.resize(newViewport.width, newViewport.height);
+          } else {
+            await session.page.setViewportSize(newViewport);
+          }
           if (this.debug) {
             console.log(
-              `[WidgetSessionManager] Resized viewport for session ${session.id} to ${newViewport.width}x${newViewport.height} (displayMode: ${displayMode ?? "unchanged"})`
+              `[WidgetSessionManager] Resized ${session.handle ? "iframe" : "viewport"} for session ${session.id} to ${newViewport.width}x${newViewport.height} (displayMode: ${displayMode ?? "unchanged"})`
             );
           }
         }
@@ -696,7 +720,16 @@ export class WidgetSessionManager extends EventEmitter {
 
     // Handle call-tool-response specially - deliver to host page to resolve pending calls
     if (type === "call-tool-response") {
-      await deliverToolCallResponse({ page: session.page, data, debug: this.debug });
+      if (session.handle) {
+        // Interactive mode: deliver tool response via the frame directly
+        // The pending calls queue is managed per-frame in interactive mode
+        await session.handle.frame.evaluate((responseData: unknown) => {
+          // eslint-disable-next-line no-undef
+          window.postMessage(responseData, "*");
+        }, data);
+      } else {
+        await deliverToolCallResponse({ page: session.page, data, debug: this.debug });
+      }
       return;
     }
 
@@ -726,44 +759,52 @@ export class WidgetSessionManager extends EventEmitter {
     // This handles the case where sync arrives before widget initialization
     const isHostContextUpdate = method === "ui/notifications/host-context-changed";
 
-    // Execute on the HOST page, sending message TO the iframe
-    // This ensures event.source === window.parent in the widget
-    /* eslint-disable no-undef */
-    await session.page.evaluate(
-      ({
-        method: m,
-        params: p,
-        storeOnHost,
-      }: {
-        method: string;
-        params: unknown;
-        storeOnHost: boolean;
-      }) => {
-        // Store host context updates for ui/initialize response
-        if (storeOnHost) {
-          const w = window as Window & { __mcpHostContextUpdates?: Record<string, unknown> };
-          w.__mcpHostContextUpdates = { ...(w.__mcpHostContextUpdates ?? {}), ...(p as object) };
-          // eslint-disable-next-line no-console
-          console.log("[MCP Host] Stored hostContext update for ui/initialize:", p);
-        }
+    if (session.handle) {
+      // Interactive mode: postMessage via frame.evaluate (no getElementById needed)
+      await session.handle.postMessage({
+        jsonrpc: "2.0",
+        method,
+        params,
+      });
+    } else {
+      // Headless mode: send from host page to iframe via getElementById
+      /* eslint-disable no-undef */
+      await session.page.evaluate(
+        ({
+          method: m,
+          params: p,
+          storeOnHost,
+        }: {
+          method: string;
+          params: unknown;
+          storeOnHost: boolean;
+        }) => {
+          // Store host context updates for ui/initialize response
+          if (storeOnHost) {
+            const w = window as Window & { __mcpHostContextUpdates?: Record<string, unknown> };
+            w.__mcpHostContextUpdates = { ...(w.__mcpHostContextUpdates ?? {}), ...(p as object) };
+            // eslint-disable-next-line no-console
+            console.log("[MCP Host] Stored hostContext update for ui/initialize:", p);
+          }
 
-        const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
-        if (iframe?.contentWindow) {
-          iframe.contentWindow.postMessage(
-            {
-              jsonrpc: "2.0",
-              method: m,
-              params: p,
-            },
-            "*"
-          );
-          // eslint-disable-next-line no-console
-          console.log("[MCP Host] Sent synced event:", m, p);
-        }
-      },
-      { method, params, storeOnHost: isHostContextUpdate }
-    );
-    /* eslint-enable no-undef */
+          const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
+          if (iframe?.contentWindow) {
+            iframe.contentWindow.postMessage(
+              {
+                jsonrpc: "2.0",
+                method: m,
+                params: p,
+              },
+              "*"
+            );
+            // eslint-disable-next-line no-console
+            console.log("[MCP Host] Sent synced event:", m, p);
+          }
+        },
+        { method, params, storeOnHost: isHostContextUpdate }
+      );
+      /* eslint-enable no-undef */
+    }
   }
 
   /**
@@ -787,18 +828,22 @@ export class WidgetSessionManager extends EventEmitter {
       data: data,
     };
 
-    // Execute on the HOST page, sending message TO the iframe
-    // This ensures event.source === window.parent in the widget
-    /* eslint-disable no-undef */
-    await session.page.evaluate((message: typeof syncMessage) => {
-      const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
-      if (iframe?.contentWindow) {
-        iframe.contentWindow.postMessage(message, "*");
-        // eslint-disable-next-line no-console
-        console.log("[OpenAI Host] Sent synced event:", message.syncType, message.data);
-      }
-    }, syncMessage);
-    /* eslint-enable no-undef */
+    if (session.handle) {
+      // Interactive mode: postMessage via frame.evaluate
+      await session.handle.postMessage(syncMessage);
+    } else {
+      // Headless mode: send from host page to iframe via getElementById
+      /* eslint-disable no-undef */
+      await session.page.evaluate((message: typeof syncMessage) => {
+        const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
+        if (iframe?.contentWindow) {
+          iframe.contentWindow.postMessage(message, "*");
+          // eslint-disable-next-line no-console
+          console.log("[OpenAI Host] Sent synced event:", message.syncType, message.data);
+        }
+      }, syncMessage);
+      /* eslint-enable no-undef */
+    }
   }
 
   // ===========================================================================
@@ -821,10 +866,11 @@ export class WidgetSessionManager extends EventEmitter {
       : Array.from(this.store.values());
 
     for (const session of sessions) {
-      if (session.page.isClosed()) continue;
+      if (session.handle ? !session.handle.isAlive() : session.page.isClosed()) continue;
 
-      // Find widget iframe
-      const frame = session.page.frame({ name: "widget-frame" });
+      // Find widget iframe: use handle's frame (interactive) or session-scoped URL regex (headless)
+      const frame =
+        session.handle?.frame ?? session.page.frame({ url: new RegExp(`/widget/${session.id}/`) });
       if (!frame) {
         if (this.debug) {
           console.log(`[WidgetSessionManager] No widget-frame found for session ${session.id}`);
@@ -984,7 +1030,7 @@ export class WidgetSessionManager extends EventEmitter {
   getPageForStreaming(sessionId: string): Page | null {
     const session = this.store.peek(sessionId);
     if (!session) return null;
-    if (session.page.isClosed()) return null;
+    if (session.handle ? !session.handle.isAlive() : session.page.isClosed()) return null;
     return session.page;
   }
 

@@ -146,6 +146,10 @@ export function createCallToolTool(registry: ConnectionRegistry) {
                 inspectorUrl ?? undefined
               );
 
+              // In standalone mode without interactive flag, renderInBrowser returns BrowserRenderResult
+              if (!("page" in renderResult)) {
+                throw new Error("Unexpected WidgetFrameHandle in call-tool context");
+              }
               const { page } = renderResult;
 
               // Get widget session ID from renderResult (from WidgetServer)

@@ -8,6 +8,7 @@ import type {
   SessionSource,
   ProxyMetadata,
 } from "./widget-session";
+import type { WidgetFrameHandle } from "../types/widget-frame-handle";
 
 export interface SessionStoreOptions {
   /** Session TTL in milliseconds (default: 30 minutes) */
@@ -30,6 +31,7 @@ export interface CreateSessionOptions {
   source?: SessionSource;
   proxyMetadata?: ProxyMetadata;
   onTouch?: () => void;
+  handle?: WidgetFrameHandle;
 }
 
 export class SessionStore {
@@ -72,6 +74,7 @@ export class SessionStore {
       toolCalls: [],
       events: [],
       onTouch: options.onTouch,
+      handle: options.handle,
     };
     this.sessions.set(options.sessionId, session);
 
@@ -231,9 +234,13 @@ export class SessionStore {
     if (!session) {
       return false;
     }
-    session.page.close().catch(() => {
-      // Ignore errors when closing page
-    });
+    if (session.handle) {
+      session.handle.dispose().catch(() => {});
+    } else {
+      session.page.close().catch(() => {
+        // Ignore errors when closing page
+      });
+    }
     return this.sessions.delete(sessionId);
   }
 
@@ -247,7 +254,9 @@ export class SessionStore {
     }
 
     try {
-      if (!session.page.isClosed()) {
+      if (session.handle) {
+        await session.handle.dispose();
+      } else if (!session.page.isClosed()) {
         await session.page.close();
       }
     } catch {
@@ -271,7 +280,9 @@ export class SessionStore {
     const promises: Promise<void>[] = [];
 
     for (const session of this.sessions.values()) {
-      if (!session.page.isClosed()) {
+      if (session.handle) {
+        promises.push(session.handle.dispose().catch(() => {}));
+      } else if (!session.page.isClosed()) {
         promises.push(
           session.page.close().catch(() => {
             // Ignore errors when closing page
@@ -295,9 +306,13 @@ export class SessionStore {
    */
   clear(): void {
     for (const session of this.sessions.values()) {
-      session.page.close().catch(() => {
-        // Ignore errors when closing page
-      });
+      if (session.handle) {
+        session.handle.dispose().catch(() => {});
+      } else {
+        session.page.close().catch(() => {
+          // Ignore errors when closing page
+        });
+      }
     }
     this.sessions.clear();
   }

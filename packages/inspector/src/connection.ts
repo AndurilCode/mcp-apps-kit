@@ -869,6 +869,13 @@ export class ConnectionManager extends EventEmitter {
   }
 
   /**
+   * Get the widget server port, or undefined if not running.
+   */
+  getWidgetServerPort(): number | undefined {
+    return this.widgetServer?.getPort();
+  }
+
+  /**
    * Stop the widget server (called during cleanup)
    */
   async stopWidgetServer(): Promise<void> {

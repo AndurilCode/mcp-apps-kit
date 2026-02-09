@@ -137,7 +137,8 @@ export function createTestWidgetInteractionTool(registry: ConnectionRegistry) {
           const { page, protocol } = session;
 
           // Get the widget iframe for interactions
-          const frame = page.frame({ url: /\/widget\// });
+          const frame =
+            session.handle?.frame ?? page.frame({ url: new RegExp(`/widget/${session.id}/`) });
           if (!frame) {
             return {
               hasUI: true,
@@ -166,7 +167,8 @@ export function createTestWidgetInteractionTool(registry: ConnectionRegistry) {
                   if (selector) {
                     await frame.click(selector);
                   } else if (position) {
-                    await page.mouse.click(position.x, position.y);
+                    const mousePage = session.handle ? frame.page() : page;
+                    await mousePage.mouse.click(position.x, position.y);
                   }
                   break;
 
@@ -245,20 +247,28 @@ export function createTestWidgetInteractionTool(registry: ConnectionRegistry) {
                     const offsetX = frameBbox?.x ?? 0;
                     const offsetY = frameBbox?.y ?? 0;
 
-                    // Perform drag
-                    const mouse = page.mouse;
-                    await mouse.move(offsetX + startX, offsetY + startY);
-                    await mouse.down();
-                    for (let step = 1; step <= dragSteps; step++) {
-                      const progress = step / dragSteps;
-                      await mouse.move(
-                        offsetX + startX + (endX - startX) * progress,
-                        offsetY + startY + (endY - startY) * progress
-                      );
-                      await page.waitForTimeout(10);
+                    // Use locator-based drag when both source and target are selectors
+                    if (selector && typeof target === "string") {
+                      const sourceLocator = frame.locator(selector).first();
+                      const targetLocator = frame.locator(target).first();
+                      await sourceLocator.dragTo(targetLocator);
+                    } else {
+                      // Coordinate-based drag: use page.mouse with iframe offset
+                      const dragPage = session.handle ? frame.page() : page;
+                      const mouse = dragPage.mouse;
+                      await mouse.move(offsetX + startX, offsetY + startY);
+                      await mouse.down();
+                      for (let step = 1; step <= dragSteps; step++) {
+                        const progress = step / dragSteps;
+                        await mouse.move(
+                          offsetX + startX + (endX - startX) * progress,
+                          offsetY + startY + (endY - startY) * progress
+                        );
+                        await dragPage.waitForTimeout(10);
+                      }
+                      await mouse.up();
+                      await dragPage.waitForTimeout(50);
                     }
-                    await mouse.up();
-                    await page.waitForTimeout(50);
                   }
                   break;
 
@@ -423,6 +433,9 @@ export function createTestWidgetInteractionTool(registry: ConnectionRegistry) {
           inspectorUrl ?? undefined
         );
 
+        if (!("page" in renderResult)) {
+          throw new Error("Unexpected WidgetFrameHandle in test-widget-interaction");
+        }
         const { page } = renderResult;
         errors.push(...renderResult.errors);
 
@@ -560,20 +573,27 @@ export function createTestWidgetInteractionTool(registry: ConnectionRegistry) {
                   const offsetX = frameBbox?.x ?? 0;
                   const offsetY = frameBbox?.y ?? 0;
 
-                  // Perform drag
-                  const mouse = page.mouse;
-                  await mouse.move(offsetX + startX, offsetY + startY);
-                  await mouse.down();
-                  for (let step = 1; step <= dragSteps; step++) {
-                    const progress = step / dragSteps;
-                    await mouse.move(
-                      offsetX + startX + (endX - startX) * progress,
-                      offsetY + startY + (endY - startY) * progress
-                    );
-                    await page.waitForTimeout(10);
+                  // Use locator-based drag when both source and target are selectors
+                  if (selector && typeof target === "string") {
+                    const sourceLocator = frame.locator(selector).first();
+                    const targetLocator = frame.locator(target).first();
+                    await sourceLocator.dragTo(targetLocator);
+                  } else {
+                    // Coordinate-based drag: use page.mouse with iframe offset
+                    const mouse = page.mouse;
+                    await mouse.move(offsetX + startX, offsetY + startY);
+                    await mouse.down();
+                    for (let step = 1; step <= dragSteps; step++) {
+                      const progress = step / dragSteps;
+                      await mouse.move(
+                        offsetX + startX + (endX - startX) * progress,
+                        offsetY + startY + (endY - startY) * progress
+                      );
+                      await page.waitForTimeout(10);
+                    }
+                    await mouse.up();
+                    await page.waitForTimeout(50);
                   }
-                  await mouse.up();
-                  await page.waitForTimeout(50);
                 }
                 break;
 

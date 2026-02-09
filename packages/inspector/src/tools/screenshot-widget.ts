@@ -91,8 +91,27 @@ export function createScreenshotWidgetTool(registry: ConnectionRegistry) {
         try {
           const { page, protocol } = session;
 
-          // Target the widget iframe for screenshot (unless fullPage is requested)
-          const frame = page.frame({ url: /\/widget\// });
+          // Use WidgetFrameHandle for screenshots in interactive mode
+          if (session.handle && !input.fullPage) {
+            const data = await session.handle.screenshot({ type: format });
+            await mkdir(SCREENSHOTS_DIR, { recursive: true });
+            const timestamp = Date.now();
+            const filename = `${session.toolName}-${timestamp}.${format}`;
+            const screenshotPath = join(SCREENSHOTS_DIR, filename);
+            await writeFile(screenshotPath, data);
+
+            return {
+              hasUI: true,
+              protocol,
+              screenshotPath,
+              format,
+              dimensions: viewport,
+              errors: [],
+            };
+          }
+
+          // Headless path: target the widget iframe for screenshot
+          const frame = page.frame({ url: new RegExp(`/widget/${session.id}/`) });
           let screenshotResult: { data: Buffer; format: "png" | "jpeg" };
 
           if (frame && !input.fullPage) {
@@ -221,7 +240,8 @@ export function createScreenshotWidgetTool(registry: ConnectionRegistry) {
       const environmentState = connectionManager.getEnvironmentState();
       const inspectorUrl = connectionManager.getInspectorUrl();
 
-      type PageType = Awaited<ReturnType<typeof uiHostManager.renderInBrowser>>["page"];
+      type RenderResult = Awaited<ReturnType<typeof uiHostManager.renderInBrowser>>;
+      type PageType = Extract<RenderResult, { page: unknown }>["page"];
       let page: PageType | undefined;
 
       try {
@@ -237,6 +257,9 @@ export function createScreenshotWidgetTool(registry: ConnectionRegistry) {
           inspectorUrl ?? undefined
         );
 
+        if (!("page" in renderResult)) {
+          throw new Error("Unexpected WidgetFrameHandle in screenshot-widget");
+        }
         page = renderResult.page;
         const { errors } = renderResult;
 
@@ -281,7 +304,7 @@ export function createScreenshotWidgetTool(registry: ConnectionRegistry) {
           errors: [`Screenshot failed: ${message}`],
         };
       } finally {
-        // Clean up resources
+        // Clean up resources (standalone mode always creates its own page)
         if (page) {
           await page.close().catch(() => {});
         }

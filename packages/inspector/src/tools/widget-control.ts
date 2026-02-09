@@ -65,7 +65,7 @@ export function createWidgetEvaluateTool(registry: ConnectionRegistry) {
         };
       }
 
-      if (session.page.isClosed()) {
+      if (session.handle ? !session.handle.isAlive() : session.page.isClosed()) {
         return {
           success: false,
           error: "Page closed",
@@ -74,7 +74,9 @@ export function createWidgetEvaluateTool(registry: ConnectionRegistry) {
 
       try {
         // Target the widget iframe
-        const frame = session.page.frame({ url: /\/widget\// });
+        const frame =
+          session.handle?.frame ??
+          session.page.frame({ url: new RegExp(`/widget/${session.id}/`) });
         if (!frame) {
           return {
             success: false,
@@ -520,7 +522,7 @@ export function createWidgetWaitForSelectorTool(registry: ConnectionRegistry) {
         };
       }
 
-      if (session.page.isClosed()) {
+      if (session.handle ? !session.handle.isAlive() : session.page.isClosed()) {
         return {
           success: false,
           error: "Page closed",
@@ -529,7 +531,9 @@ export function createWidgetWaitForSelectorTool(registry: ConnectionRegistry) {
 
       try {
         // Target the widget iframe
-        const frame = session.page.frame({ url: /\/widget\// });
+        const frame =
+          session.handle?.frame ??
+          session.page.frame({ url: new RegExp(`/widget/${session.id}/`) });
         if (!frame) {
           return {
             success: false,
@@ -608,7 +612,7 @@ export function createWidgetLocatorTool(registry: ConnectionRegistry) {
         };
       }
 
-      if (session.page.isClosed()) {
+      if (session.handle ? !session.handle.isAlive() : session.page.isClosed()) {
         return {
           success: false,
           error: "Page closed",
@@ -617,7 +621,9 @@ export function createWidgetLocatorTool(registry: ConnectionRegistry) {
 
       try {
         // Target the widget iframe
-        const frame = session.page.frame({ url: /\/widget\// });
+        const frame =
+          session.handle?.frame ??
+          session.page.frame({ url: new RegExp(`/widget/${session.id}/`) });
         if (!frame) {
           return {
             success: false,
@@ -735,7 +741,7 @@ export function createWidgetDragTool(registry: ConnectionRegistry) {
         };
       }
 
-      if (session.page.isClosed()) {
+      if (session.handle ? !session.handle.isAlive() : session.page.isClosed()) {
         return {
           success: false,
           error: "Page closed",
@@ -744,7 +750,9 @@ export function createWidgetDragTool(registry: ConnectionRegistry) {
 
       try {
         // Target the widget iframe
-        const frame = session.page.frame({ url: /\/widget\// });
+        const frame =
+          session.handle?.frame ??
+          session.page.frame({ url: new RegExp(`/widget/${session.id}/`) });
         if (!frame) {
           return {
             success: false,
@@ -797,46 +805,45 @@ export function createWidgetDragTool(registry: ConnectionRegistry) {
           endPosition = input.target;
         }
 
-        // Get the iframe's position relative to the page to adjust coordinates
-        const frameElement = await frame.frameElement();
-        const frameBbox = await frameElement.boundingBox();
-        if (!frameBbox) {
-          return {
-            success: false,
-            error: "Could not determine iframe position",
-          };
+        // Use locator-based drag when both source and target are selectors (works with frames)
+        if (typeof input.source === "string" && typeof input.target === "string") {
+          const sourceLocator = frame.locator(input.source).first();
+          const targetLocator = frame.locator(input.target).first();
+          await sourceLocator.dragTo(targetLocator, { timeout });
+        } else {
+          // Coordinate-based drag: need page.mouse with iframe offset
+          const frameElement = await frame.frameElement();
+          const frameBbox = await frameElement.boundingBox();
+          if (!frameBbox) {
+            return {
+              success: false,
+              error: "Could not determine iframe position",
+            };
+          }
+
+          const pageStartX = frameBbox.x + startPosition.x;
+          const pageStartY = frameBbox.y + startPosition.y;
+          const pageEndX = frameBbox.x + endPosition.x;
+          const pageEndY = frameBbox.y + endPosition.y;
+
+          // Use the underlying page's mouse (frame doesn't have .mouse)
+          const page = session.handle ? frame.page() /* get page from frame */ : session.page;
+          const mouse = page.mouse;
+
+          await mouse.move(pageStartX, pageStartY);
+          await mouse.down();
+
+          for (let i = 1; i <= steps; i++) {
+            const progress = i / steps;
+            const currentX = pageStartX + (pageEndX - pageStartX) * progress;
+            const currentY = pageStartY + (pageEndY - pageStartY) * progress;
+            await mouse.move(currentX, currentY);
+            await page.waitForTimeout(10);
+          }
+
+          await mouse.up();
+          await page.waitForTimeout(50);
         }
-
-        // Adjust positions to page coordinates (add iframe offset)
-        const pageStartX = frameBbox.x + startPosition.x;
-        const pageStartY = frameBbox.y + startPosition.y;
-        const pageEndX = frameBbox.x + endPosition.x;
-        const pageEndY = frameBbox.y + endPosition.y;
-
-        // Perform the drag operation using page mouse
-        const mouse = session.page.mouse;
-
-        // Move to start position
-        await mouse.move(pageStartX, pageStartY);
-
-        // Press mouse button
-        await mouse.down();
-
-        // Move in steps to simulate smooth drag
-        for (let i = 1; i <= steps; i++) {
-          const progress = i / steps;
-          const currentX = pageStartX + (pageEndX - pageStartX) * progress;
-          const currentY = pageStartY + (pageEndY - pageStartY) * progress;
-          await mouse.move(currentX, currentY);
-          // Small delay for drag events to register
-          await session.page.waitForTimeout(10);
-        }
-
-        // Release mouse button
-        await mouse.up();
-
-        // Small delay for drop events to process
-        await session.page.waitForTimeout(50);
 
         return {
           success: true,
@@ -903,7 +910,7 @@ export function createWidgetRefreshTool(registry: ConnectionRegistry) {
         };
       }
 
-      if (session.page.isClosed()) {
+      if (session.handle ? !session.handle.isAlive() : session.page.isClosed()) {
         return {
           success: false,
           error: "Page closed",
@@ -949,13 +956,30 @@ export function createWidgetRefreshTool(registry: ConnectionRegistry) {
         session.toolResult = newToolResult;
 
         // Push the new data to the widget via postMessage
-        const frame = session.page.frame({ url: /\/widget\// });
+        const frame =
+          session.handle?.frame ??
+          session.page.frame({ url: new RegExp(`/widget/${session.id}/`) });
         let widgetUpdated = false;
         let widgetUpdateError: string | undefined;
 
         if (frame) {
           try {
-            if (session.protocol === "mcp") {
+            if (session.handle) {
+              // Interactive mode: use WidgetFrameHandle.postMessage() via frame.evaluate
+              if (session.protocol === "mcp") {
+                await session.handle.postMessage({
+                  jsonrpc: "2.0",
+                  method: "ui/context",
+                  params: { toolOutput: newToolResult },
+                });
+              } else {
+                await session.handle.postMessage({
+                  type: "updateOutput",
+                  output: newToolResult,
+                });
+              }
+              widgetUpdated = true;
+            } else if (session.protocol === "mcp") {
               // MCP protocol: Send ui/context with updated toolOutput
               /* eslint-disable no-undef */
               await session.page.evaluate(
@@ -964,7 +988,6 @@ export function createWidgetRefreshTool(registry: ConnectionRegistry) {
                     "widget-frame"
                   ) as HTMLIFrameElement | null;
                   if (iframe?.contentWindow) {
-                    // Send updated context to widget
                     iframe.contentWindow.postMessage(
                       {
                         jsonrpc: "2.0",

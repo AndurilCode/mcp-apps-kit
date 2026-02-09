@@ -17,7 +17,7 @@ import { z } from "zod";
 import { ConnectionManager, inferProtocolType, type ProtocolType } from "./connection";
 import { ConnectionRegistry } from "./connection-registry";
 import type { InspectorServerOptions } from "./types";
-import { handleDashboardRequest } from "./dashboard/dashboard-server";
+import { handleDashboardRequest, DashboardNotifier } from "./dashboard/dashboard-server";
 import { ServerStore, type LocalStorageMigrationPayload } from "./persistence/server-store";
 import {
   createConnectTool,
@@ -315,6 +315,14 @@ export function createStandaloneInspectorServer(
   const defaultPort = options.port ?? 6274;
   const targetUrl = options.targetUrl;
   const presetOAuthProvider = options.oauthProvider;
+
+  // Dashboard SSE notifier for session lifecycle events
+  const dashboardNotifier = new DashboardNotifier();
+
+  /** Get the widget server port from the active connection, if running */
+  const getWidgetPort = (): number | undefined => {
+    return getActiveConnectionManager()?.getWidgetServerPort();
+  };
 
   // Create MCP app with inspector tools
   // Add reasoning field to all tools for agent view transparency
@@ -1032,13 +1040,27 @@ export function createStandaloneInspectorServer(
       return;
     }
 
+    // Widget proxy routes (/host/*, /widget/*)
+    if (url.startsWith("/host/") || url.startsWith("/widget/")) {
+      const dashOpts = { widgetPort: getWidgetPort(), notifier: dashboardNotifier };
+      const handled = await handleDashboardRequest(
+        req,
+        res,
+        getActiveConnectionManager(),
+        registry,
+        dashOpts
+      );
+      if (handled) return;
+    }
+
     // Handle /mcp/primitives before routing to MCP app (supports ?connectionId=...)
     if (url.startsWith("/mcp/primitives") && req.method === "GET") {
       const handled = await handleDashboardRequest(
         req,
         res,
         getActiveConnectionManager(),
-        registry
+        registry,
+        { widgetPort: getWidgetPort(), notifier: dashboardNotifier }
       );
       if (handled) return;
     }
@@ -1260,7 +1282,8 @@ export function createStandaloneInspectorServer(
         req,
         res,
         getActiveConnectionManager(),
-        registry
+        registry,
+        { widgetPort: getWidgetPort(), notifier: dashboardNotifier }
       );
       if (handled) return;
     }

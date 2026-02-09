@@ -258,6 +258,9 @@ export function createGetConsoleLogsTool(registry: ConnectionRegistry) {
           inspectorUrl ?? undefined
         );
 
+        if (!("page" in renderResult)) {
+          throw new Error("Unexpected WidgetFrameHandle in get-console-logs");
+        }
         const { page } = renderResult;
         errors.push(...renderResult.errors);
 

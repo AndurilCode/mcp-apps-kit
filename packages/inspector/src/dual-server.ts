@@ -26,7 +26,7 @@ import type {
 } from "./types";
 import { registerProxyToolsDirectly } from "./proxy-tools";
 import { registerProxyResources } from "./proxy-resources";
-import { handleDashboardRequest } from "./dashboard/dashboard-server";
+import { handleDashboardRequest, DashboardNotifier } from "./dashboard/dashboard-server";
 import { handleOAuthRoutes } from "./oauth/callback-handler";
 import { ServerStore, type LocalStorageMigrationPayload } from "./persistence/server-store";
 import { createWellKnownProxy } from "./oauth/wellknown-proxy";
@@ -176,6 +176,14 @@ export function createDualInspectorServer(
   };
 
   const defaultPort = options.port ?? 6274;
+
+  // Dashboard SSE notifier for session lifecycle events
+  const dashboardNotifier = new DashboardNotifier();
+
+  /** Get the widget server port from the active connection, if running */
+  const getWidgetPort = (): number | undefined => {
+    return getActiveConnectionManager()?.getWidgetServerPort();
+  };
 
   // Well-known endpoint proxy for OAuth discovery in dual mode
   const wellKnownProxy = createWellKnownProxy({ debug: options.debug });
@@ -794,13 +802,26 @@ export function createDualInspectorServer(
       return;
     }
 
+    // Widget proxy routes (/host/*, /widget/*)
+    if (url.startsWith("/host/") || url.startsWith("/widget/")) {
+      const handled = await handleDashboardRequest(
+        req,
+        res,
+        getActiveConnectionManager(),
+        registry,
+        { widgetPort: getWidgetPort(), notifier: dashboardNotifier }
+      );
+      if (handled) return;
+    }
+
     // Dashboard routes (including /mcp/primitives with optional ?connectionId=...)
     if (url.startsWith("/dashboard") || url.startsWith("/mcp/primitives")) {
       const handled = await handleDashboardRequest(
         req,
         res,
         getActiveConnectionManager(),
-        registry
+        registry,
+        { widgetPort: getWidgetPort(), notifier: dashboardNotifier }
       );
       if (handled) return;
     }

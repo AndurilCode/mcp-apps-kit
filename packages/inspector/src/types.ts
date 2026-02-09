@@ -151,3 +151,6 @@ export type {
 } from "./types/index";
 
 export { isDomSyncEventType, getEventCategory, getEventSummary } from "./types/index";
+
+export type { WidgetFrameHandle } from "./types/widget-frame-handle";
+export { WidgetFrameHandleImpl, createWidgetFrameHandle } from "./types/widget-frame-handle";

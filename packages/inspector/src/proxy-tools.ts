@@ -192,6 +192,10 @@ export function registerProxyToolsDirectly(
                   true // isDualMode - wait for synced responses from external widget
                 );
 
+                // In dual mode, renderInBrowser always returns BrowserRenderResult (not WidgetFrameHandle)
+                if (!("page" in renderResult)) {
+                  throw new Error("Unexpected WidgetFrameHandle in dual mode proxy");
+                }
                 const { page } = renderResult;
 
                 // Extract widget session ID from URL

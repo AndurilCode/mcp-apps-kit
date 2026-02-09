@@ -9,6 +9,7 @@ import type { Frame, Page } from "playwright";
 import type { ConsoleLogEntry } from "../tools/get-console-logs";
 import type { DetectedProtocol } from "../ui-host";
 import type { InspectorEvent, TrackedDialog, WidgetToolCall } from "../types";
+import type { WidgetFrameHandle } from "../types/widget-frame-handle";
 
 /**
  * Source endpoint that created the session
@@ -83,6 +84,8 @@ export interface ActiveWidgetSession extends Omit<WidgetSession, "sessionId" | "
   lastSnapshotTimestamp?: number;
   /** Optional callback to keep external session (WidgetServer) alive when this session is touched */
   onTouch?: () => void;
+  /** WidgetFrameHandle for interactive mode (dashboard iframe). When set, tools use handle instead of raw page. */
+  handle?: WidgetFrameHandle;
   /** Accumulated inspector events (for dashboard events panel) */
   events: InspectorEvent[];
 }

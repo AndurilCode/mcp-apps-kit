@@ -145,7 +145,7 @@ export function createGetWidgetStateTool(registry: ConnectionRegistry) {
         };
       }
 
-      if (session.page.isClosed()) {
+      if (session.handle ? !session.handle.isAlive() : session.page.isClosed()) {
         return {
           success: false,
           error: "Page closed",
@@ -156,8 +156,10 @@ export function createGetWidgetStateTool(registry: ConnectionRegistry) {
         // Get environment state (globals)
         const environmentState = connectionManager.getEnvironmentState();
 
-        // Target the widget iframe
-        const frame = session.page.frame({ url: /\/widget\// });
+        // Target the widget iframe: use handle's frame (interactive) or session-scoped URL regex
+        const frame =
+          session.handle?.frame ??
+          session.page.frame({ url: new RegExp(`/widget/${session.id}/`) });
 
         // Get tool calls from session (recorded by /execute-tool with results)
         // This includes the actual tool results, not just args

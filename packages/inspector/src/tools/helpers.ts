@@ -49,6 +49,18 @@ export function validateWidgetSession(
     };
   }
 
+  // Use WidgetFrameHandle if available (interactive mode), otherwise raw page
+  if (session.handle) {
+    if (!session.handle.isAlive()) {
+      return {
+        success: false,
+        error: "Page closed",
+        hints: { next: "Create a new session with preview_ui or call_tool(renderWidget=true)" },
+      };
+    }
+    return { success: true, session, frame: session.handle.frame };
+  }
+
   if (session.page.isClosed()) {
     return {
       success: false,
@@ -57,7 +69,7 @@ export function validateWidgetSession(
     };
   }
 
-  const frame = session.page.frame({ url: /\/widget\// });
+  const frame = session.page.frame({ url: new RegExp(`/widget/${session.id}/`) });
   if (!frame) {
     return {
       success: false,
