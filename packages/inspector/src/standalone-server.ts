@@ -18,6 +18,7 @@ import { ConnectionManager, inferProtocolType, type ProtocolType } from "./conne
 import { ConnectionRegistry } from "./connection-registry";
 import type { InspectorServerOptions } from "./types";
 import { handleDashboardRequest } from "./dashboard/dashboard-server";
+import { ServerStore } from "./persistence/server-store";
 import {
   createConnectTool,
   createDisconnectTool,
@@ -290,9 +291,11 @@ function createInspectorTools(registry: ConnectionRegistry): ToolDefs {
 export function createStandaloneInspectorServer(
   options: StandaloneInspectorServerOptions = {}
 ): StandaloneInspectorServer {
+  const serverStore = new ServerStore();
   const registry = new ConnectionRegistry({
     connectionManagerOptions: options,
     maxConnections: options.maxConnections ?? 20,
+    serverStore,
   });
   // Keep a reference for backward-compat APIs that need a single ConnectionManager
   let connectionManager: ConnectionManager | null = null;
@@ -1154,6 +1157,87 @@ export function createStandaloneInspectorServer(
       res.writeHead(webResponse.status, Object.fromEntries(webResponse.headers.entries()));
       const responseBody = await webResponse.arrayBuffer();
       res.end(Buffer.from(responseBody));
+      return;
+    }
+
+    // Server persistence routes (/api/servers)
+    if (url === "/api/servers" || url.startsWith("/api/servers/")) {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+      if (req.method === "OPTIONS") {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+
+      if (url === "/api/servers" && req.method === "GET") {
+        try {
+          const servers = await serverStore.listAll();
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true, servers }));
+        } catch {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: false, error: "Failed to load servers" }));
+        }
+        return;
+      }
+
+      if (url === "/api/servers/migrate" && req.method === "POST") {
+        try {
+          const chunks: Buffer[] = [];
+          for await (const chunk of req) {
+            chunks.push(chunk as Buffer);
+          }
+          const body = JSON.parse(Buffer.concat(chunks).toString("utf-8"));
+          const count = await serverStore.migrate(body);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true, imported: count }));
+        } catch {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: false, error: "Invalid migration payload" }));
+        }
+        return;
+      }
+
+      if (url === "/api/servers" && req.method === "POST") {
+        try {
+          const chunks: Buffer[] = [];
+          for await (const chunk of req) {
+            chunks.push(chunk as Buffer);
+          }
+          const entry = JSON.parse(Buffer.concat(chunks).toString("utf-8"));
+          await serverStore.save(entry);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true }));
+        } catch {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: false, error: "Invalid server entry" }));
+        }
+        return;
+      }
+
+      if (url.startsWith("/api/servers/") && req.method === "DELETE") {
+        const id = decodeURIComponent(url.slice("/api/servers/".length));
+        if (!id || id === "migrate") {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: false, error: "Missing server ID" }));
+          return;
+        }
+        try {
+          const deleted = await serverStore.delete(id);
+          res.writeHead(deleted ? 200 : 404, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true, deleted }));
+        } catch {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: false, error: "Failed to delete server" }));
+        }
+        return;
+      }
+
+      res.writeHead(405, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Method not allowed" }));
       return;
     }
 
