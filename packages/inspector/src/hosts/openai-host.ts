@@ -17,6 +17,9 @@ import {
   getPlatformFromDeviceType,
   type DisplayMode,
 } from "../types/environment-types";
+import { createLogger } from "../debug/logger";
+
+const logger = createLogger("openai-host");
 
 // Re-export shared types for backwards compatibility
 export type { TrackedToolCall };
@@ -242,7 +245,7 @@ export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptio
               },
             }));
 
-            console.log('[OpenAI Host] requestDisplayMode:', mode, 'sizing:', sizing);
+            logger.info('[OpenAI Host] requestDisplayMode:', mode, 'sizing:', sizing);
             return { mode: mode };
           },
 
@@ -343,8 +346,7 @@ export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptio
       });
       win.dispatchEvent(event);
       if (debugMode) {
-        // eslint-disable-next-line no-console
-        console.log("[OpenAI Host] Dispatched set_globals:", globals);
+        logger.info("[OpenAI Host] Dispatched set_globals:", globals);
       }
     };
 
@@ -390,8 +392,7 @@ export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptio
           timestamp: Date.now(),
         });
         if (debug) {
-          // eslint-disable-next-line no-console
-          console.log("[OpenAI Host] setState called:", state);
+          logger.info("[OpenAI Host] setState called:", state);
         }
       },
 
@@ -403,8 +404,7 @@ export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptio
       callTool: async (name: string, args: unknown) => {
         this.recordToolCall(name, args);
         if (debug) {
-          // eslint-disable-next-line no-console
-          console.log("[OpenAI Host] callTool:", name, args);
+          logger.info("[OpenAI Host] callTool:", name, args);
         }
         return { output: JSON.stringify({ mock: true }) };
       },
@@ -444,8 +444,7 @@ export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptio
         }
 
         if (debug) {
-          // eslint-disable-next-line no-console
-          console.log("[OpenAI Host] requestDisplayMode:", mode, "sizing:", sizing);
+          logger.info("[OpenAI Host] requestDisplayMode:", mode, "sizing:", sizing);
         }
 
         return { mode };

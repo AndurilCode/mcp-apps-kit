@@ -23,6 +23,10 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
 import type { EnvironmentState } from "./types";
+import { createLogger } from "./debug/logger";
+
+const logger = createLogger("widget-server");
+
 import {
   generateMcpHostPage as generateMcpHostPageTemplate,
   generateOpenAIHostPage as generateOpenAIHostPageTemplate,
@@ -427,8 +431,7 @@ export class WidgetServer {
    */
   private log(message: string): void {
     if (this.options.debug) {
-      // eslint-disable-next-line no-console
-      console.log(`[WidgetServer] ${message}`);
+      logger.info(`[WidgetServer] ${message}`);
     }
   }
 

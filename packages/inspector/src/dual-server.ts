@@ -31,6 +31,10 @@ import { handleOAuthRoutes } from "./oauth/callback-handler";
 import { ServerStore, type LocalStorageMigrationPayload } from "./persistence/server-store";
 import { createWellKnownProxy } from "./oauth/wellknown-proxy";
 import type { WellKnownProxyContext } from "./oauth/wellknown-proxy";
+import { createLogger } from "./debug/logger";
+
+const logger = createLogger("dual-server");
+
 import {
   createConnectTool,
   createDisconnectTool,
@@ -226,8 +230,7 @@ export function createDualInspectorServer(
     newCm.on("schemaUpdated", (schema: TargetServerSchema) => {
       // Only create once per lifecycle
       if (appsApp !== null) {
-        // eslint-disable-next-line no-console
-        console.warn(
+        logger.warn(
           `[dual-inspector] Target already connected. Restart inspector to connect to a different target.`
         );
         return;
@@ -256,8 +259,7 @@ export function createDualInspectorServer(
       // Register proxy resources on the MCP server
       const registeredResources = registerProxyResources(mcpServer, newCm, schema.resources);
 
-      // eslint-disable-next-line no-console
-      console.log(
+      logger.info(
         `[dual-inspector] /apps/mcp ready with ${schema.tools.length} proxy tools and ${registeredResources.length} proxy resources`
       );
     }); // end schemaUpdated
@@ -275,8 +277,7 @@ export function createDualInspectorServer(
 
     // Debug: log all incoming requests
     if (options.debug) {
-      // eslint-disable-next-line no-console
-      console.log(`[inspector] Request: ${req.method} ${url}`);
+      logger.info(`[inspector] Request: ${req.method} ${url}`);
     }
 
     // Health check
@@ -556,8 +557,7 @@ export function createDualInspectorServer(
     // Environment update endpoint (for standalone mode widgets)
     // Called when the widget requests display mode or other environment changes
     if (url === "/update-environment") {
-      // eslint-disable-next-line no-console
-      console.log(`[inspector] /update-environment request: method=${req.method}`);
+      logger.info(`[inspector] /update-environment request: method=${req.method}`);
 
       // Handle CORS
       res.setHeader("Access-Control-Allow-Origin", "*");
@@ -565,8 +565,7 @@ export function createDualInspectorServer(
       res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
       if (req.method === "OPTIONS") {
-        // eslint-disable-next-line no-console
-        console.log(`[inspector] /update-environment OPTIONS preflight - sending CORS headers`);
+        logger.info(`[inspector] /update-environment OPTIONS preflight - sending CORS headers`);
         res.writeHead(204);
         res.end();
         return;
@@ -622,8 +621,7 @@ export function createDualInspectorServer(
           );
 
           if (options.debug) {
-            // eslint-disable-next-line no-console
-            console.log(
+            logger.info(
               `[inspector] Environment updated from widget, session ${data.sessionId}, resized: ${updated}`
             );
           }
@@ -875,8 +873,7 @@ export function createDualInspectorServer(
         try {
           httpServer = http.createServer((req, res) => {
             void handleRequest(req, res).catch((error: unknown) => {
-              // eslint-disable-next-line no-console
-              console.error("[dual-inspector] Request error:", error);
+              logger.error("[dual-inspector] Request error:", error);
               if (!res.headersSent) {
                 res.writeHead(500, { "Content-Type": "application/json" });
                 res.end(JSON.stringify({ error: "Internal server error" }));
@@ -888,12 +885,9 @@ export function createDualInspectorServer(
             // Use 127.0.0.1 instead of localhost to match widget server origin (avoids CORS issues)
             getActiveConnectionManager()?.setInspectorUrl(`http://127.0.0.1:${port}`);
 
-            // eslint-disable-next-line no-console
-            console.log(`[dual-inspector] Started on port ${port}`);
-            // eslint-disable-next-line no-console
-            console.log(`  Agent endpoint: http://localhost:${port}/agent/mcp`);
-            // eslint-disable-next-line no-console
-            console.log(`  Apps endpoint:  http://localhost:${port}/apps/mcp (after connect)`);
+            logger.info(`[dual-inspector] Started on port ${port}`);
+            logger.info(`  Agent endpoint: http://localhost:${port}/agent/mcp`);
+            logger.info(`  Apps endpoint:  http://localhost:${port}/apps/mcp (after connect)`);
             resolve();
           });
           httpServer.on("error", (err: Error) => {
@@ -920,8 +914,7 @@ export function createDualInspectorServer(
             reject(err);
           } else {
             httpServer = null;
-            // eslint-disable-next-line no-console
-            console.log(`[dual-inspector] Stopped`);
+            logger.info(`[dual-inspector] Stopped`);
             resolve();
           }
         });

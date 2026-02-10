@@ -65,6 +65,7 @@ export function createLogger(source: string): Logger {
     return `${timestamp()} [${msgLevel.toUpperCase()}] [${source}]`;
   }
 
+  /* eslint-disable no-console */
   return {
     debug(...args: unknown[]) {
       if (shouldLog("debug")) {
@@ -87,6 +88,7 @@ export function createLogger(source: string): Logger {
       }
     },
   };
+  /* eslint-enable no-console */
 }
 
 // =============================================================================

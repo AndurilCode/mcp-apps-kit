@@ -62,6 +62,9 @@ import {
 import type { InspectorEventType } from "./types";
 import { handleOAuthRoutes } from "./oauth/callback-handler";
 import type { InspectorOAuthProvider } from "./oauth/provider";
+import { createLogger } from "./debug/logger";
+
+const logger = createLogger("standalone-server");
 
 // =============================================================================
 // VALID INSPECTOR EVENT TYPES (for validation)
@@ -1011,8 +1014,7 @@ export function createStandaloneInspectorServer(
           );
 
           if (options.debug) {
-            // eslint-disable-next-line no-console
-            console.log(
+            logger.info(
               `[inspector] Environment updated from widget, session ${data.sessionId}, resized: ${updated}`
             );
           }
@@ -1276,8 +1278,7 @@ export function createStandaloneInspectorServer(
         try {
           httpServer = http.createServer((req, res) => {
             void handleRequest(req, res).catch((error: unknown) => {
-              // eslint-disable-next-line no-console
-              console.error("[inspector] Request error:", error);
+              logger.error("[inspector] Request error:", error);
               if (!res.headersSent) {
                 res.writeHead(500, { "Content-Type": "application/json" });
                 res.end(JSON.stringify({ error: "Internal server error" }));
@@ -1322,15 +1323,13 @@ export function createStandaloneInspectorServer(
                   // Mark server as ready now that auto-connect succeeded
                   isReady = true;
                   if (options.debug) {
-                    // eslint-disable-next-line no-console
-                    console.log(`[inspector] Auto-connected to: ${targetUrl}`);
+                    logger.info(`[inspector] Auto-connected to: ${targetUrl}`);
                   }
                   resolve();
                 })
                 .catch((error: unknown) => {
                   const message = error instanceof Error ? error.message : String(error);
-                  // eslint-disable-next-line no-console
-                  console.error(`[inspector] Auto-connect failed: ${message}`);
+                  logger.error(`[inspector] Auto-connect failed: ${message}`);
                   // Close the HTTP server since we can't proceed
                   httpServer?.close();
                   reject(new Error(`Auto-connect to ${targetUrl} failed: ${message}`));
