@@ -9,6 +9,10 @@ import type {
   ProxyMetadata,
 } from "./widget-session";
 
+import { createLogger } from "../debug/logger";
+
+const logger = createLogger("SessionStore");
+
 export interface SessionStoreOptions {
   /** Session TTL in milliseconds (default: 30 minutes) */
   ttlMs?: number;
@@ -76,7 +80,7 @@ export class SessionStore {
     this.sessions.set(options.sessionId, session);
 
     if (this.debug) {
-      console.log(`[SessionStore] Created session ${options.sessionId}`);
+      logger.info(`[SessionStore] Created session ${options.sessionId}`);
     }
 
     return session;
@@ -257,7 +261,7 @@ export class SessionStore {
     this.sessions.delete(sessionId);
 
     if (this.debug) {
-      console.log(`[SessionStore] Closed session ${sessionId}`);
+      logger.info(`[SessionStore] Closed session ${sessionId}`);
     }
 
     return true;
@@ -284,7 +288,7 @@ export class SessionStore {
     this.sessions.clear();
 
     if (this.debug) {
-      console.log(`[SessionStore] Closed ${count} session(s)`);
+      logger.info(`[SessionStore] Closed ${count} session(s)`);
     }
 
     return count;
@@ -313,7 +317,7 @@ export class SessionStore {
     await this.closeAll();
 
     if (this.debug) {
-      console.log(`[SessionStore] Disposed`);
+      logger.info(`[SessionStore] Disposed`);
     }
   }
 
@@ -330,7 +334,7 @@ export class SessionStore {
     for (const sessionId of expiredIds) {
       this.delete(sessionId);
       if (this.debug) {
-        console.log(`[SessionStore] Expired session ${sessionId}`);
+        logger.info(`[SessionStore] Expired session ${sessionId}`);
       }
     }
   }

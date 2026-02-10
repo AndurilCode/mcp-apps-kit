@@ -18,6 +18,10 @@ import {
   type DisplayModePlatform,
 } from "../types/environment-types";
 
+import { createLogger } from "../debug/logger";
+
+const logger = createLogger("McpHost");
+
 // Re-export shared types for backwards compatibility
 export type { TrackedToolCall };
 
@@ -107,8 +111,7 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
       value: {
         postMessage: (message: unknown, _targetOrigin: string) => {
           if (debug) {
-            // eslint-disable-next-line no-console
-            console.log("[MCP Host] Received postMessage:", JSON.stringify(message, null, 2));
+            logger.info("[MCP Host] Received postMessage:", JSON.stringify(message, null, 2));
           }
           this.handlePostMessage(message, win);
         },
@@ -217,7 +220,7 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
 
               // Handle ui/initialize request
               if (message && message.jsonrpc === '2.0' && message.method === 'ui/initialize') {
-                console.log('[MCP Host Emulator] Received ui/initialize, responding...');
+                logger.info('[MCP Host Emulator] Received ui/initialize, responding...');
                 // Respond with initialization success
                 var response = {
                   jsonrpc: '2.0',
@@ -242,11 +245,11 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
                   origin: '*',
                   source: window,
                 }));
-                console.log('[MCP Host Emulator] Sent ui/initialize response');
+                logger.info('[MCP Host Emulator] Sent ui/initialize response');
 
                 // Then send the tool result after a longer delay to ensure widget is ready
                 setTimeout(function() {
-                  console.log('[MCP Host Emulator] Sending ui/notifications/tool-result...');
+                  logger.info('[MCP Host Emulator] Sending ui/notifications/tool-result...');
                   var resultMessage = {
                     jsonrpc: '2.0',
                     method: 'ui/notifications/tool-result',
@@ -275,7 +278,7 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
                   emu.displayMode = requestedMode;
                   emu.viewport = { width: sizing.width, height: sizing.height };
 
-                  console.log('[MCP Host Emulator] Display mode changed to:', requestedMode, 'sizing:', sizing);
+                  logger.info('[MCP Host Emulator] Display mode changed to:', requestedMode, 'sizing:', sizing);
 
                   // Send response
                   var displayModeResponse = {
@@ -419,8 +422,7 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
       case "logging/sendMessage":
         // Handle logging from widget
         if (debug && msg.params) {
-          // eslint-disable-next-line no-console
-          console.log("[MCP Widget Log]", msg.params.level, msg.params.data);
+          logger.info(`[MCP Widget Log] ${String(msg.params.level)}`, msg.params.data);
         }
         break;
 
@@ -432,8 +434,7 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
           // Validate that mode is a valid DisplayMode value
           if (!isValidDisplayMode(requestedMode)) {
             if (debug) {
-              // eslint-disable-next-line no-console
-              console.log("[MCP Host] Invalid display mode requested:", requestedMode);
+              logger.info("[MCP Host] Invalid display mode requested:", requestedMode);
             }
             this.sendError(
               window,
@@ -457,8 +458,7 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
 
       default:
         if (debug) {
-          // eslint-disable-next-line no-console
-          console.log("[MCP Host] Unhandled method:", msg.method);
+          logger.info("[MCP Host] Unhandled method:", msg.method);
         }
     }
   }
@@ -481,8 +481,7 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
     this.currentViewport = { width: sizing.width, height: sizing.height };
 
     if (debug) {
-      // eslint-disable-next-line no-console
-      console.log("[MCP Host] Display mode changed to:", mode, "sizing:", sizing);
+      logger.info(`[MCP Host] Display mode changed to: ${String(mode)} sizing: ${String(sizing)}`);
     }
 
     // Send response with granted mode
