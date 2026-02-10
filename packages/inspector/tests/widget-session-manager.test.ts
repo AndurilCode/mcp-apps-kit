@@ -229,7 +229,7 @@ describe("WidgetSessionManager", () => {
     });
 
     it("should log creation when debug is enabled", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
       const debugManager = new WidgetSessionManager({ debug: true });
       const mockPage = createMockPage();
 
@@ -243,6 +243,7 @@ describe("WidgetSessionManager", () => {
       );
 
       expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[widget-session-manager]"),
         expect.stringContaining("[WidgetSessionManager] Created session")
       );
 
@@ -907,12 +908,15 @@ describe("WidgetSessionManager", () => {
     });
 
     it("should log disposal when debug is enabled", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
       const debugManager = new WidgetSessionManager({ debug: true });
 
       await debugManager.dispose();
 
-      expect(consoleSpy).toHaveBeenCalledWith("[WidgetSessionManager] Disposed");
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[widget-session-manager]"),
+        "[WidgetSessionManager] Disposed"
+      );
       consoleSpy.mockRestore();
     });
   });

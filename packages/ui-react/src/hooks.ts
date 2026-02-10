@@ -19,6 +19,26 @@ import type {
 import { clientDebugLogger, type ClientDebugLogger } from "@mcp-apps-kit/ui";
 import { useAppsContext } from "./context";
 
+// Lightweight scoped logger (mirrors inspector's createLogger, avoids cross-package dep)
+const uiReactLogger = (() => {
+  const source = "ui-react:hooks";
+  const ts = () => new Date().toISOString();
+  const LEVELS: Record<string, number> = { debug: 0, info: 1, warn: 2, error: 3, silent: 4 };
+  // eslint-disable-next-line no-undef, @typescript-eslint/no-unnecessary-condition
+  const envLevel =
+    typeof process !== "undefined"
+      ? ((process.env?.MCP_APPS_LOG_LEVEL as string | undefined) ?? "").toLowerCase()
+      : "";
+  const threshold: number = LEVELS[envLevel] ?? 1; // 1 = info
+  const ok = (l: string): boolean => (LEVELS[l] ?? 1) >= threshold;
+  return {
+    // eslint-disable-next-line no-console
+    warn: (...args: unknown[]) => {
+      if (ok("warn")) console.warn(`${ts()} [WARN] [${source}]`, ...args);
+    },
+  };
+})();
+
 // =============================================================================
 // SHARED UTILITIES
 // =============================================================================
@@ -297,8 +317,7 @@ export function useUpdateModelContext(): (params: UpdateModelContextParams) => P
   return useCallback(
     async (params: UpdateModelContextParams) => {
       if (!client) {
-        // eslint-disable-next-line no-console
-        console.warn("[useUpdateModelContext] Client not available");
+        uiReactLogger.warn("Client not available");
         return;
       }
       await client.updateModelContext(params);

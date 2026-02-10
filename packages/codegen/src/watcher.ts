@@ -18,19 +18,32 @@ import { hasValidExtension, shouldSkipFile } from "./naming";
 import { getVersionDirectories } from "./generator";
 
 /**
- * Default logger
+ * Default logger backed by structured logging with timestamp and source prefix.
+ * Respects MCP_APPS_LOG_LEVEL environment variable (default: "info").
  */
-const defaultLogger: PluginLogger = {
-  info: (message: string) => {
-    console.log(`[mcp-apps-plugin] ${message}`);
-  },
-  warn: (message: string) => {
-    console.warn(`[mcp-apps-plugin] ${message}`);
-  },
-  error: (message: string) => {
-    console.error(`[mcp-apps-plugin] ${message}`);
-  },
-};
+const defaultLogger: PluginLogger = (() => {
+  const source = "codegen:watcher";
+  const ts = () => new Date().toISOString();
+  const LEVELS: Record<string, number> = { debug: 0, info: 1, warn: 2, error: 3, silent: 4 };
+  const envLevel =
+    typeof process !== "undefined" ? (process.env.MCP_APPS_LOG_LEVEL ?? "").toLowerCase() : "";
+  const threshold: number = LEVELS[envLevel] ?? 1; // 1 = info
+  const ok = (l: string): boolean => (LEVELS[l] ?? 1) >= threshold;
+  return {
+    info: (message: string) => {
+      // eslint-disable-next-line no-console
+      if (ok("info")) console.info(`${ts()} [INFO] [${source}]`, message);
+    },
+    warn: (message: string) => {
+      // eslint-disable-next-line no-console
+      if (ok("warn")) console.warn(`${ts()} [WARN] [${source}]`, message);
+    },
+    error: (message: string) => {
+      // eslint-disable-next-line no-console
+      if (ok("error")) console.error(`${ts()} [ERROR] [${source}]`, message);
+    },
+  };
+})();
 
 /**
  * Options for setting up the watcher

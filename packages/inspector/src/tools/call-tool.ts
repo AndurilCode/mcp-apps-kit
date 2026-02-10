@@ -7,6 +7,10 @@ import { defineTool } from "@mcp-apps-kit/core";
 import type { ConnectionRegistry } from "../connection-registry";
 import type { CallToolOutput, ToolHints } from "../types";
 import { UIHostManager } from "../ui-host";
+import { createLogger } from "../debug/logger";
+
+const logger = createLogger("call-tool");
+
 import {
   findUIResourceForTool,
   fetchWidgetHTML,
@@ -155,7 +159,7 @@ export function createCallToolTool(registry: ConnectionRegistry) {
               const widgetSessionId = urlMatch?.[1];
 
               if (!widgetSessionId) {
-                console.warn(
+                logger.warn(
                   `[call_tool] Failed to extract widgetSessionId from page URL: ${pageUrl}`
                 );
                 // Widget session ID extraction failed, return result without session
@@ -167,8 +171,7 @@ export function createCallToolTool(registry: ConnectionRegistry) {
 
               // Create widget session in session manager
               const sessionManager = connectionManager.getWidgetSessionManager();
-              // eslint-disable-next-line no-console
-              console.log(
+              logger.info(
                 `[call_tool] Creating session for ${input.name}, widgetSessionId: ${widgetSessionId}, hostUrl: ${pageUrl}`
               );
               const session = await sessionManager.createSession(
@@ -184,14 +187,13 @@ export function createCallToolTool(registry: ConnectionRegistry) {
               );
 
               sessionId = session.id;
-              // eslint-disable-next-line no-console
-              console.log(`[call_tool] Session created: ${sessionId}`);
+              logger.info(`[call_tool] Session created: ${sessionId}`);
             }
           }
         } catch (error) {
           // Widget rendering failed, but tool call succeeded
           // Continue without session
-          console.warn(`[call_tool] Failed to render widget:`, error);
+          logger.warn(`[call_tool] Failed to render widget:`, error);
         }
 
         // Add hints when widget session is created

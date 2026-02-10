@@ -10,6 +10,9 @@
  */
 
 import type { Page, CDPSession } from "playwright";
+import { createLogger } from "../debug/logger";
+
+const logger = createLogger("cdp-streamer");
 
 /**
  * Screencast frame data
@@ -130,8 +133,7 @@ export class CDPStreamer {
           .send("Page.screencastFrameAck", { sessionId: event.sessionId })
           .catch((err: unknown) => {
             if (this.debug) {
-              // eslint-disable-next-line no-console
-              console.warn(`[CDPStreamer] Frame ack failed for ${sessionId}:`, err);
+              logger.warn(`[CDPStreamer] Frame ack failed for ${sessionId}:`, err);
             }
           });
       });
@@ -162,8 +164,7 @@ export class CDPStreamer {
       });
 
       if (this.debug) {
-        // eslint-disable-next-line no-console
-        console.log(`[CDPStreamer] Started screencast for session ${sessionId}`);
+        logger.info(`[CDPStreamer] Started screencast for session ${sessionId}`);
       }
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
@@ -194,8 +195,7 @@ export class CDPStreamer {
     }
 
     if (this.debug) {
-      // eslint-disable-next-line no-console
-      console.log(
+      logger.info(
         `[CDPStreamer] Updating dimensions for ${sessionId}: ${width}x${height} (was ${session.currentDimensions.width}x${session.currentDimensions.height})`
       );
     }
@@ -217,15 +217,13 @@ export class CDPStreamer {
       session.currentDimensions = { width, height };
 
       if (this.debug) {
-        // eslint-disable-next-line no-console
-        console.log(`[CDPStreamer] Restarted screencast for ${sessionId} with new dimensions`);
+        logger.info(`[CDPStreamer] Restarted screencast for ${sessionId} with new dimensions`);
       }
 
       return true;
     } catch (error) {
       if (this.debug) {
-        // eslint-disable-next-line no-console
-        console.warn(`[CDPStreamer] Failed to update dimensions for ${sessionId}:`, error);
+        logger.warn(`[CDPStreamer] Failed to update dimensions for ${sessionId}:`, error);
       }
       return false;
     }
@@ -253,8 +251,7 @@ export class CDPStreamer {
       await session.cdpSession.detach();
     } catch (error) {
       if (this.debug) {
-        // eslint-disable-next-line no-console
-        console.warn(`[CDPStreamer] Error stopping screencast for ${sessionId}:`, error);
+        logger.warn(`[CDPStreamer] Error stopping screencast for ${sessionId}:`, error);
       }
     }
 
@@ -262,8 +259,7 @@ export class CDPStreamer {
     this.sessions.delete(sessionId);
 
     if (this.debug) {
-      // eslint-disable-next-line no-console
-      console.log(`[CDPStreamer] Stopped screencast for session ${sessionId}`);
+      logger.info(`[CDPStreamer] Stopped screencast for session ${sessionId}`);
     }
   }
 

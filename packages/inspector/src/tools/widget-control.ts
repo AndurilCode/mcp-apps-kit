@@ -12,6 +12,10 @@
 import { z } from "zod";
 import { defineTool } from "@mcp-apps-kit/core";
 import type { ConnectionRegistry } from "../connection-registry";
+import { createLogger } from "../debug/logger";
+
+const logger = createLogger("widget-control");
+
 import type {
   WidgetEvaluateOutput,
   WidgetClickOutput,
@@ -1008,7 +1012,7 @@ export function createWidgetRefreshTool(registry: ConnectionRegistry) {
             // Widget update failed, but tool call succeeded
             const updateErrorMessage =
               updateError instanceof Error ? updateError.message : String(updateError);
-            console.warn(
+            logger.warn(
               `[widget-refresh] Failed to push update to widget (session: ${input.sessionId}, protocol: ${session.protocol}):`,
               updateErrorMessage
             );

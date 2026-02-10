@@ -34,6 +34,22 @@ import { wrapWithErrorInjection, type ToolErrorConfig } from "./error-injection"
 import { runBatch, type BatchEvalCase, type BatchOptions, type BatchResult } from "./batch";
 import type { TestClient, TestServer } from "../../types";
 
+// Lightweight scoped logger (mirrors inspector's createLogger, avoids cross-package dep)
+const evaluatorLogger = (() => {
+  const source = "testing:evaluator";
+  const ts = () => new Date().toISOString();
+  const LEVELS: Record<string, number> = { debug: 0, info: 1, warn: 2, error: 3, silent: 4 };
+  const envLevel = (process.env.MCP_APPS_LOG_LEVEL ?? "").toLowerCase();
+  const threshold: number = LEVELS[envLevel] ?? 1; // 1 = info
+  const ok = (l: string): boolean => (LEVELS[l] ?? 1) >= threshold;
+  return {
+    // eslint-disable-next-line no-console
+    warn: (...args: unknown[]) => {
+      if (ok("warn")) console.warn(`${ts()} [WARN] [${source}]`, ...args);
+    },
+  };
+})();
+
 // Type for App from @mcp-apps-kit/core (avoiding direct dependency)
 interface App {
   start(options?: { port?: number; transport?: string }): Promise<void>;
@@ -771,7 +787,7 @@ export const describeEval: DescribeWithSkip = Object.assign(
       | undefined;
 
     if (!globalDescribe) {
-      console.warn("[describeEval] No test framework detected. Skipping:", name);
+      evaluatorLogger.warn("No test framework detected. Skipping:", name);
       return;
     }
 

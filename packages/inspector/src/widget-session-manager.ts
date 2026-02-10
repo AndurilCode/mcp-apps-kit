@@ -56,6 +56,9 @@ import {
 // Import from session module
 import { SessionStore, setupPageListeners, deliverToolCallResponse } from "./session";
 import type { ActiveWidgetSession, SessionInfo, SessionSource, ProxyMetadata } from "./session";
+import { createLogger } from "./debug/logger";
+
+const logger = createLogger("widget-session-manager");
 
 // Re-export types for backwards compatibility
 export type { ActiveWidgetSession, SessionInfo, SessionSource, ProxyMetadata };
@@ -119,7 +122,7 @@ export class WidgetSessionManager extends EventEmitter {
     const session = this.store.peek(sessionId);
     if (!session) {
       if (this.debug) {
-        console.log(
+        logger.info(
           `[WidgetSessionManager] Dropping event ${type} - session ${sessionId} not found`
         );
       }
@@ -141,7 +144,7 @@ export class WidgetSessionManager extends EventEmitter {
     this.emit("event", event);
 
     if (this.debug) {
-      console.log(`[WidgetSessionManager] Recorded event ${type} for session ${sessionId}`);
+      logger.info(`[WidgetSessionManager] Recorded event ${type} for session ${sessionId}`);
     }
 
     return event;
@@ -231,7 +234,7 @@ export class WidgetSessionManager extends EventEmitter {
     this.recordEvent(sessionId, "tool-result", { toolName, result: toolResult }, "host", protocol);
 
     if (this.debug) {
-      console.log(`[WidgetSessionManager] Created session ${sessionId} for tool ${toolName}`);
+      logger.info(`[WidgetSessionManager] Created session ${sessionId} for tool ${toolName}`);
     }
 
     return session;
@@ -277,7 +280,7 @@ export class WidgetSessionManager extends EventEmitter {
     const session = this.store.peek(sessionId);
     if (!session) {
       if (this.debug) {
-        console.log(`[WidgetSessionManager] Session not found: ${sessionId}`);
+        logger.info(`[WidgetSessionManager] Session not found: ${sessionId}`);
       }
       return false;
     }
@@ -312,7 +315,7 @@ export class WidgetSessionManager extends EventEmitter {
     );
 
     if (this.debug) {
-      console.log(`[WidgetSessionManager] Recorded tool call ${toolName} for session ${sessionId}`);
+      logger.info(`[WidgetSessionManager] Recorded tool call ${toolName} for session ${sessionId}`);
     }
 
     return true;
@@ -370,7 +373,7 @@ export class WidgetSessionManager extends EventEmitter {
       await page.setViewportSize(viewport);
 
       if (this.debug) {
-        console.log(
+        logger.info(
           `[WidgetSessionManager] Resized page viewport to ${viewport.width}x${viewport.height}`
         );
       }
@@ -406,8 +409,7 @@ export class WidgetSessionManager extends EventEmitter {
               params: { hostContext: ctx },
             };
             iframe.contentWindow.postMessage(message, "*");
-            // eslint-disable-next-line no-console
-            console.log("[MCP Host] Sent ui/notifications/host-context-changed", ctx);
+            logger.info("[MCP Host] Sent ui/notifications/host-context-changed", ctx);
           }
         }, hostContext);
         /* eslint-enable no-undef */
@@ -437,8 +439,7 @@ export class WidgetSessionManager extends EventEmitter {
           const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
           if (iframe?.contentWindow) {
             iframe.contentWindow.postMessage(message, "*");
-            // eslint-disable-next-line no-console
-            console.log("[OpenAI Host] Sent globals sync:", message.data);
+            logger.info("[OpenAI Host] Sent globals sync:", message.data);
           }
         }, syncMessage);
         /* eslint-enable no-undef */
@@ -451,13 +452,13 @@ export class WidgetSessionManager extends EventEmitter {
       this.store.touch(sessionId);
 
       if (this.debug) {
-        console.log(`[WidgetSessionManager] Updated globals for session ${sessionId}`);
+        logger.info(`[WidgetSessionManager] Updated globals for session ${sessionId}`);
       }
 
       return true;
     } catch (error) {
       if (this.debug) {
-        console.warn(
+        logger.warn(
           `[WidgetSessionManager] Error updating globals for session ${sessionId}:`,
           error
         );
@@ -603,14 +604,14 @@ export class WidgetSessionManager extends EventEmitter {
         if (newViewport) {
           await session.page.setViewportSize(newViewport);
           if (this.debug) {
-            console.log(
+            logger.info(
               `[WidgetSessionManager] Resized viewport for session ${session.id} to ${newViewport.width}x${newViewport.height} (displayMode: ${displayMode ?? "unchanged"})`
             );
           }
         }
       } catch (error) {
         if (this.debug) {
-          console.warn(
+          logger.warn(
             `[WidgetSessionManager] Failed to resize viewport for session ${session.id}:`,
             error
           );
@@ -640,13 +641,13 @@ export class WidgetSessionManager extends EventEmitter {
       }
 
       if (this.debug) {
-        console.log(
+        logger.info(
           `[WidgetSessionManager] Delivered ${type} event to session ${session.id} (${protocol})`
         );
       }
     } catch (error) {
       if (this.debug) {
-        console.warn(
+        logger.warn(
           `[WidgetSessionManager] Error delivering ${type} event to session ${session.id}:`,
           error
         );
@@ -743,8 +744,7 @@ export class WidgetSessionManager extends EventEmitter {
         if (storeOnHost) {
           const w = window as Window & { __mcpHostContextUpdates?: Record<string, unknown> };
           w.__mcpHostContextUpdates = { ...(w.__mcpHostContextUpdates ?? {}), ...(p as object) };
-          // eslint-disable-next-line no-console
-          console.log("[MCP Host] Stored hostContext update for ui/initialize:", p);
+          logger.info("[MCP Host] Stored hostContext update for ui/initialize:", p);
         }
 
         const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
@@ -757,8 +757,7 @@ export class WidgetSessionManager extends EventEmitter {
             },
             "*"
           );
-          // eslint-disable-next-line no-console
-          console.log("[MCP Host] Sent synced event:", m, p);
+          logger.info("[MCP Host] Sent synced event:", m, p);
         }
       },
       { method, params, storeOnHost: isHostContextUpdate }
@@ -794,8 +793,7 @@ export class WidgetSessionManager extends EventEmitter {
       const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
       if (iframe?.contentWindow) {
         iframe.contentWindow.postMessage(message, "*");
-        // eslint-disable-next-line no-console
-        console.log("[OpenAI Host] Sent synced event:", message.syncType, message.data);
+        logger.info("[OpenAI Host] Sent synced event:", message.syncType, message.data);
       }
     }, syncMessage);
     /* eslint-enable no-undef */
@@ -827,7 +825,7 @@ export class WidgetSessionManager extends EventEmitter {
       const frame = session.page.frame({ name: "widget-frame" });
       if (!frame) {
         if (this.debug) {
-          console.log(`[WidgetSessionManager] No widget-frame found for session ${session.id}`);
+          logger.info(`[WidgetSessionManager] No widget-frame found for session ${session.id}`);
         }
         continue;
       }
@@ -836,11 +834,11 @@ export class WidgetSessionManager extends EventEmitter {
         await this.applyDomEventToFrame(frame, type, data);
         this.store.touch(session.id);
         if (this.debug) {
-          console.log(`[WidgetSessionManager] Applied ${type} to session ${session.id}`);
+          logger.info(`[WidgetSessionManager] Applied ${type} to session ${session.id}`);
         }
       } catch (error) {
         if (this.debug) {
-          console.warn(`[WidgetSessionManager] Failed to apply ${type}:`, error);
+          logger.warn(`[WidgetSessionManager] Failed to apply ${type}:`, error);
         }
       }
     }
@@ -1009,7 +1007,7 @@ export class WidgetSessionManager extends EventEmitter {
     const result = await this.store.close(sessionId);
 
     if (this.debug && result) {
-      console.log(`[WidgetSessionManager] Closed session ${sessionId}`);
+      logger.info(`[WidgetSessionManager] Closed session ${sessionId}`);
     }
 
     return result;
@@ -1033,7 +1031,7 @@ export class WidgetSessionManager extends EventEmitter {
     const count = await this.store.closeAll();
 
     if (this.debug) {
-      console.log(`[WidgetSessionManager] Closed ${count} session(s)`);
+      logger.info(`[WidgetSessionManager] Closed ${count} session(s)`);
     }
 
     return count;
@@ -1046,7 +1044,7 @@ export class WidgetSessionManager extends EventEmitter {
     await this.store.dispose();
 
     if (this.debug) {
-      console.log(`[WidgetSessionManager] Disposed`);
+      logger.info(`[WidgetSessionManager] Disposed`);
     }
   }
 
