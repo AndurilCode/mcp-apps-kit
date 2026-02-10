@@ -31,11 +31,14 @@ import { WidgetServer } from "./widget-server";
 import { InspectorOAuthProvider } from "./oauth/provider";
 import type { OAuthState } from "./oauth/types";
 import { discoverAuthRequirements, type AuthRequiredEvent } from "./oauth/discovery";
+import { createLogger } from "./debug/logger";
 
 /**
  * Protocol type inferred from connected server's tools
  */
 export type ProtocolType = "chatgpt-apps" | "mcp-apps" | "mcp";
+
+const logger = createLogger("inspector");
 
 /**
  * Infer the protocol type from connected server's tools
@@ -224,7 +227,7 @@ export class ConnectionManager extends EventEmitter {
     const existingProvider = this.oauthProvider;
     if (this.state.connected && this.state.client) {
       if (this.debug) {
-        console.log(`[inspector] Disconnecting from previous server: ${this.state.serverUrl}`);
+        logger.info(`[inspector] Disconnecting from previous server: ${this.state.serverUrl}`);
       }
       // Temporarily clear provider so disconnect() doesn't revoke tokens we still need
       this.oauthProvider = null;
@@ -236,7 +239,7 @@ export class ConnectionManager extends EventEmitter {
     }
 
     if (this.debug) {
-      console.log(`[inspector] Connecting to server: ${label}`);
+      logger.info(`[inspector] Connecting to server: ${label}`);
     }
 
     // Wire onTransportClose for stdio auto-restart
@@ -259,7 +262,7 @@ export class ConnectionManager extends EventEmitter {
       provider.onStatusChange = () => {
         if (this.debug) {
           const state = provider.getOAuthState();
-          console.log(`[inspector] OAuth status changed: ${state.status}`);
+          logger.info(`[inspector] OAuth status changed: ${state.status}`);
         }
       };
 
@@ -287,7 +290,7 @@ export class ConnectionManager extends EventEmitter {
       provider.onStatusChange = () => {
         if (this.debug) {
           const state = provider.getOAuthState();
-          console.log(`[inspector] OAuth status changed: ${state.status}`);
+          logger.info(`[inspector] OAuth status changed: ${state.status}`);
         }
       };
 
@@ -309,7 +312,7 @@ export class ConnectionManager extends EventEmitter {
       // Check if this is an auth error on an HTTP connection without OAuth configured
       if (params.transport === "http" && !authProvider && !oauthConfig && isAuthError(error)) {
         if (this.debug) {
-          console.log(`[inspector] Auth error detected during connect, running discovery`);
+          logger.info(`[inspector] Auth error detected during connect, running discovery`);
         }
 
         // Run discovery and emit authRequired instead of throwing
@@ -343,7 +346,7 @@ export class ConnectionManager extends EventEmitter {
         const pendingUrl = authProvider.getPendingAuthUrl?.();
         if (pendingUrl || this.oauthProvider) {
           if (this.debug) {
-            console.log(
+            logger.info(
               `[inspector] Auth error with OAuth configured, pending auth URL: ${pendingUrl}`
             );
           }
@@ -383,7 +386,7 @@ export class ConnectionManager extends EventEmitter {
       if (params.transport === "http" && !authProvider && !oauthConfig && isAuthError(error)) {
         // Auth error during capability listing (server accepted transport but rejected request)
         if (this.debug) {
-          console.log(`[inspector] Auth error during capability listing, running discovery`);
+          logger.info(`[inspector] Auth error during capability listing, running discovery`);
         }
 
         const discovery = await discoverAuthRequirements(params.url);
@@ -418,7 +421,7 @@ export class ConnectionManager extends EventEmitter {
 
       // Server doesn't support tools capability (non-auth error)
       if (this.debug) {
-        console.log(`[inspector] Server doesn't support tools capability`);
+        logger.info(`[inspector] Server doesn't support tools capability`);
       }
     }
 
@@ -427,7 +430,7 @@ export class ConnectionManager extends EventEmitter {
     } catch {
       // Server doesn't support resources capability
       if (this.debug) {
-        console.log(`[inspector] Server doesn't support resources capability`);
+        logger.info(`[inspector] Server doesn't support resources capability`);
       }
     }
 
@@ -436,7 +439,7 @@ export class ConnectionManager extends EventEmitter {
     } catch {
       // Server doesn't support prompts capability
       if (this.debug) {
-        console.log(`[inspector] Server doesn't support prompts capability`);
+        logger.info(`[inspector] Server doesn't support prompts capability`);
       }
     }
 
@@ -479,8 +482,8 @@ export class ConnectionManager extends EventEmitter {
     this.autoRestartAttempts = 0;
 
     if (this.debug) {
-      console.log(`[inspector] Connected to ${label}`);
-      console.log(
+      logger.info(`[inspector] Connected to ${label}`);
+      logger.info(
         `[inspector] Tools: ${tools.length}, Resources: ${resources.length}, Prompts: ${prompts.length}`
       );
     }
@@ -583,7 +586,7 @@ export class ConnectionManager extends EventEmitter {
         await this.state.client.disconnect();
       } catch (error) {
         if (this.debug) {
-          console.warn(`[inspector] Error during disconnect:`, error);
+          logger.warn(`[inspector] Error during disconnect:`, error);
         }
       }
     }
@@ -610,7 +613,7 @@ export class ConnectionManager extends EventEmitter {
       // Server-side token revocation (fire-and-forget)
       this.oauthProvider.revokeTokens().catch((err: unknown) => {
         if (this.debug) {
-          console.warn(`[inspector] Token revocation during disconnect failed:`, err);
+          logger.warn(`[inspector] Token revocation during disconnect failed:`, err);
         }
       });
       // Delete persisted token file so next connect requires fresh login
@@ -628,7 +631,7 @@ export class ConnectionManager extends EventEmitter {
     this.oauthProvider = null;
 
     if (this.debug) {
-      console.log(`[inspector] Disconnected from ${previousUrl}`);
+      logger.info(`[inspector] Disconnected from ${previousUrl}`);
     }
 
     // Emit disconnected event for proxy cleanup
@@ -643,7 +646,7 @@ export class ConnectionManager extends EventEmitter {
   private handleStdioProcessExit(params: ConnectionParams, options: ConnectOptions): void {
     if (this.autoRestartAttempts >= ConnectionManager.MAX_RESTART_ATTEMPTS) {
       if (this.debug) {
-        console.log(
+        logger.info(
           `[inspector] Max auto-restart attempts (${ConnectionManager.MAX_RESTART_ATTEMPTS}) reached, disconnecting`
         );
       }
@@ -655,7 +658,7 @@ export class ConnectionManager extends EventEmitter {
     this.autoRestartAttempts++;
 
     if (this.debug) {
-      console.log(
+      logger.info(
         `[inspector] stdio process exited, restarting in ${delay}ms (attempt ${this.autoRestartAttempts}/${ConnectionManager.MAX_RESTART_ATTEMPTS})`
       );
     }
@@ -668,7 +671,7 @@ export class ConnectionManager extends EventEmitter {
       // Abort if disconnect() was called while we were waiting
       if (this.connectionGeneration !== generationAtStart) {
         if (this.debug) {
-          console.log(`[inspector] Auto-restart aborted: disconnect called during backoff`);
+          logger.info(`[inspector] Auto-restart aborted: disconnect called during backoff`);
         }
         return;
       }
@@ -678,7 +681,7 @@ export class ConnectionManager extends EventEmitter {
           // Abort if disconnect() was called while connect() was in-flight
           if (this.connectionGeneration !== generationAtStart) {
             if (this.debug) {
-              console.log(`[inspector] Auto-restart aborted: disconnect called during reconnect`);
+              logger.info(`[inspector] Auto-restart aborted: disconnect called during reconnect`);
             }
             void this.disconnect();
             return;
@@ -688,7 +691,7 @@ export class ConnectionManager extends EventEmitter {
         })
         .catch(() => {
           if (this.debug) {
-            console.log(`[inspector] Auto-restart failed, disconnecting`);
+            logger.info(`[inspector] Auto-restart failed, disconnecting`);
           }
           void this.disconnect().catch(() => {
             /* cleanup best-effort */
@@ -814,7 +817,7 @@ export class ConnectionManager extends EventEmitter {
     };
 
     if (this.debug) {
-      console.log(`[inspector] Environment state updated:`, partial);
+      logger.info(`[inspector] Environment state updated:`, partial);
     }
 
     return { ...this.environmentState };
@@ -827,7 +830,7 @@ export class ConnectionManager extends EventEmitter {
     this.environmentState = getDefaultEnvironmentState();
 
     if (this.debug) {
-      console.log(`[inspector] Environment state reset to defaults`);
+      logger.info(`[inspector] Environment state reset to defaults`);
     }
 
     return { ...this.environmentState };
@@ -852,8 +855,7 @@ export class ConnectionManager extends EventEmitter {
       this.widgetServer = new WidgetServer({ debug: this.debug });
       await this.widgetServer.start();
       if (this.debug) {
-        // eslint-disable-next-line no-console
-        console.log(
+        logger.info(
           `[inspector] Shared WidgetServer started on port ${this.widgetServer.getPort()}`
         );
       }
@@ -876,8 +878,7 @@ export class ConnectionManager extends EventEmitter {
       await this.widgetServer.stop();
       this.widgetServer = null;
       if (this.debug) {
-        // eslint-disable-next-line no-console
-        console.log(`[inspector] Shared WidgetServer stopped`);
+        logger.info(`[inspector] Shared WidgetServer stopped`);
       }
     }
   }
@@ -899,7 +900,7 @@ export class ConnectionManager extends EventEmitter {
   setAuthToken(token: string): void {
     this.authToken = token;
     if (this.debug) {
-      console.log(`[inspector] Auth token set`);
+      logger.info(`[inspector] Auth token set`);
     }
   }
 
@@ -920,7 +921,7 @@ export class ConnectionManager extends EventEmitter {
   setInspectorUrl(url: string): void {
     this.inspectorUrl = url;
     if (this.debug) {
-      console.log(`[inspector] Inspector URL set to: ${url}`);
+      logger.info(`[inspector] Inspector URL set to: ${url}`);
     }
   }
 
@@ -949,7 +950,7 @@ export class ConnectionManager extends EventEmitter {
     this.externalMcpHostContext = { ...(this.externalMcpHostContext ?? {}), ...globals };
 
     if (this.debug) {
-      console.log(`[inspector] Stored external MCP hostContext:`, this.externalMcpHostContext);
+      logger.info(`[inspector] Stored external MCP hostContext:`, this.externalMcpHostContext);
     }
 
     // Map OpenAI globals format OR MCP hostContext format to EnvironmentState
@@ -1034,7 +1035,7 @@ export class ConnectionManager extends EventEmitter {
     // Only update if we have changes
     if (Object.keys(update).length === 0) {
       if (this.debug) {
-        console.log(`[inspector] No relevant environment fields in globals, skipping update`);
+        logger.info(`[inspector] No relevant environment fields in globals, skipping update`);
       }
       return;
     }
@@ -1043,7 +1044,7 @@ export class ConnectionManager extends EventEmitter {
     this.setEnvironmentState(update);
 
     if (this.debug) {
-      console.log(`[inspector] Environment updated from external globals:`, update);
+      logger.info(`[inspector] Environment updated from external globals:`, update);
     }
   }
 
@@ -1071,7 +1072,7 @@ export class ConnectionManager extends EventEmitter {
       return null;
     } catch (error) {
       if (this.debug) {
-        console.warn(`[inspector] Error reading resource ${uri}:`, error);
+        logger.warn(`[inspector] Error reading resource ${uri}:`, error);
       }
       return null;
     }
@@ -1099,7 +1100,7 @@ export class ConnectionManager extends EventEmitter {
   setOAuthProvider(provider: InspectorOAuthProvider): void {
     this.oauthProvider = provider;
     if (this.debug) {
-      console.log(`[inspector] OAuth provider set externally`);
+      logger.info(`[inspector] OAuth provider set externally`);
     }
   }
 
@@ -1154,7 +1155,7 @@ export class ConnectionManager extends EventEmitter {
     this.emit("agentEvent", event);
 
     if (this.debug) {
-      console.log(`[inspector] Agent event recorded: ${type}`, event.id);
+      logger.info(`[inspector] Agent event recorded: ${type}`, event.id);
     }
 
     return event;
@@ -1179,7 +1180,7 @@ export class ConnectionManager extends EventEmitter {
     this.agentEvents = [];
 
     if (this.debug) {
-      console.log(`[inspector] Cleared ${count} agent events`);
+      logger.info(`[inspector] Cleared ${count} agent events`);
     }
 
     return count;
@@ -1236,7 +1237,7 @@ export class ConnectionManager extends EventEmitter {
     this.recordAgentEvent("agent-initialize", payload);
 
     if (this.debug) {
-      console.log(
+      logger.info(
         `[inspector] Agent initialize detected: ${clientInfo?.name ?? "unknown"}${clientInfo?.version ? ` v${clientInfo.version}` : ""}`
       );
     }
