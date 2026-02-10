@@ -75,9 +75,9 @@
     }
   },
   "dependencies": {
-    "@typescript-eslint/types": "^8.54.0",
-    "@typescript-eslint/typescript-estree": "^8.54.0",
-    "esbuild": "^0.27.2"
+    "@typescript-eslint/types": "^8.55.0",
+    "@typescript-eslint/typescript-estree": "^8.55.0",
+    "esbuild": "^0.27.3"
   },
   "devDependencies": {
     "@mcp-apps-kit/core": "workspace:*",
