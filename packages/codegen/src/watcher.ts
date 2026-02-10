@@ -17,20 +17,7 @@ import type {
 import { hasValidExtension, shouldSkipFile } from "./naming";
 import { getVersionDirectories } from "./generator";
 
-/**
- * Default logger
- */
-const defaultLogger: PluginLogger = {
-  info: (message: string) => {
-    console.log(`[mcp-apps-plugin] ${message}`);
-  },
-  warn: (message: string) => {
-    console.warn(`[mcp-apps-plugin] ${message}`);
-  },
-  error: (message: string) => {
-    console.error(`[mcp-apps-plugin] ${message}`);
-  },
-};
+import { defaultLogger } from "./utils/logger";
 
 /**
  * Options for setting up the watcher

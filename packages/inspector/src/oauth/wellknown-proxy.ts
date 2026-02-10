@@ -18,6 +18,10 @@
 import type http from "http";
 import type { OAuthProtectedResourceMetadata, OAuthMetadata } from "./types";
 
+import { createLogger } from "../debug/logger";
+
+const logger = createLogger("WellknownProxy");
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -77,8 +81,7 @@ export function createWellKnownProxy(options: WellKnownProxyOptions = {}) {
 
   function log(message: string): void {
     if (debug) {
-      // eslint-disable-next-line no-console
-      console.log(`[oauth:wellknown-proxy] ${message}`);
+      logger.info(`[oauth:wellknown-proxy] ${message}`);
     }
   }
 

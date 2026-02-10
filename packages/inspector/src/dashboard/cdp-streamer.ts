@@ -134,7 +134,7 @@ export class CDPStreamer {
           .send("Page.screencastFrameAck", { sessionId: event.sessionId })
           .catch((err: unknown) => {
             if (this.debug) {
-              logger.warn(`[CDPStreamer] Frame ack failed for ${sessionId}:`, err);
+              logger.warn(`Frame ack failed for ${sessionId}:`, err);
             }
           });
       });
@@ -165,7 +165,7 @@ export class CDPStreamer {
       });
 
       if (this.debug) {
-        logger.info(`[CDPStreamer] Started screencast for session ${sessionId}`);
+        logger.info(`Started screencast for session ${sessionId}`);
       }
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
@@ -197,7 +197,7 @@ export class CDPStreamer {
 
     if (this.debug) {
       logger.info(
-        `[CDPStreamer] Updating dimensions for ${sessionId}: ${width}x${height} (was ${session.currentDimensions.width}x${session.currentDimensions.height})`
+        `Updating dimensions for ${sessionId}: ${width}x${height} (was ${session.currentDimensions.width}x${session.currentDimensions.height})`
       );
     }
 
@@ -218,13 +218,13 @@ export class CDPStreamer {
       session.currentDimensions = { width, height };
 
       if (this.debug) {
-        logger.info(`[CDPStreamer] Restarted screencast for ${sessionId} with new dimensions`);
+        logger.info(`Restarted screencast for ${sessionId} with new dimensions`);
       }
 
       return true;
     } catch (error) {
       if (this.debug) {
-        logger.warn(`[CDPStreamer] Failed to update dimensions for ${sessionId}:`, error);
+        logger.warn(`Failed to update dimensions for ${sessionId}:`, error);
       }
       return false;
     }
@@ -252,7 +252,7 @@ export class CDPStreamer {
       await session.cdpSession.detach();
     } catch (error) {
       if (this.debug) {
-        logger.warn(`[CDPStreamer] Error stopping screencast for ${sessionId}:`, error);
+        logger.warn(`Error stopping screencast for ${sessionId}:`, error);
       }
     }
 
@@ -260,7 +260,7 @@ export class CDPStreamer {
     this.sessions.delete(sessionId);
 
     if (this.debug) {
-      logger.info(`[CDPStreamer] Stopped screencast for session ${sessionId}`);
+      logger.info(`Stopped screencast for session ${sessionId}`);
     }
   }
 

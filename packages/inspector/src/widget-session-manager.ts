@@ -409,7 +409,7 @@ export class WidgetSessionManager extends EventEmitter {
               params: { hostContext: ctx },
             };
             iframe.contentWindow.postMessage(message, "*");
-            logger.info("[MCP Host] Sent ui/notifications/host-context-changed", ctx);
+            console.log("[MCP Host] Sent ui/notifications/host-context-changed", ctx); // eslint-disable-line no-console
           }
         }, hostContext);
         /* eslint-enable no-undef */
@@ -439,7 +439,7 @@ export class WidgetSessionManager extends EventEmitter {
           const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
           if (iframe?.contentWindow) {
             iframe.contentWindow.postMessage(message, "*");
-            logger.info("[OpenAI Host] Sent globals sync:", message.data);
+            console.log("[OpenAI Host] Sent globals sync:", message.data); // eslint-disable-line no-console
           }
         }, syncMessage);
         /* eslint-enable no-undef */
@@ -744,7 +744,7 @@ export class WidgetSessionManager extends EventEmitter {
         if (storeOnHost) {
           const w = window as Window & { __mcpHostContextUpdates?: Record<string, unknown> };
           w.__mcpHostContextUpdates = { ...(w.__mcpHostContextUpdates ?? {}), ...(p as object) };
-          logger.info("[MCP Host] Stored hostContext update for ui/initialize:", p);
+          console.log("[MCP Host] Stored hostContext update for ui/initialize:", p); // eslint-disable-line no-console
         }
 
         const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;

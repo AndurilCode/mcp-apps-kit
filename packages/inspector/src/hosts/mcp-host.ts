@@ -111,7 +111,7 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
       value: {
         postMessage: (message: unknown, _targetOrigin: string) => {
           if (debug) {
-            logger.info("[MCP Host] Received postMessage:", JSON.stringify(message, null, 2));
+            logger.info("Received postMessage:", JSON.stringify(message, null, 2));
           }
           this.handlePostMessage(message, win);
         },
@@ -422,7 +422,7 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
       case "logging/sendMessage":
         // Handle logging from widget
         if (debug && msg.params) {
-          logger.info(`[MCP Widget Log] ${String(msg.params.level)}`, msg.params.data);
+          logger.info(`Widget log [${String(msg.params.level)}]:`, msg.params.data);
         }
         break;
 
@@ -434,7 +434,7 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
           // Validate that mode is a valid DisplayMode value
           if (!isValidDisplayMode(requestedMode)) {
             if (debug) {
-              logger.info("[MCP Host] Invalid display mode requested:", requestedMode);
+              logger.info("Invalid display mode requested:", requestedMode);
             }
             this.sendError(
               window,
@@ -458,7 +458,7 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
 
       default:
         if (debug) {
-          logger.info("[MCP Host] Unhandled method:", msg.method);
+          logger.info("Unhandled method:", msg.method);
         }
     }
   }
@@ -481,7 +481,7 @@ export class MCPHostEmulator extends BaseHostEmulator<MCPHostEmulatorOptions> {
     this.currentViewport = { width: sizing.width, height: sizing.height };
 
     if (debug) {
-      logger.info(`[MCP Host] Display mode changed to: ${String(mode)} sizing: ${String(sizing)}`);
+      logger.info(`Display mode changed to: ${mode}`, sizing);
     }
 
     // Send response with granted mode

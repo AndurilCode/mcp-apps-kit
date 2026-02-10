@@ -11,6 +11,10 @@ import type { TargetToolInfo, McpServerLike } from "./types";
 import { UIHostManager } from "./ui-host";
 import { findUIResourceForTool, fetchWidgetHTML } from "./tools/helpers";
 
+import { createLogger } from "./debug/logger";
+
+const logger = createLogger("ProxyTools");
+
 /**
  * Check if the connection manager has a cached schema
  *
@@ -200,8 +204,7 @@ export function registerProxyToolsDirectly(
                 const widgetSessionId = urlMatch?.[1];
 
                 if (!widgetSessionId) {
-                  // eslint-disable-next-line no-console
-                  console.warn(
+                  logger.warn(
                     `[proxy] Failed to extract widget session ID from URL: ${pageUrl}. Skipping session creation.`
                   );
                   // Skip session creation but continue with tool result
@@ -234,8 +237,7 @@ export function registerProxyToolsDirectly(
             }
           } catch (error) {
             // Widget rendering failed, but tool call succeeded
-            // eslint-disable-next-line no-console
-            console.warn(`[proxy] Failed to render widget for ${toolInfo.name}:`, error);
+            logger.warn(`[proxy] Failed to render widget for ${toolInfo.name}:`, error);
           }
 
           // Return the result in MCP format

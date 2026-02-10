@@ -49,7 +49,7 @@ function generateSyncScript(
   var DEBUG = true;
 
   function log() {
-    if (DEBUG) console.log.apply(console, ['[inspector-sync]'].concat(Array.prototype.slice.call(arguments)));
+    if (DEBUG) console.log.apply(console, ['[inspector-sync]'].concat(Array.prototype.slice.call(arguments))); // eslint-disable-line no-console
   }
 
   function syncEvent(type, data) {

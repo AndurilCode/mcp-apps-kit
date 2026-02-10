@@ -15,6 +15,10 @@ import { InspectorOAuthProvider } from "./provider";
 import { TokenStore } from "./token-store";
 import type { OAuthClientConfig } from "./types";
 
+import { createLogger } from "../debug/logger";
+
+const logger = createLogger("PresetConfig");
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -393,8 +397,7 @@ export function createProviderFromDiscovery(
       }
     } catch {
       // If browser open fails, log the URL for manual copy
-      // eslint-disable-next-line no-console
-      console.log(`\nOpen this URL in your browser to authorize:\n  ${urlStr}\n`);
+      logger.info(`\nOpen this URL in your browser to authorize:\n  ${urlStr}\n`);
     }
   };
 

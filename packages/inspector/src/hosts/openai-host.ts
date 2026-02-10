@@ -347,7 +347,7 @@ export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptio
       });
       win.dispatchEvent(event);
       if (debugMode) {
-        logger.info("[OpenAI Host] Dispatched set_globals:", globals);
+        logger.info("Dispatched set_globals:", globals);
       }
     };
 
@@ -393,7 +393,7 @@ export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptio
           timestamp: Date.now(),
         });
         if (debug) {
-          logger.info("[OpenAI Host] setState called:", state);
+          logger.info("setState called:", state);
         }
       },
 
@@ -405,7 +405,7 @@ export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptio
       callTool: async (name: string, args: unknown) => {
         this.recordToolCall(name, args);
         if (debug) {
-          logger.info(`[OpenAI Host] callTool: ${name}`, args);
+          logger.info(`callTool: ${name}`, args);
         }
         return { output: JSON.stringify({ mock: true }) };
       },
@@ -445,9 +445,7 @@ export class OpenAIHostEmulator extends BaseHostEmulator<OpenAIHostEmulatorOptio
         }
 
         if (debug) {
-          logger.info(
-            `[OpenAI Host] requestDisplayMode: ${String(mode)} sizing: ${String(sizing)}`
-          );
+          logger.info(`requestDisplayMode: ${mode}`, sizing);
         }
 
         return { mode };

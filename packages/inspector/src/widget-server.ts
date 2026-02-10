@@ -33,6 +33,10 @@ import {
   type OpenAIRuntimeContext,
 } from "./widget-server-templates";
 
+import { createLogger } from "./debug/logger";
+
+const logger = createLogger("WidgetServer");
+
 /**
  * Widget session data
  */
@@ -427,8 +431,7 @@ export class WidgetServer {
    */
   private log(message: string): void {
     if (this.options.debug) {
-      // eslint-disable-next-line no-console
-      console.log(`[WidgetServer] ${message}`);
+      logger.info(`[WidgetServer] ${message}`);
     }
   }
 

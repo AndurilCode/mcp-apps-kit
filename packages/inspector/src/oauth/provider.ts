@@ -29,6 +29,10 @@ import type { OAuthClientInformationFull } from "@modelcontextprotocol/sdk/share
 import { TokenStore } from "./token-store";
 import type { AuthRequiredEvent } from "./discovery";
 
+import { createLogger } from "../debug/logger";
+
+const logger = createLogger("OAuthProvider");
+
 /**
  * Options for creating an InspectorOAuthProvider.
  */
@@ -628,8 +632,7 @@ export class InspectorOAuthProvider implements OAuthClientProvider {
 
   private log(message: string): void {
     if (this._debug) {
-      // eslint-disable-next-line no-console
-      console.log(`[oauth:provider] ${message}`);
+      logger.info(`[oauth:provider] ${message}`);
     }
   }
 }

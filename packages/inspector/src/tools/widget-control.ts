@@ -31,6 +31,10 @@ import {
   validateWidgetSession,
 } from "./helpers";
 
+import { createLogger } from "../debug/logger";
+
+const logger = createLogger("WidgetControl");
+
 // =============================================================================
 // WIDGET EVALUATE TOOL
 // =============================================================================
@@ -1008,7 +1012,7 @@ export function createWidgetRefreshTool(registry: ConnectionRegistry) {
             // Widget update failed, but tool call succeeded
             const updateErrorMessage =
               updateError instanceof Error ? updateError.message : String(updateError);
-            console.warn(
+            logger.warn(
               `[widget-refresh] Failed to push update to widget (session: ${input.sessionId}, protocol: ${session.protocol}):`,
               updateErrorMessage
             );

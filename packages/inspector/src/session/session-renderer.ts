@@ -91,7 +91,7 @@ export function setupPageListeners(options: SetupPageOptions): void {
 
     if (debug) {
       logger.info(
-        `[SessionRenderer] Auto-accepted ${dialogType} dialog in session ${sessionId}: "${dialog.message()}"`
+        `Auto-accepted ${dialogType} dialog in session ${sessionId}: "${dialog.message()}"`
       );
     }
 
@@ -152,9 +152,7 @@ export async function updateSessionGlobals(options: UpdateGlobalsOptions): Promi
     await page.setViewportSize(viewport);
 
     if (debug) {
-      logger.info(
-        `[SessionRenderer] Resized page viewport to ${viewport.width}x${viewport.height}`
-      );
+      logger.info(`Resized page viewport to ${viewport.width}x${viewport.height}`);
     }
 
     // Build the host context update based on protocol
@@ -166,14 +164,14 @@ export async function updateSessionGlobals(options: UpdateGlobalsOptions): Promi
     } else {
       // Log warning for unexpected protocol values
       if (debug) {
-        logger.warn(`[SessionRenderer] Unknown protocol "${protocol}", skipping globals update`);
+        logger.warn(`Unknown protocol "${protocol}", skipping globals update`);
       }
     }
 
     return true;
   } catch (error) {
     if (debug) {
-      logger.warn(`[SessionRenderer] Error updating globals:`, error);
+      logger.warn(`Error updating globals:`, error);
     }
     return false;
   }
@@ -213,7 +211,7 @@ async function updateMcpGlobals(
         params: { hostContext: ctx },
       };
       iframe.contentWindow.postMessage(message, "*");
-      logger.info("[MCP Host] Sent ui/notifications/host-context-changed", ctx);
+      console.log("[MCP Host] Sent ui/notifications/host-context-changed", ctx); // eslint-disable-line no-console
     }
   }, hostContext);
   /* eslint-enable no-undef */
@@ -252,7 +250,7 @@ async function updateOpenAIGlobals(
     const iframe = document.getElementById("widget-frame") as HTMLIFrameElement | null;
     if (iframe?.contentWindow) {
       iframe.contentWindow.postMessage(message, "*");
-      logger.info("[OpenAI Host] Sent globals sync:", message.data);
+      console.log("[OpenAI Host] Sent globals sync:", message.data); // eslint-disable-line no-console
     }
   }, syncMessage);
   /* eslint-enable no-undef */
@@ -283,7 +281,7 @@ export async function deliverToolCallResponse(options: DeliverToolResponseOption
   await page.evaluate((responseData: unknown) => {
     // Validate responseData is a non-null object before accessing properties
     if (typeof responseData !== "object" || responseData === null) {
-      logger.info("[MCP Host] Tool response is not a valid object:", responseData);
+      console.log("[MCP Host] Tool response is not a valid object:", responseData); // eslint-disable-line no-console
       return;
     }
 
@@ -300,7 +298,7 @@ export async function deliverToolCallResponse(options: DeliverToolResponseOption
           : null;
 
     if (!toolName) {
-      logger.info("[MCP Host] Tool response missing valid name/toolName string:", responseData);
+      console.log("[MCP Host] Tool response missing valid name/toolName string:", responseData); // eslint-disable-line no-console
       return;
     }
 
@@ -309,7 +307,7 @@ export async function deliverToolCallResponse(options: DeliverToolResponseOption
     const pending = w.__pendingToolCalls?.[toolName];
 
     if (!pending || pending.length === 0) {
-      logger.info("[MCP Host] No pending calls for tool:", toolName);
+      console.log("[MCP Host] No pending calls for tool:", toolName); // eslint-disable-line no-console
       return;
     }
 

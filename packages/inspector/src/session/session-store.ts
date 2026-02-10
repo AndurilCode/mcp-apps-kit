@@ -80,7 +80,7 @@ export class SessionStore {
     this.sessions.set(options.sessionId, session);
 
     if (this.debug) {
-      logger.info(`[SessionStore] Created session ${options.sessionId}`);
+      logger.info(`Created session ${options.sessionId}`);
     }
 
     return session;
@@ -261,7 +261,7 @@ export class SessionStore {
     this.sessions.delete(sessionId);
 
     if (this.debug) {
-      logger.info(`[SessionStore] Closed session ${sessionId}`);
+      logger.info(`Closed session ${sessionId}`);
     }
 
     return true;
@@ -288,7 +288,7 @@ export class SessionStore {
     this.sessions.clear();
 
     if (this.debug) {
-      logger.info(`[SessionStore] Closed ${count} session(s)`);
+      logger.info(`Closed ${count} session(s)`);
     }
 
     return count;
@@ -317,7 +317,7 @@ export class SessionStore {
     await this.closeAll();
 
     if (this.debug) {
-      logger.info(`[SessionStore] Disposed`);
+      logger.info(`Disposed`);
     }
   }
 
@@ -334,7 +334,7 @@ export class SessionStore {
     for (const sessionId of expiredIds) {
       this.delete(sessionId);
       if (this.debug) {
-        logger.info(`[SessionStore] Expired session ${sessionId}`);
+        logger.info(`Expired session ${sessionId}`);
       }
     }
   }
