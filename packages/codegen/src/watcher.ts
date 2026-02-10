@@ -18,19 +18,23 @@ import { hasValidExtension, shouldSkipFile } from "./naming";
 import { getVersionDirectories } from "./generator";
 
 /**
- * Default logger
+ * Default logger backed by structured logging with timestamp and source prefix.
  */
-const defaultLogger: PluginLogger = {
-  info: (message: string) => {
-    console.log(`[mcp-apps-plugin] ${message}`);
-  },
-  warn: (message: string) => {
-    console.warn(`[mcp-apps-plugin] ${message}`);
-  },
-  error: (message: string) => {
-    console.error(`[mcp-apps-plugin] ${message}`);
-  },
-};
+const defaultLogger: PluginLogger = (() => {
+  const source = "codegen:watcher";
+  const ts = () => new Date().toISOString();
+  return {
+    info: (message: string) => {
+      console.info(`${ts()} [INFO] [${source}]`, message);
+    },
+    warn: (message: string) => {
+      console.warn(`${ts()} [WARN] [${source}]`, message);
+    },
+    error: (message: string) => {
+      console.error(`${ts()} [ERROR] [${source}]`, message);
+    },
+  };
+})();
 
 /**
  * Options for setting up the watcher

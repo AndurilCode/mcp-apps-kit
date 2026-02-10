@@ -298,7 +298,7 @@ export function useUpdateModelContext(): (params: UpdateModelContextParams) => P
     async (params: UpdateModelContextParams) => {
       if (!client) {
         // eslint-disable-next-line no-console
-        console.warn("[useUpdateModelContext] Client not available");
+        console.warn(`${new Date().toISOString()} [WARN] [ui-react:hooks] Client not available`);
         return;
       }
       await client.updateModelContext(params);

@@ -771,7 +771,10 @@ export const describeEval: DescribeWithSkip = Object.assign(
       | undefined;
 
     if (!globalDescribe) {
-      console.warn("[describeEval] No test framework detected. Skipping:", name);
+      console.warn(
+        `${new Date().toISOString()} [WARN] [testing:evaluator] No test framework detected. Skipping:`,
+        name
+      );
       return;
     }
 
