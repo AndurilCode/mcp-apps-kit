@@ -165,3 +165,7 @@ export {
   describeLocatorStrategy,
   waitForDOMStability,
 } from "./tools";
+
+// Debug / logging
+export { createLogger, defaultLogger } from "./debug/logger";
+export type { Logger, LogLevel } from "./debug/logger";
