@@ -77,10 +77,6 @@ export type {
   Plugin as McpPlugin,
 } from "./types";
 
-// Deprecated aliases - re-exported for backwards compatibility
-// eslint-disable-next-line @typescript-eslint/no-deprecated
-export type { FileBasedGlobalConfig, IconConfig } from "./types";
-
 // Re-export utilities
 export { defineConfig, isVersionedConfig } from "./config";
 export {
