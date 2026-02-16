@@ -41,16 +41,6 @@ export type { GlobalConfig, Icon };
 export type { CorePlugin as Plugin };
 
 /**
- * @deprecated Use GlobalConfig from @mcp-apps-kit/core instead
- */
-export type FileBasedGlobalConfig = GlobalConfig;
-
-/**
- * @deprecated Use Icon from @mcp-apps-kit/core instead
- */
-export type IconConfig = Icon;
-
-/**
  * Configuration for file-based MCP app
  *
  * Used with `defineConfig()` in `mcp.config.ts`.
