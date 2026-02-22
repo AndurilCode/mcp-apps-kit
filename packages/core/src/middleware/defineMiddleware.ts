@@ -192,7 +192,6 @@ export function defineMiddleware(definition: MiddlewareDefinition): Middleware {
     }
 
     // Call next and capture result (guaranteed!)
-    // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
     const result = await next();
 
     // Run after hook
@@ -220,7 +219,6 @@ export function defineMiddleware(definition: MiddlewareDefinition): Middleware {
 defineMiddleware.before = (hook: BeforeHook): Middleware => {
   return (async (context, next) => {
     await hook(context);
-    // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
     return await next();
   }) as Middleware;
 };
@@ -239,7 +237,6 @@ defineMiddleware.before = (hook: BeforeHook): Middleware => {
  */
 defineMiddleware.after = (hook: AfterHook): Middleware => {
   return (async (context, next) => {
-    // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
     const result = await next();
     await hook(context);
     return result;
