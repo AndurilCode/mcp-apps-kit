@@ -58,7 +58,7 @@
   "dependencies": {
     "@mcp-apps-kit/core": "workspace:*",
     "@mcp-apps-kit/testing": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.25.3",
+    "@modelcontextprotocol/sdk": "^1.27.0",
     "jsdom": "^27.0.0",
     "zod": "^4.3.5"
   },
@@ -81,7 +81,7 @@
     }
   },
   "optionalDependencies": {
-    "playwright": "^1.50.0"
+    "playwright": "^1.58.2"
   },
   "engines": {
     "node": ">=20.0.0"

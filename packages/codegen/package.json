@@ -64,8 +64,8 @@
     }
   },
   "dependencies": {
-    "@typescript-eslint/types": "^8.54.0",
-    "@typescript-eslint/typescript-estree": "^8.54.0",
+    "@typescript-eslint/types": "^8.56.1",
+    "@typescript-eslint/typescript-estree": "^8.56.1",
     "chokidar": "^5.0.0",
     "jiti": "^2.6.1"
   },

@@ -42,7 +42,7 @@
     "directory": "packages/core"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.3",
+    "@modelcontextprotocol/sdk": "^1.27.0",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.3",
     "jwks-rsa": "^3.2.1",
