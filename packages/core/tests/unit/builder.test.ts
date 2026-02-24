@@ -1,6 +1,7 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
 import { z } from "zod";
 import { tool } from "../../src/index";
+import { isToolBuilder, ensureBuilt } from "../../src/builder/ensure-built";
 import type { ToolDef } from "../../src/types/tools";
 
 describe("Tool Builder", () => {
@@ -228,5 +229,56 @@ describe("Tool Builder", () => {
     expect(() => handle.call({}, async () => ({}))).toThrow(
       "ToolBuilder method called with invalid context"
     );
+  });
+});
+
+describe("isToolBuilder", () => {
+  it("returns true for an unbuilt tool builder", () => {
+    const builder = tool("check")
+      .describe("Check")
+      .input(z.object({}))
+      .handle(async () => ({}));
+    expect(isToolBuilder(builder)).toBe(true);
+  });
+
+  it("returns false for a built ToolDef", () => {
+    const def = tool("check")
+      .describe("Check")
+      .input(z.object({}))
+      .handle(async () => ({}))
+      .build();
+    expect(isToolBuilder(def)).toBe(false);
+  });
+
+  it("returns false for primitives", () => {
+    expect(isToolBuilder(null)).toBe(false);
+    expect(isToolBuilder(undefined)).toBe(false);
+    expect(isToolBuilder(42)).toBe(false);
+    expect(isToolBuilder("string")).toBe(false);
+    expect(isToolBuilder({})).toBe(false);
+  });
+});
+
+describe("ensureBuilt", () => {
+  it("builds an unbuilt builder and returns a ToolDef", () => {
+    const builder = tool("myTool")
+      .describe("Greet")
+      .input(z.object({}))
+      .handle(async () => ({}));
+    const def = ensureBuilt(builder, "greetTool");
+    expect(def.description).toBe("Greet");
+    expect(typeof def.handler).toBe("function");
+    expect(def.input).toBeInstanceOf(z.ZodObject);
+  });
+
+  it("returns an already-built ToolDef unchanged (same reference)", () => {
+    const def = tool("existing")
+      .describe("Existing")
+      .input(z.object({}))
+      .handle(async () => ({}))
+      .build();
+    const result = ensureBuilt(def, "shouldBeIgnored");
+    expect(result).toBe(def);
+    expect(result.description).toBe("Existing");
   });
 });
