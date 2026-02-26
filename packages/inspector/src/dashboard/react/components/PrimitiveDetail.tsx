@@ -1307,8 +1307,7 @@ export function PrimitiveDetail({
   const { icon, label } = getActionLabel(primitive.kind);
 
   // Extract data without the kind field for JSON export
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { kind, ...primitiveData } = primitive;
+  const { kind: _kind, ...primitiveData } = primitive;
 
   const handleBack = useCallback(() => {
     setMode("browse");
