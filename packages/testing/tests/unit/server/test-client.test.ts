@@ -51,11 +51,9 @@ vi.mock("@modelcontextprotocol/sdk/client/streamableHttp.js", () => {
       onclose: (() => void) | null = null;
       constructor(url: unknown) {
         lastHttpArgs = url;
-        // eslint-disable-next-line @typescript-eslint/no-this-alias
-        const self = this;
         setTimeout(() => {
-          lastOnclose = self.onclose;
-        }, 0);
+          lastOnclose = this.onclose;
+        });
       }
       async close() {}
     },
@@ -68,11 +66,9 @@ vi.mock("@modelcontextprotocol/sdk/client/stdio.js", () => {
       onclose: (() => void) | null = null;
       constructor(args: unknown) {
         lastStdioArgs = args;
-        // eslint-disable-next-line @typescript-eslint/no-this-alias
-        const self = this;
         setTimeout(() => {
-          lastOnclose = self.onclose;
-        }, 0);
+          lastOnclose = this.onclose;
+        });
       }
       async close() {}
     },
