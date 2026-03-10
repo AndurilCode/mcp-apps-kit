@@ -44,7 +44,7 @@
     "directory": "packages/ui"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^1.0.1"
+    "@modelcontextprotocol/ext-apps": "^1.2.0"
   },
   "engines": {
     "node": ">=18.0.0"
